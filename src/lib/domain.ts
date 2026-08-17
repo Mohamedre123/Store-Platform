@@ -43,14 +43,29 @@ export function resolveHost(rawHost: string | null | undefined): HostKind {
   return { kind: 'store', identifier: host, isCustomDomain: true }
 }
 
+/**
+ * النطاقات الفرعية تحتاج دومينًا مملوكًا مع سجل wildcard.
+ * قبل شراء الدومين — وعلى نطاقات vercel.app — نرجع للروابط بالمسار
+ * (`/s/<slug>`) عشان كل حاجة تفضل قابلة للتجربة من غير ما نستنى.
+ */
+export const SUBDOMAINS_ENABLED = (() => {
+  const explicit = process.env.NEXT_PUBLIC_SUBDOMAINS
+  if (explicit === 'on') return true
+  if (explicit === 'off') return false
+  const host = ROOT_DOMAIN.toLowerCase()
+  return !host.endsWith('.vercel.app') && !host.startsWith('localhost') && host.includes('.')
+})()
+
+const protocol = () => (ROOT_DOMAIN.startsWith('localhost') ? 'http' : 'https')
+
 export function storeUrl(slug: string, path = '') {
-  const protocol = ROOT_DOMAIN.startsWith('localhost') ? 'http' : 'https'
-  return `${protocol}://${slug}.${ROOT_DOMAIN}${path}`
+  if (!SUBDOMAINS_ENABLED) return `${protocol()}://${ROOT_DOMAIN}/s/${slug}${path}`
+  return `${protocol()}://${slug}.${ROOT_DOMAIN}${path}`
 }
 
 export function dashboardUrl(path = '') {
-  const protocol = ROOT_DOMAIN.startsWith('localhost') ? 'http' : 'https'
-  return `${protocol}://dashboard.${ROOT_DOMAIN}${path}`
+  if (!SUBDOMAINS_ENABLED) return `${protocol()}://${ROOT_DOMAIN}/dashboard${path}`
+  return `${protocol()}://dashboard.${ROOT_DOMAIN}${path}`
 }
 
 /** يتحقق أن النطاق الفرعي صالح: حروف لاتينية صغيرة وأرقام وشرطات فقط */
