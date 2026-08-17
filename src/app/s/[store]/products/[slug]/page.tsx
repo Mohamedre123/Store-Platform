@@ -1,5 +1,5 @@
 import Image from 'next/image'
-import Link from 'next/link'
+import { SLink as Link } from '@/components/storefront/store-link'
 import { notFound } from 'next/navigation'
 import { ChevronLeft, ImageOff, Truck, Undo2 } from 'lucide-react'
 import {

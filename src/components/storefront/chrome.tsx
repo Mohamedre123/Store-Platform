@@ -1,6 +1,6 @@
 'use client'
 
-import Link from 'next/link'
+import { SLink as Link } from './store-link'
 import Image from 'next/image'
 import { Menu, ShoppingBag, X } from 'lucide-react'
 import { useState } from 'react'

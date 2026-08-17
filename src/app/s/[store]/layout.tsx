@@ -1,9 +1,11 @@
+import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { getStore, getStoreTheme, listCategories } from '@/lib/storefront'
 import { CartProvider } from '@/components/storefront/cart'
 import { StoreHeader } from '@/components/storefront/chrome'
 import { PreviewBridge } from '@/components/storefront/preview-bridge'
+import { StoreLinkProvider } from '@/components/storefront/store-link'
 import { FONT_STACKS, RADIUS_PX, defaultCustomization, mergeCustomization } from '@/lib/customization'
 
 export const dynamic = 'force-dynamic'
@@ -41,6 +43,14 @@ export default async function StorefrontLayout({
   const theme = await getStoreTheme(store.id)
   const cats = await listCategories(store.id)
 
+  /**
+   * لو الطلب جه من نطاق المتجر، الوكيل بيحط الترويسة دي وتبقى الروابط
+   * الجذرية صحيحة. غير كده إحنا متقدّمين بالمسار، ولازم كل رابط داخلي
+   * ياخد البادئة — وإلا العميل يضغط «المنتجات» فيخرج من متجره أصلًا.
+   */
+  const fromStoreHost = (await headers()).get('x-zawya-store')
+  const base = fromStoreHost ? '' : '/s/' + identifier
+
   const custom = mergeCustomization(defaultCustomization(theme.definition), {
     identity: theme.tokens,
     announcement: theme.announcementBar,
@@ -71,7 +81,8 @@ export default async function StorefrontLayout({
   } as React.CSSProperties
 
   return (
-    <CartProvider storeSlug={store.slug}>
+    <StoreLinkProvider base={base}>
+      <CartProvider storeSlug={store.slug}>
       <div
         style={vars}
         data-zawya-store
@@ -122,6 +133,7 @@ export default async function StorefrontLayout({
           </footer>
         </div>
       </div>
-    </CartProvider>
+      </CartProvider>
+    </StoreLinkProvider>
   )
 }

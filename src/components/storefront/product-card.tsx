@@ -1,5 +1,5 @@
 import Image from 'next/image'
-import Link from 'next/link'
+import { SLink as Link } from './store-link'
 import { ImageOff, Star } from 'lucide-react'
 import type { StorefrontProduct } from '@/lib/storefront'
 import { discountPercent } from '@/lib/storefront'
