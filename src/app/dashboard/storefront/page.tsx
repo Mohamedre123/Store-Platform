@@ -1,5 +1,6 @@
+import Link from 'next/link'
 import { eq } from 'drizzle-orm'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, Paintbrush } from 'lucide-react'
 import { db } from '@/db'
 import { storeThemes, type Section } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
@@ -30,6 +31,14 @@ export default async function StorefrontPage() {
         title="المتجر"
         description="اختار شكل متجرك، ورتّب أقسام صفحته الرئيسية."
         action={
+          <div className="flex flex-wrap gap-2">
+          <Link
+            href="/dashboard/storefront/customize"
+            className="zw-lift zw-press inline-flex min-h-11 items-center gap-2 rounded-lg bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-fg)] shadow-sm"
+          >
+            <Paintbrush className="h-4 w-4" aria-hidden="true" />
+            تخصيص المتجر
+          </Link>
           <a
             href={storeUrl(store.slug)}
             target="_blank"
@@ -39,6 +48,7 @@ export default async function StorefrontPage() {
             <ExternalLink className="h-4 w-4" aria-hidden="true" />
             عرض المتجر
           </a>
+          </div>
         }
       />
 

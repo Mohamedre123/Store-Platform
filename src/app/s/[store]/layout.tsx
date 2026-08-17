@@ -3,10 +3,10 @@ import type { Metadata } from 'next'
 import { getStore, getStoreTheme, listCategories } from '@/lib/storefront'
 import { CartProvider } from '@/components/storefront/cart'
 import { StoreHeader } from '@/components/storefront/chrome'
+import { PreviewBridge } from '@/components/storefront/preview-bridge'
+import { FONT_STACKS, RADIUS_PX, defaultCustomization, mergeCustomization } from '@/lib/customization'
 
 export const dynamic = 'force-dynamic'
-
-const RADIUS = { none: '0px', sm: '4px', md: '8px', lg: '14px', full: '999px' } as const
 
 export async function generateMetadata({
   params,
@@ -41,6 +41,13 @@ export default async function StorefrontLayout({
   const theme = await getStoreTheme(store.id)
   const cats = await listCategories(store.id)
 
+  const custom = mergeCustomization(defaultCustomization(theme.definition), {
+    identity: theme.tokens,
+    announcement: theme.announcementBar,
+    header: theme.header,
+    footer: theme.footer,
+  })
+
   const nav = [
     { label: 'الرئيسية', href: '/' },
     { label: 'كل المنتجات', href: '/products' },
@@ -52,22 +59,40 @@ export default async function StorefrontLayout({
    * كده الثيم بيتغيّر بتبديل قيم، من غير أي كلاسات مشروطة في المكوّنات.
    */
   const vars = {
-    '--sf-primary': theme.tokens.primary,
-    '--sf-accent': theme.tokens.accent ?? theme.tokens.primary,
-    '--sf-bg': theme.tokens.background ?? '#ffffff',
-    '--sf-surface': theme.tokens.surface ?? '#ffffff',
-    '--sf-text': theme.tokens.text ?? '#111111',
-    '--sf-radius': RADIUS[theme.tokens.radius ?? 'md'],
+    '--sf-primary': custom.identity.primary,
+    '--sf-accent': custom.identity.accent,
+    '--sf-bg': custom.identity.background,
+    '--sf-surface': custom.identity.surface,
+    '--sf-text': custom.identity.text,
+    '--sf-radius': RADIUS_PX[custom.identity.radius],
+    '--sf-font-heading': FONT_STACKS[custom.identity.fontHeading],
+    '--sf-font-body': FONT_STACKS[custom.identity.fontBody],
+    fontFamily: 'var(--sf-font-body)',
   } as React.CSSProperties
 
   return (
     <CartProvider storeSlug={store.slug}>
       <div
         style={vars}
+        data-zawya-store
         className="min-h-screen-safe flex flex-col"
         // لون النص والخلفية من المتجر لا من المنصة
       >
         <div style={{ background: 'var(--sf-bg)', color: 'var(--sf-text)' }} className="flex min-h-full flex-1 flex-col">
+          <PreviewBridge />
+
+          <div
+            data-sf="announcement"
+            style={{
+              display: custom.announcement.enabled ? undefined : 'none',
+              background: custom.announcement.background,
+              color: custom.announcement.color,
+            }}
+            className="px-4 py-2 text-center text-sm"
+          >
+            <span data-sf="announcement-text">{custom.announcement.text}</span>
+          </div>
+
           <StoreHeader
             storeName={store.name}
             logo={store.logoLight}
@@ -89,8 +114,10 @@ export default async function StorefrontLayout({
 
           <footer className="border-t border-[var(--sf-text)]/10 py-8">
             <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 text-sm opacity-65 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-              <span>© {new Date().getFullYear()} {store.name}</span>
-              <span className="opacity-70">مدعوم بـزاوية</span>
+              <span>{custom.footer.copyright || `© ${new Date().getFullYear()} ${store.name}`}</span>
+              <span data-sf="powered-by" style={{ display: custom.footer.showPoweredBy ? undefined : 'none' }} className="opacity-70">
+                مدعوم بـزاوية
+              </span>
             </div>
           </footer>
         </div>
