@@ -23,9 +23,19 @@ function createClient(): Client {
     )
   }
   return postgres(connectionString, {
-    max: process.env.NODE_ENV === 'production' ? 10 : 3,
-    idle_timeout: 20,
-    connect_timeout: 15,
+    /**
+     * اتصال واحد لكل نسخة — وده مقصود مش تقليل.
+     *
+     * على Vercel كل نسخة بتخدم طلبًا واحدًا في اللحظة، فاتصال واحد
+     * كفاية. لما كانت 10، كل نسخة كانت بتفتح 10 اتصالات، وVercel
+     * بيشغّل عشرات النسخ وقت الضغط — فتتخطّى حدود Supabase وترفض
+     * الاتصالات الجديدة، والنتيجة إن الموقع «بيقع» فجأة ويرجع.
+     */
+    max: 1,
+    // إطلاق الاتصال بسرعة عشان ما يفضلش محجوزًا بعد انتهاء الطلب
+    idle_timeout: 10,
+    max_lifetime: 60 * 5,
+    connect_timeout: 10,
     // مطلوب مع Supabase transaction pooler — لا يدعم العبارات المُجهَّزة
     prepare: false,
   })

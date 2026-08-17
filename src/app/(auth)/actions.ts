@@ -23,6 +23,7 @@ import { createSession, destroySession, hashPassword, verifyPassword } from '@/l
 import { isValidSlug } from '@/lib/domain'
 import { issueEmailOtp } from '@/lib/otp'
 import { config } from '@/lib/config'
+import { contentFor } from '@/lib/theme-content'
 import { suggestStoreSlug } from '@/lib/utils'
 
 export type FormState = { error?: string; fieldErrors?: Record<string, string> } | null
@@ -149,14 +150,7 @@ export async function signupAction(_prev: FormState, formData: FormData): Promis
       storeId: store.id,
       themeSlug: 'zawya',
       tokens: { primary: '#634b9a', radius: 'lg', mode: 'light' },
-      homeSections: [
-        { id: 'hero', type: 'hero', enabled: true, settings: {} },
-        { id: 'categories', type: 'categories', enabled: true, settings: { title: 'تسوّق حسب القسم' } },
-        { id: 'featured', type: 'featured_products', enabled: true, settings: { title: 'منتجات مختارة' } },
-        { id: 'new', type: 'new_arrivals', enabled: true, settings: { title: 'وصل حديثًا' } },
-        { id: 'sale', type: 'sale_products', enabled: false, settings: { title: 'التخفيضات' } },
-        { id: 'trust', type: 'trust_badges', enabled: true, settings: {} },
-      ],
+      homeSections: contentFor('zawya').sections,
     })
 
     // الدفع عند الاستلام مفعّل افتراضيًا — هو الأساس في السوق المصري

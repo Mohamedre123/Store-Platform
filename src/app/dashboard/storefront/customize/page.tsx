@@ -3,7 +3,6 @@ import { db } from '@/db'
 import { storeThemes } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { getTheme } from '@/lib/themes'
-import { storeUrl } from '@/lib/domain'
 import { defaultCustomization, mergeCustomization } from '@/lib/customization'
 import { Customizer } from './customizer'
 
@@ -39,7 +38,7 @@ export default async function CustomizePage() {
   return (
     <Customizer
       initial={customization}
-      previewUrl={`${storeUrl(store.slug)}?preview=1`}
+      previewUrl={`/s/${store.slug}?preview=1`}
       themeName={theme.name}
     />
   )

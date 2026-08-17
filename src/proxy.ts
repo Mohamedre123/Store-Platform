@@ -23,6 +23,18 @@ export default function proxy(req: NextRequest) {
   headers.set('x-zawya-host', host ?? '')
   headers.set('x-zawya-path', path)
 
+  /**
+   * مسار المتجر الصريح يُخدَم كما هو من أي مضيف.
+   *
+   * لازم عشان معاينة المحرّر: لوحة التاجر على نطاق، ومتجره على نطاق
+   * تاني. لو الإطار حمّل نطاق المتجر كان هيبقى أصلًا مختلفًا، والمعاينة
+   * تفشل لو النطاق الفرعي لسه ما اشتغلش. بالمسار ده الإطار بيفضل على
+   * نفس أصل اللوحة، فالمعاينة تشتغل مهما كان إعداد النطاقات.
+   */
+  if (path.startsWith('/s/')) {
+    return NextResponse.next({ request: { headers } })
+  }
+
   if (target.kind === 'dashboard') {
     // dashboard.zawya.app/orders  →  /dashboard/orders
     if (!path.startsWith('/dashboard') && !path.startsWith('/api')) {

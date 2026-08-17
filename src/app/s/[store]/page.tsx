@@ -4,98 +4,9 @@ import { notFound } from 'next/navigation'
 import { ArrowLeft, CreditCard, Package, RotateCcw, Truck } from 'lucide-react'
 import { getStore, getStoreTheme, listCategories, listProducts } from '@/lib/storefront'
 import { ProductCard } from '@/components/storefront/product-card'
-import type { HeroStyle } from '@/lib/themes'
+import { Hero } from '@/components/storefront/hero'
 
 export const dynamic = 'force-dynamic'
-
-/* ────────────────────────── البانر ────────────────────────── */
-
-function Hero({
-  style,
-  storeName,
-  tagline,
-}: {
-  style: HeroStyle
-  storeName: string
-  tagline: string | null
-}) {
-  if (style === 'none') return null
-
-  const heading = storeName
-  const sub = tagline ?? 'اطلب دلوقتي والتوصيل لباب البيت'
-
-  const cta = (
-    <Link
-      href="/products"
-      className="inline-flex min-h-12 items-center gap-2 rounded-[var(--sf-radius)] bg-[var(--sf-primary)] px-6 font-semibold text-white transition-opacity hover:opacity-90"
-    >
-      تسوّق دلوقتي
-      <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-    </Link>
-  )
-
-  if (style === 'split') {
-    return (
-      <section className="mx-auto grid max-w-6xl items-center gap-8 px-4 py-12 sm:px-6 md:grid-cols-2 md:py-16">
-        <div className="flex flex-col gap-4">
-          <h1 className="text-balance text-3xl font-bold tracking-tight sm:text-5xl">{heading}</h1>
-          <p className="text-lg opacity-70">{sub}</p>
-          <div className="mt-2">{cta}</div>
-        </div>
-        <div
-          className="aspect-[4/3] rounded-[var(--sf-radius)]"
-          style={{ background: 'var(--sf-primary)', opacity: 0.92 }}
-          aria-hidden="true"
-        />
-      </section>
-    )
-  }
-
-  if (style === 'fullbleed') {
-    return (
-      <section
-        className="flex min-h-[58vh] flex-col items-start justify-center gap-5 px-4 py-16 sm:px-6"
-        style={{ background: 'var(--sf-primary)' }}
-      >
-        <div className="mx-auto w-full max-w-6xl">
-          <h1 className="text-balance text-4xl font-bold tracking-tight text-white sm:text-6xl">
-            {heading}
-          </h1>
-          <p className="mt-4 max-w-lg text-lg text-white/85">{sub}</p>
-          <Link
-            href="/products"
-            className="mt-7 inline-flex min-h-12 items-center gap-2 rounded-[var(--sf-radius)] bg-white px-6 font-semibold text-[var(--sf-primary)]"
-          >
-            تسوّق دلوقتي
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          </Link>
-        </div>
-      </section>
-    )
-  }
-
-  // boxed و stacked
-  return (
-    <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-      <div
-        className="flex flex-col items-start justify-center gap-4 rounded-[var(--sf-radius)] px-6 py-14 sm:px-10 sm:py-20"
-        style={{ background: 'var(--sf-primary)' }}
-      >
-        <h1 className="text-balance text-3xl font-bold tracking-tight text-white sm:text-5xl">
-          {heading}
-        </h1>
-        <p className="max-w-lg text-white/85">{sub}</p>
-        <Link
-          href="/products"
-          className="mt-2 inline-flex min-h-12 items-center gap-2 rounded-[var(--sf-radius)] bg-white px-6 font-semibold text-[var(--sf-primary)]"
-        >
-          تسوّق دلوقتي
-          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        </Link>
-      </div>
-    </section>
-  )
-}
 
 /* ────────────────────────── عناوين الأقسام ────────────────────────── */
 
@@ -148,7 +59,14 @@ export default async function StoreHomePage({ params }: { params: Promise<{ stor
 
   return (
     <>
-      {show('hero') && <Hero style={layout.hero} storeName={store.name} tagline={store.tagline} />}
+      {show('hero') && (
+        <Hero
+          hero={theme.hero}
+          storeName={store.name}
+          tagline={store.tagline}
+          fallbackStyle={layout.hero}
+        />
+      )}
 
       {empty ? (
         <section className="mx-auto flex max-w-md flex-col items-center gap-3 px-4 py-24 text-center">

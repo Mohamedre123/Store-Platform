@@ -73,6 +73,24 @@ export const getStore = cache(async (identifier: string): Promise<StorefrontStor
   return rest
 })
 
+export type HeroDraft = {
+  style?: 'fullbleed' | 'boxed' | 'split' | 'stacked' | 'none'
+  height?: 'sm' | 'md' | 'lg' | 'full'
+  autoplay?: boolean
+  intervalSeconds?: number
+  slides?: Array<{
+    id: string
+    imageDesktop: string | null
+    imageMobile: string | null
+    title: string
+    subtitle: string
+    ctaLabel: string
+    ctaUrl: string
+    textPosition: 'start' | 'center' | 'end'
+    overlay: number
+  }>
+}
+
 export type StoreTheme = {
   definition: ThemeDefinition
   tokens: ThemeTokens
@@ -80,6 +98,7 @@ export type StoreTheme = {
   header: Record<string, unknown>
   footer: Record<string, unknown>
   announcementBar: Record<string, unknown>
+  hero?: HeroDraft
 }
 
 export const getStoreTheme = cache(async (storeId: string): Promise<StoreTheme> => {
@@ -106,6 +125,8 @@ export const getStoreTheme = cache(async (storeId: string): Promise<StoreTheme> 
     header: row?.header ?? {},
     footer: row?.footer ?? {},
     announcementBar: row?.announcementBar ?? {},
+    // شرائح البانر وشريط الأدوات مخزّنة في draft — نخرجها هنا مرة واحدة
+    hero: ((row?.draft ?? {}) as Record<string, unknown>).hero as HeroDraft | undefined,
   }
 })
 

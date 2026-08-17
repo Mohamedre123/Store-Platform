@@ -6,6 +6,7 @@ import { db } from '@/db'
 import { storeThemes, type Section, type ThemeTokens } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { getTheme } from '@/lib/themes'
+import { contentFor } from '@/lib/theme-content'
 
 export type ThemeActionState = { ok?: boolean; error?: string } | null
 
@@ -27,9 +28,25 @@ export async function applyThemeAction(slug: string): Promise<ThemeActionState> 
     radius: theme.radius,
   }
 
+  /**
+   * الثيم بييجي بمحتواه: أقسام مرتّبة وشرائح بانر ونصوص جاهزة.
+   * التاجر يعدّل فوقها بدل ما يبدأ من صفحة فاضية.
+   */
+  const content = contentFor(theme.slug)
+  const previousDraft = (current?.draft ?? {}) as Record<string, unknown>
+
   await db
     .update(storeThemes)
-    .set({ themeSlug: theme.slug, tokens })
+    .set({
+      themeSlug: theme.slug,
+      tokens,
+      homeSections: content.sections,
+      announcementBar: { ...(current?.announcementBar ?? {}), enabled: true, text: content.announcement.text },
+      draft: {
+        ...previousDraft,
+        hero: { style: theme.layout.hero, height: 'md', autoplay: true, intervalSeconds: 6, slides: content.slides },
+      },
+    })
     .where(eq(storeThemes.storeId, store.id))
 
   revalidatePath('/dashboard/storefront')
