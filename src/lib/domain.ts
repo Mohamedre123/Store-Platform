@@ -39,6 +39,17 @@ export function resolveHost(rawHost: string | null | undefined): HostKind {
     return { kind: 'store', identifier: sub, isCustomDomain: false }
   }
 
+  /**
+   * نطاقات Vercel ليست متاجر أبدًا — هي روابط النشر والمعاينة.
+   *
+   * من غير الاستثناء ده، لو NEXT_PUBLIC_ROOT_DOMAIN ما اتظبطش صح،
+   * أي زيارة لرابط النشر بتتحوّل لبحث عن متجر بنطاق مخصّص، وتفشل.
+   * النتيجة: الموقع كله واقع بدل ما يشتغل على رابط Vercel عادي.
+   */
+  if (host.endsWith('.vercel.app') || host === 'localhost' || host.endsWith('.localhost')) {
+    return { kind: 'marketing' }
+  }
+
   // أي مضيف آخر = نطاق مخصّص لمتجر
   return { kind: 'store', identifier: host, isCustomDomain: true }
 }

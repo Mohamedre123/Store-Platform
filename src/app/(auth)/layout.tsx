@@ -1,4 +1,4 @@
-import Image from 'next/image'
+import { Logo } from '@/components/logo'
 import Link from 'next/link'
 import { brand } from '@/lib/brand'
 
@@ -8,15 +8,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <header className="border-b border-[var(--border)]">
         <div className="mx-auto flex h-16 max-w-5xl items-center px-4 sm:px-6">
           <Link href="/" className="flex items-center gap-2.5">
-            <Image
-              src={brand.logo}
-              alt={brand.name}
-              width={36}
-              height={36}
-              priority
-              className="h-8 w-8 object-contain"
-            />
-            <span className="font-bold tracking-tight">{brand.name}</span>
+            <Logo size="md" priority />
           </Link>
         </div>
       </header>

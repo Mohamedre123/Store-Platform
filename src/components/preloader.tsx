@@ -48,7 +48,7 @@ export function Preloader() {
       <div className="zw-preloader__glow" aria-hidden="true" />
       <div className="zw-preloader__mark">
         <Image
-          src={brand.logo}
+          src={brand.mark}
           alt={brand.name}
           width={200}
           height={200}
@@ -57,7 +57,7 @@ export function Preloader() {
           className="zw-preloader__logo zw-preloader__logo--light"
         />
         <Image
-          src={brand.logoDark}
+          src={brand.markDark}
           alt=""
           aria-hidden="true"
           width={200}

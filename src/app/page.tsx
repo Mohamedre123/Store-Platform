@@ -19,6 +19,7 @@ import {
   Reveal,
   SpotlightCard,
 } from "@/components/motion";
+import { Logo } from "@/components/logo";
 import { brand } from "@/lib/brand";
 
 const features = [
@@ -95,31 +96,7 @@ export default function HomePage() {
               aria-label={brand.name}
               className="zw-lift -mx-2 flex min-h-11 items-center gap-2 rounded-lg px-2"
             >
-              <Image
-                src={brand.logo}
-                alt=""
-                aria-hidden="true"
-                width={96}
-                height={96}
-                priority
-                className="h-12 w-12 shrink-0 object-contain dark:hidden"
-              />
-              <Image
-                src={brand.logoDark}
-                alt=""
-                width={96}
-                height={96}
-                priority
-                aria-hidden="true"
-                className="hidden h-12 w-12 shrink-0 object-contain dark:block"
-              />
-              <span className="zw-wordmark">
-                <span className="zw-wordmark__ar">{brand.name}</span>
-                <span className="zw-wordmark__divider" aria-hidden="true" />
-                <span className="zw-wordmark__en" aria-hidden="true">
-                  {brand.nameEn}
-                </span>
-              </span>
+              <Logo size="md" priority />
             </Link>
 
             <nav className="hidden items-center gap-7 text-sm text-[var(--fg-muted)] md:flex">
@@ -300,24 +277,8 @@ export default function HomePage() {
         <footer className="border-t border-[var(--border)]">
           <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 text-sm text-[var(--fg-subtle)] sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div className="flex items-center gap-2">
-              <Image
-                src={brand.logo}
-                alt=""
-                width={24}
-                height={24}
-                className="h-6 w-6 object-contain dark:hidden"
-              />
-              <Image
-                src={brand.logoDark}
-                alt=""
-                width={24}
-                height={24}
-                aria-hidden="true"
-                className="hidden h-6 w-6 object-contain dark:block"
-              />
-              <span>
-                {brand.name} — {brand.tagline}
-              </span>
+              <Logo size="sm" />
+              <span className="text-[var(--fg-subtle)]">— {brand.tagline}</span>
             </div>
             <p className="tabular">
               © {new Date().getFullYear()} {brand.name}
