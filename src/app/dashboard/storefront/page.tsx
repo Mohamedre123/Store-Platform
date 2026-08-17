@@ -1,20 +1,99 @@
-import { Store } from 'lucide-react'
-import { ComingSoon } from '@/components/dashboard/page-shell'
+import { eq } from 'drizzle-orm'
+import { ExternalLink } from 'lucide-react'
+import { db } from '@/db'
+import { storeThemes, type Section } from '@/db/schema'
+import { getDashboardContext } from '@/lib/store-context'
+import { getTheme } from '@/lib/themes'
+import { storeUrl } from '@/lib/domain'
+import { PageHeader } from '@/components/dashboard/page-shell'
+import { Reveal } from '@/components/motion'
+import { ThemeGallery } from './theme-gallery'
+import { ImageSpecHint, SectionEditor } from './section-editor'
 
-export const metadata = { title: "المتجر" }
+export const metadata = { title: 'المتجر' }
 
-export default function Page() {
+export default async function StorefrontPage() {
+  const { store } = await getDashboardContext()
+
+  const [theme] = await db
+    .select()
+    .from(storeThemes)
+    .where(eq(storeThemes.storeId, store.id))
+    .limit(1)
+
+  const current = getTheme(theme?.themeSlug ?? 'zawya')
+  const sections = (theme?.homeSections ?? []) as Section[]
+
   return (
-    <ComingSoon
-      icon={Store}
-      title={"المتجر"}
-      description={"شكل متجرك وصفحاته"}
-      features={[
-        "محرر الثيم بمعاينة حيّة",
-        "أقسام الصفحة الرئيسية بترتيب تسحبه بنفسك",
-        "الشعار والألوان والخطوط",
-        "الصفحات الثابتة والمدوّنة وصفحات البيع",
-      ]}
-    />
+    <div className="flex flex-col gap-10">
+      <PageHeader
+        title="المتجر"
+        description="اختار شكل متجرك، ورتّب أقسام صفحته الرئيسية."
+        action={
+          <a
+            href={storeUrl(store.slug)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="zw-lift inline-flex min-h-11 items-center gap-2 rounded-lg border border-[var(--border-strong)] px-4 text-sm font-medium text-[var(--fg-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--fg)]"
+          >
+            <ExternalLink className="h-4 w-4" aria-hidden="true" />
+            عرض المتجر
+          </a>
+        }
+      />
+
+      {/* الثيمات */}
+      <section className="flex flex-col gap-4">
+        <Reveal>
+          <div>
+            <h2 className="text-lg font-semibold">الثيم</h2>
+            <p className="mt-1 text-sm text-[var(--fg-muted)]">
+              الثيم بيحدّد تخطيط متجرك وشكل بطاقات المنتجات. تقدر تغيّره في أي وقت من غير ما تفقد
+              منتجاتك أو طلباتك.
+            </p>
+          </div>
+        </Reveal>
+        <ThemeGallery currentSlug={current.slug} />
+      </section>
+
+      {/* أقسام الصفحة الرئيسية */}
+      <section className="flex flex-col gap-4">
+        <Reveal>
+          <div>
+            <h2 className="text-lg font-semibold">أقسام الصفحة الرئيسية</h2>
+            <p className="mt-1 text-sm text-[var(--fg-muted)]">
+              رتّب الأقسام وشغّل أو أطفي اللي مش محتاجه. الترتيب هنا هو نفسه اللي هيشوفه العميل.
+            </p>
+          </div>
+        </Reveal>
+        <Reveal delay={80}>
+          <SectionEditor initial={sections} />
+        </Reveal>
+      </section>
+
+      {/* مقاسات الصور */}
+      <section className="flex flex-col gap-4">
+        <Reveal>
+          <div>
+            <h2 className="text-lg font-semibold">مقاسات الصور</h2>
+            <p className="mt-1 text-sm text-[var(--fg-muted)]">
+              دي المقاسات اللي المتجر مبني عليها. لو رفعت بمقاس تاني الصورة هتتقص أو تطلع مش
+              واضحة — والمقاسات دي بتظهرلك برضو جنب كل خانة رفع.
+            </p>
+          </div>
+        </Reveal>
+
+        <Reveal delay={80}>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <ImageSpecHint specKey="heroDesktop" />
+            <ImageSpecHint specKey="heroMobile" />
+            <ImageSpecHint specKey="promoBanner" />
+            <ImageSpecHint specKey="categoryImage" />
+            <ImageSpecHint specKey="productImage" />
+            <ImageSpecHint specKey="logo" />
+          </div>
+        </Reveal>
+      </section>
+    </div>
   )
 }

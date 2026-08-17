@@ -26,6 +26,8 @@ export type DashboardContext = {
 export const getDashboardContext = cache(async (): Promise<DashboardContext> => {
   const user = await getCurrentUser()
   if (!user) redirect('/login')
+  // لا دخول للوحة قبل تأكيد البريد — الحساب بيمسك متجرًا وفلوس عملاء
+  if (!user.emailVerifiedAt) redirect('/verify')
 
   const memberships = await getUserStores(user.id)
   if (memberships.length === 0) redirect('/signup')

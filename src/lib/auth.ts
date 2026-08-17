@@ -33,6 +33,7 @@ export type SessionUser = {
   id: string
   email: string
   name: string
+  emailVerifiedAt: Date | null
   phone: string | null
   avatar: string | null
   locale: 'ar' | 'en'
@@ -109,6 +110,7 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
       phone: users.phone,
       avatar: users.avatar,
       locale: users.locale,
+      emailVerifiedAt: users.emailVerifiedAt,
       isPlatformAdmin: users.isPlatformAdmin,
     })
     .from(sessions)

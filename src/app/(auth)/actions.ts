@@ -21,6 +21,7 @@ import {
 } from '@/db/schema'
 import { createSession, destroySession, hashPassword, verifyPassword } from '@/lib/auth'
 import { isValidSlug } from '@/lib/domain'
+import { issueEmailOtp } from '@/lib/otp'
 import { suggestStoreSlug } from '@/lib/utils'
 
 export type FormState = { error?: string; fieldErrors?: Record<string, string> } | null
@@ -191,7 +192,11 @@ export async function signupAction(_prev: FormState, formData: FormData): Promis
   })
 
   await createSession(userId, await requestMeta())
-  redirect('/dashboard')
+
+  // رمز التأكيد يُرسل بعد إنشاء الجلسة، فيقدر يعيد الطلب من صفحة التأكيد
+  const otp = await issueEmailOtp(userId, email, name)
+  if (otp.ok && otp.autoVerified) redirect('/dashboard')
+  redirect('/verify')
 }
 
 /* ────────────────────────── تسجيل الدخول ────────────────────────── */
@@ -207,7 +212,7 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
   const { email, password } = parsed.data
 
   const [user] = await db
-    .select({ id: users.id, passwordHash: users.passwordHash })
+    .select({ id: users.id, passwordHash: users.passwordHash, emailVerifiedAt: users.emailVerifiedAt, name: users.name })
     .from(users)
     .where(eq(users.email, email))
     .limit(1)
@@ -219,6 +224,12 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
 
   await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id))
   await createSession(user.id, await requestMeta())
+
+  if (!user.emailVerifiedAt) {
+    const otp = await issueEmailOtp(user.id, email, user.name)
+    if (!(otp.ok && otp.autoVerified)) redirect('/verify')
+  }
+
   redirect('/dashboard')
 }
 
