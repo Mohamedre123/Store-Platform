@@ -1,14 +1,44 @@
 /**
  * سجلّ الثيمات.
  *
- * الثيم معرَّف في الكود لا في قاعدة البيانات: كل ثيم له تخطيطه
- * وأقسامه وإعداداته الافتراضية بأنواع TypeScript كاملة. اللي يتخزّن
- * لكل متجر هو اختياره وتعديلاته فقط (جدول store_themes).
+ * الثيم مش لون — الثيم تخطيط. كل ثيم هنا بيختلف عن اللي جنبه في
+ * شكل البانر وعدد الأعمدة ونسبة الصورة وشكل البطاقة ومكان البحث،
+ * مش في الألوان بس. لو اتنين اختلفوا في اللون فقط، يبقى واحد منهم
+ * زيادة ومالوش لزوم.
  *
- * إضافة ثيم جديد = صف واحد هنا + مكوّنات تخطيطه. مفيش هجرة قاعدة بيانات.
+ * التعريف في الكود لا في قاعدة البيانات: أنواع TypeScript كاملة،
+ * وإضافة ثيم = صف واحد هنا بلا هجرة قاعدة بيانات.
  */
 
 export type ThemeCategory = 'أزياء' | 'تجميل' | 'إلكترونيات' | 'منزل' | 'أطعمة' | 'عام'
+
+/** شكل البانر الرئيسي */
+export type HeroStyle =
+  | 'fullbleed' // صورة بملء العرض والنص فوقها
+  | 'boxed' // بانر داخل حاوية بحواف
+  | 'split' // نص في نص وصورة في نص
+  | 'stacked' // بانر صغير فوقه شريط تصنيفات
+  | 'none' // بلا بانر — القائمة أو المنتجات فورًا
+
+/** شكل بطاقة المنتج */
+export type CardStyle =
+  | 'clean' // صورة ثم اسم ثم سعر
+  | 'overlay' // النص فوق الصورة
+  | 'framed' // إطار وحدود ومواصفات
+  | 'editorial' // صورة طويلة ونص تحتها بمسافة واسعة
+  | 'compact' // صف أفقي: صورة صغيرة وتفاصيل جنبها
+
+export type ThemeLayout = {
+  hero: HeroStyle
+  /** أعمدة شبكة المنتجات على الكمبيوتر */
+  columns: 2 | 3 | 4
+  card: CardStyle
+  imageRatio: 'square' | 'portrait' | 'wide'
+  nav: 'top' | 'centered' | 'split'
+  showSearchInHeader: boolean
+  showCategoryStrip: boolean
+  showPriceBadge: boolean
+}
 
 export type ThemeDefinition = {
   slug: string
@@ -16,7 +46,6 @@ export type ThemeDefinition = {
   nameEn: string
   description: string
   categories: ThemeCategory[]
-  /** لوحة ألوان مقترحة — التاجر يقدر يغيّرها بالكامل */
   palette: {
     primary: string
     accent: string
@@ -24,11 +53,12 @@ export type ThemeDefinition = {
     surface: string
     text: string
   }
-  /** ملامح التخطيط التي تميّز هذا الثيم */
+  layout: ThemeLayout
+  /** ما الذي يميّز هذا الثيم فعلًا — يُعرض للتاجر ليختار بوعي */
   traits: string[]
+  /** لمن لا يناسب — الصدق هنا يوفّر على التاجر تجربة فاشلة */
+  bestFor: string
   radius: 'none' | 'sm' | 'md' | 'lg' | 'full'
-  headerStyle: 'classic' | 'centered' | 'minimal' | 'split'
-  productCard: 'clean' | 'overlay' | 'framed' | 'editorial'
   isPro?: boolean
 }
 
@@ -37,98 +67,178 @@ export const THEMES: ThemeDefinition[] = [
     slug: 'zawya',
     name: 'زاوية',
     nameEn: 'Zawya',
-    description: 'الثيم الافتراضي — متوازن وسريع ويصلح لأي نشاط. أنسب بداية لو لسه مش عارف تختار.',
+    description:
+      'شبكة أربع أعمدة وبحث بارز في الهيدر. يعرض أكبر عدد منتجات في أقل تمرير — أنسب لو كتالوجك كبير.',
     categories: ['عام'],
     palette: { primary: '#634b9a', accent: '#927dc5', background: '#f6f6f9', surface: '#ffffff', text: '#222540' },
-    traits: ['شبكة منتجات ٤ أعمدة', 'هيدر بحث بارز', 'بطاقات نظيفة'],
+    layout: {
+      hero: 'boxed',
+      columns: 4,
+      card: 'clean',
+      imageRatio: 'square',
+      nav: 'top',
+      showSearchInHeader: true,
+      showCategoryStrip: true,
+      showPriceBadge: false,
+    },
+    traits: ['٤ أعمدة', 'بحث في الهيدر', 'شريط أقسام'],
+    bestFor: 'متجر فيه منتجات كتير ومتنوّعة',
     radius: 'lg',
-    headerStyle: 'classic',
-    productCard: 'clean',
   },
   {
     slug: 'atlas',
     name: 'أطلس',
     nameEn: 'Atlas',
-    description: 'واجهة أزياء عريضة بصور كبيرة وتفاصيل قليلة. الصورة هي البطل.',
+    description:
+      'بانر بملء الشاشة وصور طولية بعمودين. الصورة كبيرة والتفاصيل قليلة — للأزياء اللي بتتباع بالمنظر.',
     categories: ['أزياء'],
     palette: { primary: '#1b1b1f', accent: '#c8a15a', background: '#ffffff', surface: '#faf9f7', text: '#1b1b1f' },
-    traits: ['بانر بملء الشاشة', 'صور بنسبة طولية', 'تنقّل بسيط'],
+    layout: {
+      hero: 'fullbleed',
+      columns: 2,
+      card: 'editorial',
+      imageRatio: 'portrait',
+      nav: 'centered',
+      showSearchInHeader: false,
+      showCategoryStrip: false,
+      showPriceBadge: false,
+    },
+    traits: ['بانر بملء الشاشة', 'عمودين بصور طولية', 'تنقّل في النص'],
+    bestFor: 'أزياء بصور احترافية',
     radius: 'none',
-    headerStyle: 'centered',
-    productCard: 'editorial',
   },
   {
     slug: 'noor',
     name: 'نور',
     nameEn: 'Noor',
-    description: 'ثيم تجميل وعناية بألوان فاتحة ومساحات واسعة وإحساس فاخر.',
+    description:
+      'أقسام دائرية فوق وثلاثة أعمدة تحت. مساحات واسعة وإحساس ناعم — للتجميل والعناية.',
     categories: ['تجميل'],
     palette: { primary: '#a8577a', accent: '#e6c9d4', background: '#fdf9fa', surface: '#ffffff', text: '#3a2530' },
-    traits: ['بطاقات دائرية', 'أقسام بأيقونات', 'تقييمات بارزة'],
+    layout: {
+      hero: 'stacked',
+      columns: 3,
+      card: 'clean',
+      imageRatio: 'square',
+      nav: 'centered',
+      showSearchInHeader: false,
+      showCategoryStrip: true,
+      showPriceBadge: false,
+    },
+    traits: ['أقسام دائرية', '٣ أعمدة', 'مساحات واسعة'],
+    bestFor: 'تجميل وعناية بأقسام واضحة',
     radius: 'full',
-    headerStyle: 'centered',
-    productCard: 'clean',
   },
   {
     slug: 'tayyar',
     name: 'تيّار',
     nameEn: 'Tayyar',
-    description: 'إلكترونيات وأجهزة — مواصفات ظاهرة ومقارنة سريعة وشبكة كثيفة.',
+    description:
+      'بانر مقسوم نصين وبطاقات بإطار ومواصفات وشارة سعر. كثافة عالية للمقارنة السريعة.',
     categories: ['إلكترونيات'],
     palette: { primary: '#0f4c81', accent: '#00b3a4', background: '#f5f7fa', surface: '#ffffff', text: '#0d1b2a' },
-    traits: ['مواصفات على البطاقة', 'شارات الضمان', 'فلاتر جانبية'],
+    layout: {
+      hero: 'split',
+      columns: 4,
+      card: 'framed',
+      imageRatio: 'square',
+      nav: 'split',
+      showSearchInHeader: true,
+      showCategoryStrip: false,
+      showPriceBadge: true,
+    },
+    traits: ['بانر نصين', 'بطاقات بإطار', 'شارة سعر'],
+    bestFor: 'أجهزة ومنتجات بمواصفات',
     radius: 'md',
-    headerStyle: 'split',
-    productCard: 'framed',
   },
   {
     slug: 'dar',
     name: 'دار',
     nameEn: 'Dar',
-    description: 'أثاث ومفروشات — صور بيئية واسعة وتصنيفات بالغرفة.',
+    description:
+      'صور عريضة بعمودين والنص فوق الصورة. بيعرض المنتج في بيئته مش على خلفية بيضا.',
     categories: ['منزل'],
     palette: { primary: '#6b5644', accent: '#c9a227', background: '#faf7f2', surface: '#ffffff', text: '#2e2419' },
-    traits: ['أقسام بصور كبيرة', 'عرض بالغرفة', 'مساحات مريحة'],
+    layout: {
+      hero: 'fullbleed',
+      columns: 2,
+      card: 'overlay',
+      imageRatio: 'wide',
+      nav: 'top',
+      showSearchInHeader: false,
+      showCategoryStrip: true,
+      showPriceBadge: false,
+    },
+    traits: ['صور عريضة', 'نص فوق الصورة', 'عمودين'],
+    bestFor: 'أثاث ومفروشات بصور بيئية',
     radius: 'sm',
-    headerStyle: 'classic',
-    productCard: 'overlay',
   },
   {
     slug: 'sufra',
     name: 'سفرة',
     nameEn: 'Sufra',
-    description: 'مطاعم وأطعمة — قائمة بأقسام وصور شهيّة وطلب سريع.',
+    description:
+      'من غير بانر — قائمة بصفوف أفقية وشريط أقسام ثابت. العميل بيوصل للأكلة في ثانية.',
     categories: ['أطعمة'],
     palette: { primary: '#b3341f', accent: '#e8a33d', background: '#fffaf5', surface: '#ffffff', text: '#2b1a12' },
-    traits: ['قائمة بتبويبات', 'إضافات على المنتج', 'زر طلب سريع'],
+    layout: {
+      hero: 'none',
+      columns: 2,
+      card: 'compact',
+      imageRatio: 'square',
+      nav: 'top',
+      showSearchInHeader: true,
+      showCategoryStrip: true,
+      showPriceBadge: true,
+    },
+    traits: ['بلا بانر', 'صفوف أفقية', 'شريط أقسام ثابت'],
+    bestFor: 'مطاعم وقوايم أكل',
     radius: 'lg',
-    headerStyle: 'minimal',
-    productCard: 'clean',
   },
   {
     slug: 'sadaf',
     name: 'صدف',
     nameEn: 'Sadaf',
-    description: 'مجوهرات وإكسسوارات — خلفية داكنة تُبرز لمعان المنتج.',
+    description:
+      'خلفية داكنة وثلاثة أعمدة بصور مربّعة. الإضاءة على المنتج نفسه — للمجوهرات والقطع اللامعة.',
     categories: ['أزياء', 'تجميل'],
     palette: { primary: '#c9a227', accent: '#e8d9a0', background: '#14131a', surface: '#1e1c26', text: '#f0ece2' },
-    traits: ['وضع داكن أصلي', 'إضاءة على الصور', 'تفاصيل ذهبية'],
+    layout: {
+      hero: 'boxed',
+      columns: 3,
+      card: 'overlay',
+      imageRatio: 'square',
+      nav: 'centered',
+      showSearchInHeader: false,
+      showCategoryStrip: false,
+      showPriceBadge: false,
+    },
+    traits: ['وضع داكن أصلي', '٣ أعمدة', 'نص فوق الصورة'],
+    bestFor: 'مجوهرات وإكسسوارات',
     radius: 'sm',
-    headerStyle: 'centered',
-    productCard: 'overlay',
     isPro: true,
   },
   {
     slug: 'sarie',
     name: 'سريع',
     nameEn: 'Sarie',
-    description: 'صفحة منتج واحد للحملات الإعلانية — كل شيء يقود لزر الشراء.',
+    description:
+      'صفحة منتج واحد: بانر نصين وزر شراء ثابت. مفيش شبكة منتجات أصلًا — كل حاجة بتقود للشراء.',
     categories: ['عام'],
     palette: { primary: '#16a34a', accent: '#fbbf24', background: '#ffffff', surface: '#f8fafc', text: '#111827' },
-    traits: ['دفع سريع بارز', 'مؤقّت عرض', 'إثبات اجتماعي'],
+    layout: {
+      hero: 'split',
+      columns: 2,
+      card: 'compact',
+      imageRatio: 'wide',
+      nav: 'top',
+      showSearchInHeader: false,
+      showCategoryStrip: false,
+      showPriceBadge: true,
+    },
+    traits: ['منتج واحد', 'زر شراء ثابت', 'بلا تشتيت'],
+    bestFor: 'حملات إعلانية لمنتج واحد',
     radius: 'md',
-    headerStyle: 'minimal',
-    productCard: 'clean',
   },
 ]
 
@@ -157,7 +267,6 @@ export type SectionMeta = {
   type: SectionType
   name: string
   description: string
-  /** لا يمكن حذفه أو تحريكه من مكانه */
   locked?: boolean
 }
 
@@ -190,9 +299,9 @@ export function getSectionMeta(type: string): SectionMeta {
 /**
  * المقاسات المطلوبة لكل صورة يرفعها التاجر.
  *
- * تُعرض في الواجهة جنب كل حقل رفع. السبب إن التاجر بيرفع صورة
- * بمقاس عشوائي فتطلع مقصوصة أو مبهتة، وميعرفش ليه — فنقوله المقاس
- * الصحيح قبل ما يرفع.
+ * تُعرض جنب كل حقل رفع. السبب إن التاجر بيرفع صورة بمقاس عشوائي
+ * فتطلع مقصوصة أو مبهتة وميعرفش ليه — فنقوله المقاس قبل ما يرفع
+ * لا بعد ما يشتكي.
  */
 export type ImageSpec = {
   key: string
@@ -208,7 +317,7 @@ export const IMAGE_SPECS: Record<string, ImageSpec> = {
     label: 'بانر الكمبيوتر',
     width: 1920,
     height: 720,
-    note: 'الشاشات العريضة. سيب أطراف الصورة فاضية شوية عشان مش هتظهر كلها على كل المقاسات.',
+    note: 'الشاشات العريضة. سيب أطراف الصورة فاضية شوية — مش هتظهر كلها على كل المقاسات.',
   },
   heroMobile: {
     key: 'heroMobile',

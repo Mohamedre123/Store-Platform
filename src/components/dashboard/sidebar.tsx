@@ -13,6 +13,7 @@ import {
   Megaphone,
   Menu,
   Package,
+  Globe,
   Plug,
   Settings,
   ShoppingBag,
@@ -52,6 +53,7 @@ const groups: Array<{
       { href: '/dashboard/payments', label: 'الدفع', icon: CreditCard },
       { href: '/dashboard/plugins', label: 'الإضافات', icon: Plug },
       { href: '/dashboard/settings', label: 'الإعدادات', icon: Settings },
+      { href: '/dashboard/settings/domain', label: 'النطاق', icon: Globe },
     ],
   },
 ]

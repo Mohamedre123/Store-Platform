@@ -4,67 +4,10 @@ import { useState, useTransition } from 'react'
 import { Check, Loader2, Sparkles } from 'lucide-react'
 import { applyThemeAction } from './actions'
 import { THEMES, THEME_CATEGORIES, type ThemeCategory } from '@/lib/themes'
+import { ThemePreview } from './theme-preview'
 import { Button } from '@/components/ui'
 import { Reveal, SpotlightCard } from '@/components/motion'
 import { cn } from '@/lib/utils'
-
-/**
- * معاينة مصغّرة للثيم مرسومة بالـCSS.
- *
- * مش صورة جاهزة عمدًا: لو الثيم اتعدّل، المعاينة بتتعدّل معاه فورًا،
- * وما بنحتاجش نرفع لقطة شاشة جديدة لكل ثيم في كل مرة.
- */
-function ThemePreview({ theme }: { theme: (typeof THEMES)[number] }) {
-  const { palette, radius, headerStyle } = theme
-  const r = { none: '0', sm: '3px', md: '7px', lg: '11px', full: '999px' }[radius]
-
-  return (
-    <div
-      className="pointer-events-none aspect-[4/3] w-full overflow-hidden border-b border-[var(--border)]"
-      style={{ background: palette.background }}
-      aria-hidden="true"
-    >
-      {/* الهيدر */}
-      <div
-        className={cn(
-          'flex h-6 items-center gap-1.5 px-2.5',
-          headerStyle === 'centered' && 'justify-center',
-          headerStyle === 'split' && 'justify-between',
-        )}
-        style={{ background: palette.surface, borderBottom: `1px solid ${palette.text}14` }}
-      >
-        <div className="h-1.5 w-6 rounded-full" style={{ background: palette.primary }} />
-        {headerStyle !== 'centered' && (
-          <div className="flex gap-1">
-            {[8, 6, 7].map((w, i) => (
-              <div key={i} className="h-1 rounded-full" style={{ width: w, background: `${palette.text}33` }} />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* البانر */}
-      <div
-        className="mx-2.5 mt-2.5 flex h-11 flex-col justify-center gap-1 px-2.5"
-        style={{ background: palette.primary, borderRadius: r }}
-      >
-        <div className="h-1.5 w-1/2 rounded-full" style={{ background: '#ffffff99' }} />
-        <div className="h-1 w-1/3 rounded-full" style={{ background: '#ffffff66' }} />
-      </div>
-
-      {/* شبكة المنتجات */}
-      <div className="mt-2.5 grid grid-cols-4 gap-1.5 px-2.5">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="flex flex-col gap-1">
-            <div className="aspect-square" style={{ background: `${palette.text}12`, borderRadius: r }} />
-            <div className="h-1 w-3/4 rounded-full" style={{ background: `${palette.text}25` }} />
-            <div className="h-1 w-1/2 rounded-full" style={{ background: palette.accent }} />
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 export function ThemeGallery({ currentSlug }: { currentSlug: string }) {
   const [filter, setFilter] = useState<ThemeCategory | 'الكل'>('الكل')
@@ -138,6 +81,10 @@ export function ThemeGallery({ currentSlug }: { currentSlug: string }) {
 
                   <p className="flex-1 text-sm leading-relaxed text-[var(--fg-muted)]">
                     {theme.description}
+                  </p>
+
+                  <p className="text-xs text-[var(--fg-subtle)]">
+                    مناسب لـ: {theme.bestFor}
                   </p>
 
                   <ul className="flex flex-wrap gap-1.5">
