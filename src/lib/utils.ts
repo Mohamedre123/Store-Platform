@@ -57,6 +57,55 @@ export function applyBps(amount: number, bps: number): number {
 }
 
 /**
+ * خريطة نقحرة عربي → لاتيني.
+ * النطق مصري متعمَّد: الجيم «g» لا «j»، عشان التاجر يقرأ رابطه
+ * ويلاقيه مطابقًا للي بينطقه.
+ */
+const TRANSLITERATION: Record<string, string> = {
+  ا: 'a', أ: 'a', إ: 'e', آ: 'a', ٱ: 'a',
+  ب: 'b', ت: 't', ث: 'th', ج: 'g', ح: 'h', خ: 'kh',
+  د: 'd', ذ: 'z', ر: 'r', ز: 'z', س: 's', ش: 'sh',
+  ص: 's', ض: 'd', ط: 't', ظ: 'z', ع: 'a', غ: 'gh',
+  ف: 'f', ق: 'q', ك: 'k', ل: 'l', م: 'm', ن: 'n',
+  ه: 'h', ة: 'a', و: 'w', ؤ: 'o', ي: 'y', ى: 'a', ئ: 'e',
+  ء: '', پ: 'p', چ: 'ch', ڤ: 'v', گ: 'g',
+  '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+  '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9',
+}
+
+/** التشكيل والتطويل — يُحذفان قبل النقحرة */
+const ARABIC_MARKS = /[ً-ْٰـ]/g
+
+/**
+ * يحوّل اسمًا عربيًا إلى رابط لاتيني مقروء.
+ * «متجر الأناقة» → «mtgr-alanaqa»
+ *
+ * لازمة لأن أغلب التجار هيكتبوا اسم متجرهم بالعربي، والنطاق الفرعي
+ * لا يقبل إلا حروفًا لاتينية.
+ */
+export function transliterate(input: string): string {
+  const cleaned = input.replace(ARABIC_MARKS, '')
+  let out = ''
+  for (const char of cleaned) {
+    out += TRANSLITERATION[char] ?? char
+  }
+  return out
+}
+
+/** اقتراح نطاق فرعي صالح من اسم المتجر، عربيًا كان أو إنجليزيًا */
+export function suggestStoreSlug(name: string): string {
+  return transliterate(name)
+    .toLowerCase()
+    .trim()
+    .replace(/[\s_]+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 40)
+    .replace(/-$/, '')
+}
+
+/**
  * يحوّل نصًا عربيًا أو إنجليزيًا إلى slug صالح للروابط.
  * العربية تُبقى كما هي (URL-encoded) لأن جوجل يفهمها ويفضّلها للسيو المحلي.
  */

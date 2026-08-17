@@ -46,7 +46,11 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ar" dir="rtl" className={plexArabic.variable} suppressHydrationWarning>
-      <body>{children}</body>
+      {/*
+        بعض إضافات المتصفح تضيف خصائص على body قبل تحميل React،
+        فيظهر تحذير عدم تطابق. التجاهل هنا مقصود ولا يخفي أخطاءنا.
+      */}
+      <body suppressHydrationWarning>{children}</body>
     </html>
   )
 }

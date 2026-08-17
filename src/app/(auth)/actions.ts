@@ -21,7 +21,7 @@ import {
 } from '@/db/schema'
 import { createSession, destroySession, hashPassword, verifyPassword } from '@/lib/auth'
 import { isValidSlug } from '@/lib/domain'
-import { slugify } from '@/lib/utils'
+import { suggestStoreSlug } from '@/lib/utils'
 
 export type FormState = { error?: string; fieldErrors?: Record<string, string> } | null
 
@@ -68,7 +68,7 @@ export async function signupAction(_prev: FormState, formData: FormData): Promis
     email: formData.get('email'),
     password: formData.get('password'),
     storeName: formData.get('storeName'),
-    storeSlug: formData.get('storeSlug') || slugify(String(formData.get('storeName') ?? '')),
+    storeSlug: formData.get('storeSlug') || suggestStoreSlug(String(formData.get('storeName') ?? '')),
   })
 
   if (!parsed.success) {
