@@ -1,35 +1,246 @@
+import Image from 'next/image'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { eq, or } from 'drizzle-orm'
-import { db } from '@/db'
-import { stores } from '@/db/schema'
+import { ArrowLeft, CreditCard, Package, RotateCcw, Truck } from 'lucide-react'
+import { getStore, getStoreTheme, listCategories, listProducts } from '@/lib/storefront'
+import { ProductCard } from '@/components/storefront/product-card'
+import type { HeroStyle } from '@/lib/themes'
 
-// المتجر يُقرأ من قاعدة البيانات لكل طلب — لا تصيير ثابت وقت البناء
 export const dynamic = 'force-dynamic'
 
-/** واجهة المتجر — تُحلّ من النطاق الفرعي أو النطاق المخصص */
-export default async function StorefrontHome({
-  params,
+/* ────────────────────────── البانر ────────────────────────── */
+
+function Hero({
+  style,
+  storeName,
+  tagline,
 }: {
-  params: Promise<{ store: string }>
+  style: HeroStyle
+  storeName: string
+  tagline: string | null
 }) {
+  if (style === 'none') return null
+
+  const heading = storeName
+  const sub = tagline ?? 'اطلب دلوقتي والتوصيل لباب البيت'
+
+  const cta = (
+    <Link
+      href="/products"
+      className="inline-flex min-h-12 items-center gap-2 rounded-[var(--sf-radius)] bg-[var(--sf-primary)] px-6 font-semibold text-white transition-opacity hover:opacity-90"
+    >
+      تسوّق دلوقتي
+      <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+    </Link>
+  )
+
+  if (style === 'split') {
+    return (
+      <section className="mx-auto grid max-w-6xl items-center gap-8 px-4 py-12 sm:px-6 md:grid-cols-2 md:py-16">
+        <div className="flex flex-col gap-4">
+          <h1 className="text-balance text-3xl font-bold tracking-tight sm:text-5xl">{heading}</h1>
+          <p className="text-lg opacity-70">{sub}</p>
+          <div className="mt-2">{cta}</div>
+        </div>
+        <div
+          className="aspect-[4/3] rounded-[var(--sf-radius)]"
+          style={{ background: 'var(--sf-primary)', opacity: 0.92 }}
+          aria-hidden="true"
+        />
+      </section>
+    )
+  }
+
+  if (style === 'fullbleed') {
+    return (
+      <section
+        className="flex min-h-[58vh] flex-col items-start justify-center gap-5 px-4 py-16 sm:px-6"
+        style={{ background: 'var(--sf-primary)' }}
+      >
+        <div className="mx-auto w-full max-w-6xl">
+          <h1 className="text-balance text-4xl font-bold tracking-tight text-white sm:text-6xl">
+            {heading}
+          </h1>
+          <p className="mt-4 max-w-lg text-lg text-white/85">{sub}</p>
+          <Link
+            href="/products"
+            className="mt-7 inline-flex min-h-12 items-center gap-2 rounded-[var(--sf-radius)] bg-white px-6 font-semibold text-[var(--sf-primary)]"
+          >
+            تسوّق دلوقتي
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          </Link>
+        </div>
+      </section>
+    )
+  }
+
+  // boxed و stacked
+  return (
+    <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+      <div
+        className="flex flex-col items-start justify-center gap-4 rounded-[var(--sf-radius)] px-6 py-14 sm:px-10 sm:py-20"
+        style={{ background: 'var(--sf-primary)' }}
+      >
+        <h1 className="text-balance text-3xl font-bold tracking-tight text-white sm:text-5xl">
+          {heading}
+        </h1>
+        <p className="max-w-lg text-white/85">{sub}</p>
+        <Link
+          href="/products"
+          className="mt-2 inline-flex min-h-12 items-center gap-2 rounded-[var(--sf-radius)] bg-white px-6 font-semibold text-[var(--sf-primary)]"
+        >
+          تسوّق دلوقتي
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+        </Link>
+      </div>
+    </section>
+  )
+}
+
+/* ────────────────────────── عناوين الأقسام ────────────────────────── */
+
+function SectionHead({ title, href }: { title: string; href?: string }) {
+  return (
+    <div className="mb-6 flex items-baseline justify-between gap-4">
+      <h2 className="text-xl font-bold tracking-tight sm:text-2xl">{title}</h2>
+      {href && (
+        <Link href={href} className="shrink-0 text-sm font-medium text-[var(--sf-primary)] hover:underline">
+          عرض الكل
+        </Link>
+      )}
+    </div>
+  )
+}
+
+/* ────────────────────────── الصفحة ────────────────────────── */
+
+export default async function StoreHomePage({ params }: { params: Promise<{ store: string }> }) {
   const { store: identifier } = await params
-
-  const [store] = await db
-    .select({ name: stores.name, isPublished: stores.isPublished, status: stores.status })
-    .from(stores)
-    .where(or(eq(stores.slug, identifier), eq(stores.customDomain, identifier)))
-    .limit(1)
-
+  const store = await getStore(identifier)
   if (!store) notFound()
 
+  const theme = await getStoreTheme(store.id)
+  const { layout } = theme.definition
+
+  const enabled = new Set(theme.sections.filter((s) => s.enabled).map((s) => s.type))
+  // لو التاجر ما رتّبش أقسامًا بعد، نعرض الأساسي بدل صفحة فاضية
+  const show = (type: string) => (theme.sections.length === 0 ? true : enabled.has(type))
+
+  const [cats, featured, latest, onSale] = await Promise.all([
+    listCategories(store.id),
+    listProducts(store.id, { featured: true, limit: layout.columns * 2 }),
+    listProducts(store.id, { limit: layout.columns * 2 }),
+    listProducts(store.id, { onSale: true, limit: layout.columns }),
+  ])
+
+  const gridClass =
+    layout.card === 'compact'
+      ? 'grid gap-3 sm:grid-cols-2'
+      : layout.columns === 2
+        ? 'grid grid-cols-2 gap-4 sm:gap-6'
+        : layout.columns === 3
+          ? 'grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3'
+          : 'grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4'
+
+  const cardProps = { currency: store.currency, style: layout.card, imageRatio: layout.imageRatio }
+
+  const empty = latest.length === 0
+
   return (
-    <main className="min-h-screen-safe flex items-center justify-center p-6">
-      <div className="flex max-w-md flex-col items-center gap-3 text-center">
-        <h1 className="text-2xl font-bold tracking-tight">{store.name}</h1>
-        <p className="text-[var(--fg-muted)]">
-          {store.isPublished ? 'المتجر تحت الإنشاء — قريبًا.' : 'المتجر لسه مش منشور.'}
-        </p>
-      </div>
-    </main>
+    <>
+      {show('hero') && <Hero style={layout.hero} storeName={store.name} tagline={store.tagline} />}
+
+      {empty ? (
+        <section className="mx-auto flex max-w-md flex-col items-center gap-3 px-4 py-24 text-center">
+          <Package className="h-10 w-10 opacity-25" aria-hidden="true" />
+          <h2 className="text-lg font-bold">لسه مافيش منتجات</h2>
+          <p className="opacity-65">المتجر بيتجهّز. ارجع تاني قريب.</p>
+        </section>
+      ) : (
+        <>
+          {show('categories') && cats.length > 0 && (
+            <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+              <SectionHead title="تسوّق حسب القسم" />
+              <div className="scroll-x flex gap-4 pb-2 sm:grid sm:grid-cols-4 lg:grid-cols-6">
+                {cats.map((c) => (
+                  <Link
+                    key={c.id}
+                    href={`/category/${c.slug}`}
+                    className="group flex w-28 shrink-0 flex-col items-center gap-2 sm:w-auto"
+                  >
+                    <span
+                      className={`relative aspect-square w-full overflow-hidden bg-[var(--sf-text)]/6 ${
+                        theme.tokens.radius === 'full' ? 'rounded-full' : 'rounded-[var(--sf-radius)]'
+                      }`}
+                    >
+                      {c.image ? (
+                        <Image src={c.image} alt="" fill sizes="120px" className="object-cover transition-transform duration-500 group-hover:scale-105" />
+                      ) : (
+                        <span className="flex h-full items-center justify-center opacity-25">
+                          <Package className="h-6 w-6" aria-hidden="true" />
+                        </span>
+                      )}
+                    </span>
+                    <span className="text-center text-sm font-medium">{c.name}</span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {show('featured_products') && featured.length > 0 && (
+            <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+              <SectionHead title="منتجات مختارة" href="/products" />
+              <div className={gridClass}>
+                {featured.map((p) => (
+                  <ProductCard key={p.id} product={p} {...cardProps} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {show('sale_products') && onSale.length > 0 && (
+            <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+              <SectionHead title="التخفيضات" href="/products" />
+              <div className={gridClass}>
+                {onSale.map((p) => (
+                  <ProductCard key={p.id} product={p} {...cardProps} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {show('new_arrivals') && (
+            <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+              <SectionHead title="وصل حديثًا" href="/products" />
+              <div className={gridClass}>
+                {latest.map((p) => (
+                  <ProductCard key={p.id} product={p} {...cardProps} />
+                ))}
+              </div>
+            </section>
+          )}
+        </>
+      )}
+
+      {show('trust_badges') && (
+        <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+          <div className="grid grid-cols-2 gap-4 border-t border-[var(--sf-text)]/10 pt-8 md:grid-cols-4">
+            {[
+              { icon: Truck, t: 'شحن سريع', d: 'لكل المحافظات' },
+              { icon: CreditCard, t: 'دفع عند الاستلام', d: 'ادفع لما يوصلك' },
+              { icon: RotateCcw, t: 'إرجاع سهل', d: 'لو المنتج مش زي ما توقّعت' },
+              { icon: Package, t: 'تغليف آمن', d: 'يوصلك بحالته' },
+            ].map(({ icon: Icon, t, d }) => (
+              <div key={t} className="flex flex-col items-center gap-1.5 text-center">
+                <Icon className="h-6 w-6 text-[var(--sf-primary)]" aria-hidden="true" />
+                <span className="text-sm font-semibold">{t}</span>
+                <span className="text-xs opacity-60">{d}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+    </>
   )
 }

@@ -1,0 +1,127 @@
+'use client'
+
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+
+/**
+ * السلة.
+ *
+ * محفوظة في المتصفح لا على الخادم: العميل بيتسوّق قبل ما يسجّل، ولو
+ * ربطناها بحساب كنا هنفقد سلّته لو قفل الصفحة. وبتُخزَّن بمفتاح
+ * لكل متجر عشان متجرين مفتوحين في نفس المتصفح ما يخلطوش سلالهم.
+ *
+ * السعر مخزَّن مع البند كلقطة، لكن الحساب النهائي بيتم على الخادم
+ * وقت الطلب — ما ينفعش نثق في سعر جاي من المتصفح.
+ */
+
+export type CartItem = {
+  productId: string
+  variantId?: string
+  name: string
+  slug: string
+  image?: string
+  price: number
+  quantity: number
+  maxStock?: number
+}
+
+type CartContext = {
+  items: CartItem[]
+  add: (item: Omit<CartItem, 'quantity'>, quantity?: number) => void
+  remove: (productId: string, variantId?: string) => void
+  setQuantity: (productId: string, quantity: number, variantId?: string) => void
+  clear: () => void
+  count: number
+  subtotal: number
+  isOpen: boolean
+  setOpen: (open: boolean) => void
+  ready: boolean
+}
+
+const Ctx = createContext<CartContext | null>(null)
+
+const keyFor = (storeSlug: string) => `zawya_cart_${storeSlug}`
+const sameLine = (a: CartItem, productId: string, variantId?: string) =>
+  a.productId === productId && (a.variantId ?? '') === (variantId ?? '')
+
+export function CartProvider({ storeSlug, children }: { storeSlug: string; children: ReactNode }) {
+  const [items, setItems] = useState<CartItem[]>([])
+  const [isOpen, setOpen] = useState(false)
+  // قبل القراءة من التخزين، ما نعرضش عدد السلة — وإلا يظهر صفر ثم يقفز
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(keyFor(storeSlug))
+      if (raw) setItems(JSON.parse(raw) as CartItem[])
+    } catch {
+      // تخزين معطّل أو بيانات تالفة — نبدأ بسلة فاضية
+    }
+    setReady(true)
+  }, [storeSlug])
+
+  useEffect(() => {
+    if (!ready) return
+    try {
+      localStorage.setItem(keyFor(storeSlug), JSON.stringify(items))
+    } catch {
+      // التخزين ممتلئ أو مرفوض — السلة تفضل في الذاكرة للجلسة دي
+    }
+  }, [items, storeSlug, ready])
+
+  const value = useMemo<CartContext>(() => {
+    const count = items.reduce((n, i) => n + i.quantity, 0)
+    const subtotal = items.reduce((n, i) => n + i.price * i.quantity, 0)
+
+    return {
+      items,
+      count,
+      subtotal,
+      isOpen,
+      setOpen,
+      ready,
+
+      add(item, quantity = 1) {
+        setItems((prev) => {
+          const existing = prev.find((p) => sameLine(p, item.productId, item.variantId))
+          if (existing) {
+            const wanted = existing.quantity + quantity
+            const capped = item.maxStock ? Math.min(wanted, item.maxStock) : wanted
+            return prev.map((p) =>
+              sameLine(p, item.productId, item.variantId) ? { ...p, quantity: capped } : p,
+            )
+          }
+          return [...prev, { ...item, quantity }]
+        })
+        setOpen(true)
+      },
+
+      remove(productId, variantId) {
+        setItems((prev) => prev.filter((p) => !sameLine(p, productId, variantId)))
+      },
+
+      setQuantity(productId, quantity, variantId) {
+        setItems((prev) =>
+          quantity <= 0
+            ? prev.filter((p) => !sameLine(p, productId, variantId))
+            : prev.map((p) =>
+                sameLine(p, productId, variantId)
+                  ? { ...p, quantity: p.maxStock ? Math.min(quantity, p.maxStock) : quantity }
+                  : p,
+              ),
+        )
+      },
+
+      clear() {
+        setItems([])
+      },
+    }
+  }, [items, isOpen, ready])
+
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>
+}
+
+export function useCart() {
+  const ctx = useContext(Ctx)
+  if (!ctx) throw new Error('useCart لازم يكون جوّه CartProvider')
+  return ctx
+}
