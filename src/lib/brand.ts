@@ -12,10 +12,10 @@ export const brand = {
   description:
     'أنشئ متجرك الإلكتروني وابدأ البيع في دقائق. إدارة طلبات ومنتجات وشحن ودفع وتسويق — في مكان واحد.',
   logo: '/brand/zawya-logo.png',
-  logoDark: '/brand/zawya-logo.png',
+  logoDark: '/brand/zawya-logo-white.png',
   /** لون العلامة — مأخوذ من الشعار */
   color: '#634b9a',
-  supportEmail: 'support@zawya.app',
+  supportEmail: 'support@zawya.cc',
   supportWhatsapp: '',
 } as const
 

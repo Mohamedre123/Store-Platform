@@ -1,0 +1,535 @@
+/* ══════════════════════════════════════════════════════════════
+   الحركة والتفاعل
+
+   قاعدة عامة: الحركة على transform وopacity فقط — دول الاتنين
+   اللي المتصفح بينفّذهم على كرت الشاشة، فبيفضلوا ناعمين حتى على
+   الموبايلات المتوسطة والضعيفة.
+   ══════════════════════════════════════════════════════════════ */
+
+/* ─────────────── شاشة التحميل ─────────────── */
+
+/**
+ * الحركة كلها مشروطة بوجود جافاسكربت عامل.
+ *
+ * من غير الشرط ده، لو الجافاسكربت وقع أو كان مطفيًا يفضل المحتوى
+ * كله بـopacity صفر وشاشة التحميل حاجبة الصفحة — يعني موقع فاضي.
+ * الكلاس `zw-js` بيتحط من سكربت صغير في أول الصفحة.
+ */
+.zw-preloader {
+  display: none;
+}
+
+/**
+ * الخلفية تتبع وضع الجهاز، وكل وضع ياخد نسخة الشعار اللي تبان عليه:
+ *
+ *   فاتح → خلفية فاتحة بلمسة بنفسجية + الشعار الأصلي الملوّن
+ *   داكن → خلفية بنفسجية غامقة + الشعار الأبيض
+ *
+ * السبب: كتابة الشعار الأصلي كحلي غامق (#22243A). على خلفية سودا
+ * بتختفي تمامًا. أي خلفية تخلّي النسخة الملوّنة واضحة لازم تكون
+ * فاتحة — وده اللي النسخة البيضا اتعملت أصلًا عشانه.
+ */
+.zw-js .zw-preloader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* الهالة أكبر من الشاشة على الموبايل — نقصّها هنا */
+  overflow: hidden;
+  background: linear-gradient(165deg, #faf9fd 0%, #eceaf6 55%, #e2def0 100%);
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity 0.55s ease,
+    visibility 0s linear 0.55s;
+  /* احتياطي: تختفي حتى لو الجافاسكربت وقع تمامًا */
+  animation: zw-preloader-failsafe 0.5s ease 3s forwards;
+}
+
+.zw-js .zw-preloader--done {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+@keyframes zw-preloader-failsafe {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+/* الوضع الداكن: خلفية بنفسجية غامقة مع الشعار الأبيض */
+:root[data-theme='dark'] .zw-js .zw-preloader,
+.zw-js :root[data-theme='dark'] .zw-preloader {
+  background: linear-gradient(165deg, #241f42 0%, #171633 55%, #101026 100%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .zw-preloader {
+    background: linear-gradient(165deg, #241f42 0%, #171633 55%, #101026 100%);
+  }
+}
+
+/* تبديل نسخة الشعار حسب الوضع */
+.zw-preloader__logo--dark {
+  display: none;
+}
+
+:root[data-theme='dark'] .zw-preloader__logo--light {
+  display: none;
+}
+:root[data-theme='dark'] .zw-preloader__logo--dark {
+  display: block;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .zw-preloader__logo--light {
+    display: none;
+  }
+  :root:not([data-theme='light']) .zw-preloader__logo--dark {
+    display: block;
+  }
+}
+
+/* توهّج بنفسجي يعطي الشعار عمقًا دون أن يبهت حروفه */
+.zw-preloader__glow {
+  position: absolute;
+  width: min(38rem, 120vw);
+  height: min(38rem, 120vw);
+  background: radial-gradient(circle, rgb(118 94 176 / 0.18) 0%, rgb(118 94 176 / 0) 62%);
+  animation: zw-pulse 3.2s ease-in-out infinite;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .zw-preloader__glow {
+    background: radial-gradient(circle, rgb(146 125 197 / 0.3) 0%, rgb(146 125 197 / 0) 62%);
+  }
+}
+
+:root[data-theme='dark'] .zw-preloader__glow {
+  background: radial-gradient(circle, rgb(146 125 197 / 0.3) 0%, rgb(146 125 197 / 0) 62%);
+}
+
+.zw-preloader__mark {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.75rem;
+}
+
+.zw-preloader__logo {
+  width: clamp(8.75rem, 34vw, 11.25rem);
+  height: auto;
+  animation: zw-float 3.2s ease-in-out infinite;
+}
+
+.zw-preloader__bar {
+  position: relative;
+  display: block;
+  width: 7.5rem;
+  max-width: 40vw;
+  height: 3px;
+  overflow: hidden;
+  background: rgb(34 37 64 / 0.12);
+  border-radius: 999px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .zw-preloader__bar {
+    background: rgb(255 255 255 / 0.12);
+  }
+}
+
+:root[data-theme='dark'] .zw-preloader__bar {
+  background: rgb(255 255 255 / 0.12);
+}
+
+.zw-preloader__bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 45%;
+  background: linear-gradient(90deg, #4d3f7a, #8f77c9, #4d3f7a);
+  border-radius: inherit;
+  animation: zw-sweep 1.25s ease-in-out infinite;
+}
+
+@keyframes zw-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.94);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes zw-float {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-8px) scale(1.015);
+  }
+}
+
+@keyframes zw-sweep {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(340%);
+  }
+}
+
+/* ─────────────── علامة الاسم ─────────────── */
+
+/**
+ * قفل اسم مكوّن من جزأين مثل الشعار نفسه: العربي بارز ومضغوط،
+ * وجنبه فاصل رفيع ثم اللاتيني بحجم أصغر وتباعد حروف واسع.
+ * الغرض أن يقرأ كعلامة مصمَّمة لا كنص عادي جنب صورة.
+ */
+.zw-wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  line-height: 1;
+}
+
+.zw-wordmark__ar {
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+}
+
+.zw-wordmark__divider {
+  width: 1px;
+  height: 1.125rem;
+  background: var(--border-strong);
+}
+
+.zw-wordmark__en {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: lowercase;
+  color: var(--fg-subtle);
+  direction: ltr;
+  /* التباعد يضيف فراغًا بعد آخر حرف — نسحبه ليتوازن بصريًا */
+  margin-inline-end: -0.22em;
+}
+
+@media (max-width: 400px) {
+  .zw-wordmark__divider,
+  .zw-wordmark__en {
+    display: none;
+  }
+}
+
+/* ─────────────── الخلفية المتحركة ─────────────── */
+
+.zw-aurora {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.zw-aurora__blob {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  /* تدرّج شعاعي بدل filter:blur — نفس النعومة بجزء بسيط من التكلفة */
+  opacity: 0.6;
+  will-change: transform;
+}
+
+.zw-aurora__blob--1 {
+  top: -18%;
+  right: -12%;
+  width: min(46rem, 105vw);
+  height: min(46rem, 105vw);
+  background: radial-gradient(circle, rgb(118 94 176 / 0.42) 0%, rgb(118 94 176 / 0) 68%);
+  animation: zw-drift-a 26s ease-in-out infinite;
+}
+
+.zw-aurora__blob--2 {
+  bottom: -22%;
+  left: -16%;
+  width: min(40rem, 95vw);
+  height: min(40rem, 95vw);
+  background: radial-gradient(circle, rgb(92 104 144 / 0.36) 0%, rgb(92 104 144 / 0) 68%);
+  animation: zw-drift-b 32s ease-in-out infinite;
+}
+
+.zw-aurora__blob--3 {
+  top: 34%;
+  left: 40%;
+  width: min(30rem, 80vw);
+  height: min(30rem, 80vw);
+  background: radial-gradient(circle, rgb(146 125 197 / 0.26) 0%, rgb(146 125 197 / 0) 70%);
+  animation: zw-drift-c 24s ease-in-out infinite;
+}
+
+/* شبكة خفيفة تعطي إحساسًا بالعمق */
+.zw-aurora__grid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.45;
+  background-image:
+    linear-gradient(to left, var(--border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+  background-size: 64px 64px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 55% at 50% 0%, #000 20%, transparent 78%);
+  mask-image: radial-gradient(ellipse 80% 55% at 50% 0%, #000 20%, transparent 78%);
+}
+
+@keyframes zw-drift-a {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  33% {
+    transform: translate3d(-5%, 7%, 0) scale(1.08);
+  }
+  66% {
+    transform: translate3d(4%, -4%, 0) scale(0.95);
+  }
+}
+
+@keyframes zw-drift-b {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  40% {
+    transform: translate3d(7%, -6%, 0) scale(1.1);
+  }
+  75% {
+    transform: translate3d(-3%, 4%, 0) scale(0.94);
+  }
+}
+
+@keyframes zw-drift-c {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(6%, -8%, 0) scale(1.12);
+  }
+}
+
+/* ─────────────── الدخول عند فتح الصفحة ─────────────── */
+
+/**
+ * لمحتوى أول الشاشة. حركة CSS خالصة لا تنتظر React —
+ * فالمحتوى يظهر حتى لو الجهاز بطيء والتفاعل لسه ما اشتغلش.
+ */
+.zw-js .zw-enter {
+  opacity: 0;
+  animation: zw-enter-in 0.75s cubic-bezier(0.22, 1, 0.36, 1) var(--zw-delay, 0ms) both;
+}
+
+@keyframes zw-enter-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, var(--zw-y, 22px), 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* ─────────────── الظهور عند التمرير ─────────────── */
+
+/**
+ * مشروط بكلاس «zw-hydrated» الذي يضعه React بعد أن يشتغل فعلًا.
+ * لو React وقع لأي سبب، الكلاس لا يُوضَع ويفضل المحتوى ظاهرًا
+ * بدل أن يختفي للأبد.
+ */
+.zw-hydrated .zw-reveal {
+  opacity: 0;
+  transform: translate3d(0, var(--zw-y, 20px), 0);
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1) var(--zw-delay, 0ms),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1) var(--zw-delay, 0ms);
+}
+
+.zw-hydrated .zw-reveal--in {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+/* ─────────────── بطاقة بلمعة تتبع الماوس ─────────────── */
+
+.zw-spotlight {
+  position: relative;
+  isolation: isolate;
+  transition:
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.35s ease,
+    box-shadow 0.35s ease;
+}
+
+.zw-spotlight::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  background: radial-gradient(
+    18rem circle at var(--zw-mx, 50%) var(--zw-my, 50%),
+    rgb(118 94 176 / 0.16),
+    transparent 62%
+  );
+}
+
+/* الحركة عند التحويم للماوس فقط — اللمس لا يمرّ بحالة hover */
+@media (hover: hover) and (pointer: fine) {
+  .zw-spotlight:hover {
+    transform: translateY(-4px);
+    border-color: var(--border-strong);
+    box-shadow: var(--shadow-pop);
+  }
+
+  .zw-spotlight:hover::before {
+    opacity: 1;
+  }
+}
+
+/* ─────────────── تفاصيل تفاعلية صغيرة ─────────────── */
+
+.zw-lift {
+  transition:
+    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.25s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .zw-lift:hover {
+    transform: translateY(-2px);
+  }
+}
+
+.zw-press:active {
+  transform: scale(0.975);
+}
+
+/* رابط بخط سفلي ينمو من جهة البداية */
+.zw-underline {
+  position: relative;
+}
+
+.zw-underline::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -4px;
+  width: 100%;
+  height: 1.5px;
+  background: currentColor;
+  border-radius: 2px;
+  transform: scaleX(0);
+  transform-origin: right center;
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.zw-underline:hover::after,
+.zw-underline:focus-visible::after {
+  transform: scaleX(1);
+}
+
+/* نص بتدرّج لوني متحرك */
+.zw-gradient-text {
+  background-image: linear-gradient(100deg, #634b9a 8%, #927dc5 52%, #634b9a 96%);
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: zw-shimmer 7s linear infinite;
+}
+
+:root[data-theme='dark'] .zw-gradient-text {
+  background-image: linear-gradient(100deg, #a08cd0 8%, #d5cdea 52%, #a08cd0 96%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .zw-gradient-text {
+    background-image: linear-gradient(100deg, #a08cd0 8%, #d5cdea 52%, #a08cd0 96%);
+  }
+}
+
+/* احتياطي للمتصفحات التي لا تدعم قصّ الخلفية على النص */
+@supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+  .zw-gradient-text {
+    color: var(--primary);
+    background-image: none;
+    animation: none;
+  }
+}
+
+@keyframes zw-shimmer {
+  to {
+    background-position: -220% center;
+  }
+}
+
+/* نقطة نابضة */
+.zw-ping {
+  position: relative;
+}
+
+.zw-ping::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: inherit;
+  animation: zw-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes zw-ping {
+  75%,
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+/* ─────────────── احترام تفضيل تقليل الحركة ─────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .zw-aurora__blob,
+  .zw-preloader__glow,
+  .zw-preloader__logo,
+  .zw-preloader__bar::after,
+  .zw-gradient-text,
+  .zw-enter,
+  .zw-ping::after {
+    animation: none !important;
+  }
+
+  .zw-hydrated .zw-reveal {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .zw-spotlight:hover,
+  .zw-lift:hover {
+    transform: none !important;
+  }
+}

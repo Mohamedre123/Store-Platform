@@ -159,7 +159,7 @@ export function Sidebar({
             onClick={() => setOpen(false)}
             className="absolute inset-0 bg-[var(--color-ink-950)]/50"
           />
-          <aside className="absolute inset-y-0 end-0 flex w-[min(18rem,85vw)] flex-col bg-[var(--surface)] shadow-xl">
+          <aside className="absolute inset-y-0 start-0 flex w-[min(18rem,85vw)] flex-col bg-[var(--surface)] shadow-xl">
             <div className="flex items-center justify-between border-b border-[var(--border)] pe-2">
               <div className="min-w-0 flex-1">{header}</div>
               <button
@@ -178,7 +178,7 @@ export function Sidebar({
       )}
 
       {/* الشريط الثابت على الشاشات الكبيرة */}
-      <aside className="fixed inset-y-0 end-0 hidden w-64 flex-col border-s border-[var(--border)] bg-[var(--surface)] lg:flex">
+      <aside className="fixed inset-y-0 start-0 hidden w-64 flex-col border-e border-[var(--border)] bg-[var(--surface)] lg:flex">
         {header}
         {nav}
         {footer}

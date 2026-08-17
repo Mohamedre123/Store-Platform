@@ -11,7 +11,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <div className="min-h-screen-safe">
       <Sidebar storeName={store.name} storeSlug={store.slug} storeLogo={store.logoLight} />
 
-      <div className="lg:me-64">
+      <div className="lg:ms-64">
         {/* الشريط العلوي */}
         <header className="sticky top-0 z-30 hidden h-16 items-center justify-between gap-4 border-b border-[var(--border)] bg-[var(--surface)] px-6 lg:flex">
           <a

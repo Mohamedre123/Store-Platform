@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { IBM_Plex_Sans_Arabic } from 'next/font/google'
+import { Preloader } from '@/components/preloader'
 import './globals.css'
 
 const plexArabic = IBM_Plex_Sans_Arabic({
@@ -50,7 +51,23 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         بعض إضافات المتصفح تضيف خصائص على body قبل تحميل React،
         فيظهر تحذير عدم تطابق. التجاهل هنا مقصود ولا يخفي أخطاءنا.
       */}
-      <body suppressHydrationWarning>{children}</body>
+      <head>
+        {/*
+          يُعلِم CSS أن الجافاسكربت شغّال، فتُفعَّل شاشة التحميل والحركة.
+          لو الجافاسكربت مطفي أو وقع، الكلاس ما يتحطّش والمحتوى يظهر كامل
+          بدل ما يفضل مخفيًا وراء شاشة تحميل عالقة.
+          يعمل قبل أول رسم للصفحة فلا يحدث وميض.
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `document.documentElement.classList.add('zw-js')`,
+          }}
+        />
+      </head>
+      <body suppressHydrationWarning>
+        <Preloader />
+        {children}
+      </body>
     </html>
   )
 }

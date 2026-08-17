@@ -1,4 +1,20 @@
 @import 'tailwindcss';
+@import './motion.css';
+
+/**
+ * متغيّر `dark:` يتبع نفس منطق التوكنات: الاختيار الصريح للمستخدم
+ * يغلب تفضيل النظام في الاتجاهين.
+ */
+@custom-variant dark {
+  &:where([data-theme='dark'], [data-theme='dark'] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme='light']), :root:not([data-theme='light']) *) {
+      @slot;
+    }
+  }
+}
 
 /* ──────────────────────────────────────────────────────────────
    هوية زاوية
