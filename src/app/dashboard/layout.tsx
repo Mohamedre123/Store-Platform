@@ -1,5 +1,6 @@
 import { getDashboardContext } from '@/lib/store-context'
 import { Sidebar } from '@/components/dashboard/sidebar'
+import { AuroraBackground } from '@/components/motion'
 import { storeUrl } from '@/lib/domain'
 import { logoutAction } from '@/app/(auth)/actions'
 import { ExternalLink, LogOut } from 'lucide-react'
@@ -9,11 +10,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="min-h-screen-safe">
+      <AuroraBackground />
       <Sidebar storeName={store.name} storeSlug={store.slug} storeLogo={store.logoLight} />
 
       <div className="lg:ms-64">
         {/* الشريط العلوي */}
-        <header className="sticky top-0 z-30 hidden h-16 items-center justify-between gap-4 border-b border-[var(--border)] bg-[var(--surface)] px-6 lg:flex">
+        <header className="sticky top-0 z-30 hidden h-16 items-center justify-between gap-4 border-b border-[var(--border)] bg-[var(--surface)]/85 px-6 backdrop-blur-md lg:flex">
           <a
             href={storeUrl(store.slug)}
             target="_blank"

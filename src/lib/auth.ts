@@ -10,6 +10,25 @@ import { generateToken, hashToken } from './crypto'
 const SESSION_COOKIE = 'zawya_session'
 const SESSION_DAYS = 30
 
+/**
+ * نطاق الكوكي.
+ *
+ * الدخول بيتم على zawya.cc واللوحة على dashboard.zawya.cc. لو الكوكي
+ * اتحفظت على المضيف وحده، المتصفح ما بيبعتهاش للنطاق الفرعي — فالمستخدم
+ * يدخل بنجاح ثم يلاقي نفسه مطرود لصفحة الدخول تاني، وكأن بياناته غلط.
+ *
+ * النقطة في الأول («.zawya.cc») بتخلي الكوكي صالحة على النطاق وكل
+ * فروعه. على localhost نسيبها فاضية لأن المتصفحات بترفض نطاق لمضيف محلي.
+ */
+function sessionCookieDomain(): string | undefined {
+  const root = (process.env.NEXT_PUBLIC_ROOT_DOMAIN || '').split(':')[0].toLowerCase()
+  if (!root || root === 'localhost' || root.endsWith('.localhost')) return undefined
+  // نطاقات vercel.app لا تقبل كوكي على مستوى النطاق الأب
+  if (root.endsWith('.vercel.app')) return undefined
+  if (!root.includes('.')) return undefined
+  return `.${root}`
+}
+
 export type SessionUser = {
   id: string
   email: string
@@ -50,6 +69,7 @@ export async function createSession(userId: string, meta: { userAgent?: string; 
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
+    domain: sessionCookieDomain(),
     expires: expiresAt,
   })
 
@@ -62,7 +82,14 @@ export async function destroySession() {
   if (token) {
     await db.delete(sessions).where(eq(sessions.tokenHash, hashToken(token)))
   }
-  jar.delete(SESSION_COOKIE)
+  jar.set(SESSION_COOKIE, '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    domain: sessionCookieDomain(),
+    maxAge: 0,
+  })
 }
 
 /**

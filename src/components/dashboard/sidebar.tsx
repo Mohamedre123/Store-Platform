@@ -89,7 +89,7 @@ export function Sidebar({
                 onClick={() => setOpen(false)}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
                   active
                     ? 'bg-[var(--primary-soft)] text-[var(--primary)]'
                     : 'text-[var(--fg-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)]',
@@ -138,7 +138,7 @@ export function Sidebar({
   return (
     <>
       {/* شريط الموبايل */}
-      <div className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-[var(--border)] bg-[var(--surface)] px-4 lg:hidden">
+      <div className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-[var(--border)] bg-[var(--surface)]/85 px-4 backdrop-blur-md lg:hidden">
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -178,7 +178,7 @@ export function Sidebar({
       )}
 
       {/* الشريط الثابت على الشاشات الكبيرة */}
-      <aside className="fixed inset-y-0 start-0 hidden w-64 flex-col border-e border-[var(--border)] bg-[var(--surface)] lg:flex">
+      <aside className="fixed inset-y-0 start-0 hidden w-64 flex-col border-e border-[var(--border)] bg-[var(--surface)]/85 backdrop-blur-md lg:flex">
         {header}
         {nav}
         {footer}
