@@ -6,9 +6,10 @@ import bcrypt from 'bcryptjs'
 import { db } from '@/db'
 import { sessions, users, storeMembers, stores } from '@/db/schema'
 import { generateToken, hashToken } from './crypto'
+import { config } from './config'
 
 const SESSION_COOKIE = 'zawya_session'
-const SESSION_DAYS = 30
+const SESSION_DAYS = config.session.days
 
 /**
  * نطاق الكوكي.

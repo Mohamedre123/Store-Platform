@@ -22,6 +22,7 @@ import {
 import { createSession, destroySession, hashPassword, verifyPassword } from '@/lib/auth'
 import { isValidSlug } from '@/lib/domain'
 import { issueEmailOtp } from '@/lib/otp'
+import { config } from '@/lib/config'
 import { suggestStoreSlug } from '@/lib/utils'
 
 export type FormState = { error?: string; fieldErrors?: Record<string, string> } | null
@@ -110,7 +111,7 @@ export async function signupAction(_prev: FormState, formData: FormData): Promis
     const [user] = await tx.insert(users).values({ email, passwordHash, name }).returning({ id: users.id })
 
     const trialEndsAt = new Date()
-    trialEndsAt.setDate(trialEndsAt.getDate() + 14)
+    trialEndsAt.setDate(trialEndsAt.getDate() + config.trialDays)
 
     const [store] = await tx
       .insert(stores)

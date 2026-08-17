@@ -3,14 +3,11 @@ import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { verificationTokens, users } from '@/db/schema'
 import { generateOtp, hashToken } from './crypto'
-import { isEmailConfigured, sendEmail, verificationEmail } from './email'
+import { isEmailConfigured, sendEmail } from './email'
+import { verificationEmail } from './email-templates'
+import { config } from './config'
 
-/** الرمز صالح عشر دقايق — كفاية للوصول وقصيرة كفاية للأمان */
-const CODE_TTL_MINUTES = 10
-/** بعد خمس محاولات خاطئة يُبطَل الرمز ولازم يطلب واحدًا جديدًا */
-const MAX_ATTEMPTS = 5
-/** لا يُسمح بطلب رمز جديد قبل مرور دقيقة */
-const RESEND_COOLDOWN_SECONDS = 60
+const { length: CODE_LENGTH, ttlMinutes: CODE_TTL_MINUTES, maxAttempts: MAX_ATTEMPTS, resendCooldownSeconds: RESEND_COOLDOWN_SECONDS } = config.otp
 
 export type IssueResult =
   | { ok: true; autoVerified: boolean; devCode?: string }
@@ -59,7 +56,7 @@ export async function issueEmailOtp(userId: string, email: string, name?: string
       ),
     )
 
-  const code = generateOtp(6)
+  const code = generateOtp(CODE_LENGTH)
   const expiresAt = new Date(Date.now() + CODE_TTL_MINUTES * 60 * 1000)
 
   await db.insert(verificationTokens).values({

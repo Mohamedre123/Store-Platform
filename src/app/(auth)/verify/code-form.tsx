@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from 'react'
 import { MailCheck } from 'lucide-react'
 import { resendCodeAction, verifyCodeAction, type VerifyState } from './actions'
 import { Alert, Button, Spinner } from '@/components/ui'
+import { config } from '@/lib/config'
 
 /**
  * إدخال رمز التحقق.
@@ -14,7 +15,8 @@ import { Alert, Button, Spinner } from '@/components/ui'
  */
 export function CodeForm({ email }: { email: string }) {
   const [state, formAction, pending] = useActionState<VerifyState, FormData>(verifyCodeAction, null)
-  const [digits, setDigits] = useState<string[]>(Array(6).fill(''))
+  const LENGTH = config.otp.length
+  const [digits, setDigits] = useState<string[]>(Array(LENGTH).fill(''))
   const [resendState, setResendState] = useState<VerifyState>(null)
   const [resending, setResending] = useState(false)
   const inputs = useRef<Array<HTMLInputElement | null>>([])
@@ -28,7 +30,7 @@ export function CodeForm({ email }: { email: string }) {
 
   // الإرسال التلقائي بمجرد اكتمال الأرقام الستة
   useEffect(() => {
-    if (code.length === 6 && !pending) formRef.current?.requestSubmit()
+    if (code.length === LENGTH && !pending) formRef.current?.requestSubmit()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code])
 
@@ -41,10 +43,10 @@ export function CodeForm({ email }: { email: string }) {
     setDigits((d) => {
       const next = [...d]
       // اللصق: وزّع الأرقام على الخانات من موضع الكتابة
-      for (let i = 0; i < clean.length && index + i < 6; i++) next[index + i] = clean[i]
+      for (let i = 0; i < clean.length && index + i < LENGTH; i++) next[index + i] = clean[i]
       return next
     })
-    const jump = Math.min(index + clean.length, 5)
+    const jump = Math.min(index + clean.length, LENGTH - 1)
     inputs.current[jump]?.focus()
   }
 
@@ -52,7 +54,7 @@ export function CodeForm({ email }: { email: string }) {
     setResending(true)
     setResendState(await resendCodeAction())
     setResending(false)
-    setDigits(Array(6).fill(''))
+    setDigits(Array(LENGTH).fill(''))
     inputs.current[0]?.focus()
   }
 
@@ -96,19 +98,19 @@ export function CodeForm({ email }: { email: string }) {
               onKeyDown={(e) => {
                 if (e.key === 'Backspace' && !digits[i] && i > 0) inputs.current[i - 1]?.focus()
                 if (e.key === 'ArrowLeft' && i > 0) inputs.current[i - 1]?.focus()
-                if (e.key === 'ArrowRight' && i < 5) inputs.current[i + 1]?.focus()
+                if (e.key === 'ArrowRight' && i < LENGTH - 1) inputs.current[i + 1]?.focus()
               }}
               type="text"
               inputMode="numeric"
               autoComplete={i === 0 ? 'one-time-code' : 'off'}
-              maxLength={6}
+              maxLength={LENGTH}
               aria-label={`الرقم ${i + 1}`}
               className="h-14 w-11 rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] text-center text-xl font-bold tabular-nums transition-colors focus:border-[var(--primary)] focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ring)] sm:w-12"
             />
           ))}
         </div>
 
-        <Button type="submit" size="lg" loading={pending} disabled={code.length !== 6}>
+        <Button type="submit" size="lg" loading={pending} disabled={code.length !== LENGTH}>
           تأكيد
         </Button>
       </form>
