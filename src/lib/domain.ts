@@ -1,0 +1,61 @@
+export const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000'
+
+/** النطاقات الفرعية المحجوزة للمنصة — لا يجوز لتاجر أن يأخذها */
+export const RESERVED_SLUGS = new Set([
+  'www', 'app', 'dashboard', 'admin', 'api', 'cdn', 'assets', 'static', 'mail',
+  'blog', 'help', 'docs', 'status', 'support', 'billing', 'pay', 'checkout',
+  'mcp', 'vip', 'go', 'link', 'ftp', 'smtp', 'ns1', 'ns2', 'zawya', 'store',
+  'shop', 'my', 'me', 'test', 'staging', 'dev', 'preview',
+])
+
+export type HostKind =
+  | { kind: 'marketing' }
+  | { kind: 'dashboard' }
+  | { kind: 'store'; identifier: string; isCustomDomain: boolean }
+
+/**
+ * يحدّد أي واجهة يطلبها المضيف.
+ * ثلاث واجهات تتقدّم من نفس التطبيق:
+ *   zawya.app            → الموقع التعريفي
+ *   dashboard.zawya.app  → لوحة التاجر
+ *   <slug>.zawya.app     → متجر التاجر
+ *   any-domain.com       → متجر بنطاق مخصّص
+ */
+export function resolveHost(rawHost: string | null | undefined): HostKind {
+  if (!rawHost) return { kind: 'marketing' }
+
+  // إزالة المنفذ وتوحيد الحالة
+  const host = rawHost.toLowerCase().split(':')[0].replace(/\.$/, '')
+  const root = ROOT_DOMAIN.toLowerCase().split(':')[0]
+
+  if (host === root || host === `www.${root}`) return { kind: 'marketing' }
+  if (host === `dashboard.${root}`) return { kind: 'dashboard' }
+
+  if (host.endsWith(`.${root}`)) {
+    const sub = host.slice(0, -(root.length + 1))
+    // نطاقات فرعية متعدّدة المستويات لا تُعتبر متاجر
+    if (sub.includes('.')) return { kind: 'marketing' }
+    if (RESERVED_SLUGS.has(sub)) return { kind: 'marketing' }
+    return { kind: 'store', identifier: sub, isCustomDomain: false }
+  }
+
+  // أي مضيف آخر = نطاق مخصّص لمتجر
+  return { kind: 'store', identifier: host, isCustomDomain: true }
+}
+
+export function storeUrl(slug: string, path = '') {
+  const protocol = ROOT_DOMAIN.startsWith('localhost') ? 'http' : 'https'
+  return `${protocol}://${slug}.${ROOT_DOMAIN}${path}`
+}
+
+export function dashboardUrl(path = '') {
+  const protocol = ROOT_DOMAIN.startsWith('localhost') ? 'http' : 'https'
+  return `${protocol}://dashboard.${ROOT_DOMAIN}${path}`
+}
+
+/** يتحقق أن النطاق الفرعي صالح: حروف لاتينية صغيرة وأرقام وشرطات فقط */
+export function isValidSlug(slug: string): boolean {
+  if (slug.length < 3 || slug.length > 40) return false
+  if (RESERVED_SLUGS.has(slug)) return false
+  return /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(slug)
+}

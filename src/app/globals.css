@@ -1,0 +1,263 @@
+@import 'tailwindcss';
+
+/* ──────────────────────────────────────────────────────────────
+   هوية زاوية
+   الألوان مأخوذة من الشعار: كحلي عميق + بنفسجي.
+   كل القيم بصيغة hex وليست oklch — عشان تعمل على المتصفحات
+   الأقدم كمان، وده مطلب أساسي في السوق المصري.
+   ────────────────────────────────────────────────────────────── */
+@theme {
+  /* البنفسجي — لون العلامة */
+  --color-brand-50: #f5f3fa;
+  --color-brand-100: #e9e5f4;
+  --color-brand-200: #d5cdea;
+  --color-brand-300: #b6a8da;
+  --color-brand-400: #927dc5;
+  --color-brand-500: #765eb0;
+  --color-brand-600: #634b9a;
+  --color-brand-700: #533e80;
+  --color-brand-800: #47366a;
+  --color-brand-900: #3d3059;
+  --color-brand-950: #271d3b;
+
+  /* الكحلي — لون النص والخلفيات الداكنة */
+  --color-ink-50: #f4f5f8;
+  --color-ink-100: #e6e8ef;
+  --color-ink-200: #ced2e0;
+  --color-ink-300: #a8b0c8;
+  --color-ink-400: #7b87ab;
+  --color-ink-500: #5c6890;
+  --color-ink-600: #495376;
+  --color-ink-700: #3d4460;
+  --color-ink-800: #363b51;
+  --color-ink-900: #222540;
+  --color-ink-950: #16182b;
+
+  /* دلالات الحالة — منفصلة عن لون العلامة عمدًا */
+  --color-success: #15803d;
+  --color-success-soft: #dcfce7;
+  --color-warning: #a16207;
+  --color-warning-soft: #fef3c7;
+  --color-danger: #b91c1c;
+  --color-danger-soft: #fee2e2;
+  --color-info: #1d4ed8;
+  --color-info-soft: #dbeafe;
+
+  --font-sans: var(--font-plex-arabic), 'Segoe UI', Tahoma, system-ui, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+
+  --radius-card: 0.875rem;
+
+  --shadow-soft: 0 1px 2px rgb(34 37 64 / 0.04), 0 8px 24px -16px rgb(34 37 64 / 0.24);
+  --shadow-pop: 0 2px 6px rgb(34 37 64 / 0.06), 0 16px 40px -20px rgb(34 37 64 / 0.32);
+}
+
+/* ──────────────────────────────────────────────────────────────
+   متغيّرات الواجهة — تتبدّل بين الوضع الفاتح والداكن
+   ────────────────────────────────────────────────────────────── */
+:root {
+  --bg: #f6f6f9;
+  --surface: #ffffff;
+  --surface-2: #f1f2f6;
+  --border: #e2e4ec;
+  --border-strong: #cdd1de;
+  --fg: #222540;
+  --fg-muted: #5c6890;
+  --fg-subtle: #8a92ad;
+  --primary: #634b9a;
+  --primary-fg: #ffffff;
+  --primary-soft: #ece8f5;
+  --ring: #927dc5;
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --bg: #14162a;
+  --surface: #1c1f36;
+  --surface-2: #242844;
+  --border: #2f3352;
+  --border-strong: #414669;
+  --fg: #eceef6;
+  --fg-muted: #a8b0c8;
+  --fg-subtle: #7b87ab;
+  --primary: #a08cd0;
+  --primary-fg: #16182b;
+  --primary-soft: #2a2547;
+  --ring: #a08cd0;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #14162a;
+    --surface: #1c1f36;
+    --surface-2: #242844;
+    --border: #2f3352;
+    --border-strong: #414669;
+    --fg: #eceef6;
+    --fg-muted: #a8b0c8;
+    --fg-subtle: #7b87ab;
+    --primary: #a08cd0;
+    --primary-fg: #16182b;
+    --primary-soft: #2a2547;
+    --ring: #a08cd0;
+    color-scheme: dark;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────
+   الأساس
+   ────────────────────────────────────────────────────────────── */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* منع القفز الأفقي على الشاشات الصغيرة */
+    overflow-x: hidden;
+  }
+
+  /* الأرقام العربية والإنجليزية تتراصف في الجداول */
+  table,
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+
+  /* الأرقام دائمًا من اليسار لليمين حتى داخل نص عربي */
+  .num,
+  bdi.num {
+    unicode-bidi: isolate;
+    direction: ltr;
+    display: inline-block;
+  }
+
+  img,
+  video,
+  svg {
+    max-width: 100%;
+    height: auto;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
+
+  /* مساحة لمس لا تقل عن 44px — مطلب أساسي على الموبايل */
+  button,
+  [role='button'],
+  a.btn {
+    touch-action: manipulation;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: var(--primary-soft);
+    color: var(--fg);
+  }
+
+  /* شريط تمرير أنيق — مع تجاهل آمن في المتصفحات التي لا تدعمه */
+  @supports selector(::-webkit-scrollbar) {
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-strong);
+      border-radius: 999px;
+      border: 2px solid var(--bg);
+    }
+  }
+}
+
+@layer utilities {
+  /* ارتفاع الشاشة الكامل مع احتياطي للمتصفحات التي لا تدعم dvh */
+  .min-h-screen-safe {
+    min-height: 100vh;
+  }
+  @supports (min-height: 100dvh) {
+    .min-h-screen-safe {
+      min-height: 100dvh;
+    }
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .scroll-x {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  .surface {
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+  }
+
+  .text-muted {
+    color: var(--fg-muted);
+  }
+  .text-subtle {
+    color: var(--fg-subtle);
+  }
+}
+
+/* احترام تفضيل تقليل الحركة */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* الطباعة — الفواتير وبوالص الشحن */
+@media print {
+  body {
+    background: #fff;
+    color: #000;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

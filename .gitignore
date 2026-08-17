@@ -1,0 +1,46 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# next.js
+.next/
+out/
+build/
+next-env.d.ts
+
+# production
+dist/
+
+# env
+.env
+.env*.local
+.env.production
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+
+# os
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# editors
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# drizzle
+drizzle/meta/_journal.json.bak
+
+# ملفات العمل المحلية
+لوجو زاوية/
