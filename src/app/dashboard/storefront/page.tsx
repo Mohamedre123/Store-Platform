@@ -9,6 +9,7 @@ import { storeUrl } from '@/lib/domain'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { ThemeGallery } from './theme-gallery'
+import { PublishControl } from './publish-control'
 import { ImageSpecHint, SectionEditor } from './section-editor'
 
 export const metadata = { title: 'المتجر' }
@@ -51,6 +52,10 @@ export default async function StorefrontPage() {
           </div>
         }
       />
+
+      <Reveal>
+        <PublishControl initialPublished={store.isPublished} />
+      </Reveal>
 
       {/* الثيمات */}
       <section className="flex flex-col gap-4">

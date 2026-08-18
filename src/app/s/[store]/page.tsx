@@ -53,6 +53,7 @@ export default async function StoreHomePage({ params }: { params: Promise<{ stor
     style: listing.cardStyle,
     imageRatio: listing.imageRatio,
     showRating: listing.showRating,
+    showQuickAdd: listing.showQuickAdd,
   }
 
   const empty = latest.length === 0

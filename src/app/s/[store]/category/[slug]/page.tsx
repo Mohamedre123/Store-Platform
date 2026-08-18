@@ -1,8 +1,17 @@
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { Package } from 'lucide-react'
-import { getCategoryBySlug, getStore, getStoreTheme, listProducts, listingGrid } from '@/lib/storefront'
+import {
+  getCategoryBySlug,
+  getStore,
+  getStoreTheme,
+  listCategories,
+  listProducts,
+  listingGrid,
+} from '@/lib/storefront'
+import { parseSort } from '@/lib/sort-options'
 import { ProductCard } from '@/components/storefront/product-card'
+import { ListingControls } from '@/components/storefront/listing-controls'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,8 +25,10 @@ export async function generateMetadata({ params }: { params: Promise<{ store: st
 
 export default async function CategoryPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ store: string; slug: string }>
+  searchParams: Promise<{ sort?: string }>
 }) {
   const { store: identifier, slug } = await params
   const store = await getStore(identifier)
@@ -29,7 +40,12 @@ export default async function CategoryPage({
   const isPreview = (await headers()).get('x-zawya-preview') === '1'
   const theme = await getStoreTheme(store.id, isPreview)
   const { listing } = theme.custom
-  const items = await listProducts(store.id, { categoryId: category.id, limit: listing.perPage || 60 })
+  const sort = parseSort((await searchParams).sort)
+
+  const [items, cats] = await Promise.all([
+    listProducts(store.id, { categoryId: category.id, limit: listing.perPage || 60, sort }),
+    listing.showCategoryFilter ? listCategories(store.id) : Promise.resolve([]),
+  ])
 
   const gridClass = listingGrid(listing)
 
@@ -39,6 +55,12 @@ export default async function CategoryPage({
       {category.description && <p className="mt-2 max-w-2xl opacity-70">{category.description}</p>}
 
       <div className="mt-8">
+        <ListingControls
+          showSort={listing.showSort}
+          showCategoryFilter={listing.showCategoryFilter}
+          categories={cats.map((c) => ({ name: c.name, slug: c.slug }))}
+          activeCategory={slug}
+        />
         {items.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-20 text-center">
             <Package className="h-10 w-10 opacity-25" aria-hidden="true" />
@@ -54,6 +76,7 @@ export default async function CategoryPage({
                 style={listing.cardStyle}
                 imageRatio={listing.imageRatio}
               showRating={listing.showRating}
+                showQuickAdd={listing.showQuickAdd}
               />
             ))}
           </div>

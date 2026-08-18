@@ -100,6 +100,21 @@
   --primary-fg: #16182b;
   --primary-soft: #2a2547;
   --ring: #a08cd0;
+
+  /*
+   * دلالات الحالة في الوضع الداكن.
+   * الخلفيات الفاتحة (‎#dcfce7‎ وأخواتها) مع نص فاتح = نص غير مقروء.
+   * هنا الخلفية غامقة والنص فاتح، فالتباين يفضل صحيحًا في الوضعين.
+   */
+  --color-success: #4ade80;
+  --color-success-soft: #14321f;
+  --color-warning: #fbbf24;
+  --color-warning-soft: #33270a;
+  --color-danger: #f87171;
+  --color-danger-soft: #3a1a1a;
+  --color-info: #7aa2f7;
+  --color-info-soft: #16233f;
+
   color-scheme: dark;
 }
 
@@ -117,6 +132,16 @@
     --primary-fg: #16182b;
     --primary-soft: #2a2547;
     --ring: #a08cd0;
+
+    --color-success: #4ade80;
+    --color-success-soft: #14321f;
+    --color-warning: #fbbf24;
+    --color-warning-soft: #33270a;
+    --color-danger: #f87171;
+    --color-danger-soft: #3a1a1a;
+    --color-info: #7aa2f7;
+    --color-info-soft: #16233f;
+
     color-scheme: dark;
   }
 }

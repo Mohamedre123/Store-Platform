@@ -10,6 +10,7 @@ import {
   type Customization,
   type PanelKey,
 } from './customization'
+import type { SortKey } from './sort-options'
 import type { Section, ThemeTokens } from '@/db/schema'
 
 /**
@@ -211,21 +212,38 @@ const visible = (storeId: string) =>
 export const listProducts = cache(
   async (
     storeId: string,
-    options: { limit?: number; categoryId?: string; onSale?: boolean; featured?: boolean } = {},
+    options: {
+      limit?: number
+      categoryId?: string
+      onSale?: boolean
+      featured?: boolean
+      sort?: SortKey
+    } = {},
   ): Promise<StorefrontProduct[]> => {
-    const { limit = 12, categoryId, onSale, featured } = options
+    const { limit = 12, categoryId, onSale, featured, sort = 'newest' } = options
 
     const conditions = [visible(storeId)]
     if (categoryId) conditions.push(eq(products.categoryId, categoryId))
     if (onSale) conditions.push(and(isNotNull(products.compareAtPrice), gt(products.compareAtPrice, products.price))!)
     if (featured) conditions.push(eq(products.isFeatured, true))
 
+    // الترتيب بيتم في قاعدة البيانات مش في الذاكرة — عشان يفضل صحيحًا
+    // مع الـlimit، ولا نجيب صفوفًا زيادة عشان نرتّبها ونرميها
+    const orderBy =
+      sort === 'price_asc'
+        ? products.price
+        : sort === 'price_desc'
+          ? desc(products.price)
+          : sort === 'best_selling'
+            ? desc(products.soldCount)
+            : desc(products.createdAt)
+
     return db
       .select(productFields)
       .from(products)
       .leftJoin(categories, eq(categories.id, products.categoryId))
       .where(and(...conditions))
-      .orderBy(desc(products.createdAt))
+      .orderBy(orderBy)
       .limit(limit)
   },
 )

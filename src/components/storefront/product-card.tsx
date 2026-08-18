@@ -5,6 +5,7 @@ import type { StorefrontProduct } from '@/lib/storefront'
 import { discountPercent } from '@/lib/storefront'
 import { formatMoney } from '@/lib/utils'
 import type { CardStyle } from '@/lib/themes'
+import { QuickAdd } from './quick-add'
 
 /**
  * بطاقة المنتج.
@@ -14,6 +15,60 @@ import type { CardStyle } from '@/lib/themes'
  * أفقي. ده اللي بيخلي الثيمات مختلفة فعلًا مش بالألوان بس.
  */
 export function ProductCard({
+  product,
+  currency,
+  style = 'clean',
+  imageRatio = 'square',
+  showRating = true,
+  showQuickAdd = false,
+}: {
+  product: StorefrontProduct
+  currency: string
+  style?: CardStyle
+  imageRatio?: 'square' | 'portrait' | 'wide'
+  showRating?: boolean
+  showQuickAdd?: boolean
+}) {
+  const soldOutForAdd = product.trackInventory && product.stock <= 0
+
+  // الزرار جنب الرابط مش جوّاه: <button> داخل <a> ترميز غير صالح
+  if (showQuickAdd) {
+    return (
+      <div className="flex flex-col">
+        <ProductCardBody
+          product={product}
+          currency={currency}
+          style={style}
+          imageRatio={imageRatio}
+          showRating={showRating}
+        />
+        <QuickAdd
+          product={{
+            productId: product.id,
+            name: product.name,
+            slug: product.slug,
+            image: product.images[0],
+            price: product.price,
+            maxStock: product.trackInventory ? product.stock : undefined,
+          }}
+          soldOut={soldOutForAdd}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <ProductCardBody
+      product={product}
+      currency={currency}
+      style={style}
+      imageRatio={imageRatio}
+      showRating={showRating}
+    />
+  )
+}
+
+function ProductCardBody({
   product,
   currency,
   style = 'clean',

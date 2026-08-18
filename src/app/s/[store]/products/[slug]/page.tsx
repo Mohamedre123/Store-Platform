@@ -74,32 +74,61 @@ export default async function ProductPage({
       </nav>
 
       <div className="grid gap-8 md:grid-cols-2 md:gap-12">
-        {/* الصور */}
-        <div className="flex flex-col gap-3">
-          <div className="relative aspect-square w-full overflow-hidden rounded-[var(--sf-radius)] bg-[var(--sf-text)]/6">
-            {product.images[0] ? (
-              <Image
-                src={product.images[0]}
-                alt={product.name}
-                fill
-                priority
-                sizes="(max-width: 768px) 100vw, 50vw"
-                className="object-cover"
-              />
-            ) : (
-              <span className="flex h-full items-center justify-center opacity-25">
-                <ImageOff className="h-10 w-10" aria-hidden="true" />
-              </span>
-            )}
-            {off && !soldOut && (
-              <span className="absolute start-3 top-3 rounded-md bg-[var(--sf-primary)] px-2 py-1 text-sm font-bold text-white tabular-nums">
-                خصم {off}%
-              </span>
-            )}
+        {/*
+          الصور — تخطيط المعرض من إعداد التاجر:
+          stacked = كل الصور تحت بعض · thumbs-side = مصغّرات جنب الصورة
+          thumbs-bottom = مصغّرات تحتها
+        */}
+        <div
+          className={
+            productPage.galleryLayout === 'thumbs-side' && product.images.length > 1
+              ? 'flex flex-row-reverse gap-3'
+              : 'flex flex-col gap-3'
+          }
+        >
+          <div className="flex flex-1 flex-col gap-3">
+            <div className="relative aspect-square w-full overflow-hidden rounded-[var(--sf-radius)] bg-[var(--sf-text)]/6">
+              {product.images[0] ? (
+                <Image
+                  src={product.images[0]}
+                  alt={product.name}
+                  fill
+                  priority
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                  className="object-cover"
+                />
+              ) : (
+                <span className="flex h-full items-center justify-center opacity-25">
+                  <ImageOff className="h-10 w-10" aria-hidden="true" />
+                </span>
+              )}
+              {off && !soldOut && (
+                <span className="absolute start-3 top-3 rounded-md bg-[var(--sf-primary)] px-2 py-1 text-sm font-bold text-white tabular-nums">
+                  خصم {off}%
+                </span>
+              )}
+            </div>
+
+            {/* المكدّس: باقي الصور بحجمها الكامل تحت بعض */}
+            {productPage.galleryLayout === 'stacked' &&
+              product.images.slice(1).map((src) => (
+                <div
+                  key={src}
+                  className="relative aspect-square w-full overflow-hidden rounded-[var(--sf-radius)] bg-[var(--sf-text)]/6"
+                >
+                  <Image src={src} alt="" fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover" />
+                </div>
+              ))}
           </div>
 
-          {product.images.length > 1 && (
-            <div className="scroll-x flex gap-2">
+          {productPage.galleryLayout !== 'stacked' && product.images.length > 1 && (
+            <div
+              className={
+                productPage.galleryLayout === 'thumbs-side'
+                  ? 'flex w-20 shrink-0 flex-col gap-2 overflow-y-auto'
+                  : 'scroll-x flex gap-2'
+              }
+            >
               {product.images.slice(1).map((src) => (
                 <span
                   key={src}
