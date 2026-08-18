@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs'
 import { db } from '@/db'
 import { sessions, users, storeMembers, stores } from '@/db/schema'
 import { generateToken, hashToken } from './crypto'
+import { ROOT_DOMAIN } from './domain'
 import { config } from './config'
 
 const SESSION_COOKIE = 'zawya_session'
@@ -24,10 +25,12 @@ const SESSION_DAYS = config.session.days
  * وحده، وهو المقبول دايمًا.
  */
 async function sessionCookieDomain(): Promise<string | undefined> {
-  const root = (process.env.NEXT_PUBLIC_ROOT_DOMAIN || '').split(':')[0].toLowerCase()
+  // ROOT_DOMAIN منظَّف بالفعل (بدون بروتوكول/www/مسار) فالكوكي يشتغل مهما
+  // كان شكل المتغيّر في Vercel
+  const root = ROOT_DOMAIN.split(':')[0]
   if (!root || !root.includes('.') || root.endsWith('.vercel.app')) return undefined
 
-  const host = (await headers()).get('host')?.split(':')[0].toLowerCase()
+  const host = (await headers()).get('host')?.split(':')[0].toLowerCase().replace(/^www\./, '')
   if (!host) return undefined
   if (host !== root && !host.endsWith('.' + root)) return undefined
 

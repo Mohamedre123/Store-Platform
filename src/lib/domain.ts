@@ -1,4 +1,22 @@
-export const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000'
+/**
+ * تنظيف قيمة النطاق الجذري.
+ *
+ * التاجر (أو أنا) ممكن يحطها في Vercel بأشكال مختلفة: «https://zawyaeg.site»
+ * أو «www.zawyaeg.site» أو «zawyaeg.site/». أي شكل غير المتوقّع كان بيخلّي
+ * حساب المضيف يفشل ويعرض 404 على الصفحة الرئيسية. بننظّفها هنا مرة واحدة
+ * فيبقى الشكل اللي نكتبه مش مهم.
+ */
+function normalizeRootDomain(raw: string): string {
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '') // بروتوكول
+    .replace(/\/.*$/, '') // أي مسار بعد الدومين
+    .replace(/^www\./, '') // بادئة www
+    .replace(/\.$/, '') // نقطة زايدة في الآخر
+}
+
+export const ROOT_DOMAIN = normalizeRootDomain(process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'localhost:3000')
 
 /** النطاقات الفرعية المحجوزة للمنصة — لا يجوز لتاجر أن يأخذها */
 export const RESERVED_SLUGS = new Set([
