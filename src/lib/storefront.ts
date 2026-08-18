@@ -2,7 +2,7 @@ import 'server-only'
 import { cache } from 'react'
 import { and, desc, eq, gt, isNotNull, or, sql } from 'drizzle-orm'
 import { db } from '@/db'
-import { categories, pages, products, stores, storePlugins, storeThemes } from '@/db/schema'
+import { categories, pages, products, reviews, stores, storePlugins, storeThemes } from '@/db/schema'
 import { getTheme, type ThemeDefinition } from './themes'
 import {
   defaultCustomization,
@@ -351,4 +351,22 @@ export const listFooterPages = cache(async (storeId: string) => {
       ),
     )
     .orderBy(pages.sortOrder)
+})
+
+/** المراجعات المعتمدة لمنتج */
+export const listProductReviews = cache(async (productId: string) => {
+  return db
+    .select({
+      id: reviews.id,
+      authorName: reviews.authorName,
+      rating: reviews.rating,
+      body: reviews.body,
+      isVerifiedPurchase: reviews.isVerifiedPurchase,
+      merchantReply: reviews.merchantReply,
+      createdAt: reviews.createdAt,
+    })
+    .from(reviews)
+    .where(and(eq(reviews.productId, productId), eq(reviews.isApproved, true)))
+    .orderBy(desc(reviews.createdAt))
+    .limit(50)
 })

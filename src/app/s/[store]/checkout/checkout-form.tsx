@@ -6,7 +6,13 @@ import Image from 'next/image'
 import { Banknote, CheckCircle2, Loader2, Tag, Truck } from 'lucide-react'
 import { useCart } from '@/components/storefront/cart'
 import { useStoreHref } from '@/components/storefront/store-link'
-import { applyCouponAction, captureIncompleteOrder, placeOrderAction } from './actions'
+import {
+  applyCouponAction,
+  captureIncompleteOrder,
+  placeOrderAction,
+  requestOrderOtpAction,
+  verifyOrderOtpAction,
+} from './actions'
 import { formatMoney, isValidPhone } from '@/lib/utils'
 import type { Region } from '@/lib/regions'
 
@@ -23,6 +29,7 @@ export type CheckoutConfig = {
   fieldNotes: FieldMode
   addressMode: 'structured' | 'simple' | 'hidden'
   showCouponField: boolean
+  otpEnabled: boolean
   minOrderEnabled: boolean
   minOrderAmount: number
   captureIncomplete: boolean
@@ -77,8 +84,43 @@ export function CheckoutForm({
   const [couponMsg, setCouponMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [applyingCoupon, startApplyCoupon] = useTransition()
 
+  // رمز التحقق
+  const [otpSent, setOtpSent] = useState(false)
+  const [otpTarget, setOtpTarget] = useState('')
+  const [otpCode, setOtpCode] = useState('')
+  const [otpVerified, setOtpVerified] = useState(false)
+  const [otpMsg, setOtpMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [otpPending, startOtp] = useTransition()
+
   const draftToken = useRef<string | undefined>(undefined)
   const captured = useRef(false)
+
+  function requestOtp() {
+    setOtpMsg(null)
+    startOtp(async () => {
+      const res = await requestOrderOtpAction({ storeIdentifier, phone, email: email || undefined })
+      if (res.ok) {
+        setOtpSent(true)
+        setOtpTarget(res.target)
+        setOtpMsg({ ok: true, text: `بعتنا الرمز على ${res.target}` })
+      } else {
+        setOtpMsg({ ok: false, text: res.error })
+      }
+    })
+  }
+
+  function verifyOtp() {
+    setOtpMsg(null)
+    startOtp(async () => {
+      const res = await verifyOrderOtpAction({ storeIdentifier, phone, code: otpCode })
+      if (res.ok) {
+        setOtpVerified(true)
+        setOtpMsg({ ok: true, text: 'اتأكّد رقمك' })
+      } else {
+        setOtpMsg({ ok: false, text: res.error })
+      }
+    })
+  }
 
   const baseShipping = freeOver !== null && subtotal >= freeOver ? 0 : (shippingByCity[city] ?? defaultShipping)
   const shipping = coupon?.freeShipping ? 0 : baseShipping
@@ -425,6 +467,57 @@ export function CheckoutForm({
             </div>
           </dl>
 
+          {/* رمز التحقق — قبل زرار التأكيد عشان يبان إنه شرط */}
+          {config.otpEnabled && !otpVerified && (
+            <div className="flex flex-col gap-2 rounded-[var(--sf-radius)] border border-[var(--sf-text)]/15 p-3">
+              <span className="text-sm font-medium">تأكيد رقمك</span>
+              {!otpSent ? (
+                <>
+                  <p className="text-xs opacity-65">هنبعتلك رمزًا على بريدك عشان نتأكد من طلبك.</p>
+                  <button
+                    type="button"
+                    onClick={requestOtp}
+                    disabled={otpPending || !isValidPhone(phone) || !email}
+                    className="min-h-11 rounded-[var(--sf-radius)] border border-[var(--sf-primary)] text-sm font-semibold text-[var(--sf-primary)] transition-colors hover:bg-[var(--sf-primary)]/8 disabled:opacity-50"
+                  >
+                    {otpPending ? 'بنبعت…' : 'ابعت رمز التحقق'}
+                  </button>
+                  {!email && <p className="text-xs text-amber-600">اكتب بريدك الإلكتروني فوق الأول.</p>}
+                </>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    inputMode="numeric"
+                    dir="ltr"
+                    placeholder="- - - - - -"
+                    aria-label="رمز التحقق"
+                    className="h-11 flex-1 rounded-[var(--sf-radius)] border border-[var(--sf-text)]/18 bg-[var(--sf-surface)] px-3 text-center text-lg tracking-[0.4em] outline-none focus:border-[var(--sf-primary)]"
+                  />
+                  <button
+                    type="button"
+                    onClick={verifyOtp}
+                    disabled={otpPending || otpCode.length !== 6}
+                    className="shrink-0 rounded-[var(--sf-radius)] bg-[var(--sf-primary)] px-4 text-sm font-semibold text-white disabled:opacity-50"
+                  >
+                    تأكيد
+                  </button>
+                </div>
+              )}
+              {otpMsg && (
+                <p className={`text-xs ${otpMsg.ok ? 'text-green-600' : 'text-red-600'}`}>{otpMsg.text}</p>
+              )}
+            </div>
+          )}
+
+          {config.otpEnabled && otpVerified && (
+            <p className="flex items-center gap-1.5 text-sm text-green-600">
+              <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+              رقمك اتأكّد
+            </p>
+          )}
+
           {error && (
             <p className="rounded-[var(--sf-radius)] bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
               {error}
@@ -434,7 +527,7 @@ export function CheckoutForm({
           <button
             type="button"
             onClick={submit}
-            disabled={pending || items.length === 0}
+            disabled={pending || items.length === 0 || (config.otpEnabled && !otpVerified)}
             className="flex min-h-13 w-full items-center justify-center gap-2 rounded-[var(--sf-radius)] bg-[var(--sf-primary)] px-6 font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
           >
             {pending && <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />}

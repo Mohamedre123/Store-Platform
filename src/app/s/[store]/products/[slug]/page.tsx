@@ -8,9 +8,11 @@ import {
   getProductBySlug,
   getStore,
   getStoreTheme,
+  listProductReviews,
   listProducts,
 } from '@/lib/storefront'
 import { ProductCard } from '@/components/storefront/product-card'
+import { ProductReviews } from '@/components/storefront/reviews'
 import { AddToCart } from '@/components/storefront/add-to-cart'
 import { formatMoney } from '@/lib/utils'
 
@@ -56,6 +58,7 @@ export default async function ProductPage({
 
   const off = discountPercent(product.price, product.compareAtPrice)
   const soldOut = product.trackInventory && product.stock <= 0
+  const productReviews = await listProductReviews(product.id)
   const related = (await listProducts(store.id, { categoryId: product.categoryId ?? undefined, limit: 5 }))
     .filter((p) => p.id !== product.id)
     .slice(0, 4)
@@ -218,6 +221,14 @@ export default async function ProductPage({
           )}
         </div>
       </div>
+
+      <ProductReviews
+        storeIdentifier={identifier}
+        productId={product.id}
+        reviews={productReviews}
+        ratingAverage={product.ratingCount > 0 ? product.ratingSum / product.ratingCount : null}
+        ratingCount={product.ratingCount}
+      />
 
       {productPage.showRelated && related.length > 0 && (
         <section className="mt-16">

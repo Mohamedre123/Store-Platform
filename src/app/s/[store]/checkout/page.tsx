@@ -69,6 +69,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ store
             fieldNotes: settings?.fieldNotes ?? 'optional',
             addressMode: settings?.addressMode ?? 'structured',
             showCouponField: settings?.showCouponField ?? true,
+            otpEnabled: settings?.otpEnabled ?? false,
             minOrderEnabled: settings?.minOrderEnabled ?? false,
             minOrderAmount: settings?.minOrderAmount ?? 0,
             captureIncomplete: settings?.captureIncompleteOrders ?? true,

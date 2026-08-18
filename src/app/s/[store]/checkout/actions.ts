@@ -18,6 +18,7 @@ import { isEmailConfigured, sendEmail } from '@/lib/email'
 import { newOrderNotificationEmail, orderConfirmationEmail } from '@/lib/store-emails'
 import { dashboardUrl, storeUrl } from '@/lib/domain'
 import { validateCoupon, recordCouponUse } from '@/lib/coupons'
+import { issueOrderOtp, isPhoneVerifiedForOrder, verifyOrderOtp } from '@/lib/order-otp'
 import { generateToken } from '@/lib/crypto'
 import { normalizePhone } from '@/lib/utils'
 
@@ -207,6 +208,20 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
 
   if (settings?.minOrderEnabled && totals.subtotal < settings.minOrderAmount) {
     return { ok: false, error: 'الطلب أقل من الحد الأدنى المسموح' }
+  }
+
+  /**
+   * التحقق من الرمز — على الخادم لا في المتصفح.
+   *
+   * لو اعتمدنا على المتصفح إنه «تحقّق»، أي حد يبعت الطلب مباشرة
+   * ويتخطّى الخطوة كلها. هنا بنسأل قاعدة البيانات: الرقم ده اتحقّق
+   * منه فعلًا خلال آخر نص ساعة ولا لأ.
+   */
+  if (settings?.otpEnabled) {
+    const verified = await isPhoneVerifiedForOrder(store.id, phone)
+    if (!verified) {
+      return { ok: false, error: 'لازم تتحقق من رقمك الأول' }
+    }
   }
 
   const result = await db.transaction(async (tx) => {
@@ -470,4 +485,40 @@ export async function applyCouponAction(input: {
   if (!res.ok) return { ok: false, error: res.message }
 
   return { ok: true, discount: res.discount, freeShipping: res.freeShipping, code: res.code }
+}
+
+/* ────────────────────────── رمز التحقق ────────────────────────── */
+
+/** يبعت رمز تحقق للعميل قبل تأكيد الطلب */
+export async function requestOrderOtpAction(input: {
+  storeIdentifier: string
+  phone: string
+  email?: string
+}): Promise<{ ok: true; target: string } | { ok: false; error: string }> {
+  const store = await getStore(input.storeIdentifier)
+  if (!store) return { ok: false, error: 'المتجر مش موجود' }
+
+  const phone = normalizePhone(input.phone, store.country === 'EG' ? '20' : '966')
+  const res = await issueOrderOtp({
+    storeId: store.id,
+    storeName: store.name,
+    phone,
+    email: input.email,
+  })
+
+  if (!res.ok) return { ok: false, error: res.error }
+  return { ok: true, target: res.maskedTarget }
+}
+
+/** يتحقق من الرمز — الطلب نفسه بيتحقق تاني قبل ما يتسجّل */
+export async function verifyOrderOtpAction(input: {
+  storeIdentifier: string
+  phone: string
+  code: string
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const store = await getStore(input.storeIdentifier)
+  if (!store) return { ok: false, error: 'المتجر مش موجود' }
+
+  const phone = normalizePhone(input.phone, store.country === 'EG' ? '20' : '966')
+  return verifyOrderOtp(store.id, phone, input.code)
 }

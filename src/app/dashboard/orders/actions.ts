@@ -5,6 +5,10 @@ import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { inventoryMovements, orderEvents, orderItems, orders, products } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { getStoreTheme } from '@/lib/storefront'
+import { isEmailConfigured, sendEmail } from '@/lib/email'
+import { isEmailableStatus, orderStatusEmail } from '@/lib/store-emails'
+import { storeUrl } from '@/lib/domain'
 import type { OrderStatus } from '@/db/schema'
 
 const LABELS: Record<OrderStatus, string> = {
@@ -28,7 +32,18 @@ export async function updateOrderStatusAction(orderId: string, status: OrderStat
   const { store, user } = await getDashboardContext()
 
   const [order] = await db
-    .select({ id: orders.id, status: orders.status, orderNumber: orders.orderNumber })
+    .select({
+      id: orders.id,
+      status: orders.status,
+      orderNumber: orders.orderNumber,
+      customerName: orders.customerName,
+      customerEmail: orders.customerEmail,
+      total: orders.total,
+      currency: orders.currency,
+      recoveryToken: orders.recoveryToken,
+      trackingNumber: orders.trackingNumber,
+      shippingCarrier: orders.shippingCarrier,
+    })
     .from(orders)
     .where(and(eq(orders.id, orderId), eq(orders.storeId, store.id)))
     .limit(1)
@@ -86,6 +101,32 @@ export async function updateOrderStatusAction(orderId: string, status: OrderStat
       actorId: user.id,
     })
   })
+
+  /**
+   * إشعار العميل بالحالة الجديدة.
+   *
+   * برّه المعاملة وبغير await: العميل لازم يتبلّغ، بس لو البريد وقع
+   * الحالة تفضل متغيّرة — التاجر غيّرها فعلًا والمخزون اتعدّل.
+   */
+  if (order.customerEmail && isEmailableStatus(status) && isEmailConfigured()) {
+    void (async () => {
+      const theme = await getStoreTheme(store.id)
+      const mail = orderStatusEmail(
+        { name: store.name, logo: store.logoLight, primary: theme.custom.identity.primary },
+        status,
+        {
+          orderNumber: order.orderNumber,
+          customerName: order.customerName,
+          total: order.total,
+          currency: order.currency,
+          trackingNumber: order.trackingNumber,
+          carrier: order.shippingCarrier,
+          trackUrl: `${storeUrl(store.slug)}/order/${order.orderNumber}?t=${encodeURIComponent(order.recoveryToken ?? '')}`,
+        },
+      )
+      await sendEmail({ to: order.customerEmail!, ...mail })
+    })().catch((e) => console.error('فشل إرسال بريد حالة الطلب:', e))
+  }
 
   revalidatePath('/dashboard/orders')
   revalidatePath(`/dashboard/orders/${orderId}`)
