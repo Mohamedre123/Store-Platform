@@ -1,5 +1,5 @@
 import 'server-only'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { cache } from 'react'
 import { and, eq, gt } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
@@ -12,22 +12,26 @@ const SESSION_COOKIE = 'zawya_session'
 const SESSION_DAYS = config.session.days
 
 /**
- * نطاق الكوكي.
+ * نطاق الكوكي — يُشتقّ من المضيف الفعلي للطلب لا من الإعدادات.
  *
- * الدخول بيتم على zawya.cc واللوحة على dashboard.zawya.cc. لو الكوكي
- * اتحفظت على المضيف وحده، المتصفح ما بيبعتهاش للنطاق الفرعي — فالمستخدم
- * يدخل بنجاح ثم يلاقي نفسه مطرود لصفحة الدخول تاني، وكأن بياناته غلط.
+ * السبب: المنصة بتتقدّم من أكتر من مضيف — نطاقها، ونطاق Vercel،
+ * وlocalhost. لو ثبّتنا النطاق من متغيّر البيئة، المتصفح بيرفض
+ * الكوكي على أي مضيف تاني، فالمستخدم يدخل بنجاح ثم يلاقي نفسه
+ * خارج مع أول ضغطة — وده اللي كان بيحصل على vercel.app.
  *
- * النقطة في الأول («.zawya.cc») بتخلي الكوكي صالحة على النطاق وكل
- * فروعه. على localhost نسيبها فاضية لأن المتصفحات بترفض نطاق لمضيف محلي.
+ * لما المضيف تحت نطاق المنصة، بنستخدم نطاقًا أبًا («.zawya.cc»)
+ * عشان الجلسة تسري على اللوحة والمتاجر معًا. غير كده كوكي للمضيف
+ * وحده، وهو المقبول دايمًا.
  */
-function sessionCookieDomain(): string | undefined {
+async function sessionCookieDomain(): Promise<string | undefined> {
   const root = (process.env.NEXT_PUBLIC_ROOT_DOMAIN || '').split(':')[0].toLowerCase()
-  if (!root || root === 'localhost' || root.endsWith('.localhost')) return undefined
-  // نطاقات vercel.app لا تقبل كوكي على مستوى النطاق الأب
-  if (root.endsWith('.vercel.app')) return undefined
-  if (!root.includes('.')) return undefined
-  return `.${root}`
+  if (!root || !root.includes('.') || root.endsWith('.vercel.app')) return undefined
+
+  const host = (await headers()).get('host')?.split(':')[0].toLowerCase()
+  if (!host) return undefined
+  if (host !== root && !host.endsWith('.' + root)) return undefined
+
+  return '.' + root
 }
 
 export type SessionUser = {
@@ -71,7 +75,7 @@ export async function createSession(userId: string, meta: { userAgent?: string; 
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    domain: sessionCookieDomain(),
+    domain: await sessionCookieDomain(),
     expires: expiresAt,
   })
 
@@ -89,7 +93,7 @@ export async function destroySession() {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    domain: sessionCookieDomain(),
+    domain: await sessionCookieDomain(),
     maxAge: 0,
   })
 }
