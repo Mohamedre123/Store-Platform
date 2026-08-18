@@ -154,8 +154,10 @@ export async function computeTotals(options: {
   city: string | null
   paymentGateway: string | null
   discount?: number
+  /** كوبون «شحن مجاني» بيصفّر الشحن بغض النظر عن حد الشحن المجاني */
+  couponFreeShipping?: boolean
 }): Promise<Totals> {
-  const { storeId, lines, country, city, paymentGateway, discount = 0 } = options
+  const { storeId, lines, country, city, paymentGateway, discount = 0, couponFreeShipping = false } = options
 
   const subtotal = lines.reduce((n, l) => n + l.total, 0)
   const costTotal = lines.reduce((n, l) => n + (l.costPrice ?? 0) * l.quantity, 0)
@@ -164,7 +166,7 @@ export async function computeTotals(options: {
   const zone = ship.zone
 
   const freeThreshold = zone?.freeShippingEnabled ? zone.freeOverAmount : 0
-  const freeShippingApplied = Boolean(freeThreshold && subtotal - discount >= freeThreshold)
+  const freeShippingApplied = couponFreeShipping || Boolean(freeThreshold && subtotal - discount >= freeThreshold)
   const shipping = freeShippingApplied ? 0 : ship.price
 
   // رسوم أو خصم طريقة الدفع

@@ -14,6 +14,7 @@ import {
 } from '@/db/schema'
 import { getStore } from '@/lib/storefront'
 import { computeTotals, getCheckoutSettings, priceCart } from '@/lib/checkout'
+import { validateCoupon, recordCouponUse } from '@/lib/coupons'
 import { generateToken } from '@/lib/crypto'
 import { normalizePhone } from '@/lib/utils'
 
@@ -36,6 +37,7 @@ const orderSchema = z.object({
   building: z.string().trim().optional(),
   notes: z.string().trim().max(500).optional(),
   paymentGateway: z.string().trim().default('cod'),
+  couponCode: z.string().trim().max(32).optional(),
   lines: z.array(lineSchema).min(1, 'السلة فاضية'),
   /** يربط الطلب المكتمل بالسجل الناقص اللي اتحفظ وهو بيكتب */
   draftToken: z.string().optional(),
@@ -178,6 +180,17 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
     return { ok: false, error: messages[issue.kind] }
   }
 
+  const phone = normalizePhone(input.phone, store.country === 'EG' ? '20' : '966')
+
+  // الكوبون بيتحقّق على الخادم — الخصم بيتحسب هنا مش من المتصفح. لو الكود
+  // بقى غير صالح بين ما العميل طبّقه واتأكد، بنكمّل الطلب من غير خصم بدل
+  // ما نرفضه ونضيّع البيعة.
+  let coupon: { id: string; code: string; discount: number; freeShipping: boolean } | null = null
+  if (input.couponCode) {
+    const res = await validateCoupon(store.id, input.couponCode, { lines, customerPhone: phone })
+    if (res.ok) coupon = { id: res.couponId, code: res.code, discount: res.discount, freeShipping: res.freeShipping }
+  }
+
   const settings = await getCheckoutSettings(store.id)
   const totals = await computeTotals({
     storeId: store.id,
@@ -185,13 +198,13 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
     country: input.country,
     city: input.city ?? null,
     paymentGateway: input.paymentGateway,
+    discount: coupon?.discount ?? 0,
+    couponFreeShipping: coupon?.freeShipping ?? false,
   })
 
   if (settings?.minOrderEnabled && totals.subtotal < settings.minOrderAmount) {
     return { ok: false, error: 'الطلب أقل من الحد الأدنى المسموح' }
   }
-
-  const phone = normalizePhone(input.phone, store.country === 'EG' ? '20' : '966')
 
   const result = await db.transaction(async (tx) => {
     // عميل واحد لكل رقم في كل متجر
@@ -260,6 +273,8 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
       codFee: totals.codFee,
       taxTotal: totals.tax,
       discountTotal: totals.discount,
+      couponCode: coupon?.code ?? null,
+      couponId: coupon?.id ?? null,
       total: totals.total,
       costTotal: totals.costTotal,
       currency: store.currency,
@@ -303,6 +318,17 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
         total: l.total,
       })),
     )
+
+    // تسجيل استخدام الكوبون داخل نفس المعاملة — العدّاد والحدود تفضل دقيقة
+    if (coupon && (coupon.discount > 0 || coupon.freeShipping)) {
+      await recordCouponUse(tx, {
+        couponId: coupon.id,
+        storeId: store.id,
+        orderId: orderId!,
+        customerId: customer.id,
+        amount: totals.discount,
+      })
+    }
 
     // خصم المخزون مع تسجيل الحركة
     for (const l of lines) {
@@ -349,4 +375,29 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
     .limit(1)
 
   return { ok: true, orderNumber: result.orderNumber, token: row?.token ?? '' }
+}
+
+/**
+ * تطبيق كوبون من الشيك أوت — لعرض الخصم للعميل قبل ما يأكّد.
+ *
+ * السلطة النهائية على الخصم في placeOrderAction (بيتحقّق تاني)، لكن ده
+ * بيدّي العميل رد فعل فوري: الكود اتقبل وخصمك كذا، أو الكود غلط وليه.
+ */
+export async function applyCouponAction(input: {
+  storeIdentifier: string
+  code: string
+  phone?: string
+  lines: Array<{ productId: string; quantity: number }>
+}): Promise<{ ok: true; discount: number; freeShipping: boolean; code: string } | { ok: false; error: string }> {
+  const store = await getStore(input.storeIdentifier)
+  if (!store) return { ok: false, error: 'المتجر مش موجود' }
+
+  const { lines, issue } = await priceCart(store.id, input.lines)
+  if (issue) return { ok: false, error: 'السلة فاضية' }
+
+  const phone = input.phone ? normalizePhone(input.phone, store.country === 'EG' ? '20' : '966') : null
+  const res = await validateCoupon(store.id, input.code, { lines, customerPhone: phone })
+  if (!res.ok) return { ok: false, error: res.message }
+
+  return { ok: true, discount: res.discount, freeShipping: res.freeShipping, code: res.code }
 }

@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { Banknote, CheckCircle2, Loader2, Truck } from 'lucide-react'
+import { Banknote, CheckCircle2, Loader2, Tag, Truck } from 'lucide-react'
 import { useCart } from '@/components/storefront/cart'
 import { useStoreHref } from '@/components/storefront/store-link'
-import { captureIncompleteOrder, placeOrderAction } from './actions'
+import { applyCouponAction, captureIncompleteOrder, placeOrderAction } from './actions'
 import { formatMoney, isValidPhone } from '@/lib/utils'
 import type { Region } from '@/lib/regions'
 
@@ -71,12 +71,47 @@ export function CheckoutForm({
   const [gateway, setGateway] = useState(payments[0]?.gateway ?? 'cod')
   const [error, setError] = useState<string | null>(null)
 
+  // الكوبون
+  const [couponInput, setCouponInput] = useState('')
+  const [coupon, setCoupon] = useState<{ code: string; discount: number; freeShipping: boolean } | null>(null)
+  const [couponMsg, setCouponMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [applyingCoupon, startApplyCoupon] = useTransition()
+
   const draftToken = useRef<string | undefined>(undefined)
   const captured = useRef(false)
 
-  const shipping = freeOver !== null && subtotal >= freeOver ? 0 : (shippingByCity[city] ?? defaultShipping)
-  const total = subtotal + shipping
+  const baseShipping = freeOver !== null && subtotal >= freeOver ? 0 : (shippingByCity[city] ?? defaultShipping)
+  const shipping = coupon?.freeShipping ? 0 : baseShipping
+  const discount = coupon?.discount ?? 0
+  const total = Math.max(0, subtotal - discount) + shipping
   const remainingForFree = freeOver !== null && subtotal < freeOver ? freeOver - subtotal : null
+
+  function applyCoupon() {
+    const code = couponInput.trim()
+    if (!code) return
+    setCouponMsg(null)
+    startApplyCoupon(async () => {
+      const res = await applyCouponAction({
+        storeIdentifier,
+        code,
+        phone: isValidPhone(phone) ? phone : undefined,
+        lines: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+      })
+      if (res.ok) {
+        setCoupon({ code: res.code, discount: res.discount, freeShipping: res.freeShipping })
+        setCouponMsg({ ok: true, text: res.freeShipping ? 'شحن مجاني اتطبّق' : 'الكود اتطبّق' })
+      } else {
+        setCoupon(null)
+        setCouponMsg({ ok: false, text: res.error })
+      }
+    })
+  }
+
+  function removeCoupon() {
+    setCoupon(null)
+    setCouponInput('')
+    setCouponMsg(null)
+  }
 
   /**
    * التقاط الطلب الناقص.
@@ -139,6 +174,7 @@ export function CheckoutForm({
         building: building || undefined,
         notes: notes || undefined,
         paymentGateway: gateway,
+        couponCode: coupon?.code || undefined,
         lines: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
         draftToken: draftToken.current,
       })
@@ -323,11 +359,57 @@ export function CheckoutForm({
             </p>
           )}
 
+          {config.showCouponField && (
+            <div className="border-t border-[var(--sf-text)]/10 pt-3">
+              {coupon ? (
+                <div className="flex items-center justify-between gap-2 rounded-[var(--sf-radius)] bg-green-50 px-3 py-2 text-sm">
+                  <span className="flex items-center gap-1.5 font-medium text-green-700">
+                    <Tag className="h-3.5 w-3.5" aria-hidden="true" />
+                    <bdi dir="ltr">{coupon.code}</bdi> اتطبّق
+                  </span>
+                  <button type="button" onClick={removeCoupon} className="text-xs text-green-700 underline">
+                    شيل
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex gap-2">
+                    <input
+                      value={couponInput}
+                      onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), applyCoupon())}
+                      placeholder="كود الخصم"
+                      dir="ltr"
+                      className="h-11 flex-1 rounded-[var(--sf-radius)] border border-[var(--sf-text)]/18 bg-[var(--sf-surface)] px-3 text-start text-sm uppercase outline-none focus:border-[var(--sf-primary)]"
+                    />
+                    <button
+                      type="button"
+                      onClick={applyCoupon}
+                      disabled={applyingCoupon || !couponInput.trim()}
+                      className="shrink-0 rounded-[var(--sf-radius)] border border-[var(--sf-primary)] px-4 text-sm font-medium text-[var(--sf-primary)] transition-colors hover:bg-[var(--sf-primary)]/8 disabled:opacity-50"
+                    >
+                      {applyingCoupon ? '…' : 'تطبيق'}
+                    </button>
+                  </div>
+                  {couponMsg && !couponMsg.ok && (
+                    <p className="mt-1.5 text-xs text-red-600">{couponMsg.text}</p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
           <dl className="flex flex-col gap-2 border-t border-[var(--sf-text)]/10 pt-3 text-sm">
             <div className="flex justify-between">
               <dt className="opacity-65">المنتجات</dt>
               <dd className="tabular">{formatMoney(subtotal, currency)}</dd>
             </div>
+            {discount > 0 && (
+              <div className="flex justify-between text-green-600">
+                <dt className="opacity-90">الخصم</dt>
+                <dd className="tabular">− {formatMoney(discount, currency)}</dd>
+              </div>
+            )}
             <div className="flex justify-between">
               <dt className="flex items-center gap-1.5 opacity-65">
                 <Truck className="h-3.5 w-3.5" aria-hidden="true" />
