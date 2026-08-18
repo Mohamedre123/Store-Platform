@@ -147,16 +147,22 @@ export default async function ProductPage({
             productName={product.name}
           />
 
-          <div className="flex flex-col gap-2 rounded-[var(--sf-radius)] border border-[var(--sf-text)]/10 p-4 text-sm">
-            <span className="flex items-center gap-2">
-              <Truck className="h-4 w-4 shrink-0 text-[var(--sf-primary)]" aria-hidden="true" />
-              التوصيل لكل المحافظات · الدفع عند الاستلام متاح
-            </span>
-            <span className="flex items-center gap-2">
-              <Undo2 className="h-4 w-4 shrink-0 text-[var(--sf-primary)]" aria-hidden="true" />
-              إرجاع سهل لو المنتج مش زي ما توقّعت
-            </span>
-          </div>
+          {(productPage.showShippingNote || productPage.showReturnNote || productPage.trustLines.length > 0) && (
+            <div className="flex flex-col gap-2 rounded-[var(--sf-radius)] border border-[var(--sf-text)]/10 p-4 text-sm">
+              {productPage.showShippingNote && (
+                <span className="flex items-center gap-2">
+                  <Truck className="h-4 w-4 shrink-0 text-[var(--sf-primary)]" aria-hidden="true" />
+                  {productPage.trustLines[0] || 'التوصيل لكل المحافظات · الدفع عند الاستلام متاح'}
+                </span>
+              )}
+              {productPage.showReturnNote && (
+                <span className="flex items-center gap-2">
+                  <Undo2 className="h-4 w-4 shrink-0 text-[var(--sf-primary)]" aria-hidden="true" />
+                  {productPage.trustLines[1] || 'إرجاع سهل لو المنتج مش زي ما توقّعت'}
+                </span>
+              )}
+            </div>
+          )}
 
           {product.description && (
             <div className="border-t border-[var(--sf-text)]/10 pt-5">

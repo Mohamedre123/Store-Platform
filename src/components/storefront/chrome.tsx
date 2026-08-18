@@ -23,6 +23,10 @@ export function StoreHeader({
   nav,
   navStyle,
   showSearch,
+  showCart = true,
+  showCategoriesBar = false,
+  sticky = true,
+  categories = [],
   currency,
   storeSlug,
 }: {
@@ -32,6 +36,10 @@ export function StoreHeader({
   nav: NavItem[]
   navStyle: 'top' | 'centered' | 'split'
   showSearch: boolean
+  showCart?: boolean
+  showCategoriesBar?: boolean
+  sticky?: boolean
+  categories?: Array<{ name: string; slug: string }>
   currency: string
   storeSlug: string
 }) {
@@ -69,7 +77,7 @@ export function StoreHeader({
     </nav>
   )
 
-  const cartButton = (
+  const cartButton = showCart ? (
     <button
       type="button"
       onClick={() => setOpen(true)}
@@ -83,11 +91,11 @@ export function StoreHeader({
         </span>
       )}
     </button>
-  )
+  ) : null
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-[var(--sf-text)]/10 bg-[var(--sf-surface)]/90 backdrop-blur-md">
+      <header className={`${sticky ? 'sticky top-0' : ''} z-40 border-b border-[var(--sf-text)]/10 bg-[var(--sf-surface)]/90 backdrop-blur-md`}>
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div
             className={`flex h-16 items-center gap-4 ${
@@ -138,6 +146,23 @@ export function StoreHeader({
           </div>
         </div>
       </header>
+
+      {/* شريط الأقسام — بيظهر لو التاجر فعّله */}
+      {showCategoriesBar && categories.length > 0 && (
+        <div className="border-b border-[var(--sf-text)]/10 bg-[var(--sf-surface)]/60">
+          <div className="scroll-x mx-auto flex max-w-6xl items-center gap-1 px-4 py-2 sm:px-6">
+            {categories.map((c) => (
+              <Link
+                key={c.slug}
+                href={`/category/${c.slug}`}
+                className="shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm opacity-75 transition-all hover:bg-[var(--sf-text)]/6 hover:opacity-100"
+              >
+                {c.name}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* قائمة الموبايل */}
       {menuOpen && (

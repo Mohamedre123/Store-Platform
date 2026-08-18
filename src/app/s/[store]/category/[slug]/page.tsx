@@ -53,6 +53,7 @@ export default async function CategoryPage({
                 currency={store.currency}
                 style={listing.cardStyle}
                 imageRatio={listing.imageRatio}
+              showRating={listing.showRating}
               />
             ))}
           </div>

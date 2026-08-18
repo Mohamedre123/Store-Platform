@@ -18,15 +18,17 @@ export function ProductCard({
   currency,
   style = 'clean',
   imageRatio = 'square',
+  showRating = true,
 }: {
   product: StorefrontProduct
   currency: string
   style?: CardStyle
   imageRatio?: 'square' | 'portrait' | 'wide'
+  showRating?: boolean
 }) {
   const off = discountPercent(product.price, product.compareAtPrice)
   const soldOut = product.trackInventory && product.stock <= 0
-  const rating = product.ratingCount ? product.ratingSum / product.ratingCount : null
+  const rating = showRating && product.ratingCount ? product.ratingSum / product.ratingCount : null
   const href = `/products/${product.slug}`
 
   const aspect =

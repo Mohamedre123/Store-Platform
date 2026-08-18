@@ -713,9 +713,17 @@ export function Panel({
                 onChange={(v) => patch('preloader', { style: v })}
                 columns={3}
               />
+              {s.style === 'logo' && (
+                <ImageUpload
+                  label="شعار متجرك (يظهر في شاشة التحميل والهيدر)"
+                  value={value.identity.logoLight ? [value.identity.logoLight] : []}
+                  onChange={(urls) => patch('identity', { logoLight: urls[0] ?? null })}
+                  folder="logos"
+                />
+              )}
               <p className="rounded-lg bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--fg-muted)]">
-                شكل «شعارك» بيستخدم شعار متجرك اللي رفعته في لوحة «الهوية» — مش شعار المنصة. لو
-                مارفعتش شعار، هيظهر اسم متجرك. لون الحركة بينطبق على الحلقة والنقاط.
+                ده شعار *متجرك* اللي بترفعه بنفسك — مش شعار المنصة. لو مارفعتش، هيظهر اسم متجرك.
+                لون الحركة بينطبق على الحلقة والنقاط.
               </p>
               <ColorField
                 label="لون الخلفية"

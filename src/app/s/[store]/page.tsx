@@ -48,7 +48,12 @@ export default async function StoreHomePage({ params }: { params: Promise<{ stor
   ])
 
   const gridClass = listingGrid(listing)
-  const cardProps = { currency: store.currency, style: listing.cardStyle, imageRatio: listing.imageRatio }
+  const cardProps = {
+    currency: store.currency,
+    style: listing.cardStyle,
+    imageRatio: listing.imageRatio,
+    showRating: listing.showRating,
+  }
 
   const empty = latest.length === 0
 

@@ -35,6 +35,7 @@ export default async function ProductsPage({ params }: { params: Promise<{ store
               currency={store.currency}
               style={listing.cardStyle}
               imageRatio={listing.imageRatio}
+              showRating={listing.showRating}
             />
           ))}
         </div>

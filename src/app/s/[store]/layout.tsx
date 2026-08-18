@@ -6,6 +6,7 @@ import { CartProvider } from '@/components/storefront/cart'
 import { StoreHeader } from '@/components/storefront/chrome'
 import { PreviewBridge } from '@/components/storefront/preview-bridge'
 import { StorePreloader } from '@/components/storefront/preloader'
+import { StoreFooter } from '@/components/storefront/footer'
 import { StoreToolbar } from '@/components/storefront/store-toolbar'
 import { StoreLinkProvider } from '@/components/storefront/store-link'
 import { FONT_STACKS, RADIUS_PX } from '@/lib/customization'
@@ -59,6 +60,13 @@ export default async function StorefrontLayout({
   // المصدر الوحيد لشكل المتجر — مدموج مرة واحدة في getStoreTheme
   const custom = theme.custom
 
+  /**
+   * شعار المتجر: في المعاينة بنعرض شعار المسوّدة (اللي التاجر لسه رافعه)
+   * عشان يشوفه قبل النشر؛ في النسخة الحيّة بنعرض الشعار المنشور من جدول
+   * المتجر. الاتنين شعار *التاجر* — مفيش أي شعار للمنصة في متجر العميل.
+   */
+  const storeLogo = custom.identity.logoLight ?? store.logoLight
+
   const nav = [
     { label: 'الرئيسية', href: '/' },
     { label: 'كل المنتجات', href: '/products' },
@@ -96,7 +104,7 @@ export default async function StorefrontLayout({
           {custom.preloader.enabled && (
             <StorePreloader
               settings={custom.preloader}
-              logo={store.logoLight}
+              logo={storeLogo}
               storeName={store.name}
               preview={isPreview}
             />
@@ -109,18 +117,28 @@ export default async function StorefrontLayout({
               background: custom.announcement.background,
               color: custom.announcement.color,
             }}
-            className="px-4 py-2 text-center text-sm"
+            className={`px-4 py-2 text-center text-sm ${custom.announcement.sticky ? 'sticky top-0 z-50' : ''}`}
           >
-            <span data-sf="announcement-text">{custom.announcement.text}</span>
+            {custom.announcement.link ? (
+              <a href={custom.announcement.link} className="hover:underline" data-sf="announcement-text">
+                {custom.announcement.text}
+              </a>
+            ) : (
+              <span data-sf="announcement-text">{custom.announcement.text}</span>
+            )}
           </div>
 
           <StoreHeader
             storeName={store.name}
-            logo={store.logoLight}
-            hideName={store.hideNameInHeader}
+            logo={storeLogo}
+            hideName={isPreview ? custom.identity.hideNameInHeader : store.hideNameInHeader}
             nav={nav}
             navStyle={custom.header.layout}
             showSearch={custom.header.showSearch}
+            showCart={custom.header.showCart}
+            showCategoriesBar={custom.header.showCategoriesBar}
+            sticky={custom.header.sticky}
+            categories={cats.map((c) => ({ name: c.name, slug: c.slug }))}
             currency={store.currency}
             storeSlug={store.slug}
           />
@@ -133,14 +151,7 @@ export default async function StorefrontLayout({
 
           <main className="flex-1">{children}</main>
 
-          <footer className="border-t border-[var(--sf-text)]/10 py-8">
-            <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 text-sm opacity-65 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-              <span>{custom.footer.copyright || `© ${new Date().getFullYear()} ${store.name}`}</span>
-              <span data-sf="powered-by" style={{ display: custom.footer.showPoweredBy ? undefined : 'none' }} className="opacity-70">
-                مدعوم بـزاوية
-              </span>
-            </div>
-          </footer>
+          <StoreFooter footer={custom.footer} storeName={store.name} />
 
           <StoreToolbar toolbar={custom.toolbar} />
         </div>
