@@ -27,6 +27,7 @@ export function StoreHeader({
   showCategoriesBar = false,
   sticky = true,
   categories = [],
+  cartEmptyMessage,
   currency,
   storeSlug,
 }: {
@@ -40,6 +41,7 @@ export function StoreHeader({
   showCategoriesBar?: boolean
   sticky?: boolean
   categories?: Array<{ name: string; slug: string }>
+  cartEmptyMessage?: string
   currency: string
   storeSlug: string
 }) {
@@ -201,7 +203,7 @@ export function StoreHeader({
         </div>
       )}
 
-      <CartDrawer currency={currency} storeSlug={storeSlug} />
+      <CartDrawer currency={currency} storeSlug={storeSlug} emptyMessage={cartEmptyMessage} />
     </>
   )
 }

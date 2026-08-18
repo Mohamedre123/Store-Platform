@@ -8,7 +8,14 @@ import { useCart } from './cart'
 import { formatMoney } from '@/lib/utils'
 
 /** درج السلة — يفتح من جهة البداية ويقفل بـEscape أو بالضغط برّه */
-export function CartDrawer({ currency }: { currency: string; storeSlug: string }) {
+export function CartDrawer({
+  currency,
+  emptyMessage = 'سلتك فاضية',
+}: {
+  currency: string
+  storeSlug: string
+  emptyMessage?: string
+}) {
   const { items, isOpen, setOpen, setQuantity, remove, subtotal, count } = useCart()
 
   useEffect(() => {
@@ -55,7 +62,7 @@ export function CartDrawer({ currency }: { currency: string; storeSlug: string }
         {items.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
             <ShoppingBag className="h-10 w-10 opacity-25" aria-hidden="true" />
-            <p className="font-medium">سلتك فاضية</p>
+            <p className="font-medium">{emptyMessage}</p>
             <Link
               href="/products"
               onClick={() => setOpen(false)}

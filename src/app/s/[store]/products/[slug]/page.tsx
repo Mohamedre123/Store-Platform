@@ -116,6 +116,12 @@ export default async function ProductPage({
         <div className="flex flex-col gap-5">
           <h1 className="text-balance text-2xl font-bold tracking-tight sm:text-3xl">{product.name}</h1>
 
+          {productPage.showSku && product.sku && (
+            <span className="-mt-2 text-xs text-[var(--sf-text)]/50">
+              كود المنتج: <bdi dir="ltr">{product.sku}</bdi>
+            </span>
+          )}
+
           <div className="flex flex-wrap items-baseline gap-3">
             <span className="tabular text-3xl font-bold text-[var(--sf-primary)]">
               {formatMoney(product.price, store.currency)}
@@ -127,7 +133,7 @@ export default async function ProductPage({
             )}
           </div>
 
-          {product.trackInventory && product.stock > 0 && product.stock <= 10 && (
+          {productPage.showStockCounter && product.trackInventory && product.stock > 0 && product.stock <= 10 && (
             <p className="text-sm font-medium text-amber-600">
               باقي <span className="tabular">{product.stock}</span> بس في المخزن
             </p>
