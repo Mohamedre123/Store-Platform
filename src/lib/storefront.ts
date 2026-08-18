@@ -2,7 +2,7 @@ import 'server-only'
 import { cache } from 'react'
 import { and, desc, eq, gt, isNotNull, or, sql } from 'drizzle-orm'
 import { db } from '@/db'
-import { categories, products, stores, storeThemes } from '@/db/schema'
+import { categories, products, stores, storePlugins, storeThemes } from '@/db/schema'
 import { getTheme, type ThemeDefinition } from './themes'
 import {
   defaultCustomization,
@@ -11,6 +11,7 @@ import {
   type PanelKey,
 } from './customization'
 import type { SortKey } from './sort-options'
+import type { ActivePixels } from './plugins'
 import type { Section, ThemeTokens } from '@/db/schema'
 
 /**
@@ -306,3 +307,30 @@ export function listingGrid(listing: { columnsDesktop: number; columnsMobile: nu
           : 'md:grid-cols-4'
   return `grid gap-4 sm:gap-5 ${mobile} ${desk}`
 }
+
+/**
+ * معرّفات البكسل المفعّلة للمتجر.
+ *
+ * استعلام واحد بيرجّع كل الإضافات المفعّلة، وبنحوّلها لشكل مسطّح
+ * يسهل حقنه. مغلّف بـcache زي باقي دوال المتجر.
+ */
+export const getStorePixels = cache(async (storeId: string): Promise<ActivePixels> => {
+  const rows = await db
+    .select({ slug: storePlugins.pluginSlug, config: storePlugins.config })
+    .from(storePlugins)
+    .where(and(eq(storePlugins.storeId, storeId), eq(storePlugins.enabled, true)))
+
+  const get = (slug: string, key: string) => {
+    const row = rows.find((r) => r.slug === slug)
+    const value = row?.config?.[key]
+    return typeof value === 'string' && value ? value : undefined
+  }
+
+  return {
+    facebookPixelId: get('facebook_pixel', 'pixelId'),
+    tiktokPixelId: get('tiktok_pixel', 'pixelId'),
+    snapchatPixelId: get('snapchat_pixel', 'pixelId'),
+    gaMeasurementId: get('google_analytics', 'measurementId'),
+    googleAdsId: get('google_ads', 'conversionId'),
+  }
+})

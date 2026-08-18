@@ -1,7 +1,8 @@
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
-import { getStore, getStoreTheme, listCategories } from '@/lib/storefront'
+import { getStore, getStorePixels, getStoreTheme, listCategories } from '@/lib/storefront'
+import { StorePixels } from '@/components/storefront/pixels'
 import { CartProvider } from '@/components/storefront/cart'
 import { StoreHeader } from '@/components/storefront/chrome'
 import { PreviewBridge } from '@/components/storefront/preview-bridge'
@@ -46,8 +47,11 @@ export default async function StorefrontLayout({
   const h = await headers()
   const isPreview = h.get('x-zawya-preview') === '1'
 
-  const theme = await getStoreTheme(store.id, isPreview)
-  const cats = await listCategories(store.id)
+  const [theme, cats, pixels] = await Promise.all([
+    getStoreTheme(store.id, isPreview),
+    listCategories(store.id),
+    getStorePixels(store.id),
+  ])
 
   /**
    * لو الطلب جه من نطاق المتجر، الوكيل بيحط الترويسة دي وتبقى الروابط
@@ -100,6 +104,7 @@ export default async function StorefrontLayout({
       >
         <div style={{ background: 'var(--sf-bg)', color: 'var(--sf-text)' }} className="flex min-h-full flex-1 flex-col">
           <PreviewBridge />
+          <StorePixels pixels={pixels} preview={isPreview} />
 
           {custom.preloader.enabled && (
             <StorePreloader
