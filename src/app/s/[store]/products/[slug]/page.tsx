@@ -11,8 +11,13 @@ import {
   listProductReviews,
   listProducts,
 } from '@/lib/storefront'
+import { and, eq } from 'drizzle-orm'
+import { db } from '@/db'
+import { wishlists } from '@/db/schema'
+import { getCurrentCustomer } from '@/lib/customer-auth'
 import { ProductCard } from '@/components/storefront/product-card'
 import { ProductReviews } from '@/components/storefront/reviews'
+import { WishlistButton } from '@/components/storefront/wishlist-button'
 import { AddToCart } from '@/components/storefront/add-to-cart'
 import { formatMoney } from '@/lib/utils'
 
@@ -59,6 +64,19 @@ export default async function ProductPage({
   const off = discountPercent(product.price, product.compareAtPrice)
   const soldOut = product.trackInventory && product.stock <= 0
   const productReviews = await listProductReviews(product.id)
+
+  // حالة المفضّلة للعميل المسجّل — العميل الزائر بيشوف القلب فاضي
+  const customer = await getCurrentCustomer(store.id)
+  let isSaved = false
+  if (customer) {
+    const [row] = await db
+      .select({ id: wishlists.id })
+      .from(wishlists)
+      .where(and(eq(wishlists.customerId, customer.id), eq(wishlists.productId, product.id)))
+      .limit(1)
+    isSaved = Boolean(row)
+  }
+
   const related = (await listProducts(store.id, { categoryId: product.categoryId ?? undefined, limit: 5 }))
     .filter((p) => p.id !== product.id)
     .slice(0, 4)
@@ -171,19 +189,28 @@ export default async function ProductPage({
             </p>
           )}
 
-          <AddToCart
-            item={{
-              productId: product.id,
-              name: product.name,
-              slug: product.slug,
-              image: product.images[0],
-              price: product.price,
-              maxStock: product.trackInventory ? product.stock : undefined,
-            }}
-            soldOut={soldOut}
-            whatsapp={store.whatsapp}
-            productName={product.name}
-          />
+          <div className="flex items-stretch gap-2">
+            <div className="min-w-0 flex-1">
+              <AddToCart
+                item={{
+                  productId: product.id,
+                  name: product.name,
+                  slug: product.slug,
+                  image: product.images[0],
+                  price: product.price,
+                  maxStock: product.trackInventory ? product.stock : undefined,
+                }}
+                soldOut={soldOut}
+                whatsapp={store.whatsapp}
+                productName={product.name}
+              />
+            </div>
+            <WishlistButton
+              storeIdentifier={identifier}
+              productId={product.id}
+              initialSaved={isSaved}
+            />
+          </div>
 
           {(productPage.showShippingNote || productPage.showReturnNote || productPage.trustLines.length > 0) && (
             <div className="flex flex-col gap-2 rounded-[var(--sf-radius)] border border-[var(--sf-text)]/10 p-4 text-sm">

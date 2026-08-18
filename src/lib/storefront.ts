@@ -1,6 +1,6 @@
 import 'server-only'
 import { cache } from 'react'
-import { and, desc, eq, gt, isNotNull, or, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, ilike, isNotNull, or, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { categories, pages, products, reviews, stores, storePlugins, storeThemes } from '@/db/schema'
 import { getTheme, type ThemeDefinition } from './themes'
@@ -370,3 +370,30 @@ export const listProductReviews = cache(async (productId: string) => {
     .orderBy(desc(reviews.createdAt))
     .limit(50)
 })
+
+/**
+ * البحث في منتجات المتجر.
+ *
+ * بحث نصي بسيط على الاسم والوصف المختصر — كفاية لمتجر بمئات المنتجات.
+ * `ilike` بيتجاهل حالة الحروف، والعربي مالوش حالة أصلًا فالنتيجة صح.
+ */
+export const searchProducts = cache(
+  async (storeId: string, query: string, limit = 40): Promise<StorefrontProduct[]> => {
+    const q = query.trim()
+    if (q.length < 2) return []
+
+    const pattern = `%${q}%`
+    return db
+      .select(productFields)
+      .from(products)
+      .leftJoin(categories, eq(categories.id, products.categoryId))
+      .where(
+        and(
+          visible(storeId),
+          or(ilike(products.name, pattern), ilike(products.shortDescription, pattern)),
+        ),
+      )
+      .orderBy(desc(products.soldCount))
+      .limit(limit)
+  },
+)

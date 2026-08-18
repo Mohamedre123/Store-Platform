@@ -142,6 +142,7 @@ export default async function StorefrontLayout({
             navStyle={custom.header.layout}
             showSearch={custom.header.showSearch}
             showCart={custom.header.showCart}
+            showAccount={custom.header.showAccount}
             showCategoriesBar={custom.header.showCategoriesBar}
             sticky={custom.header.sticky}
             categories={cats.map((c) => ({ name: c.name, slug: c.slug }))}

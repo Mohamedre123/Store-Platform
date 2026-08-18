@@ -2,10 +2,11 @@
 
 import { SLink as Link } from './store-link'
 import Image from 'next/image'
-import { Menu, ShoppingBag, X } from 'lucide-react'
+import { Menu, Search, ShoppingBag, User, X } from 'lucide-react'
 import { useState } from 'react'
 import { useCart } from './cart'
 import { CartDrawer } from './cart-drawer'
+import { SearchBox } from './search-box'
 
 type NavItem = { label: string; href: string }
 
@@ -24,6 +25,7 @@ export function StoreHeader({
   navStyle,
   showSearch,
   showCart = true,
+  showAccount = true,
   showCategoriesBar = false,
   sticky = true,
   categories = [],
@@ -38,6 +40,7 @@ export function StoreHeader({
   navStyle: 'top' | 'centered' | 'split'
   showSearch: boolean
   showCart?: boolean
+  showAccount?: boolean
   showCategoriesBar?: boolean
   sticky?: boolean
   categories?: Array<{ name: string; slug: string }>
@@ -79,6 +82,16 @@ export function StoreHeader({
     </nav>
   )
 
+  const accountButton = showAccount ? (
+    <Link
+      href="/account"
+      aria-label="حسابي"
+      className="flex h-11 w-11 items-center justify-center rounded-lg transition-colors hover:bg-[var(--sf-text)]/6"
+    >
+      <User className="h-5 w-5" aria-hidden="true" />
+    </Link>
+  ) : null
+
   const cartButton = showCart ? (
     <button
       type="button"
@@ -109,6 +122,7 @@ export function StoreHeader({
                 <div className="hidden md:flex">{links}</div>
                 <div className="flex justify-start md:justify-center">{brand}</div>
                 <div className="flex items-center justify-end gap-1">
+                  {accountButton}
                   {cartButton}
                   <button
                     type="button"
@@ -126,13 +140,21 @@ export function StoreHeader({
                 <div className="hidden md:flex">{links}</div>
                 <div className="flex items-center gap-1">
                   {showSearch && (
-                    <Link
-                      href="/products"
-                      className="hidden rounded-lg border border-[var(--sf-text)]/15 px-4 py-2 text-sm opacity-70 transition-opacity hover:opacity-100 lg:block"
-                    >
-                      ابحث في المنتجات…
-                    </Link>
+                    <>
+                      {/* على الشاشات الواسعة خانة بحث فعلية، وعلى الضيّقة أيقونة */}
+                      <div className="hidden w-64 lg:block">
+                        <SearchBox compact />
+                      </div>
+                      <Link
+                        href="/search"
+                        aria-label="بحث"
+                        className="flex h-11 w-11 items-center justify-center rounded-lg transition-colors hover:bg-[var(--sf-text)]/6 lg:hidden"
+                      >
+                        <Search className="h-5 w-5" aria-hidden="true" />
+                      </Link>
+                    </>
                   )}
+                  {accountButton}
                   {cartButton}
                   <button
                     type="button"
