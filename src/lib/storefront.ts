@@ -2,7 +2,7 @@ import 'server-only'
 import { cache } from 'react'
 import { and, desc, eq, gt, isNotNull, or, sql } from 'drizzle-orm'
 import { db } from '@/db'
-import { categories, products, stores, storePlugins, storeThemes } from '@/db/schema'
+import { categories, pages, products, stores, storePlugins, storeThemes } from '@/db/schema'
 import { getTheme, type ThemeDefinition } from './themes'
 import {
   defaultCustomization,
@@ -35,6 +35,7 @@ export type StorefrontStore = {
   hideNameInHeader: boolean
   phone: string | null
   whatsapp: string | null
+  email: string | null
   currency: string
   country: string
   isPublished: boolean
@@ -57,6 +58,7 @@ export const getStore = cache(async (identifier: string): Promise<StorefrontStor
       hideNameInHeader: stores.hideNameInHeader,
       phone: stores.phone,
       whatsapp: stores.whatsapp,
+      email: stores.email,
       currency: stores.currency,
       country: stores.country,
       isPublished: stores.isPublished,
@@ -333,4 +335,20 @@ export const getStorePixels = cache(async (storeId: string): Promise<ActivePixel
     gaMeasurementId: get('google_analytics', 'measurementId'),
     googleAdsId: get('google_ads', 'conversionId'),
   }
+})
+
+/** صفحات السياسات المنشورة اللي تظهر في الفوتر */
+export const listFooterPages = cache(async (storeId: string) => {
+  return db
+    .select({ slug: pages.slug, title: pages.title })
+    .from(pages)
+    .where(
+      and(
+        eq(pages.storeId, storeId),
+        eq(pages.isPublished, true),
+        eq(pages.showInFooter, true),
+        isNotNull(pages.content),
+      ),
+    )
+    .orderBy(pages.sortOrder)
 })

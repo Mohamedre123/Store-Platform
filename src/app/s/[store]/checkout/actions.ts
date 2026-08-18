@@ -12,8 +12,11 @@ import {
   products,
   stores,
 } from '@/db/schema'
-import { getStore } from '@/lib/storefront'
+import { getStore, getStoreTheme } from '@/lib/storefront'
 import { computeTotals, getCheckoutSettings, priceCart } from '@/lib/checkout'
+import { isEmailConfigured, sendEmail } from '@/lib/email'
+import { newOrderNotificationEmail, orderConfirmationEmail } from '@/lib/store-emails'
+import { dashboardUrl, storeUrl } from '@/lib/domain'
 import { validateCoupon, recordCouponUse } from '@/lib/coupons'
 import { generateToken } from '@/lib/crypto'
 import { normalizePhone } from '@/lib/utils'
@@ -374,7 +377,74 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
     .where(eq(orders.id, result.orderId!))
     .limit(1)
 
-  return { ok: true, orderNumber: result.orderNumber, token: row?.token ?? '' }
+  const token = row?.token ?? ''
+
+  /**
+   * رسائل التأكيد — بعد ما المعاملة نجحت لا جوّاها.
+   *
+   * لو البريد فشل (مفتاح ناقص، مزوّد واقع)، الطلب لازم يفضل موجود:
+   * تاجر معاه طلب من غير إيميل أحسن بكتير من عميل دفع وطلبه اتلغى
+   * عشان رسالة ما اتبعتش. عشان كده مفيش await على النتيجة ومفيش throw.
+   */
+  void sendOrderEmails({
+    store,
+    orderNumber: result.orderNumber,
+    token,
+    lines,
+    totals,
+    input,
+    phone,
+  }).catch((e) => console.error('فشل إرسال بريد الطلب:', e))
+
+  return { ok: true, orderNumber: result.orderNumber, token }
+}
+
+/** يجمع بيانات الطلب ويبعت رسالتين: تأكيد للعميل وإشعار للتاجر */
+async function sendOrderEmails(ctx: {
+  store: Awaited<ReturnType<typeof getStore>>
+  orderNumber: number
+  token: string
+  lines: Array<{ name: string; quantity: number; total: number }>
+  totals: { subtotal: number; shipping: number; discount: number; total: number }
+  input: { email?: string; name?: string; city?: string; area?: string; street?: string; building?: string }
+  phone: string
+}) {
+  const { store, orderNumber, token, lines, totals, input, phone } = ctx
+  if (!store || !isEmailConfigured()) return
+
+  const theme = await getStoreTheme(store.id)
+  const brandInfo = {
+    name: store.name,
+    logo: store.logoLight,
+    primary: theme.custom.identity.primary,
+  }
+
+  const address = [input.street, input.building, input.area, input.city].filter(Boolean).join('، ') || null
+
+  const order = {
+    orderNumber,
+    customerName: input.name || null,
+    lines,
+    subtotal: totals.subtotal,
+    shipping: totals.shipping,
+    discount: totals.discount,
+    total: totals.total,
+    currency: store.currency,
+    address,
+    phone,
+    trackUrl: `${storeUrl(store.slug)}/order/${orderNumber}?t=${encodeURIComponent(token)}`,
+  }
+
+  if (input.email) {
+    const mail = orderConfirmationEmail(brandInfo, order)
+    await sendEmail({ to: input.email, ...mail })
+  }
+
+  // إشعار التاجر — على بريد المتجر لو موجود
+  if (store.email) {
+    const mail = newOrderNotificationEmail(brandInfo, order, `${dashboardUrl()}/orders`)
+    await sendEmail({ to: store.email, ...mail })
+  }
 }
 
 /**

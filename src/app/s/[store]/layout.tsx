@@ -1,7 +1,7 @@
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
-import { getStore, getStorePixels, getStoreTheme, listCategories } from '@/lib/storefront'
+import { getStore, getStorePixels, getStoreTheme, listCategories, listFooterPages } from '@/lib/storefront'
 import { StorePixels } from '@/components/storefront/pixels'
 import { CartProvider } from '@/components/storefront/cart'
 import { StoreHeader } from '@/components/storefront/chrome'
@@ -47,10 +47,11 @@ export default async function StorefrontLayout({
   const h = await headers()
   const isPreview = h.get('x-zawya-preview') === '1'
 
-  const [theme, cats, pixels] = await Promise.all([
+  const [theme, cats, pixels, policyPages] = await Promise.all([
     getStoreTheme(store.id, isPreview),
     listCategories(store.id),
     getStorePixels(store.id),
+    listFooterPages(store.id),
   ])
 
   /**
@@ -157,7 +158,7 @@ export default async function StorefrontLayout({
 
           <main className="flex-1">{children}</main>
 
-          <StoreFooter footer={custom.footer} storeName={store.name} />
+          <StoreFooter footer={custom.footer} storeName={store.name} policyPages={policyPages} />
 
           <StoreToolbar toolbar={custom.toolbar} />
         </div>

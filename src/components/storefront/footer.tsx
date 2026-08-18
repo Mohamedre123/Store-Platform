@@ -23,7 +23,16 @@ const Tiktok = svg('M16 3v3.2a4.8 4.8 0 0 0 3.8 4.7v3A7.7 7.7 0 0 1 16 12.8V16a5
  * فوتر المتجر — بيعرض فعلًا كل اللي التاجر يظبطه: نبذة، روابط، سوشيال،
  * أيقونات دفع، وحقوق. أي إعداد يقفله بيختفي، وأي رابط يضيفه بيبان.
  */
-export function StoreFooter({ footer, storeName }: { footer: FooterSettings; storeName: string }) {
+export function StoreFooter({
+  footer,
+  storeName,
+  policyPages = [],
+}: {
+  footer: FooterSettings
+  storeName: string
+  /** صفحات السياسات المنشورة — بتنضم لروابط الفوتر تلقائيًا */
+  policyPages?: Array<{ slug: string; title: string }>
+}) {
   const socials = [
     { key: 'facebook', url: footer.social.facebook, Icon: Facebook, label: 'فيسبوك' },
     { key: 'instagram', url: footer.social.instagram, Icon: Instagram, label: 'إنستجرام' },
@@ -32,7 +41,8 @@ export function StoreFooter({ footer, storeName }: { footer: FooterSettings; sto
     { key: 'tiktok', url: footer.social.tiktok, Icon: Tiktok, label: 'تيك توك' },
   ].filter((s) => s.url)
 
-  const hasTop = footer.about || footer.links.length > 0 || (footer.showSocial && socials.length > 0)
+  const hasLinks = footer.links.length > 0 || policyPages.length > 0
+  const hasTop = footer.about || hasLinks || (footer.showSocial && socials.length > 0)
 
   return (
     <footer className="mt-8 border-t border-[var(--sf-text)]/10">
@@ -45,10 +55,20 @@ export function StoreFooter({ footer, storeName }: { footer: FooterSettings; sto
             </div>
           )}
 
-          {footer.links.length > 0 && (
+          {hasLinks && (
             <div className="flex flex-col gap-2">
               <h3 className="text-sm font-bold">روابط</h3>
               <ul className="flex flex-col gap-1.5">
+                {policyPages.map((p) => (
+                  <li key={p.slug}>
+                    <Link
+                      href={`/pages/${p.slug}`}
+                      className="text-sm opacity-65 transition-opacity hover:opacity-100"
+                    >
+                      {p.title}
+                    </Link>
+                  </li>
+                ))}
                 {footer.links.map((l) => (
                   <li key={l.id}>
                     <a href={l.url} className="text-sm opacity-65 transition-opacity hover:opacity-100">
