@@ -17,17 +17,26 @@ export function StorePreloader({
   settings,
   logo,
   storeName,
+  preview = false,
 }: {
   settings: PreloaderSettings
   logo: string | null
   storeName: string
+  /** في المعاينة بتفضل ظاهرة عشان التاجر يشوف تعديلاته على اللون والشكل */
+  preview?: boolean
 }) {
   const [gone, setGone] = useState(false)
   const [hiding, setHiding] = useState(false)
 
   useEffect(() => {
+    // في المعاينة بتفضل ظاهرة مدة أطول عشان التاجر يشوف لونها وشكلها،
+    // وكل تعديل بيعيد تحميل الإطار فبتظهر تاني — من غير ما تحجب باقي
+    // المتجر للأبد. في المتجر الحقيقي بتختفي بسرعة أول ما يحمّل.
     const hide = () => setHiding(true)
-    // نخفيها لما الصفحة تحمّل، وكحد أقصى بعد ١.٢ ثانية مهما حصل
+    if (preview) {
+      const t = setTimeout(hide, 2600)
+      return () => clearTimeout(t)
+    }
     const min = setTimeout(hide, 500)
     const max = setTimeout(hide, 1200)
     if (document.readyState === 'complete') setTimeout(hide, 400)
@@ -38,7 +47,7 @@ export function StorePreloader({
       clearTimeout(max)
       window.removeEventListener('load', hide)
     }
-  }, [])
+  }, [preview])
 
   useEffect(() => {
     if (!hiding) return

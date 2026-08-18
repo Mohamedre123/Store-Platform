@@ -94,7 +94,12 @@ export default async function StorefrontLayout({
           <PreviewBridge />
 
           {custom.preloader.enabled && (
-            <StorePreloader settings={custom.preloader} logo={store.logoLight} storeName={store.name} />
+            <StorePreloader
+              settings={custom.preloader}
+              logo={store.logoLight}
+              storeName={store.name}
+              preview={isPreview}
+            />
           )}
 
           <div

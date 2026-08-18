@@ -19,9 +19,11 @@ import {
   shippingZones,
 } from "@/db/schema";
 import { getDashboardContext } from "@/lib/store-context";
+import { storeUrl } from "@/lib/domain";
 import { formatMoney } from "@/lib/utils";
 import { Card } from "@/components/ui";
 import { Reveal, SpotlightCard } from "@/components/motion";
+import { PublishBanner } from "./publish-banner";
 
 export const metadata = { title: "لوحة التحكم" };
 
@@ -35,37 +37,52 @@ export default async function DashboardHome() {
   const { store } = await getDashboardContext();
   const today = startOfToday();
 
-  // الأرقام محسوبة على مستوى قاعدة البيانات — لا نجلب صفوفًا لنعدّها في الذاكرة
-  const [todayStats] = await db
-    .select({ orders: count(), revenue: sum(orders.total) })
-    .from(orders)
-    .where(
-      and(
-        eq(orders.storeId, store.id),
-        eq(orders.isIncomplete, false),
-        gte(orders.createdAt, today),
+  // كل الأرقام في دفعة واحدة متوازية بدل ٧ رحلات متتالية للخادم — ده اللي
+  // كان بيخلي الصفحة الرئيسية تقيلة على مابتفتح.
+  const [
+    [todayStats],
+    [pending],
+    [incomplete],
+    [productCount],
+    [customerCount],
+    [hasPayment],
+    [hasShipping],
+  ] = await Promise.all([
+    db
+      .select({ orders: count(), revenue: sum(orders.total) })
+      .from(orders)
+      .where(
+        and(
+          eq(orders.storeId, store.id),
+          eq(orders.isIncomplete, false),
+          gte(orders.createdAt, today),
+        ),
       ),
-    );
-
-  const [pending] = await db
-    .select({ n: count() })
-    .from(orders)
-    .where(and(eq(orders.storeId, store.id), eq(orders.status, "pending")));
-
-  const [incomplete] = await db
-    .select({ n: count() })
-    .from(orders)
-    .where(and(eq(orders.storeId, store.id), eq(orders.isIncomplete, true)));
-
-  const [productCount] = await db
-    .select({ n: count() })
-    .from(products)
-    .where(and(eq(products.storeId, store.id), eq(products.status, "active")));
-
-  const [customerCount] = await db
-    .select({ n: count() })
-    .from(customers)
-    .where(eq(customers.storeId, store.id));
+    db
+      .select({ n: count() })
+      .from(orders)
+      .where(and(eq(orders.storeId, store.id), eq(orders.status, "pending"))),
+    db
+      .select({ n: count() })
+      .from(orders)
+      .where(and(eq(orders.storeId, store.id), eq(orders.isIncomplete, true))),
+    db
+      .select({ n: count() })
+      .from(products)
+      .where(and(eq(products.storeId, store.id), eq(products.status, "active"))),
+    db
+      .select({ n: count() })
+      .from(customers)
+      .where(eq(customers.storeId, store.id)),
+    db
+      .select({ n: count() })
+      .from(paymentMethods)
+      .where(and(eq(paymentMethods.storeId, store.id), eq(paymentMethods.enabled, true))),
+    db
+      .select({ n: count() })
+      .from(shippingZones)
+      .where(and(eq(shippingZones.storeId, store.id), eq(shippingZones.enabled, true))),
+  ]);
 
   const stats = [
     {
@@ -94,23 +111,6 @@ export default async function DashboardHome() {
   ];
 
   // خطوات التجهيز — تظهر لحد ما المتجر يبقى جاهز للبيع
-  const [hasPayment] = await db
-    .select({ n: count() })
-    .from(paymentMethods)
-    .where(
-      and(
-        eq(paymentMethods.storeId, store.id),
-        eq(paymentMethods.enabled, true),
-      ),
-    );
-
-  const [hasShipping] = await db
-    .select({ n: count() })
-    .from(shippingZones)
-    .where(
-      and(eq(shippingZones.storeId, store.id), eq(shippingZones.enabled, true)),
-    );
-
   const setup = [
     {
       done: (productCount?.n ?? 0) > 0,
@@ -148,6 +148,10 @@ export default async function DashboardHome() {
 
   return (
     <div className="flex flex-col gap-8">
+      <Reveal>
+        <PublishBanner initialPublished={store.isPublished} storeUrl={storeUrl(store.slug)} />
+      </Reveal>
+
       <Reveal>
         <h1 className="text-2xl font-bold tracking-tight">
           أهلًا، {store.name}

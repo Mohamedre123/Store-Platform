@@ -2,10 +2,8 @@ import 'server-only'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { cache } from 'react'
-import { and, eq } from 'drizzle-orm'
-import { db } from '@/db'
-import { stores, storeMembers } from '@/db/schema'
-import { getCurrentUser, getUserStores, type SessionUser } from './auth'
+import { getCurrentUser, getMemberStoresFull, type SessionUser } from './auth'
+import { stores } from '@/db/schema'
 
 const ACTIVE_STORE_COOKIE = 'zawya_store'
 
@@ -29,27 +27,16 @@ export const getDashboardContext = cache(async (): Promise<DashboardContext> => 
   // لا دخول للوحة قبل تأكيد البريد — الحساب بيمسك متجرًا وفلوس عملاء
   if (!user.emailVerifiedAt) redirect('/verify')
 
-  const memberships = await getUserStores(user.id)
+  // استعلام واحد بيرجّع كل متاجر المستخدم كاملة + دوره، فبنختار النشط من
+  // الكوكي في الذاكرة — من غير رحلة تانية للخادم زي ما كان قبل كده.
+  const memberships = await getMemberStoresFull(user.id)
   if (memberships.length === 0) redirect('/signup')
 
   const jar = await cookies()
   const requested = jar.get(ACTIVE_STORE_COOKIE)?.value
   const chosen = memberships.find((m) => m.id === requested) ?? memberships[0]
 
-  const rows = await db
-    .select({ store: stores, role: storeMembers.role })
-    .from(stores)
-    .innerJoin(
-      storeMembers,
-      and(eq(storeMembers.storeId, stores.id), eq(storeMembers.userId, user.id)),
-    )
-    .where(eq(stores.id, chosen.id))
-    .limit(1)
-
-  const row = rows[0]
-  if (!row) redirect('/login')
-
-  return { user, store: { ...row.store, role: row.role } }
+  return { user, store: chosen }
 })
 
 /** المتجر النشط فقط — اختصار للصفحات اللي مش محتاجة بيانات المستخدم */

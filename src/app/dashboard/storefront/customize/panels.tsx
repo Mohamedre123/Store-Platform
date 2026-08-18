@@ -706,13 +706,17 @@ export function Panel({
                 label="الشكل"
                 value={s.style}
                 options={[
-                  { value: 'logo', label: 'الشعار' },
+                  { value: 'logo', label: 'شعارك' },
                   { value: 'ring', label: 'حلقة' },
                   { value: 'dots', label: 'نقاط' },
                 ]}
                 onChange={(v) => patch('preloader', { style: v })}
                 columns={3}
               />
+              <p className="rounded-lg bg-[var(--surface-2)] px-3 py-2 text-xs text-[var(--fg-muted)]">
+                شكل «شعارك» بيستخدم شعار متجرك اللي رفعته في لوحة «الهوية» — مش شعار المنصة. لو
+                مارفعتش شعار، هيظهر اسم متجرك. لون الحركة بينطبق على الحلقة والنقاط.
+              </p>
               <ColorField
                 label="لون الخلفية"
                 value={s.background}

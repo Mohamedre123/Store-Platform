@@ -141,21 +141,36 @@ export type MemberStore = {
   isPublished: boolean
 }
 
+/**
+ * كل المتاجر اللي المستخدم عضو فيها بأعمدتها الكاملة + دوره.
+ *
+ * مغلّفة بـcache فبتتنادى مرة واحدة في الطلب: التبديل بين المتاجر
+ * وسياق اللوحة الاتنين بيقروا منها بدل ما كل واحد يعمل استعلام لوحده —
+ * ده بيشيل رحلة كاملة للخادم من كل تنقّل في اللوحة.
+ */
+export const getMemberStoresFull = cache(
+  async (userId: string): Promise<Array<typeof stores.$inferSelect & { role: string }>> => {
+    const rows = await db
+      .select({ store: stores, role: storeMembers.role })
+      .from(storeMembers)
+      .innerJoin(stores, eq(stores.id, storeMembers.storeId))
+      .where(eq(storeMembers.userId, userId))
+    return rows.map((r) => ({ ...r.store, role: r.role }))
+  },
+)
+
 /** كل المتاجر اللي المستخدم عضو فيها — يخدم تعدّد المتاجر بحساب واحد */
 export const getUserStores = cache(async (userId: string): Promise<MemberStore[]> => {
-  return db
-    .select({
-      id: stores.id,
-      slug: stores.slug,
-      name: stores.name,
-      logoLight: stores.logoLight,
-      status: stores.status,
-      role: storeMembers.role,
-      isPublished: stores.isPublished,
-    })
-    .from(storeMembers)
-    .innerJoin(stores, eq(stores.id, storeMembers.storeId))
-    .where(eq(storeMembers.userId, userId))
+  const full = await getMemberStoresFull(userId)
+  return full.map((s) => ({
+    id: s.id,
+    slug: s.slug,
+    name: s.name,
+    logoLight: s.logoLight,
+    status: s.status,
+    role: s.role,
+    isPublished: s.isPublished,
+  }))
 })
 
 /** يتحقق أن المستخدم فعلًا عضو في المتجر — البوابة الوحيدة لأي بيانات متجر */

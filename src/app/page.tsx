@@ -117,7 +117,7 @@ export default function HomePage() {
             <div className="flex items-center gap-2">
               <Link
                 href="/login"
-                className="hidden min-h-11 items-center rounded-lg px-3.5 text-sm font-medium text-[var(--fg-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--fg)] sm:inline-flex"
+                className="inline-flex min-h-11 items-center rounded-lg px-3.5 text-sm font-medium text-[var(--fg-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--fg)]"
               >
                 دخول
               </Link>
