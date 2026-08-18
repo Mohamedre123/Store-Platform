@@ -688,6 +688,49 @@ export function Panel({
     )
   }
 
+  /* ══════════════════ شاشة التحميل ══════════════════ */
+  if (panel === 'preloader') {
+    const s = value.preloader
+    return (
+      <>
+        <Group title="شاشة التحميل">
+          <Toggle
+            label="تشغيل شاشة التحميل"
+            hint="بتظهر لحظة فتح المتجر بهوية متجرك بدل وميض أبيض — إحساس أكثر احترافية."
+            checked={s.enabled}
+            onChange={(v) => patch('preloader', { enabled: v })}
+          />
+          {s.enabled && (
+            <>
+              <Choice
+                label="الشكل"
+                value={s.style}
+                options={[
+                  { value: 'logo', label: 'الشعار' },
+                  { value: 'ring', label: 'حلقة' },
+                  { value: 'dots', label: 'نقاط' },
+                ]}
+                onChange={(v) => patch('preloader', { style: v })}
+                columns={3}
+              />
+              <ColorField
+                label="لون الخلفية"
+                value={s.background}
+                onChange={(v) => patch('preloader', { background: v })}
+              />
+              <ColorField
+                label="لون الحركة"
+                hint="لون الحلقة أو النقاط. الشعار بيظهر بصورته."
+                value={s.color}
+                onChange={(v) => patch('preloader', { color: v })}
+              />
+            </>
+          )}
+        </Group>
+      </>
+    )
+  }
+
   /* ══════════════════ شريط الأدوات ══════════════════ */
   const s = value.toolbar
   return (

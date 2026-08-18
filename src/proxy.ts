@@ -23,6 +23,11 @@ export default function proxy(req: NextRequest) {
   headers.set('x-zawya-host', host ?? '')
   headers.set('x-zawya-path', path)
 
+  // وضع المعاينة: الإطار في محرّر الثيم بيحمّل المتجر بـ?preview=1.
+  // الترويسة دي بتوصل للـ layout والصفحات (اللي مبتاخدش searchParams)
+  // فتقرأ المسوّدة غير المنشورة بدل النسخة الحيّة.
+  if (url.searchParams.get('preview') === '1') headers.set('x-zawya-preview', '1')
+
   /**
    * مسار المتجر الصريح يُخدَم كما هو من أي مضيف.
    *

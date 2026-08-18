@@ -5,8 +5,10 @@ import { getStore, getStoreTheme, listCategories } from '@/lib/storefront'
 import { CartProvider } from '@/components/storefront/cart'
 import { StoreHeader } from '@/components/storefront/chrome'
 import { PreviewBridge } from '@/components/storefront/preview-bridge'
+import { StorePreloader } from '@/components/storefront/preloader'
+import { StoreToolbar } from '@/components/storefront/store-toolbar'
 import { StoreLinkProvider } from '@/components/storefront/store-link'
-import { FONT_STACKS, RADIUS_PX, defaultCustomization, mergeCustomization } from '@/lib/customization'
+import { FONT_STACKS, RADIUS_PX } from '@/lib/customization'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,7 +42,10 @@ export default async function StorefrontLayout({
   const store = await getStore(identifier)
   if (!store) notFound()
 
-  const theme = await getStoreTheme(store.id)
+  const h = await headers()
+  const isPreview = h.get('x-zawya-preview') === '1'
+
+  const theme = await getStoreTheme(store.id, isPreview)
   const cats = await listCategories(store.id)
 
   /**
@@ -48,15 +53,11 @@ export default async function StorefrontLayout({
    * الجذرية صحيحة. غير كده إحنا متقدّمين بالمسار، ولازم كل رابط داخلي
    * ياخد البادئة — وإلا العميل يضغط «المنتجات» فيخرج من متجره أصلًا.
    */
-  const fromStoreHost = (await headers()).get('x-zawya-store')
+  const fromStoreHost = h.get('x-zawya-store')
   const base = fromStoreHost ? '' : '/s/' + identifier
 
-  const custom = mergeCustomization(defaultCustomization(theme.definition), {
-    identity: theme.tokens,
-    announcement: theme.announcementBar,
-    header: theme.header,
-    footer: theme.footer,
-  })
+  // المصدر الوحيد لشكل المتجر — مدموج مرة واحدة في getStoreTheme
+  const custom = theme.custom
 
   const nav = [
     { label: 'الرئيسية', href: '/' },
@@ -92,6 +93,10 @@ export default async function StorefrontLayout({
         <div style={{ background: 'var(--sf-bg)', color: 'var(--sf-text)' }} className="flex min-h-full flex-1 flex-col">
           <PreviewBridge />
 
+          {custom.preloader.enabled && (
+            <StorePreloader settings={custom.preloader} logo={store.logoLight} storeName={store.name} />
+          )}
+
           <div
             data-sf="announcement"
             style={{
@@ -109,8 +114,8 @@ export default async function StorefrontLayout({
             logo={store.logoLight}
             hideName={store.hideNameInHeader}
             nav={nav}
-            navStyle={theme.definition.layout.nav}
-            showSearch={theme.definition.layout.showSearchInHeader}
+            navStyle={custom.header.layout}
+            showSearch={custom.header.showSearch}
             currency={store.currency}
             storeSlug={store.slug}
           />
@@ -131,6 +136,8 @@ export default async function StorefrontLayout({
               </span>
             </div>
           </footer>
+
+          <StoreToolbar toolbar={custom.toolbar} />
         </div>
       </div>
       </CartProvider>

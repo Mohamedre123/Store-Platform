@@ -28,7 +28,7 @@ export const brand = {
   wordmarkRatio: 377 / 192,
   /** لون العلامة — مأخوذ من الشعار */
   color: '#634b9a',
-  supportEmail: 'support@zawya.cc',
+  supportEmail: 'support@zawyaeg.site',
   supportWhatsapp: '',
 } as const
 

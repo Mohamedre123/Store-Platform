@@ -8,10 +8,29 @@ import { getDashboardContext } from '@/lib/store-context'
 import type { Customization } from '@/lib/customization'
 
 /**
- * حفظ التخصيص.
+ * حفظ مسوّدة التخصيص — من غير نشر.
  *
- * الإعدادات كلها تُخزَّن في عمود JSON واحد، وبعض القيم تُنسخ كذلك
- * على جدول المتجر (الشعار، إخفاء الاسم) لأن أماكن تانية بتقراها
+ * المحرّر بيستدعيها مع كل تعديل (مؤجَّلة)، فالمعاينة اللي بتقرأ المسوّدة
+ * تعكس أي تغيير فورًا. النسخة الحيّة اللي بيشوفها العميل ما بتتغيّرش
+ * لحد ما التاجر يضغط نشر.
+ */
+export async function saveDraftAction(customization: Customization) {
+  const { store } = await getDashboardContext()
+
+  await db
+    .update(storeThemes)
+    .set({ draft: customization })
+    .where(eq(storeThemes.storeId, store.id))
+
+  return { ok: true }
+}
+
+/**
+ * نشر التخصيص.
+ *
+ * بننقل المسوّدة الكاملة للأعمدة المنشورة اللي بيقرأها المتجر الحيّ،
+ * وكمان بنسيبها في draft عشان المعاينة تفضل مطابقة للمنشور. وبعض القيم
+ * تُنسخ على جدول المتجر (الشعار، إخفاء الاسم) لأن أماكن تانية بتقراها
  * من هناك — لوحة التحكم والبريد وبطاقة المتجر.
  */
 export async function saveCustomizationAction(customization: Customization) {
@@ -37,7 +56,9 @@ export async function saveCustomizationAction(customization: Customization) {
       listingPage: customization.listing,
       cart: customization.cart,
       announcementBar: customization.announcement,
-      draft: { hero: customization.hero, toolbar: customization.toolbar },
+      // المسوّدة الكاملة = مصدر المعاينة، والبانر وشريط الأدوات وشاشة
+      // التحميل اللي ملهمش أعمدة مخصّصة بيتقروا من هنا في النسخة الحيّة
+      draft: customization,
       publishedAt: new Date(),
     })
     .where(eq(storeThemes.storeId, store.id))

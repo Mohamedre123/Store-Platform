@@ -147,6 +147,16 @@ export type ToolbarSettings = {
   backToTop: boolean
 }
 
+/* ────────────────────────── شاشة التحميل ────────────────────────── */
+
+export type PreloaderSettings = {
+  enabled: boolean
+  /** logo = شعار المتجر ينبض · ring = حلقة تدور · dots = ثلاث نقاط */
+  style: 'logo' | 'ring' | 'dots'
+  background: string
+  color: string
+}
+
 /* ────────────────────────── المجموع ────────────────────────── */
 
 export type Customization = {
@@ -159,6 +169,7 @@ export type Customization = {
   cart: CartSettings
   footer: FooterSettings
   toolbar: ToolbarSettings
+  preloader: PreloaderSettings
 }
 
 export type PanelKey = keyof Customization
@@ -173,6 +184,7 @@ export const PANELS: Array<{ key: PanelKey; label: string; hint: string }> = [
   { key: 'cart', label: 'السلة', hint: 'الدرج والعروض الإضافية' },
   { key: 'footer', label: 'الفوتر', hint: 'الروابط والتواصل' },
   { key: 'toolbar', label: 'شريط الأدوات', hint: 'زر واتساب والتنقّل السفلي' },
+  { key: 'preloader', label: 'شاشة التحميل', hint: 'اللي بيظهر لحظة فتح المتجر' },
 ]
 
 /** إعدادات افتراضية معقولة — متجر جديد يبان محترم من غير أي تعديل */
@@ -283,6 +295,12 @@ export function defaultCustomization(theme: {
       mobileNavEnabled: true,
       backToTop: true,
     },
+    preloader: {
+      enabled: false,
+      style: 'logo',
+      background: theme.palette.background,
+      color: theme.palette.primary,
+    },
   }
 }
 
@@ -317,6 +335,7 @@ export function mergeCustomization(
     cart: pick('cart'),
     footer: pick('footer'),
     toolbar: pick('toolbar'),
+    preloader: pick('preloader'),
   }
 }
 

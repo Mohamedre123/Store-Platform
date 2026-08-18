@@ -4,6 +4,12 @@ import { and, desc, eq, gt, isNotNull, or, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { categories, products, stores, storeThemes } from '@/db/schema'
 import { getTheme, type ThemeDefinition } from './themes'
+import {
+  defaultCustomization,
+  mergeCustomization,
+  type Customization,
+  type PanelKey,
+} from './customization'
 import type { Section, ThemeTokens } from '@/db/schema'
 
 /**
@@ -93,6 +99,8 @@ export type HeroDraft = {
 
 export type StoreTheme = {
   definition: ThemeDefinition
+  /** التخصيص الكامل المدموج — المصدر الوحيد لشكل المتجر */
+  custom: Customization
   tokens: ThemeTokens
   sections: Section[]
   header: Record<string, unknown>
@@ -101,34 +109,66 @@ export type StoreTheme = {
   hero?: HeroDraft
 }
 
-export const getStoreTheme = cache(async (storeId: string): Promise<StoreTheme> => {
-  const [row] = await db.select().from(storeThemes).where(eq(storeThemes.storeId, storeId)).limit(1)
+/**
+ * شكل المتجر الكامل.
+ *
+ * المصدر الوحيد للحقيقة هو كائن `Customization` واحد مدموج فوق افتراضي
+ * الثيم. كل الصفحات بتقرا منه — فأي إعداد التاجر يغيّره بيتطبّق فعلًا،
+ * وده كان أصل مشكلة «بعدّل ومفيش بيتغيّر».
+ *
+ * في وضع المعاينة بنقرأ المسوّدة الكاملة (draft) بدل النسخة المنشورة،
+ * فالتاجر يشوف تعديله قبل ما يضغط نشر. غير كده بنقرأ الأعمدة المنشورة.
+ */
+export const getStoreTheme = cache(
+  async (storeId: string, preview = false): Promise<StoreTheme> => {
+    const [row] = await db.select().from(storeThemes).where(eq(storeThemes.storeId, storeId)).limit(1)
 
-  const definition = getTheme(row?.themeSlug ?? 'zawya')
+    const definition = getTheme(row?.themeSlug ?? 'zawya')
+    const base = defaultCustomization(definition)
 
-  return {
-    definition,
-    // ألوان الثيم أساس، وتعديلات التاجر تعلوها.
-    // القيم الفاضية تُتجاهَل عشان لا تمسح لون الثيم بقيمة undefined.
-    tokens: {
-      primary: definition.palette.primary,
-      accent: definition.palette.accent,
-      background: definition.palette.background,
-      surface: definition.palette.surface,
-      text: definition.palette.text,
-      radius: definition.radius,
-      ...Object.fromEntries(
-        Object.entries(row?.tokens ?? {}).filter(([, v]) => v !== undefined && v !== null && v !== ''),
-      ),
-    } as ThemeTokens,
-    sections: (row?.homeSections ?? []) as Section[],
-    header: row?.header ?? {},
-    footer: row?.footer ?? {},
-    announcementBar: row?.announcementBar ?? {},
-    // شرائح البانر وشريط الأدوات مخزّنة في draft — نخرجها هنا مرة واحدة
-    hero: ((row?.draft ?? {}) as Record<string, unknown>).hero as HeroDraft | undefined,
-  }
-})
+    const draft = (row?.draft ?? {}) as Record<string, unknown>
+    // المسوّدة الكاملة اتحفظت لو فيها لوحة الهوية — الشكل القديم كان
+    // بيخزّن hero/toolbar بس، فبنميّز بينهم بوجود identity.
+    const draftIsFull = draft && typeof draft.identity === 'object'
+
+    const custom: Customization =
+      preview && draftIsFull
+        ? mergeCustomization(base, draft as Partial<Record<PanelKey, unknown>>)
+        : mergeCustomization(base, {
+            identity: row?.tokens,
+            announcement: row?.announcementBar,
+            header: row?.header,
+            footer: row?.footer,
+            listing: row?.listingPage,
+            productPage: row?.productPage,
+            cart: row?.cart,
+            hero: draft.hero,
+            toolbar: draft.toolbar,
+            preloader: draft.preloader,
+          })
+
+    return {
+      definition,
+      custom,
+      tokens: {
+        primary: custom.identity.primary,
+        accent: custom.identity.accent,
+        background: custom.identity.background,
+        surface: custom.identity.surface,
+        text: custom.identity.text,
+        radius: custom.identity.radius,
+        fontHeading: custom.identity.fontHeading,
+        fontBody: custom.identity.fontBody,
+        iconSet: custom.identity.iconSet,
+      } as ThemeTokens,
+      sections: (row?.homeSections ?? []) as Section[],
+      header: custom.header as unknown as Record<string, unknown>,
+      footer: custom.footer as unknown as Record<string, unknown>,
+      announcementBar: custom.announcement as unknown as Record<string, unknown>,
+      hero: custom.hero as HeroDraft,
+    }
+  },
+)
 
 /* ────────────────────────── الكتالوج ────────────────────────── */
 
@@ -230,4 +270,21 @@ export const getCategoryBySlug = cache(async (storeId: string, slug: string) => 
 export function discountPercent(price: number, compareAt: number | null): number | null {
   if (!compareAt || compareAt <= price) return null
   return Math.round(((compareAt - price) / compareAt) * 100)
+}
+
+/**
+ * كلاس شبكة العرض من إعداد التاجر — مصدر واحد تستخدمه كل صفحات القوائم
+ * عشان تفضل متطابقة، والأعمدة تتغيّر فعلًا لما يعدّلها في المحرّر.
+ */
+export function listingGrid(listing: { columnsDesktop: number; columnsMobile: number }): string {
+  const mobile = listing.columnsMobile === 1 ? 'grid-cols-1' : 'grid-cols-2'
+  const desk =
+    listing.columnsDesktop === 2
+      ? 'md:grid-cols-2'
+      : listing.columnsDesktop === 3
+        ? 'md:grid-cols-3'
+        : listing.columnsDesktop === 5
+          ? 'md:grid-cols-5'
+          : 'md:grid-cols-4'
+  return `grid gap-4 sm:gap-5 ${mobile} ${desk}`
 }

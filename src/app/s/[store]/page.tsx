@@ -1,8 +1,9 @@
 import Image from 'next/image'
+import { headers } from 'next/headers'
 import { SLink as Link } from '@/components/storefront/store-link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, CreditCard, Package, RotateCcw, Truck } from 'lucide-react'
-import { getStore, getStoreTheme, listCategories, listProducts } from '@/lib/storefront'
+import { CreditCard, Package, RotateCcw, Truck } from 'lucide-react'
+import { getStore, getStoreTheme, listCategories, listProducts, listingGrid } from '@/lib/storefront'
 import { ProductCard } from '@/components/storefront/product-card'
 import { Hero } from '@/components/storefront/hero'
 
@@ -30,8 +31,10 @@ export default async function StoreHomePage({ params }: { params: Promise<{ stor
   const store = await getStore(identifier)
   if (!store) notFound()
 
-  const theme = await getStoreTheme(store.id)
-  const { layout } = theme.definition
+  const isPreview = (await headers()).get('x-zawya-preview') === '1'
+  const theme = await getStoreTheme(store.id, isPreview)
+  const { listing } = theme.custom
+  const cols = listing.columnsDesktop
 
   const enabled = new Set(theme.sections.filter((s) => s.enabled).map((s) => s.type))
   // لو التاجر ما رتّبش أقسامًا بعد، نعرض الأساسي بدل صفحة فاضية
@@ -39,21 +42,13 @@ export default async function StoreHomePage({ params }: { params: Promise<{ stor
 
   const [cats, featured, latest, onSale] = await Promise.all([
     listCategories(store.id),
-    listProducts(store.id, { featured: true, limit: layout.columns * 2 }),
-    listProducts(store.id, { limit: layout.columns * 2 }),
-    listProducts(store.id, { onSale: true, limit: layout.columns }),
+    listProducts(store.id, { featured: true, limit: cols * 2 }),
+    listProducts(store.id, { limit: cols * 2 }),
+    listProducts(store.id, { onSale: true, limit: cols }),
   ])
 
-  const gridClass =
-    layout.card === 'compact'
-      ? 'grid gap-3 sm:grid-cols-2'
-      : layout.columns === 2
-        ? 'grid grid-cols-2 gap-4 sm:gap-6'
-        : layout.columns === 3
-          ? 'grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-3'
-          : 'grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4'
-
-  const cardProps = { currency: store.currency, style: layout.card, imageRatio: layout.imageRatio }
+  const gridClass = listingGrid(listing)
+  const cardProps = { currency: store.currency, style: listing.cardStyle, imageRatio: listing.imageRatio }
 
   const empty = latest.length === 0
 
@@ -64,7 +59,7 @@ export default async function StoreHomePage({ params }: { params: Promise<{ stor
           hero={theme.hero}
           storeName={store.name}
           tagline={store.tagline}
-          fallbackStyle={layout.hero}
+          fallbackStyle={theme.definition.layout.hero}
         />
       )}
 

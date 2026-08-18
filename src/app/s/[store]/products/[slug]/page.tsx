@@ -1,4 +1,5 @@
 import Image from 'next/image'
+import { headers } from 'next/headers'
 import { SLink as Link } from '@/components/storefront/store-link'
 import { notFound } from 'next/navigation'
 import { ChevronLeft, ImageOff, Truck, Undo2 } from 'lucide-react'
@@ -49,8 +50,9 @@ export default async function ProductPage({
   const product = await getProductBySlug(store.id, slug)
   if (!product) notFound()
 
-  const theme = await getStoreTheme(store.id)
-  const { layout } = theme.definition
+  const isPreview = (await headers()).get('x-zawya-preview') === '1'
+  const theme = await getStoreTheme(store.id, isPreview)
+  const { listing, productPage } = theme.custom
 
   const off = discountPercent(product.price, product.compareAtPrice)
   const soldOut = product.trackInventory && product.stock <= 0
@@ -176,17 +178,17 @@ export default async function ProductPage({
         </div>
       </div>
 
-      {related.length > 0 && (
+      {productPage.showRelated && related.length > 0 && (
         <section className="mt-16">
-          <h2 className="mb-6 text-xl font-bold tracking-tight">منتجات ممكن تعجبك</h2>
+          <h2 className="mb-6 text-xl font-bold tracking-tight">{productPage.relatedTitle || 'منتجات ممكن تعجبك'}</h2>
           <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
             {related.map((p) => (
               <ProductCard
                 key={p.id}
                 product={p}
                 currency={store.currency}
-                style={layout.card === 'compact' ? 'clean' : layout.card}
-                imageRatio={layout.imageRatio}
+                style={listing.cardStyle === 'compact' ? 'clean' : listing.cardStyle}
+                imageRatio={listing.imageRatio}
               />
             ))}
           </div>

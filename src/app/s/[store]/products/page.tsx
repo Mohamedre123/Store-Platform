@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
+import { headers } from 'next/headers'
 import { Package } from 'lucide-react'
-import { getStore, getStoreTheme, listProducts } from '@/lib/storefront'
+import { getStore, getStoreTheme, listProducts, listingGrid } from '@/lib/storefront'
 import { ProductCard } from '@/components/storefront/product-card'
 
 export const dynamic = 'force-dynamic'
@@ -11,16 +12,10 @@ export default async function ProductsPage({ params }: { params: Promise<{ store
   const store = await getStore(identifier)
   if (!store) notFound()
 
-  const theme = await getStoreTheme(store.id)
-  const { layout } = theme.definition
-  const items = await listProducts(store.id, { limit: 60 })
-
-  const gridClass =
-    layout.card === 'compact'
-      ? 'grid gap-3 sm:grid-cols-2'
-      : layout.columns === 2
-        ? 'grid grid-cols-2 gap-4 sm:gap-6'
-        : 'grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4'
+  const isPreview = (await headers()).get('x-zawya-preview') === '1'
+  const theme = await getStoreTheme(store.id, isPreview)
+  const { listing } = theme.custom
+  const items = await listProducts(store.id, { limit: listing.perPage || 60 })
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -32,14 +27,14 @@ export default async function ProductsPage({ params }: { params: Promise<{ store
           <p className="opacity-65">مافيش منتجات معروضة دلوقتي.</p>
         </div>
       ) : (
-        <div className={gridClass}>
+        <div className={listingGrid(listing)}>
           {items.map((p) => (
             <ProductCard
               key={p.id}
               product={p}
               currency={store.currency}
-              style={layout.card}
-              imageRatio={layout.imageRatio}
+              style={listing.cardStyle}
+              imageRatio={listing.imageRatio}
             />
           ))}
         </div>

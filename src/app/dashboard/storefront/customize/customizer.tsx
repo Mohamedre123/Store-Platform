@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { ArrowRight, Check, Monitor, RotateCcw, Save, Smartphone, Tablet } from 'lucide-react'
-import { saveCustomizationAction } from './actions'
+import { saveCustomizationAction, saveDraftAction } from './actions'
 import { Panel } from './panels'
 import { PANELS, type Customization, type PanelKey } from '@/lib/customization'
 import { Button } from '@/components/ui'
@@ -29,8 +29,17 @@ export function Customizer({
   const [device, setDevice] = useState<'mobile' | 'tablet' | 'desktop'>('desktop')
   const [dirty, setDirty] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const [pending, startSave] = useTransition()
   const frame = useRef<HTMLIFrameElement>(null)
+  const firstRun = useRef(true)
+  const reloadPending = useRef(false)
+  const reloadTick = useRef(0)
+
+  // خصائص الهوية اللي جسر المعاينة بيطبّقها فورًا من غير إعادة تحميل
+  const LIVE_IDENTITY = new Set([
+    'primary', 'accent', 'background', 'surface', 'text', 'radius', 'fontHeading', 'fontBody',
+  ])
 
   const patch = useCallback<
     <K extends PanelKey>(key: K, values: Partial<Customization[K]>) => void
@@ -38,13 +47,19 @@ export function Customizer({
     setDraft((prev) => ({ ...prev, [key]: { ...prev[key], ...values } }))
     setDirty(true)
     setSaved(false)
+
+    // التغييرات اللي الجسر مبيطبّقهاش لحظيًا (شرائح البانر، الأعمدة،
+    // الشعار، شاشة التحميل...) محتاجة إعادة تحميل للإطار عشان تبان.
+    // الألوان والخطوط ونص الإعلان بيتطبّقوا فورًا فمش محتاجين تحميل.
+    const liveOnly =
+      key === 'announcement' ||
+      (key === 'identity' && Object.keys(values).every((k) => LIVE_IDENTITY.has(k)))
+    if (!liveOnly) reloadPending.current = true
   }, [])
 
   /**
-   * المعاينة الحيّة.
-   *
-   * بنبعت المسوّدة للإطار برسالة بدل ما نحفظ ونعيد التحميل — التاجر
-   * بيشوف أثر كل تعديل وهو بيعمله، ومحدش من عملائه بيشوف تجاربه.
+   * المعاينة الفورية للألوان والخطوط ونص الإعلان — رسالة للإطار من غير
+   * إعادة تحميل، فالتاجر يشوف الأثر وهو بيسحب منتقي اللون.
    */
   useEffect(() => {
     const id = setTimeout(() => {
@@ -52,6 +67,30 @@ export function Customizer({
     }, 120)
     return () => clearTimeout(id)
   }, [draft])
+
+  /**
+   * حفظ المسوّدة تلقائيًا بعد ما التاجر يبطّل تعديل، وإعادة تحميل الإطار
+   * لو التغيير هيكلي — فالمعاينة بتعرض المسوّدة الحقيقية المرسومة على
+   * الخادم، بما فيها البانر والأعمدة والشعار وشاشة التحميل. من غير كده
+   * كان نص المحرّر «بعدّل ومفيش بيتغيّر».
+   */
+  useEffect(() => {
+    if (firstRun.current) {
+      firstRun.current = false
+      return
+    }
+    setSyncing(true)
+    const id = setTimeout(async () => {
+      await saveDraftAction(draft)
+      if (reloadPending.current) {
+        reloadPending.current = false
+        const f = frame.current
+        if (f) f.src = `${previewUrl}&r=${++reloadTick.current}`
+      }
+      setSyncing(false)
+    }, 600)
+    return () => clearTimeout(id)
+  }, [draft, previewUrl])
 
   // تحذير قبل مغادرة الصفحة بتعديلات غير محفوظة
   useEffect(() => {
@@ -105,6 +144,7 @@ export function Customizer({
             variant="ghost"
             size="sm"
             onClick={() => {
+              reloadPending.current = true
               setDraft(initial)
               setDirty(false)
             }}
@@ -113,6 +153,8 @@ export function Customizer({
             تراجع
           </Button>
         )}
+
+        {syncing && <span className="text-xs text-[var(--fg-subtle)]">بيحدّث المعاينة…</span>}
 
         <Button
           size="sm"
