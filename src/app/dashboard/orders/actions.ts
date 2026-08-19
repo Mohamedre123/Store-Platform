@@ -11,6 +11,7 @@ import { isEmailableStatus, orderStatusEmail } from '@/lib/store-emails'
 import { storeUrl } from '@/lib/domain'
 import { awardOrderPoints } from '@/lib/loyalty'
 import { approveAffiliateCommission, cancelAffiliateCommission } from '@/lib/affiliates'
+import { dispatchWebhook } from '@/lib/webhooks'
 import type { OrderStatus } from '@/db/schema'
 
 const LABELS: Record<OrderStatus, string> = {
@@ -124,6 +125,26 @@ export async function updateOrderStatusAction(orderId: string, status: OrderStat
     } catch (e) {
       console.error('فشل منح نقاط الولاء:', e)
     }
+  }
+
+  // إشعار الأنظمة الخارجية بتغيّر الحالة
+  dispatchWebhook(store.id, 'order.status_changed', {
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    from: order.status,
+    to: status,
+  })
+  if (status === 'delivered') {
+    dispatchWebhook(store.id, 'order.delivered', {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      total: order.total,
+    })
+  } else if (status === 'cancelled') {
+    dispatchWebhook(store.id, 'order.cancelled', {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+    })
   }
 
   /**

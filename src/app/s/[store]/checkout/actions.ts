@@ -22,6 +22,7 @@ import { validateCoupon, recordCouponUse } from '@/lib/coupons'
 import { issueOrderOtp, isPhoneVerifiedForOrder, verifyOrderOtp } from '@/lib/order-otp'
 import { computeOfferDiscount, getActiveOffers } from '@/lib/offers'
 import { findAffiliateByCode, recordAffiliateConversion } from '@/lib/affiliates'
+import { dispatchWebhook } from '@/lib/webhooks'
 import { generateToken } from '@/lib/crypto'
 import { normalizePhone } from '@/lib/utils'
 
@@ -442,6 +443,16 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
     input,
     phone,
   }).catch((e) => console.error('فشل إرسال بريد الطلب:', e))
+
+  // إشعار الأنظمة الخارجية — بدون انتظار، الطلب اتسجّل خلاص
+  dispatchWebhook(store.id, 'order.created', {
+    orderId: result.orderId,
+    orderNumber: result.orderNumber,
+    total: totals.total,
+    currency: store.currency,
+    customerName: input.name ?? null,
+    customerPhone: phone,
+  })
 
   return { ok: true, orderNumber: result.orderNumber, token }
 }
