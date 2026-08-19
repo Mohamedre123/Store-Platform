@@ -35,6 +35,8 @@ type CartContext = {
   isOpen: boolean
   setOpen: (open: boolean) => void
   ready: boolean
+  /** درج جانبي ولا صفحة سلة كاملة — إعداد التاجر */
+  mode: 'drawer' | 'page'
 }
 
 const Ctx = createContext<CartContext | null>(null)
@@ -43,7 +45,15 @@ const keyFor = (storeSlug: string) => `zawya_cart_${storeSlug}`
 const sameLine = (a: CartItem, productId: string, variantId?: string) =>
   a.productId === productId && (a.variantId ?? '') === (variantId ?? '')
 
-export function CartProvider({ storeSlug, children }: { storeSlug: string; children: ReactNode }) {
+export function CartProvider({
+  storeSlug,
+  mode = 'drawer',
+  children,
+}: {
+  storeSlug: string
+  mode?: 'drawer' | 'page'
+  children: ReactNode
+}) {
   const [items, setItems] = useState<CartItem[]>([])
   const [isOpen, setOpen] = useState(false)
   // قبل القراءة من التخزين، ما نعرضش عدد السلة — وإلا يظهر صفر ثم يقفز
@@ -79,6 +89,7 @@ export function CartProvider({ storeSlug, children }: { storeSlug: string; child
       isOpen,
       setOpen,
       ready,
+      mode,
 
       add(item, quantity = 1) {
         setItems((prev) => {
@@ -92,7 +103,9 @@ export function CartProvider({ storeSlug, children }: { storeSlug: string; child
           }
           return [...prev, { ...item, quantity }]
         })
-        setOpen(true)
+        // في وضع الصفحة مفيش درج يفتح — الزرار نفسه بيأكّد الإضافة،
+        // ونقل العميل لصفحة السلة مع كل إضافة كان هيقطع تصفّحه
+        if (mode === 'drawer') setOpen(true)
       },
 
       remove(productId, variantId) {
@@ -115,7 +128,7 @@ export function CartProvider({ storeSlug, children }: { storeSlug: string; child
         setItems([])
       },
     }
-  }, [items, isOpen, ready])
+  }, [items, isOpen, ready, mode])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

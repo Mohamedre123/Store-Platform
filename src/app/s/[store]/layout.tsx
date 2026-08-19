@@ -1,7 +1,7 @@
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
-import { getStore, getStorePixels, getStoreTheme, listCategories, listFooterPages } from '@/lib/storefront'
+import { getStore, getStorePixels, getStoreTheme, listCartUpsell, listCategories, listFooterPages } from '@/lib/storefront'
 import { StorePixels } from '@/components/storefront/pixels'
 import { CartProvider } from '@/components/storefront/cart'
 import { StoreHeader } from '@/components/storefront/chrome'
@@ -32,7 +32,12 @@ export async function generateMetadata({
     // متجر التاجر — المتجر علامة مستقلة مش صفحة تابعة لنا
     title: { absolute: store.name, template: `%s | ${store.name}` },
     description: store.tagline ?? `تسوّق من ${store.name}`,
-    icons: store.logoLight ? { icon: store.logoLight } : undefined,
+    /*
+      undefined هنا كان معناه «ورّث» — يعني أيقونة زاوية تظهر في تبويب
+      متجر التاجر. القايمة الفاضية بتلغي الوراثة: التاجر من غير شعار
+      ياخد أيقونة المتصفح العادية، أحسن من علامة حد تاني.
+    */
+    icons: store.logoLight ? { icon: store.logoLight } : { icon: [] },
     openGraph: { title: store.name, description: store.tagline ?? undefined, type: 'website' },
   }
 }
@@ -82,6 +87,13 @@ export default async function StorefrontLayout({
   // المصدر الوحيد لشكل المتجر — مدموج مرة واحدة في getStoreTheme
   const custom = theme.custom
 
+  /*
+    مقترحات السلة بتتحمّل في التخطيط لا في الدرج: الدرج مكوّن عميل،
+    وأول ما العميل يفتحه لازم يلاقي المقترحات جاهزة — لو استنى طلبًا
+    للشبكة، القسم بيظهر بعد ما يكون خلاص قرّر ويضغط «إتمام الطلب».
+  */
+  const cartUpsell = custom.cart.showUpsell ? await listCartUpsell(store.id) : []
+
   /**
    * شعار المتجر: في المعاينة بنعرض شعار المسوّدة (اللي التاجر لسه رافعه)
    * عشان يشوفه قبل النشر؛ في النسخة الحيّة بنعرض الشعار المنشور من جدول
@@ -113,7 +125,7 @@ export default async function StorefrontLayout({
 
   return (
     <StoreLinkProvider base={base}>
-      <CartProvider storeSlug={store.slug}>
+      <CartProvider storeSlug={store.slug} mode={custom.cart.mode}>
       <div
         style={vars}
         data-zawya-store
@@ -150,6 +162,8 @@ export default async function StorefrontLayout({
             cartFreeShippingBar={custom.cart.freeShippingBar}
             cartFreeOver={custom.cart.freeShippingThreshold}
             cartShowNotes={custom.cart.showNotes}
+            cartUpsell={cartUpsell}
+            cartUpsellTitle={custom.cart.upsellTitle}
             showWishlist={custom.header.showWishlist}
             logoHeight={custom.header.logoHeight}
             currency={store.currency}

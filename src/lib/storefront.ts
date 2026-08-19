@@ -2,7 +2,7 @@ import 'server-only'
 import { cache } from 'react'
 import { and, desc, eq, gt, ilike, isNotNull, isNull, or, sql } from 'drizzle-orm'
 import { db } from '@/db'
-import { banners, categories, pages, products, reviews, stores, storePlugins, storeThemes } from '@/db/schema'
+import { banners, categories, pages, products, productVariants, reviews, stores, storePlugins, storeThemes } from '@/db/schema'
 import { getTheme, type ThemeDefinition } from './themes'
 import {
   defaultCustomization,
@@ -250,6 +250,58 @@ export const listProducts = cache(
       .limit(limit)
   },
 )
+
+/** منتج مقترح في السلة — الحد الأدنى اللي الإضافة بضغطة محتاجاه */
+export type UpsellProduct = {
+  id: string
+  name: string
+  slug: string
+  price: number
+  image: string | null
+  maxStock: number | null
+}
+
+/**
+ * مقترحات السلة — «أكمل طلبك».
+ *
+ * الأكثر مبيعًا في المتجر: العميل واقف على خطوة الدفع مش في مزاج تصفّح،
+ * والمنتج اللي غيره اشتراه أقرب حاجة يضيفها بضغطة.
+ *
+ * بنستبعد اللي ليه متغيّرات: الإضافة بضغطة واحدة معناها إننا نختار
+ * المقاس نيابةً عن العميل، وده بيرجّع مرتجعًا مش بيعة. واللي نفدت
+ * كميته مستبعد كمان — اقتراح منتج مش متاح بيضيّع الثقة في الباقي.
+ */
+export const listCartUpsell = cache(async (storeId: string, limit = 6): Promise<UpsellProduct[]> => {
+  const rows = await db
+    .select({
+      id: products.id,
+      name: products.name,
+      slug: products.slug,
+      price: products.price,
+      images: products.images,
+      stock: products.stock,
+      trackInventory: products.trackInventory,
+    })
+    .from(products)
+    .where(
+      and(
+        visible(storeId),
+        sql`not exists (select 1 from ${productVariants} where ${productVariants.productId} = ${products.id})`,
+        or(eq(products.trackInventory, false), gt(products.stock, 0))!,
+      ),
+    )
+    .orderBy(desc(products.soldCount))
+    .limit(limit)
+
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    slug: r.slug,
+    price: r.price,
+    image: r.images?.[0] ?? null,
+    maxStock: r.trackInventory ? r.stock : null,
+  }))
+})
 
 export const getProductBySlug = cache(async (storeId: string, slug: string) => {
   const [row] = await db

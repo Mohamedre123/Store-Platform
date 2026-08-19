@@ -2,6 +2,7 @@ import { getDashboardContext } from '@/lib/store-context'
 import { Sidebar } from '@/components/dashboard/sidebar'
 import { SectionTabs } from '@/components/dashboard/section-tabs'
 import { AuroraBackground } from '@/components/motion'
+import { Preloader } from '@/components/preloader'
 import { storeUrl } from '@/lib/domain'
 import { logoutAction } from '@/app/(auth)/actions'
 import { ExternalLink, LogOut } from 'lucide-react'
@@ -11,6 +12,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="min-h-screen-safe">
+      <Preloader />
       <AuroraBackground />
       <Sidebar storeName={store.name} storeSlug={store.slug} storeLogo={store.logoLight} />
 

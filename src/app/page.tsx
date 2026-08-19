@@ -21,6 +21,7 @@ import {
 } from "@/components/motion";
 import { Logo } from "@/components/logo";
 import { brand } from "@/lib/brand";
+import { Preloader } from "@/components/preloader";
 
 const features = [
   {
@@ -85,6 +86,7 @@ const steps = [
 export default function HomePage() {
   return (
     <>
+      <Preloader />
       <AuroraBackground />
 
       <main className="min-h-screen-safe relative">

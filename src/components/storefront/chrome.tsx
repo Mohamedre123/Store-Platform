@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { useCart } from './cart'
 import { CartDrawer } from './cart-drawer'
 import { SearchBox } from './search-box'
+import type { UpsellProduct } from '@/lib/storefront'
 
 type NavItem = { label: string; href: string }
 
@@ -33,6 +34,8 @@ export function StoreHeader({
   cartFreeShippingBar = false,
   cartFreeOver = 0,
   cartShowNotes = false,
+  cartUpsell = [],
+  cartUpsellTitle = 'أكمل طلبك',
   showWishlist = false,
   logoHeight = 40,
   currency,
@@ -53,12 +56,14 @@ export function StoreHeader({
   cartFreeShippingBar?: boolean
   cartFreeOver?: number
   cartShowNotes?: boolean
+  cartUpsell?: UpsellProduct[]
+  cartUpsellTitle?: string
   showWishlist?: boolean
   logoHeight?: number
   currency: string
   storeSlug: string
 }) {
-  const { count, setOpen, ready } = useCart()
+  const { count, setOpen, ready, mode: cartMode } = useCart()
   const [menuOpen, setMenuOpen] = useState(false)
 
   const brand = (
@@ -115,21 +120,33 @@ export function StoreHeader({
     </Link>
   ) : null
 
-  const cartButton = showCart ? (
-    <button
-      type="button"
-      onClick={() => setOpen(true)}
-      aria-label={`السلة${ready && count ? ` — ${count} منتج` : ''}`}
-      className="relative flex h-11 w-11 items-center justify-center rounded-lg transition-colors hover:bg-[var(--sf-text)]/6"
-    >
+  /*
+    في وضع الصفحة الزرار رابط حقيقي: العميل يقدر يفتحه في تبويب جديد
+    ويحفظه، ومحرّكات البحث تشوفه. الزرار العادي بيمنع الاتنين.
+  */
+  const cartInner = (
+    <>
       <ShoppingBag className="h-5 w-5" aria-hidden="true" />
       {ready && count > 0 && (
         <span className="absolute end-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--sf-primary)] px-1 text-[10px] font-bold text-white tabular-nums">
           {count}
         </span>
       )}
+    </>
+  )
+  const cartClass =
+    'relative flex h-11 w-11 items-center justify-center rounded-lg transition-colors hover:bg-[var(--sf-text)]/6'
+  const cartLabel = `السلة${ready && count ? ` — ${count} منتج` : ''}`
+
+  const cartButton = !showCart ? null : cartMode === 'page' ? (
+    <Link href="/cart" aria-label={cartLabel} className={cartClass}>
+      {cartInner}
+    </Link>
+  ) : (
+    <button type="button" onClick={() => setOpen(true)} aria-label={cartLabel} className={cartClass}>
+      {cartInner}
     </button>
-  ) : null
+  )
 
   return (
     <>
@@ -250,14 +267,18 @@ export function StoreHeader({
         </div>
       )}
 
-      <CartDrawer
-        currency={currency}
-        storeSlug={storeSlug}
-        emptyMessage={cartEmptyMessage}
-        freeShippingBar={cartFreeShippingBar}
-        freeOver={cartFreeOver}
-        showNotes={cartShowNotes}
-      />
+      {cartMode === 'drawer' && (
+        <CartDrawer
+          currency={currency}
+          storeSlug={storeSlug}
+          emptyMessage={cartEmptyMessage}
+          freeShippingBar={cartFreeShippingBar}
+          freeOver={cartFreeOver}
+          showNotes={cartShowNotes}
+          upsell={cartUpsell}
+          upsellTitle={cartUpsellTitle}
+        />
+      )}
     </>
   )
 }

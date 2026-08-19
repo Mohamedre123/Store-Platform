@@ -25,7 +25,7 @@ export function MobileNav({
 }) {
   const pathname = usePathname()
   const href = useStoreHref()
-  const { count, setOpen, ready } = useCart()
+  const { count, setOpen, ready, mode } = useCart()
 
   const items = [
     { key: 'home', label: 'الرئيسية', icon: Home, path: '/' },
@@ -65,21 +65,38 @@ export function MobileNav({
             )
           })}
 
-          {showCart && (
-            <button
-              type="button"
-              onClick={() => setOpen(true)}
-              className="relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] opacity-60"
-            >
-              <ShoppingBag className="h-5 w-5" aria-hidden="true" />
-              السلة
-              {ready && count > 0 && (
-                <span className="absolute end-[22%] top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--sf-primary)] px-1 text-[10px] font-bold text-white tabular-nums">
-                  {count}
-                </span>
-              )}
-            </button>
-          )}
+          {showCart &&
+            (mode === 'page' ? (
+              <Link
+                href="/cart"
+                aria-current={isActive('/cart') ? 'page' : undefined}
+                className={`relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] transition-opacity ${
+                  isActive('/cart') ? 'text-[var(--sf-primary)]' : 'opacity-60'
+                }`}
+              >
+                <ShoppingBag className="h-5 w-5" aria-hidden="true" />
+                السلة
+                {ready && count > 0 && (
+                  <span className="absolute end-[22%] top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--sf-primary)] px-1 text-[10px] font-bold text-white tabular-nums">
+                    {count}
+                  </span>
+                )}
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setOpen(true)}
+                className="relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] opacity-60"
+              >
+                <ShoppingBag className="h-5 w-5" aria-hidden="true" />
+                السلة
+                {ready && count > 0 && (
+                  <span className="absolute end-[22%] top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--sf-primary)] px-1 text-[10px] font-bold text-white tabular-nums">
+                    {count}
+                  </span>
+                )}
+              </button>
+            ))}
 
           {showAccount && (
             <Link

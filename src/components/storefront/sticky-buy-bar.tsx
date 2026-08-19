@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { Check } from 'lucide-react'
 import { useCart } from './cart'
 import { formatMoney } from '@/lib/utils'
 
@@ -34,8 +35,9 @@ export function StickyBuyBar({
   /** فيه شريط تنقّل سفلي؟ نرفع الشريط فوقه بدل ما يغطّيه */
   hasMobileNav: boolean
 }) {
-  const { add, setOpen } = useCart()
+  const { add, setOpen, mode } = useCart()
   const [visible, setVisible] = useState(false)
+  const [added, setAdded] = useState(false)
 
   useEffect(() => {
     const onScroll = () => setVisible(window.scrollY > 520)
@@ -66,11 +68,24 @@ export function StickyBuyBar({
           type="button"
           onClick={() => {
             add(item, 1)
-            setOpen(true)
+            // الدرج بيأكّد الإضافة بنفسه؛ في وضع الصفحة الزرار
+            // لازم يأكّد مكانه — من غير كده العميل يدوس تاني
+            if (mode === 'drawer') setOpen(true)
+            else {
+              setAdded(true)
+              setTimeout(() => setAdded(false), 2000)
+            }
           }}
-          className="min-h-12 shrink-0 rounded-[var(--sf-radius)] bg-[var(--sf-primary)] px-6 font-semibold text-white"
+          className="flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-[var(--sf-radius)] bg-[var(--sf-primary)] px-6 font-semibold text-white"
         >
-          أضف للسلة
+          {added ? (
+            <>
+              <Check className="h-4 w-4" aria-hidden="true" />
+              اتضاف
+            </>
+          ) : (
+            'أضف للسلة'
+          )}
         </button>
       </div>
     </div>

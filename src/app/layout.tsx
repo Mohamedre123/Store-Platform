@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from 'next'
 import { IBM_Plex_Sans_Arabic } from 'next/font/google'
-import { Preloader } from '@/components/preloader'
 import './globals.css'
 
 const plexArabic = IBM_Plex_Sans_Arabic({
@@ -64,10 +63,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body suppressHydrationWarning>
-        <Preloader />
-        {children}
-      </body>
+      {/*
+        شاشة تحميل المنصة مش هنا عن قصد.
+        التخطيط ده بيلفّ متاجر التُجّار كمان، وشعار «زاوية» في متجر
+        العميل بيخلّي التاجر يبان تابعًا لينا مش صاحب علامة. كل سطح
+        من أسطح المنصة بيركّبها بنفسه، والمتجر بيركّب بري لودر التاجر.
+      */}
+      <body suppressHydrationWarning>{children}</body>
     </html>
   )
 }

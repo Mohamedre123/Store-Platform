@@ -1,11 +1,12 @@
 'use client'
 
-import Image from 'next/image'
 import { SLink as Link } from './store-link'
-import { Minus, Plus, ShoppingBag, Trash2, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { ShoppingBag, X } from 'lucide-react'
+import { useEffect } from 'react'
 import { useCart } from './cart'
+import { CartLines, CartNoteField, CartUpsell, FreeShippingProgress } from './cart-parts'
 import { formatMoney } from '@/lib/utils'
+import type { UpsellProduct } from '@/lib/storefront'
 
 /** درج السلة — يفتح من جهة البداية ويقفل بـEscape أو بالضغط برّه */
 export function CartDrawer({
@@ -14,6 +15,8 @@ export function CartDrawer({
   freeShippingBar = false,
   freeOver = 0,
   showNotes = false,
+  upsell = [],
+  upsellTitle = 'أكمل طلبك',
 }: {
   currency: string
   storeSlug: string
@@ -22,17 +25,10 @@ export function CartDrawer({
   /** حد الشحن المجاني بالوحدة الصغرى */
   freeOver?: number
   showNotes?: boolean
+  upsell?: UpsellProduct[]
+  upsellTitle?: string
 }) {
-  const { items, isOpen, setOpen, setQuantity, remove, subtotal, count } = useCart()
-  const [note, setNote] = useState('')
-
-  // نقرا الملاحظة المحفوظة مرة واحدة عند الفتح
-  useEffect(() => {
-    if (!isOpen || !showNotes) return
-    try {
-      setNote(localStorage.getItem('zw_cart_note') ?? '')
-    } catch {}
-  }, [isOpen, showNotes])
+  const { items, isOpen, setOpen, subtotal, count } = useCart()
 
   useEffect(() => {
     if (!isOpen) return
@@ -89,122 +85,19 @@ export function CartDrawer({
           </div>
         ) : (
           <>
-            <ul className="flex-1 divide-y divide-[var(--sf-text)]/8 overflow-y-auto">
-              {items.map((item) => (
-                <li key={`${item.productId}-${item.variantId ?? ''}`} className="flex gap-3 p-4">
-                  <Link
-                    href={`/products/${item.slug}`}
-                    onClick={() => setOpen(false)}
-                    className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-[var(--sf-text)]/6"
-                  >
-                    {item.image && (
-                      <Image src={item.image} alt="" fill sizes="80px" className="object-cover" />
-                    )}
-                  </Link>
-
-                  <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                    <Link
-                      href={`/products/${item.slug}`}
-                      onClick={() => setOpen(false)}
-                      className="line-clamp-2 text-sm font-medium"
-                    >
-                      {item.name}
-                    </Link>
-
-                    <span className="tabular text-sm font-bold text-[var(--sf-primary)]">
-                      {formatMoney(item.price, currency)}
-                    </span>
-
-                    <div className="mt-auto flex items-center justify-between gap-2">
-                      <div className="flex items-center rounded-lg border border-[var(--sf-text)]/15">
-                        <button
-                          type="button"
-                          onClick={() => setQuantity(item.productId, item.quantity - 1, item.variantId)}
-                          aria-label="تقليل"
-                          className="flex h-9 w-9 items-center justify-center"
-                        >
-                          <Minus className="h-3.5 w-3.5" aria-hidden="true" />
-                        </button>
-                        <span className="tabular w-8 text-center text-sm font-medium">{item.quantity}</span>
-                        <button
-                          type="button"
-                          onClick={() => setQuantity(item.productId, item.quantity + 1, item.variantId)}
-                          disabled={item.maxStock ? item.quantity >= item.maxStock : false}
-                          aria-label="زيادة"
-                          className="flex h-9 w-9 items-center justify-center disabled:opacity-35"
-                        >
-                          <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-                        </button>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => remove(item.productId, item.variantId)}
-                        aria-label={`حذف ${item.name}`}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg opacity-50 transition-opacity hover:opacity-100"
-                      >
-                        <Trash2 className="h-4 w-4" aria-hidden="true" />
-                      </button>
-                    </div>
-
-                    {item.maxStock !== undefined && item.quantity >= item.maxStock && (
-                      <span className="text-xs opacity-60">دي آخر كمية متاحة</span>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <div className="flex-1 overflow-y-auto">
+              <CartLines currency={currency} onNavigate={() => setOpen(false)} />
+              <CartUpsell products={upsell} title={upsellTitle} currency={currency} />
+            </div>
 
             <div className="safe-bottom shrink-0 border-t border-[var(--sf-text)]/10 p-4">
-              {/*
-                شريط الشحن المجاني.
-                «فاضلك ٥٠ جنيه» بيرفع قيمة الطلب أكتر من أي خصم — العميل
-                بيزوّد عشان يوصل للحد بدل ما ياخد خصمًا يقلّل هامش التاجر.
-              */}
-              {freeShippingBar && freeOver > 0 && (
+              {freeShippingBar && (
                 <div className="mb-3">
-                  {subtotal >= freeOver ? (
-                    <p className="text-sm font-medium text-green-600">
-                      مبروك! الشحن مجاني على طلبك
-                    </p>
-                  ) : (
-                    <>
-                      <p className="mb-1.5 text-xs">
-                        فاضلك{' '}
-                        <span className="tabular font-bold text-[var(--sf-primary)]">
-                          {formatMoney(freeOver - subtotal, currency)}
-                        </span>{' '}
-                        والشحن يبقى مجاني
-                      </p>
-                      <div className="h-1.5 overflow-hidden rounded-full bg-[var(--sf-text)]/10">
-                        <div
-                          className="h-full rounded-full bg-[var(--sf-primary)] transition-[width] duration-500"
-                          style={{ width: `${Math.min(100, (subtotal / freeOver) * 100)}%` }}
-                        />
-                      </div>
-                    </>
-                  )}
+                  <FreeShippingProgress subtotal={subtotal} freeOver={freeOver} currency={currency} />
                 </div>
               )}
 
-              {showNotes && (
-                <label className="mb-3 flex flex-col gap-1.5">
-                  <span className="text-xs opacity-70">ملاحظة على الطلب (اختياري)</span>
-                  <textarea
-                    value={note}
-                    onChange={(e) => {
-                      setNote(e.target.value)
-                      // بتتقرا في الشيك أوت — التخزين المحلي بيخلّيها تعدّي بين الصفحتين
-                      try {
-                        localStorage.setItem('zw_cart_note', e.target.value)
-                      } catch {}
-                    }}
-                    rows={2}
-                    placeholder="مثال: اتصل قبل التوصيل"
-                    className="rounded-[var(--sf-radius)] border border-[var(--sf-text)]/18 bg-[var(--sf-surface)] px-3 py-2 text-sm outline-none focus:border-[var(--sf-primary)]"
-                  />
-                </label>
-              )}
+              <CartNoteField active={showNotes && isOpen} />
 
               <div className="mb-3 flex items-center justify-between">
                 <span className="text-sm opacity-70">الإجمالي</span>
