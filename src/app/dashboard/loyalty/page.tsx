@@ -1,6 +1,6 @@
-import { desc, eq, sql } from 'drizzle-orm'
+import { asc, desc, eq, sql } from 'drizzle-orm'
 import { db } from '@/db'
-import { customers, loyaltyTransactions, wheelPrizes, wheelSettings } from '@/db/schema'
+import { customers, loyaltyTransactions, rewards, wheelPrizes, wheelSettings } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { getLoyaltySettings } from '@/lib/loyalty'
 import { PageHeader } from '@/components/dashboard/page-shell'
@@ -8,13 +8,14 @@ import { Reveal } from '@/components/motion'
 import { Card } from '@/components/ui'
 import { LoyaltyForm } from './loyalty-form'
 import { WheelForm } from './wheel-form'
+import { RewardsForm, type RewardItem } from './rewards-form'
 
 export const metadata = { title: 'الولاء والنقاط' }
 
 export default async function LoyaltyPage() {
   const { store } = await getDashboardContext()
 
-  const [settings, [stats], recent, [wheelCfg], wheelPrizeRows] = await Promise.all([
+  const [settings, [stats], recent, [wheelCfg], wheelPrizeRows, rewardRows] = await Promise.all([
     getLoyaltySettings(store.id),
     db
       .select({
@@ -39,6 +40,11 @@ export default async function LoyaltyPage() {
       .limit(20),
     db.select().from(wheelSettings).where(eq(wheelSettings.storeId, store.id)).limit(1),
     db.select().from(wheelPrizes).where(eq(wheelPrizes.storeId, store.id)).orderBy(wheelPrizes.position),
+    db
+      .select()
+      .from(rewards)
+      .where(eq(rewards.storeId, store.id))
+      .orderBy(asc(rewards.sortOrder), asc(rewards.pointsCost)),
   ])
 
   return (
@@ -69,6 +75,12 @@ export default async function LoyaltyPage() {
 
       <Reveal delay={100}>
         <LoyaltyForm settings={settings} currency={store.currency} />
+      </Reveal>
+
+      <Reveal delay={110}>
+        <section className="border-t border-[var(--border)] pt-6">
+          <RewardsForm rewards={rewardRows as RewardItem[]} currency={store.currency} />
+        </section>
       </Reveal>
 
       <Reveal delay={120}>

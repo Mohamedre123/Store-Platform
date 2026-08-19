@@ -32,6 +32,9 @@ export type StoreCustomer = {
   /** العميل ممكن يتسجّل ببريد من غير رقم في حالات نادرة */
   phone: string | null
   email: string | null
+  /** الولاء — بيتقرا في نفس الاستعلام بدل استعلام تاني على كل صفحة */
+  lifetimePoints: number
+  tier: string
 }
 
 export async function createCustomerSession(storeId: string, customerId: string) {
@@ -73,6 +76,8 @@ export const getCurrentCustomer = cache(
         name: customers.name,
         phone: customers.phone,
         email: customers.email,
+        lifetimePoints: customers.lifetimePoints,
+        tier: customers.tier,
       })
       .from(customerSessions)
       .innerJoin(customers, eq(customers.id, customerSessions.customerId))

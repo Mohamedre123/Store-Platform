@@ -50,20 +50,42 @@ export async function validateCoupon(
   // العميل صاحب الكود — للتحقق من «أول طلب» والحد لكل عميل
   let customerId: string | null = null
   let customerOrders = 0
+  let customerTier: string | null = null
   if (ctx.customerPhone) {
     const [c] = await db
-      .select({ id: customers.id, ordersCount: customers.ordersCount })
+      .select({ id: customers.id, ordersCount: customers.ordersCount, tier: customers.tier })
       .from(customers)
       .where(and(eq(customers.storeId, storeId), eq(customers.phone, ctx.customerPhone)))
       .limit(1)
     if (c) {
       customerId = c.id
       customerOrders = c.ordersCount
+      customerTier = c.tier
     }
   }
 
   if (coupon.eligibility === 'first_order' && customerOrders > 0) {
     return { ok: false, message: 'الكود ده لأول طلب بس' }
+  }
+
+  /**
+   * كوبون مخصوص لعميل بعينه.
+   *
+   * كوبونات مكافآت الولاء بتتولّد كده: العميل يصرف نقاطه ونديله كودًا
+   * باسمه. من غير الفحص ده الكود يشتغل مع أي حد يشوفه — والعميل بيبعته
+   * لأصحابه، فالنقاط تتخصم مرة والخصم يتاخد عشرة.
+   */
+  if (coupon.eligibility === 'specific_customers') {
+    if (!customerId || !coupon.eligibilityValue.includes(customerId)) {
+      return { ok: false, message: 'الكود ده مخصوص لعميل تاني' }
+    }
+  }
+
+  /** كوبون لمستوى ولاء معيّن — الضيف مش في أي مستوى فمش مؤهّل */
+  if (coupon.eligibility === 'tier') {
+    if (!customerTier || !coupon.eligibilityValue.includes(customerTier)) {
+      return { ok: false, message: 'الكود ده لمستوى عضوية تاني' }
+    }
   }
 
   if (customerId && coupon.usageLimitPerCustomer > 0) {

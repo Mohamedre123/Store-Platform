@@ -2,13 +2,17 @@ import { notFound } from 'next/navigation'
 import Image from 'next/image'
 import { SLink as Link } from '@/components/storefront/store-link'
 import { and, desc, eq } from 'drizzle-orm'
-import { Heart, LogOut, MapPin, Package } from 'lucide-react'
+import { Heart, MapPin, Package, Sparkles } from 'lucide-react'
 import { db } from '@/db'
 import { customerAddresses, orders, products, wishlists } from '@/db/schema'
 import { getStore } from '@/lib/storefront'
 import { getCurrentCustomer } from '@/lib/customer-auth'
 import { formatDate, formatMoney } from '@/lib/utils'
 import { statusMeta } from '@/lib/order-status'
+import { getLoyaltySettings, getPointsBalance, nextTier, tierForPoints } from '@/lib/loyalty'
+import { listActiveRewards } from '@/lib/rewards'
+import { tierAllows, TIER_LABELS } from '@/lib/rewards-meta'
+import { RewardsCatalog, type CatalogReward } from '@/components/storefront/rewards-catalog'
 import { CustomerLoginForm } from './login-form'
 import { LogoutButton } from './logout-button'
 
@@ -66,6 +70,45 @@ export default async function AccountPage({ params }: { params: Promise<{ store:
       .orderBy(desc(customerAddresses.isDefault)),
   ])
 
+  /**
+   * الولاء.
+   *
+   * الرصيد بيتقرا من سجل الحركات لا من العمود المنسوخ — السجل هو
+   * المرجع لو حصل خلاف، والعميل بيشوف رقمًا يقدر يفسّره من حركاته.
+   */
+  const loyalty = await getLoyaltySettings(store.id)
+  const showLoyalty = Boolean(loyalty?.enabled)
+
+  const [balance, rewardRows] = showLoyalty
+    ? await Promise.all([getPointsBalance(customer.id), listActiveRewards(store.id)])
+    : [0, []]
+
+  const tier = showLoyalty ? tierForPoints(loyalty, customer.lifetimePoints) : null
+  const upcoming = showLoyalty ? nextTier(loyalty, customer.lifetimePoints) : null
+
+  /*
+    القفل بيتحسب هنا على الخادم: المكافأة اللي فوق مستوى العميل
+    بتتعرض مقفولة، والاسترداد نفسه بيعيد الفحص — الإخفاء تحسين شكلي
+    مش حماية.
+  */
+  const catalog: CatalogReward[] = rewardRows.map((r) => {
+    const allowed = tierAllows(customer.tier, r.minTier)
+    return {
+      id: r.id,
+      name: r.name,
+      description: r.description,
+      type: r.type,
+      value: r.value,
+      pointsCost: r.pointsCost,
+      minTier: r.minTier,
+      stock: r.stock,
+      locked: !allowed,
+      lockReason: allowed
+        ? null
+        : `لمستوى ${TIER_LABELS[r.minTier as keyof typeof TIER_LABELS] ?? ''} فأعلى`,
+    }
+  })
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
       <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
@@ -79,6 +122,47 @@ export default async function AccountPage({ params }: { params: Promise<{ store:
         </div>
         <LogoutButton storeIdentifier={identifier} />
       </div>
+
+      {showLoyalty && (
+        <section className="mb-10 rounded-[var(--sf-radius)] border border-[var(--sf-text)]/12 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <span className="flex items-center gap-2 text-sm opacity-65">
+                <Sparkles className="h-4 w-4 text-[var(--sf-primary)]" aria-hidden="true" />
+                رصيد نقاطك
+              </span>
+              <span className="tabular mt-1 block text-3xl font-bold text-[var(--sf-primary)]">
+                {balance}
+              </span>
+            </div>
+            {tier && (
+              <div className="text-end">
+                <span className="text-xs opacity-60">مستواك</span>
+                <span className="block font-bold">{tier.name}</span>
+              </div>
+            )}
+          </div>
+
+          {upcoming && (
+            <p className="mt-3 text-sm opacity-70">
+              فاضلك{' '}
+              <span className="tabular font-bold text-[var(--sf-primary)]">
+                {upcoming.remaining}
+              </span>{' '}
+              نقطة وتوصل لمستوى {upcoming.tier.name}.
+            </p>
+          )}
+        </section>
+      )}
+
+      {showLoyalty && (
+        <RewardsCatalog
+          storeIdentifier={identifier}
+          rewards={catalog}
+          balance={balance}
+          currency={store.currency}
+        />
+      )}
 
       {/* الطلبات */}
       <section className="mb-10">
