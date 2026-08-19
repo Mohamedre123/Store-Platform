@@ -9,6 +9,7 @@ import { getStoreTheme } from '@/lib/storefront'
 import { isEmailConfigured, sendEmail } from '@/lib/email'
 import { isEmailableStatus, orderStatusEmail } from '@/lib/store-emails'
 import { storeUrl } from '@/lib/domain'
+import { awardOrderPoints } from '@/lib/loyalty'
 import type { OrderStatus } from '@/db/schema'
 
 const LABELS: Record<OrderStatus, string> = {
@@ -41,6 +42,7 @@ export async function updateOrderStatusAction(orderId: string, status: OrderStat
       total: orders.total,
       currency: orders.currency,
       recoveryToken: orders.recoveryToken,
+      customerId: orders.customerId,
       trackingNumber: orders.trackingNumber,
       shippingCarrier: orders.shippingCarrier,
     })
@@ -101,6 +103,27 @@ export async function updateOrderStatusAction(orderId: string, status: OrderStat
       actorId: user.id,
     })
   })
+
+  /**
+   * نقاط الولاء عند التسليم لا عند الطلب.
+   *
+   * لو منحناها عند الطلب، عميل يطلب ويلغي عشرين مرة يطلع بنقاط من غير
+   * ما يشتري حاجة. والدالة نفسها بتتأكد إن الطلب ما اتمنحش قبل كده،
+   * فتغيير الحالة ذهابًا وإيابًا ما يمنحش مرتين.
+   */
+  if (status === 'delivered' && order.customerId) {
+    try {
+      await awardOrderPoints({
+        storeId: store.id,
+        customerId: order.customerId,
+        orderId: order.id,
+        orderTotal: order.total,
+        orderNumber: order.orderNumber,
+      })
+    } catch (e) {
+      console.error('فشل منح نقاط الولاء:', e)
+    }
+  }
 
   /**
    * إشعار العميل بالحالة الجديدة.

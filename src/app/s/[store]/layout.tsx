@@ -9,6 +9,8 @@ import { PreviewBridge } from '@/components/storefront/preview-bridge'
 import { StorePreloader } from '@/components/storefront/preloader'
 import { StoreFooter } from '@/components/storefront/footer'
 import { StoreToolbar } from '@/components/storefront/store-toolbar'
+import { LuckyWheel } from '@/components/storefront/lucky-wheel'
+import { getWheelConfig } from '@/lib/wheel'
 import { StoreLinkProvider } from '@/components/storefront/store-link'
 import { FONT_STACKS, RADIUS_PX } from '@/lib/customization'
 
@@ -47,11 +49,12 @@ export default async function StorefrontLayout({
   const h = await headers()
   const isPreview = h.get('x-zawya-preview') === '1'
 
-  const [theme, cats, pixels, policyPages] = await Promise.all([
+  const [theme, cats, pixels, policyPages, wheel] = await Promise.all([
     getStoreTheme(store.id, isPreview),
     listCategories(store.id),
     getStorePixels(store.id),
     listFooterPages(store.id),
+    getWheelConfig(store.id),
   ])
 
   /**
@@ -162,6 +165,17 @@ export default async function StorefrontLayout({
           <StoreFooter footer={custom.footer} storeName={store.name} policyPages={policyPages} />
 
           <StoreToolbar toolbar={custom.toolbar} />
+
+          {/* عجلة الحظ — مقفولة في المعاينة عشان ما تزنقش التاجر وهو بيظبّط */}
+          {wheel && !isPreview && (
+            <LuckyWheel
+              storeIdentifier={identifier}
+              title={wheel.settings.title}
+              subtitle={wheel.settings.subtitle}
+              delaySeconds={wheel.settings.triggerAfterSeconds}
+              prizes={wheel.prizes.map((p) => ({ id: p.id, label: p.label, color: p.color }))}
+            />
+          )}
         </div>
       </div>
       </CartProvider>
