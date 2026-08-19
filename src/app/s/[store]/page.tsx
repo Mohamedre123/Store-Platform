@@ -3,9 +3,10 @@ import { headers } from 'next/headers'
 import { SLink as Link } from '@/components/storefront/store-link'
 import { notFound } from 'next/navigation'
 import { CreditCard, Package, RotateCcw, Truck } from 'lucide-react'
-import { getStore, getStoreTheme, listCategories, listProducts, listingGrid } from '@/lib/storefront'
+import { getActiveBanners, getStore, getStoreTheme, listCategories, listProducts, listingGrid } from '@/lib/storefront'
 import { ProductCard } from '@/components/storefront/product-card'
 import { Hero } from '@/components/storefront/hero'
+import { PromoBanner } from '@/components/storefront/promo-banner'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,11 +41,12 @@ export default async function StoreHomePage({ params }: { params: Promise<{ stor
   // لو التاجر ما رتّبش أقسامًا بعد، نعرض الأساسي بدل صفحة فاضية
   const show = (type: string) => (theme.sections.length === 0 ? true : enabled.has(type))
 
-  const [cats, featured, latest, onSale] = await Promise.all([
+  const [cats, featured, latest, onSale, promos] = await Promise.all([
     listCategories(store.id),
     listProducts(store.id, { featured: true, limit: cols * 2 }),
     listProducts(store.id, { limit: cols * 2 }),
     listProducts(store.id, { onSale: true, limit: cols }),
+    getActiveBanners(store.id, 'promo'),
   ])
 
   const gridClass = listingGrid(listing)
@@ -102,6 +104,17 @@ export default async function StoreHomePage({ params }: { params: Promise<{ stor
                     </span>
                     <span className="text-center text-sm font-medium">{c.name}</span>
                   </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* البانرات الترويجية — بتظهر بين الأقسام وبتختفي لوحدها لما العرض ينتهي */}
+          {promos.length > 0 && (
+            <section className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
+              <div className="flex flex-col gap-4">
+                {promos.map((b) => (
+                  <PromoBanner key={b.id} banner={b} />
                 ))}
               </div>
             </section>

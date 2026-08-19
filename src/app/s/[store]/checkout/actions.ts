@@ -1,5 +1,6 @@
 'use server'
 
+import { cookies } from 'next/headers'
 import { and, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/db'
@@ -20,6 +21,7 @@ import { dashboardUrl, storeUrl } from '@/lib/domain'
 import { validateCoupon, recordCouponUse } from '@/lib/coupons'
 import { issueOrderOtp, isPhoneVerifiedForOrder, verifyOrderOtp } from '@/lib/order-otp'
 import { computeOfferDiscount, getActiveOffers } from '@/lib/offers'
+import { findAffiliateByCode, recordAffiliateConversion } from '@/lib/affiliates'
 import { generateToken } from '@/lib/crypto'
 import { normalizePhone } from '@/lib/utils'
 
@@ -398,6 +400,31 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
     .limit(1)
 
   const token = row?.token ?? ''
+
+  /**
+   * تقييد البيعة للمسوّق لو العميل جه من رابطه.
+   *
+   * العمولة على المنتجات بعد الخصم لا على الإجمالي: الشحن مش ربح
+   * للتاجر، والعمولة عليه بتاكل من هامشه. وبتفضل «قيد الانتظار» لحد
+   * ما الطلب يتسلّم — الطلب ممكن يتلغي والعمولة على بيعة اتلغت خسارة.
+   */
+  try {
+    const refCode = (await cookies()).get('zw_ref')?.value
+    if (refCode) {
+      const affiliate = await findAffiliateByCode(store.id, refCode)
+      if (affiliate) {
+        await recordAffiliateConversion({
+          storeId: store.id,
+          affiliateId: affiliate.id,
+          orderId: result.orderId!,
+          eligibleAmount: Math.max(0, totals.subtotal - totals.discount),
+          orderTotal: totals.total,
+        })
+      }
+    }
+  } catch (e) {
+    console.error('فشل تسجيل عمولة المسوّق:', e)
+  }
 
   /**
    * رسائل التأكيد — بعد ما المعاملة نجحت لا جوّاها.

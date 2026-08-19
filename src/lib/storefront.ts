@@ -1,8 +1,8 @@
 import 'server-only'
 import { cache } from 'react'
-import { and, desc, eq, gt, ilike, isNotNull, or, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, ilike, isNotNull, isNull, or, sql } from 'drizzle-orm'
 import { db } from '@/db'
-import { categories, pages, products, reviews, stores, storePlugins, storeThemes } from '@/db/schema'
+import { banners, categories, pages, products, reviews, stores, storePlugins, storeThemes } from '@/db/schema'
 import { getTheme, type ThemeDefinition } from './themes'
 import {
   defaultCustomization,
@@ -395,5 +395,38 @@ export const searchProducts = cache(
       )
       .orderBy(desc(products.soldCount))
       .limit(limit)
+  },
+)
+
+/**
+ * البانرات الشغّالة في مكان معيّن.
+ *
+ * الفلترة بالتاريخ في قاعدة البيانات مش في الكود: البانر بينتهي لوحده
+ * في اللحظة المحددة من غير ما حد يفتكر يقفله.
+ */
+export const getActiveBanners = cache(
+  async (storeId: string, placement: 'hero' | 'promo' | 'category' | 'popup') => {
+    return db
+      .select({
+        id: banners.id,
+        title: banners.title,
+        subtitle: banners.subtitle,
+        imageDesktop: banners.imageDesktop,
+        imageMobile: banners.imageMobile,
+        ctaLabel: banners.ctaLabel,
+        ctaUrl: banners.ctaUrl,
+      })
+      .from(banners)
+      .where(
+        and(
+          eq(banners.storeId, storeId),
+          eq(banners.placement, placement),
+          eq(banners.isActive, true),
+          or(isNull(banners.startsAt), sql`${banners.startsAt} <= now()`)!,
+          or(isNull(banners.endsAt), sql`${banners.endsAt} >= now()`)!,
+        ),
+      )
+      .orderBy(banners.sortOrder)
+      .limit(5)
   },
 )

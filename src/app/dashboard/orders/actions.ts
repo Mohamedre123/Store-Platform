@@ -10,6 +10,7 @@ import { isEmailConfigured, sendEmail } from '@/lib/email'
 import { isEmailableStatus, orderStatusEmail } from '@/lib/store-emails'
 import { storeUrl } from '@/lib/domain'
 import { awardOrderPoints } from '@/lib/loyalty'
+import { approveAffiliateCommission, cancelAffiliateCommission } from '@/lib/affiliates'
 import type { OrderStatus } from '@/db/schema'
 
 const LABELS: Record<OrderStatus, string> = {
@@ -123,6 +124,17 @@ export async function updateOrderStatusAction(orderId: string, status: OrderStat
     } catch (e) {
       console.error('فشل منح نقاط الولاء:', e)
     }
+  }
+
+  /**
+   * عمولة المسوّق: بتتعتمد عند التسليم وبتتلغي مع الإلغاء أو الإرجاع.
+   * نفس منطق النقاط — العمولة على بيعة اتلغت خسارة مباشرة للتاجر.
+   */
+  try {
+    if (status === 'delivered') await approveAffiliateCommission(order.id)
+    else if (restocking) await cancelAffiliateCommission(order.id)
+  } catch (e) {
+    console.error('فشل تحديث عمولة المسوّق:', e)
   }
 
   /**

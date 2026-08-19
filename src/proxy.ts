@@ -29,6 +29,28 @@ export default function proxy(req: NextRequest) {
   if (url.searchParams.get('preview') === '1') headers.set('x-zawya-preview', '1')
 
   /**
+   * كود المسوّق من الرابط (‎?ref=CODE‎).
+   *
+   * بيتخزّن في كوكي هنا عشان يفضل مع العميل لو تصفّح صفحات تانية قبل ما
+   * يشتري. الكتابة في الوكيل مش في الصفحة: الصفحات مكوّنات خادم وما
+   * تقدرش تكتب كوكيز أثناء العرض.
+   */
+  const ref = url.searchParams.get('ref')?.trim().slice(0, 24)
+
+  /** يلحق كوكي المسوّق بأي استجابة قبل ما ترجع */
+  const finish = (res: NextResponse) => {
+    if (ref) {
+      res.cookies.set('zw_ref', ref, {
+        path: '/',
+        maxAge: 30 * 24 * 60 * 60,
+        sameSite: 'lax',
+        httpOnly: false,
+      })
+    }
+    return res
+  }
+
+  /**
    * مسار المتجر الصريح يُخدَم كما هو من أي مضيف.
    *
    * لازم عشان معاينة المحرّر: لوحة التاجر على نطاق، ومتجره على نطاق
@@ -37,28 +59,28 @@ export default function proxy(req: NextRequest) {
    * نفس أصل اللوحة، فالمعاينة تشتغل مهما كان إعداد النطاقات.
    */
   if (path.startsWith('/s/')) {
-    return NextResponse.next({ request: { headers } })
+    return finish(NextResponse.next({ request: { headers } }))
   }
 
   if (target.kind === 'dashboard') {
     // dashboard.zawya.app/orders  →  /dashboard/orders
     if (!path.startsWith('/dashboard') && !path.startsWith('/api')) {
       url.pathname = `/dashboard${path === '/' ? '' : path}`
-      return NextResponse.rewrite(url, { request: { headers } })
+      return finish(NextResponse.rewrite(url, { request: { headers } }))
     }
-    return NextResponse.next({ request: { headers } })
+    return finish(NextResponse.next({ request: { headers } }))
   }
 
   if (target.kind === 'store') {
     headers.set('x-zawya-store', target.identifier)
     if (path.startsWith('/api')) {
-      return NextResponse.next({ request: { headers } })
+      return finish(NextResponse.next({ request: { headers } }))
     }
     // matgar.zawya.app/products  →  /s/matgar/products
     url.pathname = `/s/${target.identifier}${path === '/' ? '' : path}`
-    return NextResponse.rewrite(url, { request: { headers } })
+    return finish(NextResponse.rewrite(url, { request: { headers } }))
   }
 
   // الموقع التعريفي — لا إعادة كتابة
-  return NextResponse.next({ request: { headers } })
+  return finish(NextResponse.next({ request: { headers } }))
 }
