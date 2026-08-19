@@ -1,5 +1,6 @@
 import { getDashboardContext } from '@/lib/store-context'
 import { Sidebar } from '@/components/dashboard/sidebar'
+import { SectionTabs } from '@/components/dashboard/section-tabs'
 import { AuroraBackground } from '@/components/motion'
 import { storeUrl } from '@/lib/domain'
 import { logoutAction } from '@/app/(auth)/actions'
@@ -43,7 +44,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </div>
         </header>
 
-        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
+        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+          {/* تبويبات القسم — بتظهر لوحدها في الصفحات اللي ليها إخوان */}
+          <div className="mb-6 empty:mb-0">
+            <SectionTabs />
+          </div>
+          {children}
+        </main>
       </div>
     </div>
   )

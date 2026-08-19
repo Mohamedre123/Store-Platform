@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import {
   BarChart3,
@@ -19,6 +19,7 @@ import {
   ShoppingBag,
   Star,
   Store,
+  ChevronDown,
   Code2,
   Gift,
   Zap,
@@ -34,44 +35,90 @@ import {
 import { cn } from '@/lib/utils'
 import { brand } from '@/lib/brand'
 
-const groups: Array<{
-  label?: string
-  items: Array<{ href: string; label: string; icon: typeof LayoutDashboard }>
-}> = [
+/**
+ * قائمة التنقّل.
+ *
+ * ٢٢ عنصرًا مسطّحين كانوا بيخبّوا المحتوى: التاجر ما يعرفش إن جوّه
+ * «الطلبات» فيه السلات المتروكة إلا لما يدخل ويستكشف. الأقسام هنا
+ * بتكشف اللي جوّاها من برّه، والقسم بيفضل مفتوح لو التاجر جوّاه.
+ *
+ * نفس القائمة بتتحوّل لتبويبات جوّه الصفحات — فلو دخل من رابط مباشر
+ * يشوف إخوان الصفحة قدامه برضه.
+ */
+export type NavChild = { href: string; label: string }
+export type NavSection = {
+  href: string
+  label: string
+  icon: typeof LayoutDashboard
+  children?: NavChild[]
+}
+
+export const NAV: NavSection[] = [
+  { href: '/dashboard', label: 'الرئيسية', icon: LayoutDashboard },
   {
-    items: [
-      { href: '/dashboard', label: 'الرئيسية', icon: LayoutDashboard },
-      { href: '/dashboard/orders', label: 'الطلبات', icon: ShoppingBag },
-      { href: '/dashboard/returns', label: 'المرتجعات', icon: RotateCcw },
-      { href: '/dashboard/products', label: 'المنتجات', icon: Package },
-      { href: '/dashboard/customers', label: 'العملاء', icon: Users },
-      { href: '/dashboard/loyalty', label: 'الولاء والنقاط', icon: Gift },
-      { href: '/dashboard/affiliates', label: 'المسوّقون', icon: Share2 },
-      { href: '/dashboard/reviews', label: 'المراجعات', icon: Star },
-      { href: '/dashboard/marketing', label: 'التسويق', icon: Megaphone },
-      { href: '/dashboard/analytics', label: 'التحليلات', icon: BarChart3 },
+    href: '/dashboard/orders',
+    label: 'الطلبات',
+    icon: ShoppingBag,
+    children: [
+      { href: '/dashboard/orders', label: 'كل الطلبات' },
+      { href: '/dashboard/orders?filter=incomplete', label: 'السلات المتروكة' },
+      { href: '/dashboard/returns', label: 'المرتجعات' },
     ],
   },
   {
-    label: 'قنوات البيع',
-    items: [
-      { href: '/dashboard/storefront', label: 'المتجر', icon: Store },
-      { href: '/dashboard/storefront/banners', label: 'البانرات', icon: ImageIcon },
-      { href: '/dashboard/blog', label: 'المدوّنة', icon: Newspaper },
-      { href: '/dashboard/landing', label: 'صفحات الهبوط', icon: LayoutTemplate },
-      { href: '/dashboard/inventory', label: 'المخزون', icon: Boxes },
+    href: '/dashboard/products',
+    label: 'المنتجات',
+    icon: Package,
+    children: [
+      { href: '/dashboard/products', label: 'كل المنتجات' },
+      { href: '/dashboard/products/categories', label: 'الأقسام' },
+      { href: '/dashboard/inventory', label: 'المخزون' },
     ],
   },
   {
-    label: 'الإعداد',
-    items: [
-      { href: '/dashboard/shipping', label: 'الشحن', icon: Truck },
-      { href: '/dashboard/payments', label: 'الدفع', icon: CreditCard },
-      { href: '/dashboard/automations', label: 'الأتمتة', icon: Zap },
-      { href: '/dashboard/plugins', label: 'الإضافات', icon: Plug },
-      { href: '/dashboard/developers', label: 'المطوّرون', icon: Code2 },
-      { href: '/dashboard/settings', label: 'الإعدادات', icon: Settings },
-      { href: '/dashboard/settings/domain', label: 'النطاق', icon: Globe },
+    href: '/dashboard/customers',
+    label: 'العملاء',
+    icon: Users,
+    children: [
+      { href: '/dashboard/customers', label: 'كل العملاء' },
+      { href: '/dashboard/loyalty', label: 'الولاء والنقاط' },
+      { href: '/dashboard/reviews', label: 'المراجعات' },
+    ],
+  },
+  {
+    href: '/dashboard/marketing',
+    label: 'التسويق',
+    icon: Megaphone,
+    children: [
+      { href: '/dashboard/marketing', label: 'الكوبونات والعروض' },
+      { href: '/dashboard/landing', label: 'صفحات الهبوط' },
+      { href: '/dashboard/affiliates', label: 'المسوّقون' },
+      { href: '/dashboard/automations', label: 'الأتمتة' },
+      { href: '/dashboard/analytics', label: 'التحليلات' },
+    ],
+  },
+  {
+    href: '/dashboard/storefront',
+    label: 'المتجر',
+    icon: Store,
+    children: [
+      { href: '/dashboard/storefront', label: 'الثيم والتصميم' },
+      { href: '/dashboard/storefront/banners', label: 'البانرات' },
+      { href: '/dashboard/blog', label: 'المدوّنة' },
+      { href: '/dashboard/settings/pages', label: 'صفحات المتجر' },
+    ],
+  },
+  {
+    href: '/dashboard/settings',
+    label: 'الإعدادات',
+    icon: Settings,
+    children: [
+      { href: '/dashboard/settings', label: 'بيانات المتجر' },
+      { href: '/dashboard/shipping', label: 'الشحن' },
+      { href: '/dashboard/payments', label: 'الدفع' },
+      { href: '/dashboard/settings/domain', label: 'النطاق' },
+      { href: '/dashboard/plugins', label: 'الإضافات' },
+      { href: '/dashboard/developers', label: 'المطوّرون' },
     ],
   },
 ]
@@ -79,6 +126,17 @@ const groups: Array<{
 function isActive(pathname: string, href: string) {
   if (href === '/dashboard') return pathname === '/dashboard'
   return pathname === href || pathname.startsWith(`${href}/`)
+}
+
+/**
+ * القسم نشط لو المسار الحالي جوّاه أو جوّه أي عنصر تابع له.
+ *
+ * لازم نفحص الأتباع كمان: «المرتجعات» تحت «الطلبات» بس مسارها
+ * ‎/dashboard/returns‎ اللي مش بيبدأ بـ‎/dashboard/orders‎.
+ */
+function sectionActive(pathname: string, section: NavSection) {
+  if (isActive(pathname, section.href)) return true
+  return (section.children ?? []).some((c) => isActive(pathname, c.href.split('?')[0]))
 }
 
 export function Sidebar({
@@ -91,37 +149,92 @@ export function Sidebar({
   storeLogo: string | null
 }) {
   const pathname = usePathname()
+  const search = useSearchParams()
   const [open, setOpen] = useState(false)
+  // الأقسام اللي التاجر فتحها أو طواها بإيده — بتغلب الفتح التلقائي
+  const [manual, setManual] = useState<Record<string, boolean>>({})
 
   const nav = (
-    <nav className="flex flex-1 flex-col gap-6 overflow-y-auto px-3 py-4">
-      {groups.map((group, i) => (
-        <div key={i} className="flex flex-col gap-1">
-          {group.label && (
-            <p className="px-3 pb-1 text-xs font-medium text-[var(--fg-subtle)]">{group.label}</p>
-          )}
-          {group.items.map(({ href, label, icon: Icon }) => {
-            const active = isActive(pathname, href)
-            return (
+    <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
+      {NAV.map((section) => {
+        const Icon = section.icon
+        const inSection = sectionActive(pathname, section)
+        // القسم مفتوح لو إحنا جوّاه، أو لو التاجر فتحه بنفسه
+        const expanded = section.children ? (manual[section.href] ?? inSection) : false
+
+        return (
+          <div key={section.href} className="flex flex-col">
+            <div
+              className={cn(
+                'flex items-center rounded-lg transition-colors',
+                inSection
+                  ? 'bg-[var(--primary-soft)] text-[var(--primary)]'
+                  : 'text-[var(--fg-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)]',
+              )}
+            >
               <Link
-                key={href}
-                href={href}
-                onClick={() => setOpen(false)}
-                aria-current={active ? 'page' : undefined}
-                className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
-                  active
-                    ? 'bg-[var(--primary-soft)] text-[var(--primary)]'
-                    : 'text-[var(--fg-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)]',
-                )}
+                href={section.href}
+                onClick={() => {
+                  // الدوس على القسم بيفتحه ويروح لصفحته الرئيسية معًا
+                  if (section.children) setManual((m) => ({ ...m, [section.href]: true }))
+                  setOpen(false)
+                }}
+                aria-current={isActive(pathname, section.href) ? 'page' : undefined}
+                className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-sm font-medium"
               >
                 <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
-                <span className="truncate">{label}</span>
+                <span className="truncate">{section.label}</span>
               </Link>
-            )
-          })}
-        </div>
-      ))}
+
+              {section.children && (
+                <button
+                  type="button"
+                  onClick={() => setManual((m) => ({ ...m, [section.href]: !expanded }))}
+                  aria-expanded={expanded}
+                  aria-label={`${expanded ? 'اطوِ' : 'افتح'} ${section.label}`}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+                >
+                  <ChevronDown
+                    className={cn('h-4 w-4 transition-transform', expanded && 'rotate-180')}
+                    aria-hidden="true"
+                  />
+                </button>
+              )}
+            </div>
+
+            {section.children && expanded && (
+              <div className="mt-0.5 flex flex-col gap-0.5 border-s border-[var(--border)] ms-5 ps-2">
+                {section.children.map((child) => {
+                  /**
+                   * المقارنة بتشمل الاستعلام: «كل الطلبات» و«السلات
+                   * المتروكة» نفس المسار وبيفرّقهم ‎?filter=‎ بس.
+                   * بنقراه من useSearchParams لا من window عشان الخادم
+                   * والمتصفح يرسموا نفس الحاجة.
+                   */
+                  const [childPath, childQuery] = child.href.split('?')
+                  const childActive =
+                    pathname === childPath && (childQuery ?? '') === (search.toString() || '')
+                  return (
+                    <Link
+                      key={child.href}
+                      href={child.href}
+                      onClick={() => setOpen(false)}
+                      className={cn(
+                        'truncate rounded-lg px-3 py-2 text-sm transition-colors',
+                        childActive
+                          ? 'font-medium text-[var(--primary)]'
+                          : 'text-[var(--fg-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)]',
+                      )}
+                    >
+                      {child.label}
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })}
     </nav>
   )
 
