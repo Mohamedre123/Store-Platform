@@ -19,6 +19,7 @@ import {
   ShoppingBag,
   Star,
   Store,
+  RotateCcw,
   Truck,
   Users,
   X,
@@ -34,6 +35,7 @@ const groups: Array<{
     items: [
       { href: '/dashboard', label: 'الرئيسية', icon: LayoutDashboard },
       { href: '/dashboard/orders', label: 'الطلبات', icon: ShoppingBag },
+      { href: '/dashboard/returns', label: 'المرتجعات', icon: RotateCcw },
       { href: '/dashboard/products', label: 'المنتجات', icon: Package },
       { href: '/dashboard/customers', label: 'العملاء', icon: Users },
       { href: '/dashboard/reviews', label: 'المراجعات', icon: Star },

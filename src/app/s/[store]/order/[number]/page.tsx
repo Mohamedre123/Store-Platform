@@ -4,8 +4,10 @@ import { notFound } from 'next/navigation'
 import { and, eq } from 'drizzle-orm'
 import { CheckCircle2, Clock, MessageCircle, Package, Truck } from 'lucide-react'
 import { db } from '@/db'
-import { orderItems, orders, thankYouSettings } from '@/db/schema'
+import { orderItems, orders, returns, thankYouSettings } from '@/db/schema'
 import { getStore } from '@/lib/storefront'
+import { returnStatusMeta } from '@/lib/returns-meta'
+import { ReturnForm } from './return-form'
 import { formatMoney, formatDateTime } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
@@ -54,6 +56,13 @@ export default async function OrderPage({
     .select()
     .from(thankYouSettings)
     .where(eq(thankYouSettings.storeId, store.id))
+    .limit(1)
+
+  // طلب إرجاع قائم — نعرض حالته بدل نموذج جديد
+  const [existingReturn] = await db
+    .select({ returnNumber: returns.returnNumber, status: returns.status, type: returns.type })
+    .from(returns)
+    .where(eq(returns.orderId, order.id))
     .limit(1)
 
   const stageIndex = Math.max(0, STAGES.findIndex((s) => s.key === order.status))
@@ -198,6 +207,32 @@ export default async function OrderPage({
           كمّل تسوّق
         </Link>
       </div>
+
+      {/* الإرجاع — بعد التسليم بس */}
+      {existingReturn ? (
+        <div className="mt-6 rounded-[var(--sf-radius)] border border-[var(--sf-text)]/15 p-4 text-sm">
+          <p className="font-semibold">
+            {existingReturn.type === 'refund' ? 'طلب استرداد' : 'طلب استبدال'} #
+            {existingReturn.returnNumber}
+          </p>
+          <p className="mt-1 opacity-70">{returnStatusMeta(existingReturn.status).label}</p>
+        </div>
+      ) : (
+        order.status === 'delivered' && (
+          <ReturnForm
+            storeIdentifier={identifier}
+            orderNumber={order.orderNumber}
+            token={order.recoveryToken ?? ''}
+            currency={order.currency}
+            items={items.map((i) => ({
+              id: i.id,
+              name: i.name,
+              quantity: i.quantity,
+              price: i.price,
+            }))}
+          />
+        )
+      )}
     </div>
   )
 }

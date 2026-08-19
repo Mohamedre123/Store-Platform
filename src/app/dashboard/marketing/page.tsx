@@ -1,18 +1,19 @@
 import { and, desc, eq } from 'drizzle-orm'
 import { db } from '@/db'
-import { categories, coupons, products } from '@/db/schema'
+import { categories, coupons, offers, products } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { Card } from '@/components/ui'
 import { CouponsManager, type CouponRow } from './coupons-manager'
+import { OffersManager, type OfferRow } from './offers-manager'
 
 export const metadata = { title: 'التسويق' }
 
 export default async function MarketingPage() {
   const { store } = await getDashboardContext()
 
-  const [couponRows, productRows, categoryRows] = await Promise.all([
+  const [couponRows, productRows, categoryRows, offerRows] = await Promise.all([
     db
       .select()
       .from(coupons)
@@ -30,6 +31,11 @@ export default async function MarketingPage() {
       .from(categories)
       .where(eq(categories.storeId, store.id))
       .orderBy(categories.sortOrder),
+    db
+      .select()
+      .from(offers)
+      .where(eq(offers.storeId, store.id))
+      .orderBy(offers.sortOrder),
   ])
 
   const rows = couponRows as CouponRow[]
@@ -63,12 +69,27 @@ export default async function MarketingPage() {
       )}
 
       <Reveal delay={100}>
-        <CouponsManager
-          coupons={rows}
-          currency={store.currency}
-          products={productRows}
-          categories={categoryRows}
-        />
+        <section className="flex flex-col gap-3">
+          <h2 className="font-semibold">كوبونات الخصم</h2>
+          <CouponsManager
+            coupons={rows}
+            currency={store.currency}
+            products={productRows}
+            categories={categoryRows}
+          />
+        </section>
+      </Reveal>
+
+      <Reveal delay={140}>
+        <section className="flex flex-col gap-3 border-t border-[var(--border)] pt-6">
+          <div>
+            <h2 className="font-semibold">عروض الكمية</h2>
+            <p className="mt-0.5 text-sm text-[var(--fg-muted)]">
+              كل ما يشتري أكتر، يوفّر أكتر. بيتطبّق تلقائيًا في الشيك أوت من غير كود.
+            </p>
+          </div>
+          <OffersManager offers={offerRows as OfferRow[]} products={productRows} />
+        </section>
       </Reveal>
     </div>
   )

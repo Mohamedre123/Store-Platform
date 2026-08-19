@@ -19,6 +19,7 @@ import { newOrderNotificationEmail, orderConfirmationEmail } from '@/lib/store-e
 import { dashboardUrl, storeUrl } from '@/lib/domain'
 import { validateCoupon, recordCouponUse } from '@/lib/coupons'
 import { issueOrderOtp, isPhoneVerifiedForOrder, verifyOrderOtp } from '@/lib/order-otp'
+import { computeOfferDiscount, getActiveOffers } from '@/lib/offers'
 import { generateToken } from '@/lib/crypto'
 import { normalizePhone } from '@/lib/utils'
 
@@ -195,6 +196,10 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
     if (res.ok) coupon = { id: res.couponId, code: res.code, discount: res.discount, freeShipping: res.freeShipping }
   }
 
+  // خصم الكمية بيتجمع مع الكوبون — الاتنين مصلحة العميل والتاجر حاططهم بنفسه
+  const activeOffers = await getActiveOffers(store.id)
+  const offerDiscount = computeOfferDiscount(lines, activeOffers)
+
   const settings = await getCheckoutSettings(store.id)
   const totals = await computeTotals({
     storeId: store.id,
@@ -202,7 +207,7 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
     country: input.country,
     city: input.city ?? null,
     paymentGateway: input.paymentGateway,
-    discount: coupon?.discount ?? 0,
+    discount: (coupon?.discount ?? 0) + (offerDiscount?.amount ?? 0),
     couponFreeShipping: coupon?.freeShipping ?? false,
   })
 
