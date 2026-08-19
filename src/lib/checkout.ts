@@ -1,7 +1,7 @@
 import 'server-only'
 import { and, eq, inArray } from 'drizzle-orm'
 import { db } from '@/db'
-import { checkoutSettings, paymentMethods, products, shippingRates, shippingZones, stores } from '@/db/schema'
+import { checkoutSettings, paymentMethods, products, productVariants, shippingRates, shippingZones, stores } from '@/db/schema'
 import { applyBps } from './utils'
 
 /**
@@ -12,10 +12,12 @@ import { applyBps } from './utils'
  * أي حد يقدر يشتري بسعر يكتبه بنفسه.
  */
 
-export type CartLine = { productId: string; quantity: number }
+export type CartLine = { productId: string; quantity: number; variantId?: string }
 
 export type PricedLine = {
   productId: string
+  /** المتغيّر المختار — سعره ومخزونه بيغلبوا بتوع المنتج */
+  variantId?: string | null
   name: string
   slug: string
   image: string | null
@@ -66,6 +68,34 @@ export async function priceCart(storeId: string, lines: CartLine[]) {
     .where(and(eq(products.storeId, storeId), inArray(products.id, ids)))
 
   const byId = new Map(rows.map((r) => [r.id, r]))
+
+  /**
+   * المتغيّرات المطلوبة.
+   *
+   * سعر المتغيّر ومخزونه بيغلبوا بتوع المنتج: عميل اختار «أحمر XL»
+   * لازم يدفع سعره ويتخصم من مخزونه هو — لا من مخزون المنتج العام.
+   * وبنتأكد إن المتغيّر تابع للمتجر ده فعلًا، مش بس إن معرّفه صحيح.
+   */
+  const variantIds = [...new Set(lines.map((l) => l.variantId).filter(Boolean))] as string[]
+  const variantRows = variantIds.length
+    ? await db
+        .select({
+          id: productVariants.id,
+          productId: productVariants.productId,
+          title: productVariants.title,
+          price: productVariants.price,
+          costPrice: productVariants.costPrice,
+          stock: productVariants.stock,
+          image: productVariants.image,
+          isActive: productVariants.isActive,
+        })
+        .from(productVariants)
+        .where(
+          and(eq(productVariants.storeId, storeId), inArray(productVariants.id, variantIds)),
+        )
+    : []
+  const variantById = new Map(variantRows.map((v) => [v.id, v]))
+
   const priced: PricedLine[] = []
   const unavailable: string[] = []
   const outOfStock: string[] = []
@@ -77,9 +107,24 @@ export async function priceCart(storeId: string, lines: CartLine[]) {
       continue
     }
 
-    const available = p.trackInventory ? p.stock : null
+    // المتغيّر لازم يكون تابع لنفس المنتج — وإلا نتجاهله ونسعّر المنتج
+    const variant = line.variantId ? variantById.get(line.variantId) : undefined
+    const useVariant = variant && variant.productId === p.id && variant.isActive
+
+    if (line.variantId && !useVariant) {
+      unavailable.push(p.name)
+      continue
+    }
+
+    const price = useVariant ? variant.price : p.price
+    const costPrice = useVariant ? (variant.costPrice ?? p.costPrice) : p.costPrice
+    const name = useVariant ? `${p.name} — ${variant.title}` : p.name
+
+    // المتغيّر بيتتبّع مخزونه دايمًا؛ المنتج حسب إعداده
+    const available = useVariant ? variant.stock : p.trackInventory ? p.stock : null
+
     if (available !== null && available <= 0) {
-      outOfStock.push(p.name)
+      outOfStock.push(name)
       continue
     }
 
@@ -88,13 +133,14 @@ export async function priceCart(storeId: string, lines: CartLine[]) {
 
     priced.push({
       productId: p.id,
-      name: p.name,
+      variantId: useVariant ? variant.id : null,
+      name,
       slug: p.slug,
-      image: p.images[0] ?? null,
-      price: p.price,
-      costPrice: p.costPrice,
+      image: (useVariant ? variant.image : null) ?? p.images[0] ?? null,
+      price,
+      costPrice,
       quantity,
-      total: p.price * quantity,
+      total: price * quantity,
       available,
     })
   }

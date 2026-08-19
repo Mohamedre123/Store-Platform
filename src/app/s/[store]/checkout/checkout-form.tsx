@@ -75,6 +75,19 @@ export function CheckoutForm({
   const [street, setStreet] = useState('')
   const [building, setBuilding] = useState('')
   const [notes, setNotes] = useState('')
+
+  /**
+   * الملاحظة اللي كتبها العميل في درج السلة بتتنقل هنا.
+   *
+   * من غير كده يكتب «اتصل قبل التوصيل» في السلة وتضيع — ويفتكر إننا
+   * شايفينها. بنملاها مرة واحدة بس عشان ما نلغيش تعديله هنا.
+   */
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('zw_cart_note')
+      if (saved) setNotes((n) => n || saved)
+    } catch {}
+  }, [])
   const [gateway, setGateway] = useState(payments[0]?.gateway ?? 'cod')
   const [error, setError] = useState<string | null>(null)
 
@@ -137,7 +150,7 @@ export function CheckoutForm({
         storeIdentifier,
         code,
         phone: isValidPhone(phone) ? phone : undefined,
-        lines: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+        lines: items.map((i) => ({ productId: i.productId, quantity: i.quantity, variantId: i.variantId })),
       })
       if (res.ok) {
         setCoupon({ code: res.code, discount: res.discount, freeShipping: res.freeShipping })
@@ -172,7 +185,7 @@ export function CheckoutForm({
         phone,
         name: name || undefined,
         city: city || undefined,
-        lines: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+        lines: items.map((i) => ({ productId: i.productId, quantity: i.quantity, variantId: i.variantId })),
         draftToken: draftToken.current,
       })
       if (result) {
@@ -217,7 +230,7 @@ export function CheckoutForm({
         notes: notes || undefined,
         paymentGateway: gateway,
         couponCode: coupon?.code || undefined,
-        lines: items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+        lines: items.map((i) => ({ productId: i.productId, quantity: i.quantity, variantId: i.variantId })),
         draftToken: draftToken.current,
       })
 
@@ -227,6 +240,9 @@ export function CheckoutForm({
       }
 
       clear()
+      try {
+        localStorage.removeItem('zw_cart_note')
+      } catch {}
       router.push(href(`/order/${result.orderNumber}`) + `?t=${encodeURIComponent(result.token)}`)
     })
   }

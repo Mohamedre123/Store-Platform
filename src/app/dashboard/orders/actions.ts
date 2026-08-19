@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/db'
-import { customers, inventoryMovements, orderEvents, orderItems, orders, products } from '@/db/schema'
+import { customers, inventoryMovements, orderEvents, orderItems, orders, products, productVariants } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { getStoreTheme } from '@/lib/storefront'
 import { isEmailConfigured, sendEmail } from '@/lib/email'
@@ -72,23 +72,50 @@ export async function updateOrderStatusAction(orderId: string, status: OrderStat
 
     if (restocking && wasCounted) {
       const items = await tx
-        .select({ productId: orderItems.productId, quantity: orderItems.quantity })
+        .select({
+          productId: orderItems.productId,
+          variantId: orderItems.variantId,
+          quantity: orderItems.quantity,
+        })
         .from(orderItems)
         .where(eq(orderItems.orderId, orderId))
 
       for (const item of items) {
         if (!item.productId) continue
+
+        /**
+         * الترجيع لازم يروح لنفس المكان اللي اتخصم منه.
+         *
+         * لو الطلب كان على متغيّر والترجيع راح للمنتج، مخزون «أحمر XL»
+         * يفضل ناقص ومخزون المنتج العام يزيد بالغلط — رقمين غلط بضربة
+         * واحدة.
+         */
+        if (item.variantId) {
+          await tx
+            .update(productVariants)
+            .set({ stock: sql`${productVariants.stock} + ${item.quantity}` })
+            .where(
+              and(
+                eq(productVariants.id, item.variantId),
+                eq(productVariants.storeId, store.id),
+              ),
+            )
+        } else {
+          await tx
+            .update(products)
+            .set({ stock: sql`${products.stock} + ${item.quantity}` })
+            .where(and(eq(products.id, item.productId), eq(products.storeId, store.id)))
+        }
+
         await tx
           .update(products)
-          .set({
-            stock: sql`${products.stock} + ${item.quantity}`,
-            soldCount: sql`greatest(0, ${products.soldCount} - ${item.quantity})`,
-          })
+          .set({ soldCount: sql`greatest(0, ${products.soldCount} - ${item.quantity})` })
           .where(and(eq(products.id, item.productId), eq(products.storeId, store.id)))
 
         await tx.insert(inventoryMovements).values({
           storeId: store.id,
           productId: item.productId,
+          variantId: item.variantId,
           delta: item.quantity,
           reason: status === 'returned' ? 'return' : 'cancel',
           referenceId: orderId,

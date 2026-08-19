@@ -13,11 +13,13 @@ import {
 } from '@/lib/storefront'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
-import { wishlists } from '@/db/schema'
+import { productOptionValues, productOptions, productVariants, wishlists } from '@/db/schema'
 import { getCurrentCustomer } from '@/lib/customer-auth'
 import { ProductCard } from '@/components/storefront/product-card'
 import { ProductReviews } from '@/components/storefront/reviews'
 import { WishlistButton } from '@/components/storefront/wishlist-button'
+import { VariantPicker } from '@/components/storefront/variant-picker'
+import { StickyBuyBar } from '@/components/storefront/sticky-buy-bar'
 import { AddToCart } from '@/components/storefront/add-to-cart'
 import { formatMoney } from '@/lib/utils'
 
@@ -64,6 +66,55 @@ export default async function ProductPage({
   const off = discountPercent(product.price, product.compareAtPrice)
   const soldOut = product.trackInventory && product.stock <= 0
   const productReviews = await listProductReviews(product.id)
+
+  /**
+   * الخيارات والمتغيّرات.
+   *
+   * القيم بتتجاب في استعلام واحد وبتتجمّع في الذاكرة — استعلام لكل خيار
+   * كان هيبقى N+1 على صفحة بيفتحها كل زائر.
+   */
+  const [optionRows, valueRows, variantRows] = await Promise.all([
+    db
+      .select({
+        id: productOptions.id,
+        name: productOptions.name,
+        displayAs: productOptions.displayAs,
+      })
+      .from(productOptions)
+      .where(eq(productOptions.productId, product.id))
+      .orderBy(productOptions.position),
+    db
+      .select({
+        id: productOptionValues.id,
+        optionId: productOptionValues.optionId,
+        value: productOptionValues.value,
+        hex: productOptionValues.hex,
+      })
+      .from(productOptionValues)
+      .innerJoin(productOptions, eq(productOptions.id, productOptionValues.optionId))
+      .where(eq(productOptions.productId, product.id))
+      .orderBy(productOptionValues.position),
+    db
+      .select({
+        id: productVariants.id,
+        title: productVariants.title,
+        price: productVariants.price,
+        compareAtPrice: productVariants.compareAtPrice,
+        stock: productVariants.stock,
+        image: productVariants.image,
+        optionValueIds: productVariants.optionValueIds,
+      })
+      .from(productVariants)
+      .where(
+        and(eq(productVariants.productId, product.id), eq(productVariants.isActive, true)),
+      )
+      .orderBy(productVariants.position),
+  ])
+
+  const pickerOptions = optionRows.map((o) => ({
+    ...o,
+    values: valueRows.filter((v) => v.optionId === o.id),
+  }))
 
   // حالة المفضّلة للعميل المسجّل — العميل الزائر بيشوف القلب فاضي
   const customer = await getCurrentCustomer(store.id)
@@ -172,45 +223,80 @@ export default async function ProductPage({
             </span>
           )}
 
-          <div className="flex flex-wrap items-baseline gap-3">
-            <span className="tabular text-3xl font-bold text-[var(--sf-primary)]">
-              {formatMoney(product.price, store.currency)}
-            </span>
-            {product.compareAtPrice && (
-              <span className="tabular text-lg line-through opacity-45">
-                {formatMoney(product.compareAtPrice, store.currency)}
-              </span>
-            )}
-          </div>
-
-          {productPage.showStockCounter && product.trackInventory && product.stock > 0 && product.stock <= 10 && (
-            <p className="text-sm font-medium text-amber-600">
-              باقي <span className="tabular">{product.stock}</span> بس في المخزن
-            </p>
-          )}
-
-          <div className="flex items-stretch gap-2">
-            <div className="min-w-0 flex-1">
-              <AddToCart
-                item={{
-                  productId: product.id,
-                  name: product.name,
-                  slug: product.slug,
-                  image: product.images[0],
-                  price: product.price,
-                  maxStock: product.trackInventory ? product.stock : undefined,
-                }}
-                soldOut={soldOut}
-                whatsapp={store.whatsapp}
-                productName={product.name}
+          {/*
+            المنتج اللي ليه متغيّرات، السعر والمخزون والإضافة للسلة كلها
+            بتتحكّم من المنتقي — لأن القيم دي بتتغيّر مع كل اختيار.
+          */}
+          {pickerOptions.length > 0 && variantRows.length > 0 ? (
+            <div className="flex items-stretch gap-2">
+              <div className="min-w-0 flex-1">
+                <VariantPicker
+                  options={pickerOptions}
+                  variants={variantRows}
+                  fallback={{
+                    productId: product.id,
+                    name: product.name,
+                    slug: product.slug,
+                    image: product.images[0],
+                    price: product.price,
+                  }}
+                  currency={store.currency}
+                  whatsapp={productPage.showWhatsappAsk ? store.whatsapp : null}
+                  showStockCounter={productPage.showStockCounter}
+                />
+              </div>
+              <WishlistButton
+                storeIdentifier={identifier}
+                productId={product.id}
+                initialSaved={isSaved}
               />
             </div>
-            <WishlistButton
-              storeIdentifier={identifier}
-              productId={product.id}
-              initialSaved={isSaved}
-            />
-          </div>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-baseline gap-3">
+                <span className="tabular text-3xl font-bold text-[var(--sf-primary)]">
+                  {formatMoney(product.price, store.currency)}
+                </span>
+                {product.compareAtPrice && (
+                  <span className="tabular text-lg line-through opacity-45">
+                    {formatMoney(product.compareAtPrice, store.currency)}
+                  </span>
+                )}
+              </div>
+
+              {productPage.showStockCounter &&
+                product.trackInventory &&
+                product.stock > 0 &&
+                product.stock <= 10 && (
+                  <p className="text-sm font-medium text-amber-600">
+                    باقي <span className="tabular">{product.stock}</span> بس في المخزن
+                  </p>
+                )}
+
+              <div className="flex items-stretch gap-2">
+                <div className="min-w-0 flex-1">
+                  <AddToCart
+                    item={{
+                      productId: product.id,
+                      name: product.name,
+                      slug: product.slug,
+                      image: product.images[0],
+                      price: product.price,
+                      maxStock: product.trackInventory ? product.stock : undefined,
+                    }}
+                    soldOut={soldOut}
+                    whatsapp={productPage.showWhatsappAsk ? store.whatsapp : null}
+                    productName={product.name}
+                  />
+                </div>
+                <WishlistButton
+                  storeIdentifier={identifier}
+                  productId={product.id}
+                  initialSaved={isSaved}
+                />
+              </div>
+            </>
+          )}
 
           {(productPage.showShippingNote || productPage.showReturnNote || productPage.trustLines.length > 0) && (
             <div className="flex flex-col gap-2 rounded-[var(--sf-radius)] border border-[var(--sf-text)]/10 p-4 text-sm">
@@ -273,6 +359,24 @@ export default async function ProductPage({
           </div>
         </section>
       )}
+      {/* شريط الشراء الثابت — بس لو التاجر فعّله ومفيش متغيّرات
+          (المنتج بمتغيّرات محتاج اختيار قبل الإضافة) */}
+      {productPage.stickyBuyBarOnMobile && pickerOptions.length === 0 && (
+        <StickyBuyBar
+          item={{
+            productId: product.id,
+            name: product.name,
+            slug: product.slug,
+            image: product.images[0],
+            price: product.price,
+            maxStock: product.trackInventory ? product.stock : undefined,
+          }}
+          soldOut={soldOut}
+          currency={store.currency}
+          hasMobileNav={theme.custom.toolbar.mobileNavEnabled}
+        />
+      )}
+
     </div>
   )
 }

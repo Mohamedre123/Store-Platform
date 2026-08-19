@@ -11,6 +11,7 @@ import {
   orderItems,
   orders,
   products,
+  productVariants,
   stores,
 } from '@/db/schema'
 import { getStore, getStoreTheme } from '@/lib/storefront'
@@ -32,7 +33,11 @@ export type PlaceOrderState =
   | { ok: false; error: string }
   | null
 
-const lineSchema = z.object({ productId: z.string().uuid(), quantity: z.number().int().min(1).max(999) })
+const lineSchema = z.object({
+  productId: z.string().uuid(),
+  quantity: z.number().int().min(1).max(999),
+  variantId: z.string().uuid().optional(),
+})
 
 const orderSchema = z.object({
   storeIdentifier: z.string().min(1),
@@ -66,7 +71,7 @@ export async function captureIncompleteOrder(input: {
   phone: string
   name?: string
   city?: string
-  lines: Array<{ productId: string; quantity: number }>
+  lines: Array<{ productId: string; quantity: number; variantId?: string }>
   draftToken?: string
 }): Promise<{ token: string } | null> {
   const store = await getStore(input.storeIdentifier)
@@ -116,6 +121,7 @@ export async function captureIncompleteOrder(input: {
         orderId: existing.id,
         storeId: store.id,
         productId: l.productId,
+        variantId: l.variantId ?? null,
         name: l.name,
         image: l.image,
         price: l.price,
@@ -153,6 +159,7 @@ export async function captureIncompleteOrder(input: {
       orderId: created.id,
       storeId: store.id,
       productId: l.productId,
+      variantId: l.variantId ?? null,
       name: l.name,
       image: l.image,
       price: l.price,
@@ -350,6 +357,7 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
         orderId: orderId!,
         storeId: store.id,
         productId: l.productId,
+        variantId: l.variantId ?? null,
         name: l.name,
         image: l.image,
         price: l.price,
@@ -370,17 +378,40 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
       })
     }
 
-    // خصم المخزون مع تسجيل الحركة
+    /**
+     * خصم المخزون مع تسجيل الحركة.
+     *
+     * لو السطر عليه متغيّر، الخصم بيتم من مخزون المتغيّر — مش من مخزون
+     * المنتج. عميل اشترى «أحمر XL» ما ينفعش يقلّل رصيد «أزرق S».
+     * عدّاد المبيعات بيتزوّد على المنتج في الحالتين، لأنه بيقيس المنتج
+     * كله لا المقاس.
+     */
     for (const l of lines) {
       if (l.available === null) continue
+
+      if (l.variantId) {
+        await tx
+          .update(productVariants)
+          .set({ stock: sql`greatest(0, ${productVariants.stock} - ${l.quantity})` })
+          .where(
+            and(eq(productVariants.id, l.variantId), eq(productVariants.storeId, store.id)),
+          )
+      } else {
+        await tx
+          .update(products)
+          .set({ stock: sql`greatest(0, ${products.stock} - ${l.quantity})` })
+          .where(and(eq(products.id, l.productId), eq(products.storeId, store.id)))
+      }
+
       await tx
         .update(products)
-        .set({ stock: sql`greatest(0, ${products.stock} - ${l.quantity})`, soldCount: sql`${products.soldCount} + ${l.quantity}` })
+        .set({ soldCount: sql`${products.soldCount} + ${l.quantity}` })
         .where(and(eq(products.id, l.productId), eq(products.storeId, store.id)))
 
       await tx.insert(inventoryMovements).values({
         storeId: store.id,
         productId: l.productId,
+        variantId: l.variantId ?? null,
         delta: -l.quantity,
         reason: 'order',
         referenceId: orderId,
@@ -557,7 +588,7 @@ export async function applyCouponAction(input: {
   storeIdentifier: string
   code: string
   phone?: string
-  lines: Array<{ productId: string; quantity: number }>
+  lines: Array<{ productId: string; quantity: number; variantId?: string }>
 }): Promise<{ ok: true; discount: number; freeShipping: boolean; code: string } | { ok: false; error: string }> {
   const store = await getStore(input.storeIdentifier)
   if (!store) return { ok: false, error: 'المتجر مش موجود' }

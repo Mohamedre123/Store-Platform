@@ -2,7 +2,7 @@
 
 import { SLink as Link } from './store-link'
 import Image from 'next/image'
-import { Menu, Search, ShoppingBag, User, X } from 'lucide-react'
+import { Heart, Menu, Search, ShoppingBag, User, X } from 'lucide-react'
 import { useState } from 'react'
 import { useCart } from './cart'
 import { CartDrawer } from './cart-drawer'
@@ -30,6 +30,11 @@ export function StoreHeader({
   sticky = true,
   categories = [],
   cartEmptyMessage,
+  cartFreeShippingBar = false,
+  cartFreeOver = 0,
+  cartShowNotes = false,
+  showWishlist = false,
+  logoHeight = 40,
   currency,
   storeSlug,
 }: {
@@ -45,6 +50,11 @@ export function StoreHeader({
   sticky?: boolean
   categories?: Array<{ name: string; slug: string }>
   cartEmptyMessage?: string
+  cartFreeShippingBar?: boolean
+  cartFreeOver?: number
+  cartShowNotes?: boolean
+  showWishlist?: boolean
+  logoHeight?: number
   currency: string
   storeSlug: string
 }) {
@@ -57,10 +67,13 @@ export function StoreHeader({
         <Image
           src={logo}
           alt={storeName}
-          width={44}
-          height={44}
+          width={logoHeight * 2}
+          height={logoHeight * 2}
           priority
-          className="h-10 w-10 rounded-lg object-contain"
+          // الارتفاع من إعداد التاجر والعرض تلقائي — الشعار العريض
+          // ما يتقصّش والمربّع ما يتمطّش
+          style={{ height: logoHeight, width: 'auto' }}
+          className="rounded-lg object-contain"
         />
       )}
       {!hideName && <span className="truncate text-lg font-bold tracking-tight">{storeName}</span>}
@@ -81,6 +94,16 @@ export function StoreHeader({
       ))}
     </nav>
   )
+
+  const wishlistButton = showWishlist ? (
+    <Link
+      href="/account"
+      aria-label="المفضّلة"
+      className="flex h-11 w-11 items-center justify-center rounded-lg transition-colors hover:bg-[var(--sf-text)]/6"
+    >
+      <Heart className="h-5 w-5" aria-hidden="true" />
+    </Link>
+  ) : null
 
   const accountButton = showAccount ? (
     <Link
@@ -122,6 +145,7 @@ export function StoreHeader({
                 <div className="hidden md:flex">{links}</div>
                 <div className="flex justify-start md:justify-center">{brand}</div>
                 <div className="flex items-center justify-end gap-1">
+                  {wishlistButton}
                   {accountButton}
                   {cartButton}
                   <button
@@ -154,6 +178,7 @@ export function StoreHeader({
                       </Link>
                     </>
                   )}
+                  {wishlistButton}
                   {accountButton}
                   {cartButton}
                   <button
@@ -225,7 +250,14 @@ export function StoreHeader({
         </div>
       )}
 
-      <CartDrawer currency={currency} storeSlug={storeSlug} emptyMessage={cartEmptyMessage} />
+      <CartDrawer
+        currency={currency}
+        storeSlug={storeSlug}
+        emptyMessage={cartEmptyMessage}
+        freeShippingBar={cartFreeShippingBar}
+        freeOver={cartFreeOver}
+        showNotes={cartShowNotes}
+      />
     </>
   )
 }

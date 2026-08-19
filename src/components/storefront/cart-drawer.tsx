@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import { SLink as Link } from './store-link'
 import { Minus, Plus, ShoppingBag, Trash2, X } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useCart } from './cart'
 import { formatMoney } from '@/lib/utils'
 
@@ -11,12 +11,28 @@ import { formatMoney } from '@/lib/utils'
 export function CartDrawer({
   currency,
   emptyMessage = 'سلتك فاضية',
+  freeShippingBar = false,
+  freeOver = 0,
+  showNotes = false,
 }: {
   currency: string
   storeSlug: string
   emptyMessage?: string
+  freeShippingBar?: boolean
+  /** حد الشحن المجاني بالوحدة الصغرى */
+  freeOver?: number
+  showNotes?: boolean
 }) {
   const { items, isOpen, setOpen, setQuantity, remove, subtotal, count } = useCart()
+  const [note, setNote] = useState('')
+
+  // نقرا الملاحظة المحفوظة مرة واحدة عند الفتح
+  useEffect(() => {
+    if (!isOpen || !showNotes) return
+    try {
+      setNote(localStorage.getItem('zw_cart_note') ?? '')
+    } catch {}
+  }, [isOpen, showNotes])
 
   useEffect(() => {
     if (!isOpen) return
@@ -140,6 +156,56 @@ export function CartDrawer({
             </ul>
 
             <div className="safe-bottom shrink-0 border-t border-[var(--sf-text)]/10 p-4">
+              {/*
+                شريط الشحن المجاني.
+                «فاضلك ٥٠ جنيه» بيرفع قيمة الطلب أكتر من أي خصم — العميل
+                بيزوّد عشان يوصل للحد بدل ما ياخد خصمًا يقلّل هامش التاجر.
+              */}
+              {freeShippingBar && freeOver > 0 && (
+                <div className="mb-3">
+                  {subtotal >= freeOver ? (
+                    <p className="text-sm font-medium text-green-600">
+                      مبروك! الشحن مجاني على طلبك
+                    </p>
+                  ) : (
+                    <>
+                      <p className="mb-1.5 text-xs">
+                        فاضلك{' '}
+                        <span className="tabular font-bold text-[var(--sf-primary)]">
+                          {formatMoney(freeOver - subtotal, currency)}
+                        </span>{' '}
+                        والشحن يبقى مجاني
+                      </p>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-[var(--sf-text)]/10">
+                        <div
+                          className="h-full rounded-full bg-[var(--sf-primary)] transition-[width] duration-500"
+                          style={{ width: `${Math.min(100, (subtotal / freeOver) * 100)}%` }}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {showNotes && (
+                <label className="mb-3 flex flex-col gap-1.5">
+                  <span className="text-xs opacity-70">ملاحظة على الطلب (اختياري)</span>
+                  <textarea
+                    value={note}
+                    onChange={(e) => {
+                      setNote(e.target.value)
+                      // بتتقرا في الشيك أوت — التخزين المحلي بيخلّيها تعدّي بين الصفحتين
+                      try {
+                        localStorage.setItem('zw_cart_note', e.target.value)
+                      } catch {}
+                    }}
+                    rows={2}
+                    placeholder="مثال: اتصل قبل التوصيل"
+                    className="rounded-[var(--sf-radius)] border border-[var(--sf-text)]/18 bg-[var(--sf-surface)] px-3 py-2 text-sm outline-none focus:border-[var(--sf-primary)]"
+                  />
+                </label>
+              )}
+
               <div className="mb-3 flex items-center justify-between">
                 <span className="text-sm opacity-70">الإجمالي</span>
                 <span className="tabular text-lg font-bold">{formatMoney(subtotal, currency)}</span>

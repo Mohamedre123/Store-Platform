@@ -9,6 +9,8 @@ import { PreviewBridge } from '@/components/storefront/preview-bridge'
 import { StorePreloader } from '@/components/storefront/preloader'
 import { StoreFooter } from '@/components/storefront/footer'
 import { StoreToolbar } from '@/components/storefront/store-toolbar'
+import { MobileNav } from '@/components/storefront/mobile-nav'
+import { AnnouncementBar } from '@/components/storefront/announcement-bar'
 import { LuckyWheel } from '@/components/storefront/lucky-wheel'
 import { getWheelConfig } from '@/lib/wheel'
 import { StoreLinkProvider } from '@/components/storefront/store-link'
@@ -131,24 +133,7 @@ export default async function StorefrontLayout({
             />
           )}
 
-          <div
-            data-sf="announcement"
-            style={{
-              display: custom.announcement.enabled ? undefined : 'none',
-              background: custom.announcement.background,
-              color: custom.announcement.color,
-            }}
-            className={`px-4 py-2 text-center text-sm ${custom.announcement.sticky ? 'sticky top-0 z-50' : ''}`}
-          >
-            {custom.announcement.link ? (
-              <a href={custom.announcement.link} className="hover:underline" data-sf="announcement-text">
-                {custom.announcement.text}
-              </a>
-            ) : (
-              <span data-sf="announcement-text">{custom.announcement.text}</span>
-            )}
-          </div>
-
+          <AnnouncementBar settings={custom.announcement} />
           <StoreHeader
             storeName={store.name}
             logo={storeLogo}
@@ -162,6 +147,11 @@ export default async function StorefrontLayout({
             sticky={custom.header.sticky}
             categories={cats.map((c) => ({ name: c.name, slug: c.slug }))}
             cartEmptyMessage={custom.cart.emptyMessage}
+            cartFreeShippingBar={custom.cart.freeShippingBar}
+            cartFreeOver={custom.cart.freeShippingThreshold}
+            cartShowNotes={custom.cart.showNotes}
+            showWishlist={custom.header.showWishlist}
+            logoHeight={custom.header.logoHeight}
             currency={store.currency}
             storeSlug={store.slug}
           />
@@ -177,6 +167,10 @@ export default async function StorefrontLayout({
           <StoreFooter footer={custom.footer} storeName={store.name} policyPages={policyPages} />
 
           <StoreToolbar toolbar={custom.toolbar} />
+
+          {custom.toolbar.mobileNavEnabled && (
+            <MobileNav showAccount={custom.header.showAccount} showCart={custom.header.showCart} />
+          )}
 
           {/* عجلة الحظ — مقفولة في المعاينة عشان ما تزنقش التاجر وهو بيظبّط */}
           {wheel && !isPreview && (
