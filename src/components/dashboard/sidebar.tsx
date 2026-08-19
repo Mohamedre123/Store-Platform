@@ -21,6 +21,7 @@ import {
   Store,
   Code2,
   Gift,
+  Zap,
   LayoutTemplate,
   Image as ImageIcon,
   Newspaper,
@@ -66,6 +67,7 @@ const groups: Array<{
     items: [
       { href: '/dashboard/shipping', label: 'الشحن', icon: Truck },
       { href: '/dashboard/payments', label: 'الدفع', icon: CreditCard },
+      { href: '/dashboard/automations', label: 'الأتمتة', icon: Zap },
       { href: '/dashboard/plugins', label: 'الإضافات', icon: Plug },
       { href: '/dashboard/developers', label: 'المطوّرون', icon: Code2 },
       { href: '/dashboard/settings', label: 'الإعدادات', icon: Settings },

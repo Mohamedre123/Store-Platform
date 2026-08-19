@@ -6,6 +6,7 @@ import { getStoreTheme } from './storefront'
 import { isEmailConfigured, sendEmail } from './email'
 import { abandonedCartEmail } from './store-emails'
 import { storeUrl } from './domain'
+import { runAutomations } from './automation'
 
 /**
  * تذكير السلات المتروكة.
@@ -78,6 +79,21 @@ export async function sendAbandonedCartReminders(limit = 50): Promise<ReminderRe
           resumeUrl: `${storeUrl(cart.storeSlug)}/checkout?resume=${encodeURIComponent(cart.recoveryToken ?? '')}`,
         },
       )
+
+      // محفّز الأتمتة على السلة المتروكة — التاجر ممكن يضيف كوبون مثلًا
+      runAutomations('cart.abandoned', {
+        storeId: cart.storeId,
+        storeName: cart.storeName,
+        storeSlug: cart.storeSlug,
+        currency: cart.currency,
+        orderId: cart.id,
+        orderNumber: cart.orderNumber,
+        orderTotal: cart.total,
+        itemCount: items.reduce((n, i) => n + i.quantity, 0),
+        customerName: cart.customerName,
+        customerEmail: cart.customerEmail,
+        recoveryToken: cart.recoveryToken,
+      })
 
       const sent = await sendEmail({ to: cart.customerEmail!, ...mail })
 

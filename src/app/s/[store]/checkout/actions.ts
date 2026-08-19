@@ -23,6 +23,7 @@ import { issueOrderOtp, isPhoneVerifiedForOrder, verifyOrderOtp } from '@/lib/or
 import { computeOfferDiscount, getActiveOffers } from '@/lib/offers'
 import { findAffiliateByCode, recordAffiliateConversion } from '@/lib/affiliates'
 import { dispatchWebhook } from '@/lib/webhooks'
+import { runAutomations } from '@/lib/automation'
 import { generateToken } from '@/lib/crypto'
 import { normalizePhone } from '@/lib/utils'
 
@@ -189,6 +190,19 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
   }
 
   const phone = normalizePhone(input.phone, store.country === 'EG' ? '20' : '966')
+
+  /**
+   * عدد طلبات العميل *قبل* الطلب ده.
+   *
+   * لازم نقراه قبل المعاملة: بعدها بيبقى العدّاد اتزوّد، وقاعدة زي
+   * «رحّب بالعميل الجديد» مش هتشتغل أبدًا لأن العدد بقى ١ مش ٠.
+   */
+  const [priorCustomer] = await db
+    .select({ ordersCount: customers.ordersCount })
+    .from(customers)
+    .where(and(eq(customers.storeId, store.id), eq(customers.phone, phone)))
+    .limit(1)
+  const customerOrdersBefore = priorCustomer?.ordersCount ?? 0
 
   // الكوبون بيتحقّق على الخادم — الخصم بيتحسب هنا مش من المتصفح. لو الكود
   // بقى غير صالح بين ما العميل طبّقه واتأكد، بنكمّل الطلب من غير خصم بدل
@@ -443,6 +457,34 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
     input,
     phone,
   }).catch((e) => console.error('فشل إرسال بريد الطلب:', e))
+
+  /**
+   * محفّزات الأتمتة — بعد ما الطلب اتسجّل بالكامل.
+   *
+   * السياق بيتجمّع مرة واحدة وبيتبعت للمحرّك، اللي بيقرّر أي قواعد
+   * تنطبق. لو مفيش قواعد، مفيش أي تكلفة تقريبًا.
+   */
+  const isNewCustomer = customerOrdersBefore === 0
+  const autoCtx = {
+    storeId: store.id,
+    storeName: store.name,
+    storeSlug: store.slug,
+    currency: store.currency,
+    orderId: result.orderId!,
+    orderNumber: result.orderNumber,
+    orderTotal: totals.total,
+    itemCount: lines.reduce((n, l) => n + l.quantity, 0),
+    city: input.city ?? undefined,
+    paymentMethod: input.paymentGateway === 'cod' ? 'cod' : 'online',
+    customerName: input.name ?? null,
+    customerEmail: input.email || null,
+    customerPhone: phone,
+    customerOrders: customerOrdersBefore,
+    recoveryToken: token,
+  }
+
+  runAutomations('order.created', autoCtx)
+  if (isNewCustomer) runAutomations('customer.created', autoCtx)
 
   // إشعار الأنظمة الخارجية — بدون انتظار، الطلب اتسجّل خلاص
   dispatchWebhook(store.id, 'order.created', {

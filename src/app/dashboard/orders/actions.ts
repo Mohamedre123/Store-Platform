@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/db'
-import { inventoryMovements, orderEvents, orderItems, orders, products } from '@/db/schema'
+import { customers, inventoryMovements, orderEvents, orderItems, orders, products } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { getStoreTheme } from '@/lib/storefront'
 import { isEmailConfigured, sendEmail } from '@/lib/email'
@@ -12,6 +12,7 @@ import { storeUrl } from '@/lib/domain'
 import { awardOrderPoints } from '@/lib/loyalty'
 import { approveAffiliateCommission, cancelAffiliateCommission } from '@/lib/affiliates'
 import { dispatchWebhook } from '@/lib/webhooks'
+import { runAutomations } from '@/lib/automation'
 import type { OrderStatus } from '@/db/schema'
 
 const LABELS: Record<OrderStatus, string> = {
@@ -125,6 +126,44 @@ export async function updateOrderStatusAction(orderId: string, status: OrderStat
     } catch (e) {
       console.error('فشل منح نقاط الولاء:', e)
     }
+  }
+
+  /**
+   * محفّزات الأتمتة على التسليم والإلغاء.
+   *
+   * بيانات العميل بتتقرا هنا عشان الشروط اللي بتعتمد عليها (إجمالي
+   * إنفاقه، عدد طلباته) تبقى بقيمتها بعد الطلب ده.
+   */
+  if (status === 'delivered' || status === 'cancelled') {
+    void (async () => {
+      let customerOrders = 0
+      let customerSpent = 0
+      if (order.customerId) {
+        const [c] = await db
+          .select({ ordersCount: customers.ordersCount, totalSpent: customers.totalSpent })
+          .from(customers)
+          .where(eq(customers.id, order.customerId))
+          .limit(1)
+        customerOrders = c?.ordersCount ?? 0
+        customerSpent = c?.totalSpent ?? 0
+      }
+
+      runAutomations(status === 'delivered' ? 'order.delivered' : 'order.cancelled', {
+        storeId: store.id,
+        storeName: store.name,
+        storeSlug: store.slug,
+        currency: order.currency,
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        orderTotal: order.total,
+        customerId: order.customerId ?? undefined,
+        customerName: order.customerName,
+        customerEmail: order.customerEmail,
+        customerOrders,
+        customerSpent,
+        recoveryToken: order.recoveryToken,
+      })
+    })().catch((e) => console.error('فشل محفّز الأتمتة:', e))
   }
 
   // إشعار الأنظمة الخارجية بتغيّر الحالة
