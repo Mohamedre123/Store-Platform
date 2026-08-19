@@ -57,6 +57,13 @@ export const products = pgTable(
     sku: text('sku'),
     barcode: text('barcode'),
 
+    /*
+      المورّد. من غير references عشان جدول الموردين في ملف تاني
+      (integrations) والربط كان هيعمل دورة استيراد. حذف المورّد
+      بيفرّغ العمود من فعل الحذف نفسه.
+    */
+    supplierId: uuid('supplier_id'),
+
     // المخزون
     trackInventory: boolean('track_inventory').notNull().default(true),
     stock: integer('stock').notNull().default(0),

@@ -62,6 +62,7 @@ export const NAV: NavSection[] = [
     children: [
       { href: '/dashboard/orders', label: 'كل الطلبات' },
       { href: '/dashboard/orders?filter=incomplete', label: 'السلات المتروكة' },
+      { href: '/dashboard/shipments', label: 'الشحنات' },
       { href: '/dashboard/returns', label: 'المرتجعات' },
     ],
   },
@@ -73,6 +74,7 @@ export const NAV: NavSection[] = [
       { href: '/dashboard/products', label: 'كل المنتجات' },
       { href: '/dashboard/products/categories', label: 'الأقسام' },
       { href: '/dashboard/inventory', label: 'المخزون' },
+      { href: '/dashboard/suppliers', label: 'الموردون' },
     ],
   },
   {
