@@ -49,6 +49,18 @@ export default async function StorefrontLayout({
   const h = await headers()
   const isPreview = h.get('x-zawya-preview') === '1'
 
+  /**
+   * صفحات الهبوط بتتعرض عارية — من غير هيدر ولا فوتر ولا عجلة.
+   *
+   * دي صفحة حملة إعلانية هدفها بيعة واحدة: أي رابط تاني في الصفحة
+   * فرصة إن العميل يسيبها من غير ما يشتري. وهويتها مستقلة عن المتجر
+   * أصلًا، فالهيدر بلون المتجر كان هيبوّظ شكلها.
+   */
+  const path = h.get('x-zawya-path') ?? ''
+  if (path.includes('/lp/')) {
+    return <>{children}</>
+  }
+
   const [theme, cats, pixels, policyPages, wheel] = await Promise.all([
     getStoreTheme(store.id, isPreview),
     listCategories(store.id),
