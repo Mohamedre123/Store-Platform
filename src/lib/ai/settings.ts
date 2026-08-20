@@ -81,3 +81,40 @@ export const getAiConfig = cache(
 export function isReady(cfg: AiConfig): cfg is AiConfig & { apiKey: string; model: string } {
   return cfg.enabled && Boolean(cfg.apiKey) && Boolean(cfg.model)
 }
+
+export const CLAUDE_SLUG = 'claude'
+
+export type ClaudeConfig = {
+  enabled: boolean
+  apiKey: string | null
+  model: string | null
+}
+
+export const getClaudeConfig = cache(async (storeId: string): Promise<ClaudeConfig> => {
+  const [row] = await db
+    .select({
+      enabled: storePlugins.enabled,
+      config: storePlugins.config,
+      secrets: storePlugins.secrets,
+    })
+    .from(storePlugins)
+    .where(and(eq(storePlugins.storeId, storeId), eq(storePlugins.pluginSlug, CLAUDE_SLUG)))
+    .limit(1)
+
+  if (!row) return { enabled: false, apiKey: null, model: null }
+
+  const secrets = decryptJson<{ apiKey?: string }>(row.secrets)
+  const cfg = row.config as Record<string, unknown>
+
+  return {
+    enabled: row.enabled,
+    apiKey: secrets?.apiKey ?? null,
+    model: typeof cfg.model === 'string' ? cfg.model : null,
+  }
+})
+
+export function isClaudeReady(
+  cfg: ClaudeConfig,
+): cfg is ClaudeConfig & { apiKey: string; model: string } {
+  return cfg.enabled && Boolean(cfg.apiKey) && Boolean(cfg.model)
+}

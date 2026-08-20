@@ -28,7 +28,7 @@ export type PluginDef = {
    * إضافات الذكاء الاصطناعي محتاجة تحقّق من المفتاح واختيار موديل
    * ووصف للمتجر — ده مش «الصق معرّفًا واقفل».
    */
-  custom?: 'gemini' | 'gemini_pro'
+  custom?: 'gemini' | 'gemini_pro' | 'claude'
   /** بيتحفظ في العمود المشفّر لا في config — مفتاح API مش معرّف عام */
   secretFields?: string[]
 }
@@ -107,6 +107,21 @@ export const PLUGINS: PluginDef[] = [
     ],
     where:
       'بيشتغل بمفتاح Gemini العادي لو مظبوط. حط مفتاحًا منفصل هنا لو عايز تفصل فاتورة المساعد عن باقي المنصة. المساعد بيستهلك أكتر من التحسين لأنه بيقرا بيانات متجرك — المفتاح المجاني هيقف بسرعة.',
+  },
+
+  {
+    slug: 'claude',
+    name: 'Claude — مصمّم الثيمات وصفحات الهبوط',
+    desc:
+      'مش عاجبك ولا ثيم من اللي عندنا؟ اوصف اللي في دماغك — الألوان والشكل والتخطيط — ' +
+      'وكلود يعملهولك، وتقدر تعدّله بعدين من محرّر التخصيص زي أي ثيم. ' +
+      'ونفس الحكاية في صفحات الهبوط.',
+    group: 'ai',
+    custom: 'claude',
+    secretFields: ['apiKey'],
+    fields: [{ key: 'apiKey', label: 'مفتاح Anthropic API', placeholder: 'مفتاحك من console.anthropic.com' }],
+    where:
+      'من console.anthropic.com ← API Keys. الحساب محتاج رصيد مشحون — مفيش خطة مجانية زي Gemini.',
   },
 ]
 

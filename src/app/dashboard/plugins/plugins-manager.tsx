@@ -7,6 +7,7 @@ import { PLUGINS, type PluginDef } from '@/lib/plugins'
 import { Alert, Card } from '@/components/ui'
 import { GeminiCard, type GeminiSaved } from './gemini-card'
 import { GeminiProCard, type GeminiProSaved } from './gemini-pro-card'
+import { ClaudeCard, type ClaudeSaved } from './claude-card'
 
 export type PluginRow = { slug: string; enabled: boolean; config: Record<string, unknown> }
 
@@ -25,10 +26,12 @@ export function PluginsManager({
   installed,
   gemini,
   pro,
+  claude,
 }: {
   installed: PluginRow[]
   gemini: GeminiSaved
   pro: GeminiProSaved
+  claude: ClaudeSaved
 }) {
   const bySlug = new Map(installed.map((p) => [p.slug, p]))
 
@@ -53,6 +56,8 @@ export function PluginsManager({
                   <GeminiCard key={def.slug} def={def} saved={gemini} />
                 ) : def.custom === 'gemini_pro' ? (
                   <GeminiProCard key={def.slug} def={def} saved={pro} />
+                ) : def.custom === 'claude' ? (
+                  <ClaudeCard key={def.slug} def={def} saved={claude} />
                 ) : (
                   <PluginCard key={def.slug} def={def} saved={bySlug.get(def.slug)} />
                 ),

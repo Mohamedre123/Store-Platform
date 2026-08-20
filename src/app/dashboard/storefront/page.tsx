@@ -11,6 +11,8 @@ import { Reveal } from '@/components/motion'
 import { ThemeGallery } from './theme-gallery'
 import { PublishControl } from './publish-control'
 import { ImageSpecHint, SectionEditor } from './section-editor'
+import { ThemeDesigner } from './theme-designer'
+import { getClaudeConfig, isClaudeReady } from '@/lib/ai/settings'
 
 export const metadata = { title: 'المتجر' }
 
@@ -23,6 +25,7 @@ export default async function StorefrontPage() {
     .where(eq(storeThemes.storeId, store.id))
     .limit(1)
 
+  const claude = await getClaudeConfig(store.id)
   const current = getTheme(theme?.themeSlug ?? 'zawya')
   const sections = (theme?.homeSections ?? []) as Section[]
 
@@ -69,6 +72,14 @@ export default async function StorefrontPage() {
           </div>
         </Reveal>
         <ThemeGallery currentSlug={current.slug} />
+
+        {/*
+          المصمّم تحت المعرض لا فوقه: أغلب التجّار هيلاقوا اللي عايزينه
+          في الجاهز، واللي مش لاقي بينزل ويلاقي البديل.
+        */}
+        <Reveal delay={80}>
+          <ThemeDesigner enabled={isClaudeReady(claude)} />
+        </Reveal>
       </section>
 
       {/* أقسام الصفحة الرئيسية */}

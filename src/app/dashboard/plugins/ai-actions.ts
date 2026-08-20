@@ -9,7 +9,8 @@ import { getDashboardContext } from '@/lib/store-context'
 import { encryptJson } from '@/lib/crypto'
 import { recordAudit } from '@/lib/audit'
 import { verifyKey, type GeminiModel } from '@/lib/ai/gemini'
-import { getAiConfig, GEMINI_PRO_SLUG, GEMINI_SLUG } from '@/lib/ai/settings'
+import { verifyKey as verifyClaude } from '@/lib/ai/claude'
+import { getAiConfig, getClaudeConfig, CLAUDE_SLUG, GEMINI_PRO_SLUG, GEMINI_SLUG } from '@/lib/ai/settings'
 import { getStoreBrief, suggestBrief } from '@/lib/ai/store-context'
 
 export type VerifyState =
@@ -194,5 +195,81 @@ export async function saveGeminiProAction(raw: unknown): Promise<SaveState> {
   })
 
   revalidatePath('/dashboard', 'layout')
+  return { ok: true }
+}
+
+/* ══════════════════ Claude ══════════════════ */
+
+export type ClaudeVerifyState =
+  | { ok: true; models: Array<{ id: string; label: string }>; suggested: string }
+  | { ok: false; error: string }
+
+/**
+ * التحقق من مفتاح Anthropic.
+ *
+ * بنداء حقيقي زي Gemini. مفاتيحهم بتبدأ بـ`sk-ant-` غالبًا، لكن
+ * الاعتماد على الشكل بيرفض أي صيغة جديدة والتاجر يفضل يحاول ومش فاهم.
+ */
+export async function verifyClaudeKeyAction(apiKey: string): Promise<ClaudeVerifyState> {
+  await getDashboardContext()
+
+  const key = apiKey.trim()
+  if (!key) return { ok: false, error: 'الصق المفتاح الأول' }
+
+  const res = await verifyClaude(key)
+  if (!res.ok) return { ok: false, error: res.error.message }
+
+  return { ok: true, models: res.data.models, suggested: res.data.suggested }
+}
+
+const claudeSchema = z.object({
+  enabled: z.boolean(),
+  apiKey: z.string().trim().max(300).optional(),
+  model: z.string().trim().max(120).optional(),
+})
+
+export async function saveClaudeAction(raw: unknown): Promise<SaveState> {
+  const parsed = claudeSchema.safeParse(raw)
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'بيانات ناقصة' }
+  const input = parsed.data
+
+  const { store, user } = await getDashboardContext()
+  const current = await getClaudeConfig(store.id)
+
+  const apiKey = input.apiKey || current.apiKey
+  const model = input.model || current.model
+
+  if (input.enabled && !apiKey) return { error: 'محتاج مفتاح Anthropic عشان تفعّلها.' }
+  if (input.enabled && !model) return { error: 'اختار الموديل الأول.' }
+
+  const values = {
+    enabled: input.enabled,
+    config: { model },
+    secrets: apiKey ? encryptJson({ apiKey }) : null,
+  }
+
+  const [existing] = await db
+    .select({ id: storePlugins.id })
+    .from(storePlugins)
+    .where(and(eq(storePlugins.storeId, store.id), eq(storePlugins.pluginSlug, CLAUDE_SLUG)))
+    .limit(1)
+
+  if (existing) {
+    await db.update(storePlugins).set(values).where(eq(storePlugins.id, existing.id))
+  } else {
+    await db.insert(storePlugins).values({ storeId: store.id, pluginSlug: CLAUDE_SLUG, ...values })
+  }
+
+  await recordAudit({
+    storeId: store.id,
+    userId: user.id,
+    action: 'settings.update',
+    resource: 'plugin',
+    resourceId: CLAUDE_SLUG,
+    after: { enabled: input.enabled, model, keyChanged: Boolean(input.apiKey) },
+  })
+
+  revalidatePath('/dashboard/plugins')
+  revalidatePath('/dashboard/storefront')
   return { ok: true }
 }

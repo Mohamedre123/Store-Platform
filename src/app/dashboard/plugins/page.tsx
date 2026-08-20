@@ -4,7 +4,7 @@ import { storePlugins } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
-import { getAiConfig, GEMINI_PRO_SLUG, GEMINI_SLUG } from '@/lib/ai/settings'
+import { getAiConfig, getClaudeConfig, GEMINI_PRO_SLUG, GEMINI_SLUG } from '@/lib/ai/settings'
 import { PluginsManager, type PluginRow } from './plugins-manager'
 
 export const metadata = { title: 'الإضافات' }
@@ -28,6 +28,7 @@ export default async function PluginsPage() {
   */
   const gemini = await getAiConfig(store.id, GEMINI_SLUG)
   const pro = await getAiConfig(store.id, GEMINI_PRO_SLUG)
+  const claude = await getClaudeConfig(store.id)
 
   return (
     <div className="flex flex-col gap-6">
@@ -55,6 +56,11 @@ export default async function PluginsPage() {
             model: pro.model,
             brief: pro.brief,
             baseReady: Boolean(gemini.apiKey && gemini.model),
+          }}
+          claude={{
+            enabled: claude.enabled,
+            hasKey: Boolean(claude.apiKey),
+            model: claude.model,
           }}
         />
       </Reveal>
