@@ -148,8 +148,14 @@ export const referrals = pgTable(
     createdAt: createdAt(),
   },
   (t) => [
-    uniqueIndex('referrals_store_code_unique').on(t.storeId, t.code),
+    /*
+      صف لكل تحويل لا لكل كود: الكود ثابت على العميل (customers.
+      referral_code) وبيتكرّر هنا مع كل صاحب بيستخدمه. الفهرس على
+      العميل المُحال يمنع احتسابه مرتين لو استخدم كودين.
+    */
+    uniqueIndex('referrals_store_referred_unique').on(t.storeId, t.referredCustomerId),
     index('referrals_referrer_idx').on(t.referrerCustomerId),
+    index('referrals_code_idx').on(t.storeId, t.code),
   ],
 )
 

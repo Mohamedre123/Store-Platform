@@ -13,6 +13,9 @@ import { getLoyaltySettings, getPointsBalance, nextTier, tierForPoints } from '@
 import { listActiveRewards } from '@/lib/rewards'
 import { tierAllows, TIER_LABELS } from '@/lib/rewards-meta'
 import { RewardsCatalog, type CatalogReward } from '@/components/storefront/rewards-catalog'
+import { ReferralCard } from '@/components/storefront/referral-card'
+import { getOrCreateReferralCode, getReferralStats } from '@/lib/referrals'
+import { storeUrl } from '@/lib/domain'
 import { CustomerLoginForm } from './login-form'
 import { LogoutButton } from './logout-button'
 
@@ -82,6 +85,22 @@ export default async function AccountPage({ params }: { params: Promise<{ store:
   const [balance, rewardRows] = showLoyalty
     ? await Promise.all([getPointsBalance(customer.id), listActiveRewards(store.id)])
     : [0, []]
+
+  /*
+    كود الإحالة بيتولّد أول ما العميل يفتح حسابه — مش وقت التسجيل.
+    أغلب العملاء ما بيحيلوش حد، فما نملاش الجدول أكوادًا ما اتشافتش.
+  */
+  const referral =
+    showLoyalty && loyalty!.referralPoints > 0
+      ? await (async () => {
+          const code = await getOrCreateReferralCode(store.id, customer.id)
+          return {
+            code,
+            link: storeUrl(store.slug, `/?rf=${code}`),
+            stats: await getReferralStats(store.id, customer.id),
+          }
+        })()
+      : null
 
   const tier = showLoyalty ? tierForPoints(loyalty, customer.lifetimePoints) : null
   const upcoming = showLoyalty ? nextTier(loyalty, customer.lifetimePoints) : null
@@ -161,6 +180,15 @@ export default async function AccountPage({ params }: { params: Promise<{ store:
           rewards={catalog}
           balance={balance}
           currency={store.currency}
+        />
+      )}
+
+      {referral && (
+        <ReferralCard
+          code={referral.code}
+          link={referral.link}
+          pointsPerReferral={loyalty!.referralPoints}
+          stats={referral.stats}
         />
       )}
 

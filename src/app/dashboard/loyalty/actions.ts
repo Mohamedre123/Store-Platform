@@ -19,6 +19,7 @@ export async function saveLoyaltyAction(input: {
   minPointsToRedeem: string
   welcomePoints: string
   reviewPoints: string
+  referralPoints: string
   tiers: TierConfig[]
 }): Promise<LoyaltyState> {
   const { store } = await getDashboardContext()
@@ -42,6 +43,7 @@ export async function saveLoyaltyAction(input: {
     minPointsToRedeem: Math.max(0, Math.trunc(Number(input.minPointsToRedeem) || 0)),
     welcomePoints: Math.max(0, Math.trunc(Number(input.welcomePoints) || 0)),
     reviewPoints: Math.max(0, Math.trunc(Number(input.reviewPoints) || 0)),
+    referralPoints: Math.max(0, Math.trunc(Number(input.referralPoints) || 0)),
     tiers: input.tiers
       .filter((t) => t.name.trim() && Number.isFinite(t.minPoints))
       .sort((a, b) => a.minPoints - b.minPoints),

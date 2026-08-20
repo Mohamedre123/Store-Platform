@@ -25,6 +25,7 @@ import { computeOfferDiscount, getActiveOffers } from '@/lib/offers'
 import { findAffiliateByCode, recordAffiliateConversion } from '@/lib/affiliates'
 import { dispatchWebhook } from '@/lib/webhooks'
 import { runAutomations } from '@/lib/automation'
+import { recordReferral } from '@/lib/referrals'
 import { generateToken } from '@/lib/crypto'
 import { normalizePhone } from '@/lib/utils'
 
@@ -436,7 +437,12 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
       actorType: 'customer',
     })
 
-    return { orderId, orderNumber, token: values.recoveredAt ? input.draftToken! : '' }
+    return {
+      orderId,
+      orderNumber,
+      customerId: customer.id,
+      token: values.recoveredAt ? input.draftToken! : '',
+    }
   })
 
   const [row] = await db
@@ -470,6 +476,28 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
     }
   } catch (e) {
     console.error('فشل تسجيل عمولة المسوّق:', e)
+  }
+
+  /**
+   * إحالة صاحب.
+   *
+   * للعميل الجديد بس — لو حسبناها على أي طلب، عميل قديم يستخدم كود
+   * صاحبه في كل طلب والاتنين ياخدوا نقاط بلا نهاية. والنقاط نفسها
+   * بتتصرف وقت التسليم زي نقاط الشراء.
+   */
+  try {
+    const rfCode = (await cookies()).get('zw_rf')?.value
+    if (rfCode) {
+      await recordReferral({
+        storeId: store.id,
+        code: rfCode,
+        referredCustomerId: result.customerId,
+        previousOrders: customerOrdersBefore,
+        orderId: result.orderId!,
+      })
+    }
+  } catch (e) {
+    console.error('فشل تسجيل الإحالة:', e)
   }
 
   /**

@@ -37,10 +37,25 @@ export default function proxy(req: NextRequest) {
    */
   const ref = url.searchParams.get('ref')?.trim().slice(0, 24)
 
+  /*
+    كود إحالة العملاء (‎?rf=CODE‎) — منفصل عن ‎?ref=‎ بتاع المسوّقين
+    بالعمولة عن قصد. لو الاتنين على نفس المفتاح، زيارة من رابط صاحب
+    كانت هتمسح تتبّع المسوّق (أو العكس) وحد فيهم يضيع مستحقّه.
+  */
+  const rf = url.searchParams.get('rf')?.trim().slice(0, 24)
+
   /** يلحق كوكي المسوّق بأي استجابة قبل ما ترجع */
   const finish = (res: NextResponse) => {
     if (ref) {
       res.cookies.set('zw_ref', ref, {
+        path: '/',
+        maxAge: 30 * 24 * 60 * 60,
+        sameSite: 'lax',
+        httpOnly: false,
+      })
+    }
+    if (rf) {
+      res.cookies.set('zw_rf', rf, {
         path: '/',
         maxAge: 30 * 24 * 60 * 60,
         sameSite: 'lax',

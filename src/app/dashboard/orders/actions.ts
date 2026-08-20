@@ -10,6 +10,7 @@ import { isEmailConfigured, sendEmail } from '@/lib/email'
 import { isEmailableStatus, orderStatusEmail } from '@/lib/store-emails'
 import { storeUrl } from '@/lib/domain'
 import { awardOrderPoints } from '@/lib/loyalty'
+import { rewardReferralForOrder } from '@/lib/referrals'
 import { approveAffiliateCommission, cancelAffiliateCommission } from '@/lib/affiliates'
 import { dispatchWebhook } from '@/lib/webhooks'
 import { runAutomations } from '@/lib/automation'
@@ -152,6 +153,17 @@ export async function updateOrderStatusAction(orderId: string, status: OrderStat
       })
     } catch (e) {
       console.error('فشل منح نقاط الولاء:', e)
+    }
+
+    /*
+      نقاط الإحالة كمان عند التسليم لا عند الطلب — الطلب ممكن يتلغي،
+      والنقاط على بيعة اتلغت خسارة. الدالة بتحجز الحالة الأول فإعادة
+      المحاولة ما بتمنحش مرتين.
+    */
+    try {
+      await rewardReferralForOrder(store.id, order.id)
+    } catch (e) {
+      console.error('فشل صرف نقاط الإحالة:', e)
     }
   }
 

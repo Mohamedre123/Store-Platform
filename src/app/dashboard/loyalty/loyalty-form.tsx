@@ -35,6 +35,7 @@ export function LoyaltyForm({
     minPointsToRedeem: number
     welcomePoints: number
     reviewPoints: number
+    referralPoints: number
     tiers: TierConfig[]
   } | null
   currency: string
@@ -45,6 +46,7 @@ export function LoyaltyForm({
   const [minRedeem, setMinRedeem] = useState(String(settings?.minPointsToRedeem ?? 100))
   const [welcome, setWelcome] = useState(String(settings?.welcomePoints ?? 0))
   const [review, setReview] = useState(String(settings?.reviewPoints ?? 0))
+  const [referral, setReferral] = useState(String(settings?.referralPoints ?? 0))
   const [tiers, setTiers] = useState<TierConfig[]>(
     settings?.tiers?.length ? settings.tiers : DEFAULT_TIERS,
   )
@@ -61,6 +63,7 @@ export function LoyaltyForm({
         minPointsToRedeem: minRedeem,
         welcomePoints: welcome,
         reviewPoints: review,
+        referralPoints: referral,
         tiers,
       })
       setMsg(res?.error ? { ok: false, text: res.error } : { ok: true, text: 'اتحفظ' })
@@ -148,6 +151,19 @@ export function LoyaltyForm({
                   dir="ltr"
                   className={`${field} text-start`}
                 />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-sm font-medium">نقاط الإحالة</span>
+                <input
+                  value={referral}
+                  onChange={(e) => setReferral(e.target.value)}
+                  inputMode="numeric"
+                  dir="ltr"
+                  className={`${field} text-start`}
+                />
+                <span className="text-xs text-[var(--fg-muted)]">
+                  بتتصرف للاتنين — اللي حوّل واللي اتحوّل. صفر يقفل «هات صاحبك».
+                </span>
               </label>
             </div>
           </>

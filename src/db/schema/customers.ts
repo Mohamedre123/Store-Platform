@@ -28,6 +28,13 @@ export const customers = pgTable(
     lifetimePoints: integer('lifetime_points').notNull().default(0),
     tier: text('tier').$type<LoyaltyTier>().notNull().default('bronze'),
 
+    /*
+      كود الإحالة — ثابت لكل عميل عشان يقدر يشاركه على واتساب مرة
+      ويفضل شغّال. بيتولّد أول ما يفتح حسابه لا وقت التسجيل: أغلب
+      العملاء ما بيحيلوش حد، فما نملاش الجدول أكوادًا ما اتشافتش.
+    */
+    referralCode: text('referral_code'),
+
     // إحصاءات محسوبة — تُحدَّث مع كل طلب لتفادي استعلامات ثقيلة
     ordersCount: integer('orders_count').notNull().default(0),
     totalSpent: money('total_spent'),
