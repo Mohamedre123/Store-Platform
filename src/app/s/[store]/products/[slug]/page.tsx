@@ -14,7 +14,14 @@ import {
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { productOptionValues, productOptions, productVariants, wishlists } from '@/db/schema'
+import { cookies } from 'next/headers'
 import { getCurrentCustomer } from '@/lib/customer-auth'
+import {
+  assignBucket,
+  getRunningExperiment,
+  trackExperimentView,
+  variantValue,
+} from '@/lib/experiments'
 import { ProductCard } from '@/components/storefront/product-card'
 import { ProductReviews } from '@/components/storefront/reviews'
 import { WishlistButton } from '@/components/storefront/wishlist-button'
@@ -63,7 +70,32 @@ export default async function ProductPage({
   const theme = await getStoreTheme(store.id, isPreview)
   const { listing, productPage } = theme.custom
 
-  const off = discountPercent(product.price, product.compareAtPrice)
+  /**
+   * تجربة A/B على المنتج ده.
+   *
+   * المجموعة بتتحدد من معرّف الزائر اللي في الكوكي، فالسعر بيفضل
+   * ثابت له مهما رجع للصفحة — وهو نفس المعرّف اللي التسعير بيستخدمه
+   * وقت الشيك أوت، يعني اللي شافه هو اللي هيدفعه.
+   *
+   * مقفولة في المعاينة: التاجر بيفتح متجره كتير، ومشاهداته كانت
+   * هتزوّر نتيجة تجربته هو.
+   */
+  const visitor = isPreview ? null : ((await cookies()).get('zw_v')?.value ?? null)
+  const experiment = visitor ? await getRunningExperiment(store.id, product.id) : null
+  const bucket = experiment && visitor ? assignBucket(visitor, experiment.splitBps) : null
+
+  if (experiment && bucket) {
+    // بدون await: القياس ما يصحّش يأخّر عرض الصفحة للعميل
+    void trackExperimentView(experiment.id, bucket)
+  }
+
+  const testPrice = bucket ? variantValue(experiment, bucket, 'price') : null
+  const testTitle = bucket ? variantValue(experiment, bucket, 'title') : null
+
+  const displayName = typeof testTitle === 'string' && testTitle ? testTitle : product.name
+  const displayPrice = typeof testPrice === 'number' && testPrice > 0 ? testPrice : product.price
+
+  const off = discountPercent(displayPrice, product.compareAtPrice)
   const soldOut = product.trackInventory && product.stock <= 0
   const productReviews = await listProductReviews(product.id)
 
@@ -235,10 +267,10 @@ export default async function ProductPage({
                   variants={variantRows}
                   fallback={{
                     productId: product.id,
-                    name: product.name,
+                    name: displayName,
                     slug: product.slug,
                     image: product.images[0],
-                    price: product.price,
+                    price: displayPrice,
                   }}
                   currency={store.currency}
                   whatsapp={productPage.showWhatsappAsk ? store.whatsapp : null}
@@ -255,7 +287,7 @@ export default async function ProductPage({
             <>
               <div className="flex flex-wrap items-baseline gap-3">
                 <span className="tabular text-3xl font-bold text-[var(--sf-primary)]">
-                  {formatMoney(product.price, store.currency)}
+                  {formatMoney(displayPrice, store.currency)}
                 </span>
                 {product.compareAtPrice && (
                   <span className="tabular text-lg line-through opacity-45">
@@ -278,10 +310,10 @@ export default async function ProductPage({
                   <AddToCart
                     item={{
                       productId: product.id,
-                      name: product.name,
+                      name: displayName,
                       slug: product.slug,
                       image: product.images[0],
-                      price: product.price,
+                      price: displayPrice,
                       maxStock: product.trackInventory ? product.stock : undefined,
                     }}
                     soldOut={soldOut}
@@ -365,10 +397,10 @@ export default async function ProductPage({
         <StickyBuyBar
           item={{
             productId: product.id,
-            name: product.name,
+            name: displayName,
             slug: product.slug,
             image: product.images[0],
-            price: product.price,
+            price: displayPrice,
             maxStock: product.trackInventory ? product.stock : undefined,
           }}
           soldOut={soldOut}

@@ -26,8 +26,20 @@ import { findAffiliateByCode, recordAffiliateConversion } from '@/lib/affiliates
 import { dispatchWebhook } from '@/lib/webhooks'
 import { runAutomations } from '@/lib/automation'
 import { recordReferral } from '@/lib/referrals'
+import { trackExperimentConversions } from '@/lib/experiments'
 import { generateToken } from '@/lib/crypto'
 import { normalizePhone } from '@/lib/utils'
+
+/**
+ * معرّف الزائر من الكوكي.
+ *
+ * بيستخدم في تجارب السعر بس. لو مش موجود (كوكيز مقفولة، أول طلب
+ * قبل ما الوكيل يحطه) التسعير بيرجع للسعر الأساسي — مفيش تجربة
+ * أحسن من سعر عشوائي.
+ */
+async function visitorId(): Promise<string | null> {
+  return (await cookies()).get('zw_v')?.value ?? null
+}
 
 export type PlaceOrderState =
   | { ok: true; orderNumber: number; token: string }
@@ -84,7 +96,7 @@ export async function captureIncompleteOrder(input: {
   const phone = normalizePhone(input.phone, store.country === 'EG' ? '20' : '966')
   if (phone.replace(/\D/g, '').length < 10) return null
 
-  const { lines } = await priceCart(store.id, input.lines)
+  const { lines } = await priceCart(store.id, input.lines, await visitorId())
   if (lines.length === 0) return null
 
   const totals = await computeTotals({
@@ -186,7 +198,7 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
   if (!store) return { ok: false, error: 'المتجر مش موجود' }
   if (!store.isPublished) return { ok: false, error: 'المتجر مش متاح للطلب دلوقتي' }
 
-  const { lines, issue } = await priceCart(store.id, input.lines)
+  const { lines, issue } = await priceCart(store.id, input.lines, await visitorId())
   if (issue) {
     const messages = {
       empty: 'السلة فاضية',
@@ -500,6 +512,20 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
     console.error('فشل تسجيل الإحالة:', e)
   }
 
+  /*
+    تقييد تحويلات تجارب السعر. بعد نجاح الطلب لا قبله — التجربة
+    بتقيس البيعات اللي تمّت فعلًا.
+  */
+  try {
+    await trackExperimentConversions(
+      store.id,
+      await visitorId(),
+      lines.map((l) => ({ productId: l.productId, total: l.total })),
+    )
+  } catch (e) {
+    console.error('فشل تسجيل تحويل التجربة:', e)
+  }
+
   /**
    * رسائل التأكيد — بعد ما المعاملة نجحت لا جوّاها.
    *
@@ -631,7 +657,7 @@ export async function applyCouponAction(input: {
   const store = await getStore(input.storeIdentifier)
   if (!store) return { ok: false, error: 'المتجر مش موجود' }
 
-  const { lines, issue } = await priceCart(store.id, input.lines)
+  const { lines, issue } = await priceCart(store.id, input.lines, await visitorId())
   if (issue) return { ok: false, error: 'السلة فاضية' }
 
   const phone = input.phone ? normalizePhone(input.phone, store.country === 'EG' ? '20' : '966') : null

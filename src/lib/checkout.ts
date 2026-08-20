@@ -3,6 +3,7 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { db } from '@/db'
 import { checkoutSettings, paymentMethods, products, productVariants, shippingRates, shippingZones, stores } from '@/db/schema'
 import { applyBps } from './utils'
+import { assignBucket, getRunningPriceExperiments, variantValue } from './experiments'
 
 /**
  * حساب الطلب.
@@ -47,8 +48,13 @@ export type CheckoutIssue =
   | { kind: 'out_of_stock'; names: string[] }
   | { kind: 'below_minimum'; minimum: number }
 
-/** تسعير السلة من قاعدة البيانات */
-export async function priceCart(storeId: string, lines: CartLine[]) {
+/**
+ * تسعير السلة من قاعدة البيانات.
+ *
+ * `visitorId` بيستخدم في تجارب السعر بس: السعر المعروض للزائر لازم
+ * يكون هو نفسه اللي بيتحاسب. عرض سعر ومحاسبة سعر تاني نصب مش تجربة.
+ */
+export async function priceCart(storeId: string, lines: CartLine[], visitorId?: string | null) {
   const ids = [...new Set(lines.map((l) => l.productId))].filter(Boolean)
   if (ids.length === 0) return { lines: [] as PricedLine[], issue: { kind: 'empty' } as CheckoutIssue }
 
@@ -68,6 +74,9 @@ export async function priceCart(storeId: string, lines: CartLine[]) {
     .where(and(eq(products.storeId, storeId), inArray(products.id, ids)))
 
   const byId = new Map(rows.map((r) => [r.id, r]))
+
+  // تجارب السعر الشغّالة — استعلام واحد لكل السلة
+  const priceTests = visitorId ? await getRunningPriceExperiments(storeId, ids) : new Map()
 
   /**
    * المتغيّرات المطلوبة.
@@ -116,7 +125,19 @@ export async function priceCart(storeId: string, lines: CartLine[]) {
       continue
     }
 
-    const price = useVariant ? variant.price : p.price
+    /*
+      سعر التجربة على المنتج بس لا على المتغيّر: سعر «أحمر XL» اختيار
+      صريح من التاجر، وتجربة فوقه كانت هتخلّي مقاسين من نفس المنتج
+      بأسعار مالهاش منطق ظاهر للعميل.
+    */
+    let price = useVariant ? variant.price : p.price
+    if (!useVariant && visitorId) {
+      const test = priceTests.get(p.id)
+      if (test) {
+        const alt = variantValue(test, assignBucket(visitorId, test.splitBps), 'price')
+        if (typeof alt === 'number' && alt > 0) price = alt
+      }
+    }
     const costPrice = useVariant ? (variant.costPrice ?? p.costPrice) : p.costPrice
     const name = useVariant ? `${p.name} — ${variant.title}` : p.name
 

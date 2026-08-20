@@ -44,6 +44,23 @@ export default function proxy(req: NextRequest) {
   */
   const rf = url.searchParams.get('rf')?.trim().slice(0, 24)
 
+  /*
+    معرّف زائر ثابت — لتجارب A/B بس.
+
+    التوزيع لازم يفضل ثابت للزائر الواحد: لو شاف ٤٩٠ ورجع لقى ٥٥٠،
+    هيحس إن المتجر بيغيّر أسعاره وراه ويسيبه. ولازم يكون على الخادم
+    لأن السعر بيتحاسب هناك — sessionStorage مش بيوصل للتسعير.
+
+    مالوش أي علاقة بهوية العميل: رقم عشوائي مش مربوط بحساب ولا
+    بيتبعت لأي طرف تاني، وبيتحط بس لما التجارب تحتاجه.
+  */
+  const existingVisitor = req.cookies.get('zw_v')?.value
+  const visitorId =
+    existingVisitor ??
+    (path.startsWith('/s/') || resolveHost(host).kind === 'store'
+      ? Math.random().toString(36).slice(2) + Date.now().toString(36)
+      : null)
+
   /** يلحق كوكي المسوّق بأي استجابة قبل ما ترجع */
   const finish = (res: NextResponse) => {
     if (ref) {
@@ -52,6 +69,14 @@ export default function proxy(req: NextRequest) {
         maxAge: 30 * 24 * 60 * 60,
         sameSite: 'lax',
         httpOnly: false,
+      })
+    }
+    if (visitorId && !existingVisitor) {
+      res.cookies.set('zw_v', visitorId, {
+        path: '/',
+        maxAge: 180 * 24 * 60 * 60,
+        sameSite: 'lax',
+        httpOnly: true,
       })
     }
     if (rf) {
