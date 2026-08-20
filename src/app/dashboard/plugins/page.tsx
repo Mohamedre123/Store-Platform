@@ -4,7 +4,7 @@ import { storePlugins } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
-import { getAiConfig, GEMINI_SLUG } from '@/lib/ai/settings'
+import { getAiConfig, GEMINI_PRO_SLUG, GEMINI_SLUG } from '@/lib/ai/settings'
 import { PluginsManager, type PluginRow } from './plugins-manager'
 
 export const metadata = { title: 'الإضافات' }
@@ -27,6 +27,7 @@ export default async function PluginsPage() {
     مقنّعًا، لأن أي حاجة توصل للمتصفح ممكن تتقرا.
   */
   const gemini = await getAiConfig(store.id, GEMINI_SLUG)
+  const pro = await getAiConfig(store.id, GEMINI_PRO_SLUG)
 
   return (
     <div className="flex flex-col gap-6">
@@ -47,6 +48,13 @@ export default async function PluginsPage() {
             botGreeting: gemini.botGreeting,
             botDailyLimit: gemini.botDailyLimit,
             botVisitorLimit: gemini.botVisitorLimit,
+          }}
+          pro={{
+            enabled: pro.enabled,
+            hasOwnKey: Boolean(pro.apiKey),
+            model: pro.model,
+            brief: pro.brief,
+            baseReady: Boolean(gemini.apiKey && gemini.model),
           }}
         />
       </Reveal>

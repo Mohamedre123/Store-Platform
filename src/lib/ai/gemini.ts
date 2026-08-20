@@ -212,3 +212,139 @@ export async function verifyKey(
 
   return { ok: true, data: { models: res.data, suggested: pickDefaultModel(res.data)! } }
 }
+
+/* ══════════════════ استدعاء الدوال ══════════════════ */
+
+/**
+ * تعريف أداة للموديل.
+ *
+ * `parameters` بصيغة JSON Schema المبسّطة اللي جوجل بتقبلها — أنواع
+ * وأوصاف بس، من غير مراجع ولا تركيبات. أي حاجة أعقد بتترفض بخطأ
+ * ٤٠٠ غامض، فبنخليها بسيطة عن قصد.
+ */
+export type ToolDef = {
+  name: string
+  description: string
+  parameters: {
+    type: 'object'
+    properties: Record<string, { type: string; description: string; enum?: string[] }>
+    required?: string[]
+  }
+}
+
+export type ToolCall = { name: string; args: Record<string, unknown> }
+
+/** صورة مرفقة — بتتبعت للموديل عشان يفهم المنتج من صورته */
+export type InlineImage = { mimeType: string; dataBase64: string }
+
+export type AgentTurn = {
+  /** كلام الموديل للتاجر */
+  text: string
+  /** الأدوات اللي طلب ينفّذها */
+  calls: ToolCall[]
+}
+
+type Part =
+  | { text: string }
+  | { inlineData: { mimeType: string; data: string } }
+  | { functionCall: { name: string; args: Record<string, unknown> } }
+  | { functionResponse: { name: string; response: Record<string, unknown> } }
+
+export type AgentMessage =
+  | { role: 'user'; text: string; images?: InlineImage[] }
+  | { role: 'model'; text?: string; calls?: ToolCall[] }
+  | { role: 'tool'; name: string; result: Record<string, unknown> }
+
+function toParts(m: AgentMessage): Part[] {
+  if (m.role === 'user') {
+    const parts: Part[] = []
+    if (m.text) parts.push({ text: m.text })
+    for (const img of m.images ?? []) {
+      parts.push({ inlineData: { mimeType: img.mimeType, data: img.dataBase64 } })
+    }
+    return parts.length ? parts : [{ text: '' }]
+  }
+
+  if (m.role === 'model') {
+    const parts: Part[] = []
+    if (m.text) parts.push({ text: m.text })
+    for (const c of m.calls ?? []) {
+      parts.push({ functionCall: { name: c.name, args: c.args } })
+    }
+    return parts.length ? parts : [{ text: '' }]
+  }
+
+  return [{ functionResponse: { name: m.name, response: m.result } }]
+}
+
+/**
+ * دورة واحدة مع الوكيل.
+ *
+ * بترجّع كلام الموديل **و** الأدوات اللي طلبها — من غير ما تنفّذ
+ * حاجة. التنفيذ قرار الطبقة اللي فوق، وده الحاجز اللي بيمنع الموديل
+ * إنه يغيّر أسعار من غير ما التاجر يشوف.
+ */
+export async function agentTurn(input: {
+  apiKey: string
+  model: string
+  system: string
+  messages: AgentMessage[]
+  tools: ToolDef[]
+  maxTokens?: number
+}): Promise<GeminiResult<AgentTurn>> {
+  try {
+    const res = await fetch(
+      `${BASE}/models/${encodeURIComponent(input.model)}:generateContent?key=${encodeURIComponent(input.apiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        body: JSON.stringify({
+          contents: input.messages.map((m) => ({
+            // جوجل بتسمّي دور نتيجة الأداة «user» — مش «tool»
+            role: m.role === 'model' ? 'model' : 'user',
+            parts: toParts(m),
+          })),
+          systemInstruction: { parts: [{ text: input.system }] },
+          tools: input.tools.length
+            ? [{ functionDeclarations: input.tools }]
+            : undefined,
+          generationConfig: {
+            maxOutputTokens: input.maxTokens ?? 1200,
+            // الوكيل بينفّذ إجراءات — الدقة أهم من التنوّع
+            temperature: 0.2,
+          },
+        }),
+      },
+    )
+
+    if (!res.ok) return { ok: false, error: classify(res.status, await res.text()) }
+
+    const data = (await res.json()) as {
+      candidates?: Array<{ content?: { parts?: Part[] } }>
+      promptFeedback?: { blockReason?: string }
+    }
+
+    if (data.promptFeedback?.blockReason) {
+      return { ok: false, error: { kind: 'blocked', message: 'الطلب اتمنع من فلاتر جوجل.' } }
+    }
+
+    const parts = data.candidates?.[0]?.content?.parts ?? []
+    const text = parts
+      .map((p) => ('text' in p ? p.text : ''))
+      .join('')
+      .trim()
+
+    const calls: ToolCall[] = parts
+      .filter((p): p is Extract<Part, { functionCall: unknown }> => 'functionCall' in p)
+      .map((p) => ({ name: p.functionCall.name, args: p.functionCall.args ?? {} }))
+
+    if (!text && calls.length === 0) {
+      return { ok: false, error: { kind: 'unknown', message: 'جوجل رجّعت رد فاضي.' } }
+    }
+
+    return { ok: true, data: { text, calls } }
+  } catch (e) {
+    return { ok: false, error: { kind: 'network', message: String(e).slice(0, 200) } }
+  }
+}

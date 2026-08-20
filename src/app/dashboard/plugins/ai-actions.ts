@@ -9,7 +9,7 @@ import { getDashboardContext } from '@/lib/store-context'
 import { encryptJson } from '@/lib/crypto'
 import { recordAudit } from '@/lib/audit'
 import { verifyKey, type GeminiModel } from '@/lib/ai/gemini'
-import { getAiConfig, GEMINI_SLUG } from '@/lib/ai/settings'
+import { getAiConfig, GEMINI_PRO_SLUG, GEMINI_SLUG } from '@/lib/ai/settings'
 import { getStoreBrief, suggestBrief } from '@/lib/ai/store-context'
 
 export type VerifyState =
@@ -128,5 +128,71 @@ export async function saveGeminiAction(raw: unknown): Promise<SaveState> {
   })
 
   revalidatePath('/dashboard/plugins')
+  return { ok: true }
+}
+
+const proSchema = z.object({
+  enabled: z.boolean(),
+  apiKey: z.string().trim().max(300).optional(),
+  model: z.string().trim().max(120).optional(),
+  brief: z.string().trim().max(1500).optional(),
+})
+
+/**
+ * حفظ إعداد المساعد المنفّذ.
+ *
+ * ممكن يشتغل من غير مفتاح خاص بيه: بيستعير مفتاح Gemini العادي.
+ * التاجر اللي حط مفتاحه مرة ما يصحّش نطلبه منه تاني عشان يفعّل
+ * إضافة تانية على نفس الحساب.
+ */
+export async function saveGeminiProAction(raw: unknown): Promise<SaveState> {
+  const parsed = proSchema.safeParse(raw)
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'بيانات ناقصة' }
+  const input = parsed.data
+
+  const { store, user } = await getDashboardContext()
+  const current = await getAiConfig(store.id, GEMINI_PRO_SLUG)
+  const base = await getAiConfig(store.id, GEMINI_SLUG)
+
+  const apiKey = input.apiKey || current.apiKey
+  const canBorrow = Boolean(base.apiKey && (input.model || current.model || base.model))
+
+  if (input.enabled && !apiKey && !canBorrow) {
+    return { error: 'محتاج مفتاح Gemini — هنا أو في الإضافة العادية.' }
+  }
+
+  const values = {
+    enabled: input.enabled,
+    config: {
+      model: input.model || current.model,
+      brief: input.brief ?? current.brief,
+    },
+    secrets: apiKey ? encryptJson({ apiKey }) : null,
+  }
+
+  const [existing] = await db
+    .select({ id: storePlugins.id })
+    .from(storePlugins)
+    .where(and(eq(storePlugins.storeId, store.id), eq(storePlugins.pluginSlug, GEMINI_PRO_SLUG)))
+    .limit(1)
+
+  if (existing) {
+    await db.update(storePlugins).set(values).where(eq(storePlugins.id, existing.id))
+  } else {
+    await db
+      .insert(storePlugins)
+      .values({ storeId: store.id, pluginSlug: GEMINI_PRO_SLUG, ...values })
+  }
+
+  await recordAudit({
+    storeId: store.id,
+    userId: user.id,
+    action: 'settings.update',
+    resource: 'plugin',
+    resourceId: GEMINI_PRO_SLUG,
+    after: { enabled: input.enabled, model: values.config.model, keyChanged: Boolean(input.apiKey) },
+  })
+
+  revalidatePath('/dashboard', 'layout')
   return { ok: true }
 }

@@ -177,3 +177,56 @@ export const jobQueue = pgTable(
     index('job_queue_store_idx').on(t.storeId, t.type),
   ],
 )
+
+/**
+ * محادثات الذكاء الاصطناعي في اللوحة.
+ *
+ * جدول واحد بيخدم كل المساعدين — مساعد التاجر ومولّد الثيمات ومولّد
+ * صفحات الهبوط — بـ`kind` بتفرّق بينهم. جدول لكل مساعد كان هيكرّر
+ * نفس المنطق تلات مرات، وأي تحسين في الحفظ يتعمل في واحد وينسى في
+ * التانيين.
+ */
+export const aiConversations = pgTable(
+  'ai_conversations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    storeId: uuid('store_id').notNull().references(() => stores.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').notNull(),
+    /** assistant = مساعد اللوحة · theme = مولّد الثيمات · landing = صفحات الهبوط */
+    kind: text('kind').$type<'assistant' | 'theme' | 'landing'>().notNull().default('assistant'),
+    title: text('title').notNull().default('محادثة جديدة'),
+    /** معرّف العنصر اللي المحادثة شغّالة عليه (ثيم أو صفحة هبوط) */
+    targetId: uuid('target_id'),
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index('ai_conversations_store_idx').on(t.storeId, t.kind, t.updatedAt)],
+)
+
+export type AiToolCall = {
+  name: string
+  args: Record<string, unknown>
+  /** pending = مستنية موافقة التاجر · done = اتنفّذت · rejected = رفضها */
+  status: 'pending' | 'done' | 'rejected' | 'failed'
+  result?: string
+}
+
+export const aiMessages = pgTable(
+  'ai_messages',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    conversationId: uuid('conversation_id')
+      .notNull()
+      .references(() => aiConversations.id, { onDelete: 'cascade' }),
+    storeId: uuid('store_id').notNull().references(() => stores.id, { onDelete: 'cascade' }),
+    role: text('role').$type<'user' | 'model'>().notNull(),
+    text: text('text').notNull().default(''),
+    /** صور مرفقة — روابط بعد الرفع لا بايتات */
+    images: jsonb('images').$type<string[]>().notNull().default([]),
+    /** الإجراءات اللي المساعد اقترحها وحالتها */
+    toolCalls: jsonb('tool_calls').$type<AiToolCall[]>().notNull().default([]),
+    createdAt: createdAt(),
+  },
+  (t) => [index('ai_messages_conversation_idx').on(t.conversationId, t.createdAt)],
+)

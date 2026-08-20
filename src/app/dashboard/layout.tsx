@@ -3,12 +3,21 @@ import { Sidebar } from '@/components/dashboard/sidebar'
 import { SectionTabs } from '@/components/dashboard/section-tabs'
 import { AuroraBackground } from '@/components/motion'
 import { Preloader } from '@/components/preloader'
+import { AssistantPanel } from '@/components/dashboard/assistant-panel'
+import { getAiConfig, GEMINI_PRO_SLUG } from '@/lib/ai/settings'
 import { storeUrl } from '@/lib/domain'
 import { logoutAction } from '@/app/(auth)/actions'
 import { ExternalLink, LogOut } from 'lucide-react'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, store } = await getDashboardContext()
+
+  /*
+    المساعد بيتحمّل بس لو الإضافة مفعّلة: اللوحة العائمة ملف عميل
+    كامل، وتحميله على كل تاجر مش مفعّلها بيبطّئ اللوحة على اللي مش
+    مستفيد منها أصلًا.
+  */
+  const pro = await getAiConfig(store.id, GEMINI_PRO_SLUG)
 
   return (
     <div className="min-h-screen-safe">
@@ -52,6 +61,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <SectionTabs />
           </div>
           {children}
+          {pro.enabled && <AssistantPanel />}
         </main>
       </div>
     </div>
