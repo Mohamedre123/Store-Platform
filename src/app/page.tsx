@@ -22,6 +22,11 @@ import {
 import { Logo } from "@/components/logo";
 import { brand } from "@/lib/brand";
 import { Preloader } from "@/components/preloader";
+import {
+  ShowcaseAssistant,
+  ShowcaseLanding,
+  ShowcaseTheme,
+} from "@/components/showcase";
 
 const features = [
   {
@@ -136,6 +141,13 @@ export default function HomePage() {
         {/* البطل */}
         <section className="relative">
           <div className="mx-auto max-w-6xl px-4 pt-16 pb-20 sm:px-6 sm:pt-24 sm:pb-28">
+            {/*
+              عمودين على الشاشة الكبيرة: الوعد على اليمين والمشهد على
+              الشمال. على الموبايل المشهد بينزل تحت الكلام — الزائر
+              لازم يقرا الوعد الأول، والصورة فوق النص بتأخّر الرسالة.
+            */}
+            <div className="grid items-center gap-12 lg:grid-cols-[1fr_27rem]">
+              <div>
             <Enter>
               <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)]/70 px-3.5 py-1.5 text-xs font-medium text-[var(--fg-muted)] backdrop-blur-sm">
                 <span className="zw-ping relative h-1.5 w-1.5 rounded-full bg-[var(--primary)]" />
@@ -176,6 +188,13 @@ export default function HomePage() {
               </div>
             </Enter>
 
+              </div>
+
+              <Enter delay={200}>
+                <ShowcaseLanding />
+              </Enter>
+            </div>
+
             {/* أرقام تتحرك عند الظهور */}
             <Enter delay={320}>
               <dl className="mt-16 grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-4">
@@ -194,6 +213,55 @@ export default function HomePage() {
                 ))}
               </dl>
             </Enter>
+          </div>
+        </section>
+
+        {/*
+          مشاهد الذكاء الاصطناعي.
+
+          كل مشهد بيعرض ميزة **موجودة فعلًا** في المنصة — مش رسمًا
+          توضيحيًا. اللي الزائر بيشوفه هنا هو اللي هيلاقيه لما يسجّل،
+          وده الفرق بين عرض صادق وإعلان.
+        */}
+        <section id="ai" className="scroll-mt-20">
+          <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 sm:py-24">
+            <Reveal>
+              <h2 className="text-balance text-3xl font-bold tracking-tight sm:text-4xl">
+                الذكاء الاصطناعي شغّال جوّه متجرك
+              </h2>
+              <p className="mt-3 max-w-xl text-[var(--fg-muted)]">
+                مش زرار في الآخر — مدمج في الحتّة اللي بتحتاجه فيها. بمفتاحك
+                إنت، فمحدش بيحاسبك على استهلاك مش بتاعك.
+              </p>
+            </Reveal>
+
+            <div className="mt-12 grid gap-8 lg:grid-cols-2">
+              <Reveal>
+                <div className="flex flex-col gap-4">
+                  <ShowcaseTheme />
+                  <div>
+                    <h3 className="font-semibold">اوصف الثيم — ويتعمل</h3>
+                    <p className="mt-1 text-sm text-[var(--fg-muted)]">
+                      مش عاجبك ولا شكل جاهز؟ قول اللي في دماغك بالعربي، وعدّله
+                      بعدين بالمحرّر زي أي ثيم.
+                    </p>
+                  </div>
+                </div>
+              </Reveal>
+
+              <Reveal delay={90}>
+                <div className="flex flex-col gap-4">
+                  <ShowcaseAssistant />
+                  <div>
+                    <h3 className="font-semibold">مساعد بينفّذ — بموافقتك</h3>
+                    <p className="mt-1 text-sm text-[var(--fg-muted)]">
+                      اطلب منه يضيف منتج أو يعمل خصم، وهو ينفّذ. وكل إجراء
+                      بيتعرض عليك بالعربي وما بيحصلش غير لما توافق.
+                    </p>
+                  </div>
+                </div>
+              </Reveal>
+            </div>
           </div>
         </section>
 

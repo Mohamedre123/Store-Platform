@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import './motion.css';
+@import './showcase.css';
 
 /**
  * متغيّر `dark:` يتبع نفس منطق التوكنات: الاختيار الصريح للمستخدم

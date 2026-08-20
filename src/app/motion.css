@@ -215,7 +215,7 @@
   width: min(46rem, 105vw);
   height: min(46rem, 105vw);
   background: radial-gradient(circle, rgb(118 94 176 / 0.42) 0%, rgb(118 94 176 / 0) 68%);
-  animation: zw-drift-a 26s ease-in-out infinite;
+  animation: zw-drift-a 15s ease-in-out infinite;
 }
 
 .zw-aurora__blob--2 {
@@ -224,7 +224,7 @@
   width: min(40rem, 95vw);
   height: min(40rem, 95vw);
   background: radial-gradient(circle, rgb(92 104 144 / 0.36) 0%, rgb(92 104 144 / 0) 68%);
-  animation: zw-drift-b 32s ease-in-out infinite;
+  animation: zw-drift-b 19s ease-in-out infinite;
 }
 
 .zw-aurora__blob--3 {
@@ -233,7 +233,7 @@
   width: min(30rem, 80vw);
   height: min(30rem, 80vw);
   background: radial-gradient(circle, rgb(146 125 197 / 0.26) 0%, rgb(146 125 197 / 0) 70%);
-  animation: zw-drift-c 24s ease-in-out infinite;
+  animation: zw-drift-c 13s ease-in-out infinite;
 }
 
 /* شبكة خفيفة تعطي إحساسًا بالعمق */
@@ -249,16 +249,29 @@
   mask-image: radial-gradient(ellipse 80% 55% at 50% 0%, #000 20%, transparent 78%);
 }
 
+/*
+  المدى والسرعة.
+
+  النسخة الأولى كانت ٢٦-٣٢ ثانية بمدى ٥-٨٪ — الحركة كانت أبطأ من
+  إن العين تلاحظها، فالخلفية بتبان واقفة رغم إنها شغّالة. المدد
+  اتقصّرت للنص تقريبًا والمسافات اتضاعفت.
+
+  ولسه بعيدة عن الحد اللي بيشتّت: البلوبات ورا المحتوى وشفّافة،
+  والحركة بتحسّها بطرف عينك مش بتسحبها ليها.
+*/
 @keyframes zw-drift-a {
   0%,
   100% {
     transform: translate3d(0, 0, 0) scale(1);
   }
-  33% {
-    transform: translate3d(-5%, 7%, 0) scale(1.08);
+  25% {
+    transform: translate3d(-12%, 14%, 0) scale(1.14);
   }
-  66% {
-    transform: translate3d(4%, -4%, 0) scale(0.95);
+  50% {
+    transform: translate3d(8%, 6%, 0) scale(0.92);
+  }
+  75% {
+    transform: translate3d(10%, -10%, 0) scale(1.06);
   }
 }
 
@@ -267,11 +280,14 @@
   100% {
     transform: translate3d(0, 0, 0) scale(1);
   }
-  40% {
-    transform: translate3d(7%, -6%, 0) scale(1.1);
+  30% {
+    transform: translate3d(16%, -12%, 0) scale(1.18);
   }
-  75% {
-    transform: translate3d(-3%, 4%, 0) scale(0.94);
+  55% {
+    transform: translate3d(6%, 10%, 0) scale(0.9);
+  }
+  80% {
+    transform: translate3d(-10%, 8%, 0) scale(1.08);
   }
 }
 
@@ -280,8 +296,11 @@
   100% {
     transform: translate3d(0, 0, 0) scale(1);
   }
-  50% {
-    transform: translate3d(6%, -8%, 0) scale(1.12);
+  35% {
+    transform: translate3d(14%, -16%, 0) scale(1.2);
+  }
+  70% {
+    transform: translate3d(-12%, 10%, 0) scale(0.88);
   }
 }
 

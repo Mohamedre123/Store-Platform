@@ -1,0 +1,894 @@
+/**
+ * المشاهد المتحرّكة في الصفحة الرئيسية.
+ *
+ * كل مشهد **دورة مراحل على تايم لاين واحد**: عشان المراحل تفضل
+ * متزامنة مهما طال. لو كل عنصر أخد أنيميشن مستقل، بيبدأوا يتفكّكوا
+ * عن بعض بعد كام لفّة والمشهد يبقى عشوائي.
+ *
+ * والحركة كلها بتقف مع prefers-reduced-motion — آخر الملف.
+ */
+
+/* ══════════════════ إطار المتصفح ══════════════════ */
+
+.zw-mock {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.04),
+    0 24px 48px -24px rgb(34 37 64 / 0.28);
+}
+
+.zw-mock__bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  padding: 0.6rem 0.9rem;
+}
+
+.zw-mock__dots {
+  display: flex;
+  gap: 0.3rem;
+}
+.zw-mock__dots i {
+  display: block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+}
+
+.zw-mock__title {
+  flex: 1;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.7rem;
+  color: var(--fg-subtle);
+}
+
+.zw-mock__body {
+  position: relative;
+  /* ارتفاع ثابت: المراحل بتتبدّل جوّاه فما تخبطش تخطيط الصفحة */
+  height: clamp(16rem, 42vw, 20rem);
+  padding: 1rem;
+}
+
+/* ══════════════════ المراحل ══════════════════ */
+
+.zw-scene__stage {
+  position: absolute;
+  inset: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  opacity: 0;
+}
+
+/*
+  الدورة ١٦ ثانية: ٤ مراحل × ٤ ثواني.
+  نفس المدة لكل مرحلة بتأخير مختلف — وده اللي بيخلّيهم متزامنين
+  للأبد بدل ما يتفكّكوا.
+*/
+.zw-stage--type {
+  animation: zw-stage 16s ease-in-out infinite 0s;
+}
+.zw-stage--pick {
+  animation: zw-stage 16s ease-in-out infinite 4s;
+}
+.zw-stage--build {
+  animation: zw-stage 16s ease-in-out infinite 8s;
+}
+.zw-stage--done {
+  animation: zw-stage 16s ease-in-out infinite 12s;
+}
+
+@keyframes zw-stage {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  3% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  22% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  26% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.985);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.985);
+  }
+}
+
+/* ══════════════════ الكتابة ══════════════════ */
+
+.zw-field {
+  display: flex;
+  width: 100%;
+  max-width: 22rem;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.zw-field__label {
+  font-size: 0.7rem;
+  color: var(--fg-muted);
+}
+
+.zw-typed {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 2.5rem;
+  border-radius: 0.6rem;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  padding: 0 0.7rem;
+  font-size: 0.8rem;
+}
+
+/*
+  الكتابة بعرض متغيّر لا بعدّ الحروف: العربي حروفه متصلة، والقص
+  بالحرف بيبوّظ الرسم ويفكّ الوصلات.
+*/
+.zw-typed__text {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  animation: zw-type 4s ease-in-out infinite;
+}
+
+.zw-typed--slow .zw-typed__text {
+  animation-duration: 9s;
+}
+.zw-typed--fast .zw-typed__text {
+  animation-duration: 10s;
+}
+
+@keyframes zw-type {
+  0% {
+    max-width: 0;
+  }
+  35% {
+    max-width: 100%;
+  }
+  100% {
+    max-width: 100%;
+  }
+}
+
+.zw-typed__caret {
+  display: block;
+  width: 1.5px;
+  height: 1rem;
+  background: var(--primary);
+  animation: zw-caret 0.9s steps(2, start) infinite;
+}
+
+@keyframes zw-caret {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+/* ══════════════════ اختيار المنتج ══════════════════ */
+
+.zw-select {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 2.5rem;
+  border-radius: 0.6rem;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  padding: 0 0.7rem;
+  font-size: 0.8rem;
+}
+
+.zw-select__value {
+  flex: 1;
+  opacity: 0;
+  animation: zw-appear 16s ease-in-out infinite;
+  animation-delay: 5.6s;
+}
+
+.zw-select__caret {
+  width: 0;
+  height: 0;
+  border-inline: 4px solid transparent;
+  border-top: 5px solid var(--fg-subtle);
+  animation: zw-flip 16s ease-in-out infinite;
+  animation-delay: 4.2s;
+}
+
+@keyframes zw-flip {
+  0%,
+  2% {
+    transform: rotate(0deg);
+  }
+  4%,
+  10% {
+    transform: rotate(180deg);
+  }
+  12%,
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes zw-appear {
+  0%,
+  4% {
+    opacity: 0;
+  }
+  7%,
+  22% {
+    opacity: 1;
+  }
+  26%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.zw-menu {
+  width: 100%;
+  max-width: 22rem;
+  overflow: hidden;
+  border-radius: 0.6rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 12px 28px -14px rgb(34 37 64 / 0.35);
+  transform-origin: top;
+  opacity: 0;
+  animation: zw-menu-open 16s ease-in-out infinite;
+  animation-delay: 4.4s;
+}
+
+@keyframes zw-menu-open {
+  0%,
+  1% {
+    opacity: 0;
+    transform: scaleY(0.6) translateY(-6px);
+  }
+  4%,
+  14% {
+    opacity: 1;
+    transform: scaleY(1) translateY(0);
+  }
+  18%,
+  100% {
+    opacity: 0;
+    transform: scaleY(0.6) translateY(-6px);
+  }
+}
+
+.zw-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  font-size: 0.72rem;
+}
+.zw-menu__item + .zw-menu__item {
+  border-top: 1px solid var(--border);
+}
+
+/* المنتج المختار بيتلوّن — ده اللي بيوري إن «الاختيار» حصل */
+.zw-menu__item.is-picked {
+  animation: zw-highlight 16s ease-in-out infinite;
+  animation-delay: 4.4s;
+}
+
+@keyframes zw-highlight {
+  0%,
+  8% {
+    background: transparent;
+  }
+  10%,
+  15% {
+    background: var(--primary-soft);
+  }
+  18%,
+  100% {
+    background: transparent;
+  }
+}
+
+.zw-menu__thumb {
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+  border-radius: 0.35rem;
+  background: linear-gradient(135deg, var(--primary-soft), var(--surface-2));
+}
+.zw-menu__name {
+  flex: 1;
+}
+.zw-menu__price {
+  font-weight: 600;
+  color: var(--primary);
+}
+
+/* ══════════════════ التوليد ══════════════════ */
+
+.zw-spark {
+  display: flex;
+  height: 3.25rem;
+  width: 3.25rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  color: #fff;
+  animation: zw-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes zw-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgb(139 92 246 / 0.35);
+  }
+  50% {
+    transform: scale(1.06);
+    box-shadow: 0 0 0 12px rgb(139 92 246 / 0);
+  }
+}
+
+.zw-scene__caption {
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+}
+
+.zw-progress {
+  width: min(14rem, 70%);
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+
+.zw-progress__fill {
+  display: block;
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #8b5cf6, #ec4899);
+  animation: zw-fill 16s ease-out infinite;
+  animation-delay: 8.2s;
+}
+
+@keyframes zw-fill {
+  0% {
+    width: 0;
+  }
+  18% {
+    width: 100%;
+  }
+  100% {
+    width: 100%;
+  }
+}
+
+/* ══════════════════ النتيجة ══════════════════ */
+
+.zw-preview {
+  width: min(15rem, 78%);
+  height: 9rem;
+  overflow: hidden;
+  border-radius: 0.6rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+/*
+  التمرير التلقائي بيوري إن الصفحة كاملة مش صورة واحدة — وده اللي
+  بيدّي إحساس «اتعملت فعلًا».
+*/
+.zw-preview__scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem;
+  animation: zw-scroll 16s ease-in-out infinite;
+  animation-delay: 12.6s;
+}
+
+@keyframes zw-scroll {
+  0%,
+  4% {
+    transform: translateY(0);
+  }
+  18% {
+    transform: translateY(-42%);
+  }
+  24%,
+  100% {
+    transform: translateY(-42%);
+  }
+}
+
+.zw-preview__hero {
+  height: 2.5rem;
+  flex-shrink: 0;
+  border-radius: 0.35rem;
+  background: linear-gradient(135deg, var(--primary), #8b5cf6);
+}
+.zw-preview__line {
+  height: 0.4rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+.zw-preview__row {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.3rem;
+}
+.zw-preview__row i {
+  flex: 1;
+  height: 1.5rem;
+  border-radius: 0.3rem;
+  background: var(--surface-2);
+}
+.zw-preview__cta {
+  height: 1rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--primary-soft);
+}
+
+.zw-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 999px;
+  background: var(--color-success-soft);
+  padding: 0.25rem 0.7rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-success);
+  opacity: 0;
+  animation: zw-pop 16s ease-out infinite;
+  animation-delay: 13.6s;
+}
+
+@keyframes zw-pop {
+  0%,
+  1% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  4% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+  6%,
+  16% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  20%,
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
+/* الزرار الثابت تحت — بيفضل ظاهر طول الدورة */
+.zw-pill {
+  position: absolute;
+  inset-inline-start: 1rem;
+  bottom: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 8px 20px -10px rgb(34 37 64 / 0.4);
+  padding: 0.4rem 0.85rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+/* ══════════════════ مشهد الثيم ══════════════════ */
+
+.zw-theme {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.zw-theme__swatches {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.zw-swatch {
+  height: 1.5rem;
+  width: 1.5rem;
+  border-radius: 0.4rem;
+  border: 1px solid var(--border);
+  animation: zw-swatch 9s ease-in-out infinite;
+}
+
+/*
+  الألوان بتتبدّل من الافتراضي للأسود والدهبي — نفس اللي «التاجر»
+  كتبه فوق، فالربط بين الطلب والنتيجة بيبان من غير شرح.
+*/
+@keyframes zw-swatch {
+  0%,
+  30% {
+    background: var(--primary-soft);
+  }
+  45%,
+  88% {
+    background: #c9a227;
+  }
+  100% {
+    background: var(--primary-soft);
+  }
+}
+.zw-swatch--b {
+  animation-name: zw-swatch-b;
+}
+.zw-swatch--c {
+  animation-name: zw-swatch-c;
+}
+.zw-swatch--d {
+  animation-name: zw-swatch-d;
+}
+
+@keyframes zw-swatch-b {
+  0%,
+  30% {
+    background: var(--surface-2);
+  }
+  45%,
+  88% {
+    background: #0b0b0b;
+  }
+  100% {
+    background: var(--surface-2);
+  }
+}
+@keyframes zw-swatch-c {
+  0%,
+  30% {
+    background: var(--surface-2);
+  }
+  45%,
+  88% {
+    background: #161616;
+  }
+  100% {
+    background: var(--surface-2);
+  }
+}
+@keyframes zw-swatch-d {
+  0%,
+  30% {
+    background: var(--border);
+  }
+  45%,
+  88% {
+    background: #f5f5f5;
+  }
+  100% {
+    background: var(--border);
+  }
+}
+
+.zw-theme__canvas {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.4rem;
+  overflow: hidden;
+  border-radius: 0.6rem;
+  border: 1px solid var(--border);
+  padding: 0.5rem;
+  animation: zw-canvas 9s ease-in-out infinite;
+}
+
+@keyframes zw-canvas {
+  0%,
+  30% {
+    background: var(--surface);
+  }
+  45%,
+  88% {
+    background: #0b0b0b;
+  }
+  100% {
+    background: var(--surface);
+  }
+}
+
+.zw-theme__header {
+  height: 0.9rem;
+  border-radius: 0.25rem;
+  background: var(--surface-2);
+  animation: zw-theme-el 9s ease-in-out infinite;
+}
+.zw-theme__hero {
+  height: 3rem;
+  border-radius: 0.35rem;
+  background: var(--primary-soft);
+  animation: zw-theme-hero 9s ease-in-out infinite;
+}
+.zw-theme__grid {
+  display: flex;
+  flex: 1;
+  gap: 0.35rem;
+}
+.zw-theme__grid i {
+  flex: 1;
+  border-radius: 0.3rem;
+  background: var(--surface-2);
+  animation: zw-theme-el 9s ease-in-out infinite;
+}
+
+@keyframes zw-theme-el {
+  0%,
+  30% {
+    background: var(--surface-2);
+  }
+  45%,
+  88% {
+    background: #1e1e1e;
+  }
+  100% {
+    background: var(--surface-2);
+  }
+}
+@keyframes zw-theme-hero {
+  0%,
+  30% {
+    background: var(--primary-soft);
+  }
+  45%,
+  88% {
+    background: #c9a227;
+  }
+  100% {
+    background: var(--primary-soft);
+  }
+}
+
+/* ══════════════════ مشهد المساعد ══════════════════ */
+
+.zw-chat {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.zw-chat__msg {
+  max-width: 85%;
+  border-radius: 0.9rem;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.75rem;
+}
+
+.zw-chat__msg--me {
+  align-self: flex-start;
+  background: var(--primary);
+  color: var(--primary-fg);
+}
+
+.zw-chat__msg--bot {
+  align-self: flex-end;
+  background: var(--surface-2);
+  opacity: 0;
+  animation: zw-fade-in 10s ease-in-out infinite;
+  animation-delay: 2s;
+}
+
+@keyframes zw-fade-in {
+  0%,
+  4% {
+    opacity: 0;
+  }
+  10%,
+  88% {
+    opacity: 1;
+  }
+  95%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.zw-action {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  border-radius: 0.7rem;
+  border: 1px solid var(--border-strong);
+  padding: 0.6rem;
+  padding-bottom: 2rem;
+  opacity: 0;
+  animation: zw-fade-in 10s ease-in-out infinite;
+  animation-delay: 2.8s;
+}
+
+.zw-action__title {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.zw-action__hint {
+  font-size: 0.65rem;
+  color: var(--fg-subtle);
+}
+
+.zw-action__buttons {
+  display: flex;
+  gap: 0.35rem;
+  overflow: hidden;
+  /* بيختفوا بعد «الموافقة» وتحلّ محلهم النتيجة */
+  animation: zw-collapse 10s ease-in-out infinite;
+}
+
+@keyframes zw-collapse {
+  0%,
+  55% {
+    opacity: 1;
+    max-height: 3rem;
+  }
+  62%,
+  92% {
+    opacity: 0;
+    max-height: 0;
+  }
+  100% {
+    opacity: 1;
+    max-height: 3rem;
+  }
+}
+
+.zw-action__yes {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  border-radius: 0.45rem;
+  background: var(--primary);
+  padding: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--primary-fg);
+  /* ضغطة وهمية قبل الاختفاء — بتوري إن حد وافق فعلًا */
+  animation: zw-press 10s ease-in-out infinite;
+}
+
+@keyframes zw-press {
+  0%,
+  50% {
+    transform: scale(1);
+  }
+  53% {
+    transform: scale(0.93);
+  }
+  56%,
+  100% {
+    transform: scale(1);
+  }
+}
+
+.zw-action__no {
+  border-radius: 0.45rem;
+  border: 1px solid var(--border-strong);
+  padding: 0.35rem 0.7rem;
+  font-size: 0.68rem;
+  color: var(--fg-muted);
+}
+
+.zw-action__done {
+  position: absolute;
+  inset-inline: 0.6rem;
+  bottom: 0.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-success);
+  opacity: 0;
+  animation: zw-done 10s ease-in-out infinite;
+}
+
+@keyframes zw-done {
+  0%,
+  60% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  66%,
+  92% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.zw-send {
+  position: absolute;
+  inset-inline-end: 1rem;
+  bottom: 1rem;
+  display: flex;
+  height: 2rem;
+  width: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.6rem;
+  background: var(--primary);
+  color: var(--primary-fg);
+}
+
+/* ══════════════════ إيقاف الحركة ══════════════════ */
+
+/*
+  الحركة المستمرة بتسبّب دوخة لناس فعلًا. لما الجهاز يطلب تقليلها،
+  بنوقّف الدورة ونثبّت **النتيجة النهائية** — الزائر يشوف الميزة
+  بدل شاشة فاضية.
+*/
+@media (prefers-reduced-motion: reduce) {
+  .zw-mock,
+  .zw-mock * {
+    animation: none !important;
+    transition: none !important;
+  }
+  .zw-scene__stage {
+    opacity: 0;
+  }
+  .zw-stage--done {
+    opacity: 1;
+  }
+  .zw-select__value,
+  .zw-chat__msg--bot,
+  .zw-action,
+  .zw-action__done {
+    opacity: 1;
+  }
+  .zw-menu,
+  .zw-action__buttons,
+  .zw-typed__caret {
+    display: none;
+  }
+  .zw-progress__fill {
+    width: 100%;
+  }
+  .zw-typed__text {
+    max-width: 100%;
+  }
+}
