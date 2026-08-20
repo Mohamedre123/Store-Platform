@@ -100,7 +100,11 @@ export async function sendAbandonedCartReminders(limit = 50): Promise<ReminderRe
         recoveryToken: cart.recoveryToken,
       })
 
-      const sent = await sendEmail({ to: cart.customerEmail!, ...mail })
+      const sent = await sendEmail({
+        to: cart.customerEmail!,
+        ...mail,
+        log: { storeId: cart.storeId, event: 'abandoned_cart', orderId: cart.id },
+      })
 
       /**
        * بنسجّل المحاولة سواء نجحت أو فشلت.

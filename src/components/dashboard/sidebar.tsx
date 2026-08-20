@@ -119,6 +119,7 @@ export const NAV: NavSection[] = [
       { href: '/dashboard/shipping', label: 'الشحن' },
       { href: '/dashboard/payments', label: 'الدفع' },
       { href: '/dashboard/settings/domain', label: 'النطاق' },
+      { href: '/dashboard/messages', label: 'سجل الرسايل' },
       { href: '/dashboard/plugins', label: 'الإضافات' },
       { href: '/dashboard/developers', label: 'المطوّرون' },
     ],

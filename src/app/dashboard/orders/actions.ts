@@ -258,7 +258,16 @@ export async function updateOrderStatusAction(orderId: string, status: OrderStat
           trackUrl: `${storeUrl(store.slug)}/order/${order.orderNumber}?t=${encodeURIComponent(order.recoveryToken ?? '')}`,
         },
       )
-      await sendEmail({ to: order.customerEmail!, ...mail })
+      await sendEmail({
+        to: order.customerEmail!,
+        ...mail,
+        log: {
+          storeId: store.id,
+          event: `order_${status}`,
+          orderId: order.id,
+          customerId: order.customerId ?? undefined,
+        },
+      })
     })().catch((e) => console.error('فشل إرسال بريد حالة الطلب:', e))
   }
 

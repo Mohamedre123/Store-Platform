@@ -144,6 +144,7 @@ async function runAction(action: Action, ctx: AutomationContext) {
       if (!body.trim()) return
 
       await sendEmail({
+        log: { storeId: ctx.storeId, event: 'automation', orderId: ctx.orderId },
         to: ctx.customerEmail,
         subject,
         html: simpleEmail(ctx.storeName, theme.custom.identity.primary, body),
@@ -191,6 +192,7 @@ async function runAction(action: Action, ctx: AutomationContext) {
       if (ctx.customerEmail && isEmailConfigured() && cfg.email !== false) {
         const theme = await getStoreTheme(ctx.storeId)
         await sendEmail({
+          log: { storeId: ctx.storeId, event: 'automation', orderId: ctx.orderId },
           to: ctx.customerEmail,
           subject: `كود خصم ${percent / 100}٪ من ${ctx.storeName}`,
           html: simpleEmail(

@@ -509,6 +509,7 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
    */
   void sendOrderEmails({
     store,
+    orderId: result.orderId!,
     orderNumber: result.orderNumber,
     token,
     lines,
@@ -561,6 +562,7 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
 /** يجمع بيانات الطلب ويبعت رسالتين: تأكيد للعميل وإشعار للتاجر */
 async function sendOrderEmails(ctx: {
   store: Awaited<ReturnType<typeof getStore>>
+  orderId: string
   orderNumber: number
   token: string
   lines: Array<{ name: string; quantity: number; total: number }>
@@ -568,7 +570,7 @@ async function sendOrderEmails(ctx: {
   input: { email?: string; name?: string; city?: string; area?: string; street?: string; building?: string }
   phone: string
 }) {
-  const { store, orderNumber, token, lines, totals, input, phone } = ctx
+  const { store, orderId, orderNumber, token, lines, totals, input, phone } = ctx
   if (!store || !isEmailConfigured()) return
 
   const theme = await getStoreTheme(store.id)
@@ -596,13 +598,21 @@ async function sendOrderEmails(ctx: {
 
   if (input.email) {
     const mail = orderConfirmationEmail(brandInfo, order)
-    await sendEmail({ to: input.email, ...mail })
+    await sendEmail({
+      to: input.email,
+      ...mail,
+      log: { storeId: store.id, event: 'order_confirmation', orderId },
+    })
   }
 
   // إشعار التاجر — على بريد المتجر لو موجود
   if (store.email) {
     const mail = newOrderNotificationEmail(brandInfo, order, `${dashboardUrl()}/orders`)
-    await sendEmail({ to: store.email, ...mail })
+    await sendEmail({
+      to: store.email,
+      ...mail,
+      log: { storeId: store.id, event: 'merchant_new_order', orderId },
+    })
   }
 }
 
