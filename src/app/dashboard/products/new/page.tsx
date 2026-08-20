@@ -19,7 +19,7 @@ export default async function NewProductPage() {
   return (
     <div className="flex flex-col gap-8">
       <PageHeader title="منتج جديد" description="املأ البيانات وارفع الصور، وهيظهر في متجرك." />
-      <ProductForm categories={cats} currency={store.currency} />
+      <ProductForm categories={cats} currency={store.currency} storeName={store.name} />
     </div>
   )
 }

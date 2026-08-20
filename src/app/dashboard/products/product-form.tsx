@@ -6,12 +6,17 @@ import { Save } from 'lucide-react'
 import { saveProductAction, type FormState } from './actions'
 import { Alert, Button, Card, Field, Input, Textarea } from '@/components/ui'
 import { ImageUpload } from '@/components/ui/image-upload'
-import { fromMinorUnits } from '@/lib/utils'
+import { formatMoney, fromMinorUnits, toMinorUnits } from '@/lib/utils'
+import { SeoFields } from '@/components/dashboard/seo-fields'
 
 type Product = {
   id: string
   name: string
   description: string | null
+  brand: string | null
+  seoTitle: string | null
+  seoDescription: string | null
+  slug: string
   categoryId: string | null
   price: number
   compareAtPrice: number | null
@@ -30,15 +35,27 @@ export function ProductForm({
   product,
   categories,
   currency,
+  storeName,
 }: {
   product?: Product
   categories: Array<{ id: string; name: string }>
   currency: string
+  storeName: string
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(saveProductAction, null)
   const [images, setImages] = useState<string[]>(product?.images ?? [])
   const [trackInventory, setTrackInventory] = useState(product?.trackInventory ?? true)
   const [status, setStatus] = useState(product?.status === 'active' ? 'active' : 'draft')
+
+  /*
+    الاسم والقسم والماركة في حالة لأن معاينة السيو بتتحرّك معاهم وهو
+    بيكتب. من غير كده التاجر بيكتب «{Name}» ويشوف «{Name}» — ومعاينة
+    ما بتوريش النتيجة مالهاش لازمة.
+  */
+  const [name, setName] = useState(product?.name ?? '')
+  const [brand, setBrand] = useState(product?.brand ?? '')
+  const [categoryId, setCategoryId] = useState(product?.categoryId ?? '')
+  const [sku, setSku] = useState(product?.sku ?? '')
 
   const [price, setPrice] = useState(asAmount(product?.price))
   const [cost, setCost] = useState(asAmount(product?.costPrice))
@@ -70,7 +87,8 @@ export function ProductForm({
                 id="name"
                 name="name"
                 required
-                defaultValue={product?.name}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 placeholder="تيشيرت قطن رجالي"
               />
             </Field>
@@ -177,6 +195,23 @@ export function ProductForm({
               </div>
             )}
           </Card>
+
+          <Card className="p-5">
+            <SeoFields
+              defaultTitle={product?.seoTitle}
+              defaultSlug={product?.slug}
+              defaultDescription={product?.seoDescription}
+              context={{
+                name: name || 'اسم المنتج',
+                category: categories.find((c) => c.id === categoryId)?.name ?? null,
+                brand: brand || null,
+                sku: sku || null,
+                // نفس تنسيق المتجر — المعاينة اللي بتعرض شكلًا تاني بتكدب
+                price: price ? formatMoney(toMinorUnits(price), currency) : null,
+                store: storeName,
+              }}
+            />
+          </Card>
         </div>
 
         {/* العمود الجانبي */}
@@ -212,7 +247,8 @@ export function ProductForm({
               <select
                 id="categoryId"
                 name="categoryId"
-                defaultValue={product?.categoryId ?? ''}
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
                 className="h-11 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-sm transition-colors focus:border-[var(--primary)] focus:outline-none"
               >
                 <option value="">بدون قسم</option>
@@ -223,6 +259,16 @@ export function ProductForm({
                 ))}
               </select>
             </Field>
+            <Field label="الماركة" htmlFor="brand" hint="بتستخدم في عنوان صفحة المنتج">
+              <Input
+                id="brand"
+                name="brand"
+                value={brand}
+                onChange={(e) => setBrand(e.target.value)}
+                placeholder="اختياري"
+              />
+            </Field>
+
             {categories.length === 0 && (
               <p className="text-xs text-[var(--fg-subtle)]">
                 لسه مافيش أقسام.{' '}
@@ -237,7 +283,14 @@ export function ProductForm({
             <h2 className="font-semibold">المخزون</h2>
 
             <Field label="كود المنتج (SKU)" htmlFor="sku" hint="اختياري — للتنظيم الداخلي">
-              <Input id="sku" name="sku" defaultValue={product?.sku ?? ''} dir="ltr" className="text-start" />
+              <Input
+                id="sku"
+                name="sku"
+                value={sku}
+                onChange={(e) => setSku(e.target.value)}
+                dir="ltr"
+                className="text-start"
+              />
             </Field>
 
             <label className="flex items-start gap-2.5">

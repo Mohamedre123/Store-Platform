@@ -10,6 +10,7 @@ import { getDashboardContext } from '@/lib/store-context'
 import { recordAudit } from '@/lib/audit'
 import { deleteImage } from '@/lib/storage'
 import { suggestStoreSlug, toMinorUnits } from '@/lib/utils'
+import { renderSeoSlug } from '@/lib/seo-template'
 
 export type FormState = { error?: string; fieldErrors?: Record<string, string> } | null
 
@@ -111,6 +112,10 @@ const productSchema = z.object({
   compareAtPrice: z.string().optional(),
   costPrice: z.string().optional(),
   sku: z.string().trim().optional(),
+  brand: z.string().trim().max(60).optional(),
+  seoTitle: z.string().trim().max(200).optional(),
+  seoSlug: z.string().trim().max(200).optional(),
+  seoDescription: z.string().trim().max(400).optional(),
   stock: z.string().optional(),
   trackInventory: z.boolean(),
   status: z.enum(['draft', 'active']),
@@ -129,6 +134,10 @@ export async function saveProductAction(_prev: FormState, formData: FormData): P
     compareAtPrice: formData.get('compareAtPrice') || undefined,
     costPrice: formData.get('costPrice') || undefined,
     sku: formData.get('sku') || undefined,
+    brand: formData.get('brand') || undefined,
+    seoTitle: formData.get('seoTitle') || undefined,
+    seoSlug: formData.get('seoSlug') || undefined,
+    seoDescription: formData.get('seoDescription') || undefined,
     stock: formData.get('stock') || undefined,
     trackInventory: formData.get('trackInventory') !== 'false',
     status: formData.get('status') === 'active' ? 'active' : 'draft',
@@ -148,6 +157,26 @@ export async function saveProductAction(_prev: FormState, formData: FormData): P
 
   const stock = d.stock ? Math.max(0, Math.trunc(Number(d.stock) || 0)) : 0
 
+  // اسم القسم — عشان {Category} في قالب الرابط يتحلّ
+  let categoryName: string | null = null
+  if (d.categoryId) {
+    const [c] = await db
+      .select({ name: categories.name })
+      .from(categories)
+      .where(and(eq(categories.id, d.categoryId), eq(categories.storeId, store.id)))
+      .limit(1)
+    categoryName = c?.name ?? null
+  }
+
+  const seoCtx = {
+    name: d.name,
+    category: categoryName,
+    brand: d.brand ?? null,
+    sku: d.sku ?? null,
+    price: `${d.price} ${store.currency}`,
+    store: store.name,
+  }
+
   const values = {
     name: d.name,
     description: d.description,
@@ -156,6 +185,14 @@ export async function saveProductAction(_prev: FormState, formData: FormData): P
     compareAtPrice: compareAt && compareAt > 0 ? compareAt : null,
     costPrice: d.costPrice ? toMinorUnits(d.costPrice) : null,
     sku: d.sku,
+    brand: d.brand || null,
+    /*
+      العنوان والوصف بيتحفظوا **كقوالب** زي ما التاجر كتبهم — بيتحلّوا
+      وقت العرض. لو حفظنا النص المحلول، تغيير اسم المنتج بعد شهر كان
+      هيسيب العنوان على الاسم القديم من غير ما حد ياخد باله.
+    */
+    seoTitle: d.seoTitle || null,
+    seoDescription: d.seoDescription || null,
     stock,
     trackInventory: d.trackInventory,
     status: d.status,
@@ -165,16 +202,26 @@ export async function saveProductAction(_prev: FormState, formData: FormData): P
 
   if (id) {
     const [before] = await db
-      .select({ stock: products.stock })
+      .select({ stock: products.stock, slug: products.slug })
       .from(products)
       .where(and(eq(products.id, id), eq(products.storeId, store.id)))
       .limit(1)
 
     if (!before) return { error: 'المنتج مش موجود' }
 
+    /*
+      الرابط بيتغيّر بس لو التاجر كتبه بنفسه بالفعل.
+      تغييره تلقائيًا مع كل تعديل اسم كان هيكسر كل لينك اتبعت على
+      واتساب أو اتفهرس في جوجل — والتاجر ما يعرفش غير من شكوى عميل.
+    */
+    const slugUpdate =
+      d.seoSlug && d.seoSlug !== before.slug
+        ? { slug: await uniqueSlug(store.id, renderSeoSlug(d.seoSlug, seoCtx), 'products', id) }
+        : {}
+
     await db
       .update(products)
-      .set(values)
+      .set({ ...values, ...slugUpdate })
       .where(and(eq(products.id, id), eq(products.storeId, store.id)))
 
     // أي تعديل يدوي على الكمية يتسجّل — عشان سؤال «المخزون راح فين؟» يبقى له إجابة
@@ -193,7 +240,11 @@ export async function saveProductAction(_prev: FormState, formData: FormData): P
       .values({
         ...values,
         storeId: store.id,
-        slug: await uniqueSlug(store.id, suggestStoreSlug(d.name), 'products'),
+        slug: await uniqueSlug(
+          store.id,
+          d.seoSlug ? renderSeoSlug(d.seoSlug, seoCtx) : suggestStoreSlug(d.name),
+          'products',
+        ),
       })
       .returning({ id: products.id })
 

@@ -98,6 +98,18 @@ export const products = pgTable(
     showStockCounter: boolean('show_stock_counter').notNull().default(false),
     showLiveViewers: boolean('show_live_viewers').notNull().default(false),
 
+    /*
+      الماركة — متغيّر في قوالب السيو ({Brand}).
+      من غير العمود ده، الشيبس اللي في المحرّر يبقى زرارًا بيحط
+      متغيّرًا ما يتحلّش أبدًا.
+    */
+    brand: text('brand'),
+
+    /*
+      قوالب السيو بتتخزّن كقوالب لا كنص محلول: التاجر بيكتب
+      «{Name} من {Brand}» مرة، ولو غيّر اسم المنتج بعد شهر العنوان
+      بيتغيّر معاه. لو حفظنا النص المحلول، كان هيفضل على الاسم القديم.
+    */
     seoTitle: text('seo_title'),
     seoDescription: text('seo_description'),
 

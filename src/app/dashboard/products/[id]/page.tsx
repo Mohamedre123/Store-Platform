@@ -35,6 +35,10 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
           id: product.id,
           name: product.name,
           description: product.description,
+          brand: product.brand,
+          seoTitle: product.seoTitle,
+          seoDescription: product.seoDescription,
+          slug: product.slug,
           categoryId: product.categoryId,
           price: product.price,
           compareAtPrice: product.compareAtPrice,
@@ -47,6 +51,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
         }}
         categories={cats}
         currency={store.currency}
+        storeName={store.name}
       />
     </div>
   )

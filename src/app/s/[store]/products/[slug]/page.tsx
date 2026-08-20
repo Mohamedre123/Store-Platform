@@ -13,7 +13,9 @@ import {
 } from '@/lib/storefront'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
-import { productOptionValues, productOptions, productVariants, wishlists } from '@/db/schema'
+import { categories as categoriesTable, productOptionValues, productOptions, productVariants, wishlists } from '@/db/schema'
+import { renderSeo } from '@/lib/seo-template'
+import { formatMoney } from '@/lib/utils'
 import { cookies } from 'next/headers'
 import { getCurrentCustomer } from '@/lib/customer-auth'
 import {
@@ -28,7 +30,6 @@ import { WishlistButton } from '@/components/storefront/wishlist-button'
 import { VariantPicker } from '@/components/storefront/variant-picker'
 import { StickyBuyBar } from '@/components/storefront/sticky-buy-bar'
 import { AddToCart } from '@/components/storefront/add-to-cart'
-import { formatMoney } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,12 +45,53 @@ export async function generateMetadata({
   const product = await getProductBySlug(store.id, slug)
   if (!product) return { title: 'المنتج مش موجود' }
 
+  /*
+    قوالب السيو بتتحلّ هنا لا وقت الحفظ: التاجر كتب «{Name} من
+    {Brand}» مرة، ولو غيّر الاسم بكرة العنوان بيتغيّر معاه لوحده.
+  */
+  let categoryName: string | null = null
+  if (product.categoryId) {
+    const [c] = await db
+      .select({ name: categoriesTable.name })
+      .from(categoriesTable)
+      .where(eq(categoriesTable.id, product.categoryId))
+      .limit(1)
+    categoryName = c?.name ?? null
+  }
+
+  const ctx = {
+    name: product.name,
+    category: categoryName,
+    brand: product.brand,
+    sku: product.sku,
+    price: formatMoney(product.price, store.currency),
+    store: store.name,
+  }
+
+  const title = renderSeo(product.seoTitle, ctx) || product.name
+  const description =
+    renderSeo(product.seoDescription, ctx) || product.shortDescription || undefined
+
+  /*
+    التاجر لما يكتب عنوان سيو، ده يبقى العنوان بالظبط.
+    قالب التخطيط بيلحق «| اسم المتجر» بكل عنوان، فلو التاجر كتب
+    {Store} في قالبه كان الاسم بيتكرر مرتين في نتيجة البحث. العنوان
+    المكتوب بإيد التاجر أولى من قالب عام.
+  */
+  const hasCustomTitle = Boolean(renderSeo(product.seoTitle, ctx))
+
   return {
-    title: product.seoTitle ?? product.name,
-    description: product.seoDescription ?? product.shortDescription ?? undefined,
+    title: hasCustomTitle ? { absolute: title } : title,
+    description,
     openGraph: {
-      title: product.name,
+      title,
+      description,
       images: product.images.length ? [{ url: product.images[0] }] : undefined,
+    },
+    twitter: {
+      card: 'summary_large_image' as const,
+      title,
+      description,
     },
   }
 }
