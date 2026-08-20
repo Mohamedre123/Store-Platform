@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { Check, Save } from 'lucide-react'
 import { saveRegionalAction, saveStoreInfoAction } from './actions'
 import { Alert, Card } from '@/components/ui'
+import { ImproveButton } from '@/components/dashboard/improve-button'
 import { Choice, Toggle } from '@/components/dashboard/controls'
 import { ImageUpload } from '@/components/ui/image-upload'
 import { COUNTRIES } from '@/lib/regions'
@@ -97,7 +98,16 @@ export function SettingsForm({
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-sm font-medium">وصف قصير</span>
+          <span className="flex flex-wrap items-center justify-between gap-2 text-sm font-medium">
+            وصف قصير
+            <ImproveButton
+              task="store_tagline"
+              value={tagline}
+              onApply={setTagline}
+              fields={{ 'اسم المتجر': name }}
+              compact
+            />
+          </span>
           <input
             value={tagline}
             onChange={(e) => setTagline(e.target.value)}

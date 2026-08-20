@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { Check, FileText, Plus, Trash2, X } from 'lucide-react'
 import { deletePostAction, savePostAction, togglePostAction, type PostInput } from './actions'
 import { Alert, Button, Card } from '@/components/ui'
+import { ImproveButton } from '@/components/dashboard/improve-button'
 import { Toggle } from '@/components/dashboard/controls'
 import { ImageUpload } from '@/components/ui/image-upload'
 import { formatDate } from '@/lib/utils'
@@ -75,7 +76,16 @@ export function BlogManager({ posts }: { posts: PostRow[] }) {
           {error && <Alert tone="danger">{error}</Alert>}
 
           <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">العنوان</span>
+            <span className="flex flex-wrap items-center justify-between gap-2 text-sm font-medium">
+              العنوان
+              <ImproveButton
+                task="blog_title"
+                value={form.title}
+                onApply={(v) => setForm({ ...form, title: v })}
+                fields={{ 'عنوان المقال': form.title }}
+                compact
+              />
+            </span>
             <input
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
@@ -95,7 +105,16 @@ export function BlogManager({ posts }: { posts: PostRow[] }) {
           </label>
 
           <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">مقدّمة قصيرة</span>
+            <span className="flex flex-wrap items-center justify-between gap-2 text-sm font-medium">
+              مقدّمة قصيرة
+              <ImproveButton
+                task="blog_excerpt"
+                value={form.excerpt}
+                onApply={(v) => setForm({ ...form, excerpt: v })}
+                fields={{ 'عنوان المقال': form.title }}
+                compact
+              />
+            </span>
             <textarea
               value={form.excerpt}
               onChange={(e) => setForm({ ...form, excerpt: e.target.value })}
@@ -106,7 +125,16 @@ export function BlogManager({ posts }: { posts: PostRow[] }) {
           </label>
 
           <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">المحتوى</span>
+            <span className="flex flex-wrap items-center justify-between gap-2 text-sm font-medium">
+              المحتوى
+              <ImproveButton
+                task="blog_content"
+                value={form.content}
+                onApply={(v) => setForm({ ...form, content: v })}
+                fields={{ 'عنوان المقال': form.title }}
+                compact
+              />
+            </span>
             <textarea
               value={form.content}
               onChange={(e) => setForm({ ...form, content: e.target.value })}

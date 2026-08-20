@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { Check, FileText, Save } from 'lucide-react'
 import { savePageAction } from './actions'
 import { Alert, Card } from '@/components/ui'
+import { ImproveButton } from '@/components/dashboard/improve-button'
 import { Toggle } from '@/components/dashboard/controls'
 
 export type PageRow = {
@@ -104,7 +105,16 @@ function PageCard({ page }: { page: PageRow }) {
       </label>
 
       <label className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium">المحتوى</span>
+        <span className="flex flex-wrap items-center justify-between gap-2 text-sm font-medium">
+          المحتوى
+          <ImproveButton
+            task="page_content"
+            value={content}
+            onApply={setContent}
+            fields={{ 'نوع الصفحة': page.title }}
+            compact
+          />
+        </span>
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}

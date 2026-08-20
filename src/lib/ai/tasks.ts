@@ -22,6 +22,11 @@ export type TaskKey =
   | 'banner_text'
   | 'landing_headline'
   | 'email_text'
+  | 'blog_title'
+  | 'blog_excerpt'
+  | 'blog_content'
+  | 'page_content'
+  | 'store_tagline'
   | 'free'
 
 type TaskDef = {
@@ -87,6 +92,41 @@ export const TASKS: Record<TaskKey, TaskDef> = {
     instruction:
       'اكتب عنوانًا رئيسيًا لصفحة هبوط منتج. لازم يقول الفايدة الأساسية في جملة واحدة، مش يوصف المنتج.',
     maxChars: 80,
+    variants: 3,
+  },
+  blog_title: {
+    label: 'عنوان المقال',
+    instruction:
+      'اكتب عنوان مقال لمدوّنة متجر. لازم يوعد بفايدة محدّدة يقراها العميل، ويكون فيه الكلمة اللي بيدوّر بيها. من غير كلام رنّان مالوش مضمون.',
+    maxChars: 70,
+    variants: 3,
+  },
+  blog_excerpt: {
+    label: 'مقدّمة المقال',
+    instruction:
+      'اكتب سطرين بيلخّصوا المقال ويخلّوا القارئ يكمّل. بيظهروا في قايمة المقالات وفي نتيجة البحث.',
+    maxChars: 160,
+    variants: 3,
+  },
+  blog_content: {
+    label: 'محتوى المقال',
+    instruction:
+      'اكتب مقال مدوّنة لمتجر. ابدأ بالمشكلة اللي القارئ فيها، وبعدين الحل بخطوات عملية. عناوين فرعية وفقرات قصيرة. من غير حشو ولا مقدمات طويلة.',
+    maxChars: 2500,
+    variants: 1,
+  },
+  page_content: {
+    label: 'محتوى الصفحة',
+    instruction:
+      'اكتب محتوى صفحة سياسات لمتجر (شحن، استبدال، خصوصية…). واضح ومباشر وبالعربي البسيط. ما تخترعش مدد ولا شروط — سيب أماكن للتاجر يملاها لو مش معروفة.',
+    maxChars: 1500,
+    variants: 1,
+  },
+  store_tagline: {
+    label: 'جملة المتجر التعريفية',
+    instruction:
+      'اكتب جملة واحدة بتوصف المتجر — بتظهر تحت اسمه. تقول بيبيع إيه ولمين في أقل كلام ممكن.',
+    maxChars: 70,
     variants: 3,
   },
   email_text: {
@@ -170,6 +210,24 @@ export function buildPrompt(input: {
  */
 export function parseSuggestions(raw: string, task: TaskKey): string[] {
   const def = TASKS[task]
+
+  /*
+    النصوص الطويلة (مقال، صفحة سياسات) بترجع **كنص واحد** لا كسطور.
+    التفكيك بالسطر كان بيقطّع المقال لعشرين «اقتراح» كل واحد سطر —
+    والتاجر يلاقي فقرات مبعترة مكان مقاله.
+
+    العلامة: اقتراح واحد مطلوب + مساحة طويلة.
+  */
+  if (def.variants === 1 && def.maxChars > 500) {
+    const body = raw
+      .split('\n')
+      .filter((l, i) => !(i === 0 && /^(?:إليك|اليك|إليكم|دي|دول|هي|هذه|هنا)\s.*[:：]\s*$/.test(l.trim())))
+      .join('\n')
+      .trim()
+
+    if (!body) return []
+    return [body.length <= def.maxChars ? body : body.slice(0, def.maxChars).trim()]
+  }
 
   const out = raw
     .split('\n')

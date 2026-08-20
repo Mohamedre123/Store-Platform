@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { Layers, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { deleteCategoryAction, saveCategoryAction, type FormState } from '../actions'
 import { Alert, Button, Card, Field, Input, Textarea } from '@/components/ui'
+import { ImproveButton } from '@/components/dashboard/improve-button'
 import { ImageUpload } from '@/components/ui/image-upload'
 
 type Category = {
@@ -125,6 +126,8 @@ function CategoryForm({ category, onClose }: { category: Category | null; onClos
   const [state, formAction, pending] = useActionState<FormState, FormData>(saveCategoryAction, null)
   const [image, setImage] = useState<string[]>(category?.image ? [category.image] : [])
   const [isActive, setIsActive] = useState(category?.isActive ?? true)
+  const [name, setName] = useState(category?.name ?? '')
+  const [description, setDescription] = useState(category?.description ?? '')
 
   return (
     <Card className="p-5">
@@ -148,12 +151,38 @@ function CategoryForm({ category, onClose }: { category: Category | null; onClos
         {state?.error && <Alert>{state.error}</Alert>}
 
         <Field label="اسم القسم" required htmlFor="name" error={state?.fieldErrors?.name}>
-          <Input id="name" name="name" required defaultValue={category?.name} placeholder="تيشيرتات" />
+          <Input
+            id="name"
+            name="name"
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="تيشيرتات"
+          />
         </Field>
 
-        <Field label="الوصف" htmlFor="description" hint="اختياري — يظهر أعلى صفحة القسم">
-          <Textarea id="description" name="description" rows={2} defaultValue={category?.description ?? ''} />
-        </Field>
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <label htmlFor="description" className="text-sm font-medium">
+              الوصف
+            </label>
+            <ImproveButton
+              task="category_description"
+              value={description}
+              onApply={setDescription}
+              fields={{ 'اسم القسم': name }}
+              compact
+            />
+          </div>
+          <Textarea
+            id="description"
+            name="description"
+            rows={2}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+          <p className="text-xs text-[var(--fg-muted)]">اختياري — يظهر أعلى صفحة القسم</p>
+        </div>
 
         <ImageUpload
           label="صورة القسم"

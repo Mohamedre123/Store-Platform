@@ -10,6 +10,7 @@ import {
   type BannerInput,
 } from './actions'
 import { Alert, Button, Card } from '@/components/ui'
+import { ImproveButton } from '@/components/dashboard/improve-button'
 import { Choice, Toggle } from '@/components/dashboard/controls'
 import { ImageUpload } from '@/components/ui/image-upload'
 import { ImageSpecHint } from '../section-editor'
@@ -107,7 +108,15 @@ export function BannersManager({ banners }: { banners: BannerRow[] }) {
           />
 
           <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">العنوان</span>
+            <span className="flex flex-wrap items-center justify-between gap-2 text-sm font-medium">
+              العنوان
+              <ImproveButton
+                task="banner_text"
+                value={form.title}
+                onApply={(v) => setForm({ ...form, title: v })}
+                compact
+              />
+            </span>
             <input
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
@@ -117,7 +126,16 @@ export function BannersManager({ banners }: { banners: BannerRow[] }) {
           </label>
 
           <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">سطر توضيحي</span>
+            <span className="flex flex-wrap items-center justify-between gap-2 text-sm font-medium">
+              سطر توضيحي
+              <ImproveButton
+                task="banner_text"
+                value={form.subtitle}
+                onApply={(v) => setForm({ ...form, subtitle: v })}
+                fields={{ 'العنوان': form.title }}
+                compact
+              />
+            </span>
             <input
               value={form.subtitle}
               onChange={(e) => setForm({ ...form, subtitle: e.target.value })}
@@ -125,7 +143,7 @@ export function BannersManager({ banners }: { banners: BannerRow[] }) {
             />
           </label>
 
-          <ImageSpecHint specKey="promo" />
+          <ImageSpecHint specKey="promoBanner" />
           <ImageUpload
             label="صورة الكمبيوتر"
             value={form.imageDesktop ? [form.imageDesktop] : []}

@@ -311,7 +311,17 @@ export type ImageSpec = {
   note: string
 }
 
-export const IMAGE_SPECS: Record<string, ImageSpec> = {
+/**
+ * مواصفات الصور.
+ *
+ * من غير `Record<string, ...>` عن قصد: الأنواع المعمّمة بتخلّي
+ * `keyof typeof IMAGE_SPECS` مجرد `string`، فأي خطأ مطبعي في اسم
+ * المفتاح بيعدّي من الفحص ويقع في المتصفح. وده اللي حصل فعلًا —
+ * صفحة البانرات كانت بتطلب «promo» بدل «promoBanner» وبتقع كلها.
+ *
+ * `satisfies` بيتحقّق من الشكل ويحتفظ بالمفاتيح الحرفية.
+ */
+export const IMAGE_SPECS = {
   heroDesktop: {
     key: 'heroDesktop',
     label: 'بانر الكمبيوتر',
@@ -361,4 +371,4 @@ export const IMAGE_SPECS: Record<string, ImageSpec> = {
     height: 64,
     note: 'تظهر في تبويب المتصفح. خلّيها العلامة وحدها من غير كلام.',
   },
-}
+} satisfies Record<string, ImageSpec>
