@@ -5,6 +5,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { apiKeys, webhooks } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { recordAudit } from '@/lib/audit'
 import { createRawKey } from '@/lib/api-auth'
 import { generateToken } from '@/lib/crypto'
 
@@ -43,12 +44,20 @@ export async function createApiKeyAction(input: {
 }
 
 export async function revokeApiKeyAction(id: string): Promise<DevState> {
-  const { store } = await getDashboardContext()
+  const { store, user } = await getDashboardContext()
 
   await db
     .update(apiKeys)
     .set({ revokedAt: new Date() })
     .where(and(eq(apiKeys.id, id), eq(apiKeys.storeId, store.id)))
+
+  await recordAudit({
+    storeId: store.id,
+    userId: user.id,
+    action: 'apikey.revoke',
+    resource: 'api_key',
+    resourceId: id,
+  })
 
   revalidatePath('/dashboard/developers')
   return { ok: true }

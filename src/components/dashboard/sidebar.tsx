@@ -120,6 +120,7 @@ export const NAV: NavSection[] = [
       { href: '/dashboard/payments', label: 'الدفع' },
       { href: '/dashboard/settings/domain', label: 'النطاق' },
       { href: '/dashboard/messages', label: 'سجل الرسايل' },
+      { href: '/dashboard/settings/activity', label: 'سجل النشاط' },
       { href: '/dashboard/plugins', label: 'الإضافات' },
       { href: '/dashboard/developers', label: 'المطوّرون' },
     ],

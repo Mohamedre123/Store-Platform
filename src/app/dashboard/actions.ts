@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { stores } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { recordAudit } from '@/lib/audit'
 
 /**
  * نشر المتجر أو إيقافه.
@@ -14,12 +15,20 @@ import { getDashboardContext } from '@/lib/store-context'
  * ينشر بضغطة. الإيقاف بيرجّعه مخفي لو حب يعدّل بهدوء.
  */
 export async function togglePublishAction(publish: boolean) {
-  const { store } = await getDashboardContext()
+  const { store, user } = await getDashboardContext()
 
   await db
     .update(stores)
     .set({ isPublished: publish })
     .where(eq(stores.id, store.id))
+
+  await recordAudit({
+    storeId: store.id,
+    userId: user.id,
+    action: publish ? 'store.publish' : 'store.unpublish',
+    resource: 'store',
+    resourceId: store.id,
+  })
 
   revalidatePath('/dashboard')
   revalidatePath('/dashboard/settings')

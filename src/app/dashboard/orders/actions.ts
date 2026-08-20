@@ -5,6 +5,7 @@ import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { customers, inventoryMovements, orderEvents, orderItems, orders, products, productVariants } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { recordAudit } from '@/lib/audit'
 import { getStoreTheme } from '@/lib/storefront'
 import { isEmailConfigured, sendEmail } from '@/lib/email'
 import { isEmailableStatus, orderStatusEmail } from '@/lib/store-emails'
@@ -142,6 +143,16 @@ export async function updateOrderStatusAction(orderId: string, status: OrderStat
    * ما يشتري حاجة. والدالة نفسها بتتأكد إن الطلب ما اتمنحش قبل كده،
    * فتغيير الحالة ذهابًا وإيابًا ما يمنحش مرتين.
    */
+  await recordAudit({
+    storeId: store.id,
+    userId: user.id,
+    action: status === 'cancelled' ? 'order.cancel' : 'order.status_change',
+    resource: 'order',
+    resourceId: order.id,
+    before: { status: order.status },
+    after: { status },
+  })
+
   if (status === 'delivered' && order.customerId) {
     try {
       await awardOrderPoints({

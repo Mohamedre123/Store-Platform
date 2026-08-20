@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { db } from '@/db'
 import { categories, products, inventoryMovements } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { recordAudit } from '@/lib/audit'
 import { deleteImage } from '@/lib/storage'
 import { suggestStoreSlug, toMinorUnits } from '@/lib/utils'
 
@@ -212,10 +213,10 @@ export async function saveProductAction(_prev: FormState, formData: FormData): P
 }
 
 export async function deleteProductAction(id: string) {
-  const { store } = await getDashboardContext()
+  const { store, user } = await getDashboardContext()
 
   const [product] = await db
-    .select({ images: products.images })
+    .select({ images: products.images, name: products.name, price: products.price })
     .from(products)
     .where(and(eq(products.id, id), eq(products.storeId, store.id)))
     .limit(1)
@@ -223,6 +224,15 @@ export async function deleteProductAction(id: string) {
   if (!product) return
 
   await db.delete(products).where(and(eq(products.id, id), eq(products.storeId, store.id)))
+
+  await recordAudit({
+    storeId: store.id,
+    userId: user.id,
+    action: 'product.delete',
+    resource: 'product',
+    resourceId: id,
+    before: { name: product.name, price: product.price },
+  })
 
   // تنظيف الصور بعد حذف الصف — لو فشل الحذف ما نبقاش مسحنا صور منتج موجود
   for (const url of product.images) {

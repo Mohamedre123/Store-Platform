@@ -5,6 +5,7 @@ import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { inventoryMovements, orderEvents, orderItems, products, returnItems, returns } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { recordAudit } from '@/lib/audit'
 import type { ReturnStatus } from '@/lib/returns-meta'
 
 export type ReturnState = { ok?: boolean; error?: string } | null
@@ -80,6 +81,16 @@ export async function updateReturnStatusAction(id: string, status: ReturnStatus)
       actorType: 'merchant',
       actorId: user.id,
     })
+  })
+
+  await recordAudit({
+    storeId: store.id,
+    userId: user.id,
+    action: 'return.status_change',
+    resource: 'return',
+    resourceId: id,
+    before: { status: ret.status },
+    after: { status },
   })
 
   revalidatePath('/dashboard/returns')

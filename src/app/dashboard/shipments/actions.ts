@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { db } from '@/db'
 import { orderEvents, orders, shipments } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { recordAudit } from '@/lib/audit'
 import { shipmentStatusMeta, type ShipmentStatus } from '@/lib/carriers'
 import { updateOrderStatusAction } from '@/app/dashboard/orders/actions'
 
@@ -145,7 +146,7 @@ export async function updateShipmentStatusAction(
  * من غير السجل ده بيبقى بيصدّق كشف الشركة على عماه.
  */
 export async function settleCodAction(id: string, collected: boolean): Promise<ShipmentState> {
-  const { store } = await getDashboardContext()
+  const { store, user } = await getDashboardContext()
 
   const updated = await db
     .update(shipments)
@@ -155,12 +156,21 @@ export async function settleCodAction(id: string, collected: boolean): Promise<S
 
   if (!updated.length) return { error: 'الشحنة مش موجودة' }
 
+  await recordAudit({
+    storeId: store.id,
+    userId: user.id,
+    action: 'shipment.cod_settled',
+    resource: 'shipment',
+    resourceId: id,
+    after: { collected },
+  })
+
   revalidatePath('/dashboard/shipments')
   return { ok: true }
 }
 
 export async function deleteShipmentAction(id: string): Promise<ShipmentState> {
-  const { store } = await getDashboardContext()
+  const { store, user } = await getDashboardContext()
 
   const deleted = await db
     .delete(shipments)
@@ -168,6 +178,14 @@ export async function deleteShipmentAction(id: string): Promise<ShipmentState> {
     .returning({ id: shipments.id })
 
   if (!deleted.length) return { error: 'الشحنة مش موجودة' }
+
+  await recordAudit({
+    storeId: store.id,
+    userId: user.id,
+    action: 'shipment.delete',
+    resource: 'shipment',
+    resourceId: id,
+  })
 
   revalidatePath('/dashboard/shipments')
   return { ok: true }
