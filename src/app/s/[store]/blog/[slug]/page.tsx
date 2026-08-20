@@ -6,7 +6,7 @@ import { ChevronLeft } from 'lucide-react'
 import { db } from '@/db'
 import { blogPosts } from '@/db/schema'
 import { getStore } from '@/lib/storefront'
-import { formatDate } from '@/lib/utils'
+import { formatDate, decodeSlug } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,7 +26,8 @@ export async function generateMetadata({
 }: {
   params: Promise<{ store: string; slug: string }>
 }) {
-  const { store: identifier, slug } = await params
+  const { store: identifier, slug: rawSlug } = await params
+  const slug = decodeSlug(rawSlug)
   const store = await getStore(identifier)
   if (!store) return { title: 'مقال' }
   const post = await loadPost(store.id, slug)
@@ -41,7 +42,8 @@ export default async function BlogPostPage({
 }: {
   params: Promise<{ store: string; slug: string }>
 }) {
-  const { store: identifier, slug } = await params
+  const { store: identifier, slug: rawSlug } = await params
+  const slug = decodeSlug(rawSlug)
   const store = await getStore(identifier)
   if (!store) notFound()
 

@@ -154,3 +154,22 @@ export function formatDateTime(date: Date | string, locale = 'ar-EG') {
     return d.toISOString()
   }
 }
+
+/**
+ * فكّ ترميز جزء من الرابط جاي من `params`.
+ *
+ * **مش زيادة احتياط — ده بيصلّح ٤٠٤ حقيقي.** في مسار ديناميكي واحد،
+ * `generateMetadata` بتاخد القيمة مفكوكة والصفحة بتاخدها مشفّرة
+ * (‎%D8%B9…‎). أي رابط فيه حروف عربية بيقع، والتاجر اللي سمّى صفحة
+ * هبوطه بالعربي بيلاقي رابطه ميّت.
+ *
+ * `decodeURIComponent` على نص مفكوك أصلًا ما بيغيّرش حاجة، وبيرمي بس
+ * لو النص فيه ‎%‎ مش جزء من ترميز صحيح — وساعتها بنرجّعه زي ما هو.
+ */
+export function decodeSlug(value: string): string {
+  try {
+    return decodeURIComponent(value)
+  } catch {
+    return value
+  }
+}

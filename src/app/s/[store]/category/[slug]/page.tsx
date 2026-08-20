@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { decodeSlug } from '@/lib/utils'
 import { headers } from 'next/headers'
 import { Package } from 'lucide-react'
 import {
@@ -16,7 +17,8 @@ import { ListingControls } from '@/components/storefront/listing-controls'
 export const dynamic = 'force-dynamic'
 
 export async function generateMetadata({ params }: { params: Promise<{ store: string; slug: string }> }) {
-  const { store: identifier, slug } = await params
+  const { store: identifier, slug: rawSlug } = await params
+  const slug = decodeSlug(rawSlug)
   const store = await getStore(identifier)
   if (!store) return { title: 'القسم' }
   const category = await getCategoryBySlug(store.id, slug)
@@ -30,7 +32,8 @@ export default async function CategoryPage({
   params: Promise<{ store: string; slug: string }>
   searchParams: Promise<{ sort?: string }>
 }) {
-  const { store: identifier, slug } = await params
+  const { store: identifier, slug: rawSlug } = await params
+  const slug = decodeSlug(rawSlug)
   const store = await getStore(identifier)
   if (!store) notFound()
 

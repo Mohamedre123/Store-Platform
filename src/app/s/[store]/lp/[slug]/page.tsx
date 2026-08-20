@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { decodeSlug } from '@/lib/utils'
 import { headers } from 'next/headers'
 import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/db'
@@ -33,7 +34,8 @@ export async function generateMetadata({
 }: {
   params: Promise<{ store: string; slug: string }>
 }) {
-  const { store: identifier, slug } = await params
+  const { store: identifier, slug: rawSlug } = await params
+  const slug = decodeSlug(rawSlug)
   const store = await getStore(identifier)
   if (!store) return { title: 'الصفحة' }
   const funnel = await loadFunnel(store.id, slug, false)
@@ -48,7 +50,8 @@ export default async function LandingPage({
 }: {
   params: Promise<{ store: string; slug: string }>
 }) {
-  const { store: identifier, slug } = await params
+  const { store: identifier, slug: rawSlug } = await params
+  const slug = decodeSlug(rawSlug)
   const store = await getStore(identifier)
   if (!store) notFound()
 

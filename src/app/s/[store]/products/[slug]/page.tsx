@@ -15,7 +15,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { categories as categoriesTable, productOptionValues, productOptions, productVariants, wishlists } from '@/db/schema'
 import { renderSeo } from '@/lib/seo-template'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, decodeSlug } from '@/lib/utils'
 import { cookies } from 'next/headers'
 import { getCurrentCustomer } from '@/lib/customer-auth'
 import {
@@ -38,7 +38,8 @@ export async function generateMetadata({
 }: {
   params: Promise<{ store: string; slug: string }>
 }) {
-  const { store: identifier, slug } = await params
+  const { store: identifier, slug: rawSlug } = await params
+  const slug = decodeSlug(rawSlug)
   const store = await getStore(identifier)
   if (!store) return { title: 'المنتج' }
 
@@ -101,7 +102,8 @@ export default async function ProductPage({
 }: {
   params: Promise<{ store: string; slug: string }>
 }) {
-  const { store: identifier, slug } = await params
+  const { store: identifier, slug: rawSlug } = await params
+  const slug = decodeSlug(rawSlug)
   const store = await getStore(identifier)
   if (!store) notFound()
 

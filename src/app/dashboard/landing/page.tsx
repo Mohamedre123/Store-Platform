@@ -6,11 +6,15 @@ import { storeUrl } from '@/lib/domain'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { LandingList, type FunnelRow } from './landing-list'
+import { LandingAi } from './landing-ai'
+import { getClaudeConfig, isClaudeReady } from '@/lib/ai/settings'
 
 export const metadata = { title: 'صفحات الهبوط' }
 
 export default async function LandingPage() {
   const { store } = await getDashboardContext()
+
+  const claude = await getClaudeConfig(store.id)
 
   const [rows, productRows] = await Promise.all([
     db
@@ -42,7 +46,15 @@ export default async function LandingPage() {
         description="صفحة لكل حملة — بهويتها الخاصة المستقلة عن شكل متجرك."
       />
 
+      {/*
+        المولّد فوق القايمة: التاجر اللي داخل يعمل صفحة جديدة ده أول
+        اللي بيشوفه، واللي جاي يعدّل القديم بيعدّي عليه لتحت.
+      */}
       <Reveal>
+        <LandingAi enabled={isClaudeReady(claude)} />
+      </Reveal>
+
+      <Reveal delay={60}>
         <LandingList
           funnels={rows as FunnelRow[]}
           products={productRows}
