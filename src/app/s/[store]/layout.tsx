@@ -14,6 +14,7 @@ import { MobileNav } from '@/components/storefront/mobile-nav'
 import { AnnouncementBar } from '@/components/storefront/announcement-bar'
 import { LuckyWheel } from '@/components/storefront/lucky-wheel'
 import { getWheelConfig } from '@/lib/wheel'
+import { getAiConfig, isReady } from '@/lib/ai/settings'
 import { StoreLinkProvider } from '@/components/storefront/store-link'
 import { FONT_STACKS, RADIUS_PX } from '@/lib/customization'
 
@@ -76,6 +77,14 @@ export default async function StorefrontLayout({
     listFooterPages(store.id),
     getWheelConfig(store.id),
   ])
+
+  /*
+    مساعد المتجر — مقفول في المعاينة زي عجلة الحظ.
+    كل رسالة بتستهلك من رصيد التاجر، وتجاربه وهو بيظبّط الشكل ما
+    يصحّش تتحسب عليه.
+  */
+  const ai = await getAiConfig(store.id)
+  const botReady = !isPreview && ai.botEnabled && isReady(ai)
 
   /**
    * لو الطلب جه من نطاق المتجر، الوكيل بيحط الترويسة دي وتبقى الروابط
@@ -188,7 +197,20 @@ export default async function StorefrontLayout({
 
           <StoreFooter footer={custom.footer} storeName={store.name} policyPages={policyPages} />
 
-          <StoreToolbar toolbar={custom.toolbar} />
+          <StoreToolbar
+            toolbar={custom.toolbar}
+            bot={
+              botReady
+                ? {
+                    storeIdentifier: identifier,
+                    greeting:
+                      ai.botGreeting?.trim() ||
+                      `أهلًا بيك في ${store.name}! اسألني عن أي منتج وأنا أساعدك.`,
+                    accent: custom.identity.primary,
+                  }
+                : null
+            }
+          />
 
           {custom.toolbar.mobileNavEnabled && (
             <MobileNav showAccount={custom.header.showAccount} showCart={custom.header.showCart} />

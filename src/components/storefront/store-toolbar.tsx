@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowUp, MessageCircle } from 'lucide-react'
 import type { ToolbarSettings } from '@/lib/customization'
+import { StoreBot } from './store-bot'
 import { normalizePhone } from '@/lib/utils'
 
 /**
@@ -11,7 +12,14 @@ import { normalizePhone } from '@/lib/utils'
  * زر واتساب بيفتح محادثة مباشرة برقم التاجر ورسالة جاهزة — من أقوى
  * أدوات البيع في السوق المصري. زر الرجوع لأعلى بيظهر بعد التمرير بس.
  */
-export function StoreToolbar({ toolbar }: { toolbar: ToolbarSettings }) {
+export function StoreToolbar({
+  toolbar,
+  bot,
+}: {
+  toolbar: ToolbarSettings
+  /** مساعد المتجر — بيتحط فوق الواتساب لو مفعّل */
+  bot?: { storeIdentifier: string; greeting: string; accent: string } | null
+}) {
   const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
@@ -34,7 +42,7 @@ export function StoreToolbar({ toolbar }: { toolbar: ToolbarSettings }) {
     <div
       data-sf="whatsapp-float"
       className={`fixed bottom-4 z-40 flex flex-col gap-2 ${side}`}
-      style={{ display: toolbar.whatsappEnabled || toolbar.backToTop ? undefined : 'none' }}
+      style={{ display: toolbar.whatsappEnabled || toolbar.backToTop || bot ? undefined : 'none' }}
     >
       {toolbar.backToTop && (
         <button
@@ -46,6 +54,15 @@ export function StoreToolbar({ toolbar }: { toolbar: ToolbarSettings }) {
         >
           <ArrowUp className="h-5 w-5" aria-hidden="true" />
         </button>
+      )}
+
+      {bot && (
+        <StoreBot
+          storeIdentifier={bot.storeIdentifier}
+          greeting={bot.greeting}
+          accent={bot.accent}
+          whatsappHref={waHref}
+        />
       )}
 
       {waHref && (

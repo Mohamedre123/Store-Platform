@@ -1,19 +1,32 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { BarChart3, Check, HelpCircle, Target } from 'lucide-react'
+import { BarChart3, Check, HelpCircle, Sparkles, Target } from 'lucide-react'
 import { savePluginAction } from './actions'
 import { PLUGINS, type PluginDef } from '@/lib/plugins'
 import { Alert, Card } from '@/components/ui'
+import { GeminiCard, type GeminiSaved } from './gemini-card'
 
 export type PluginRow = { slug: string; enabled: boolean; config: Record<string, unknown> }
 
 const GROUPS = [
+  {
+    key: 'ai' as const,
+    title: 'الذكاء الاصطناعي',
+    icon: Sparkles,
+    hint: 'بمفتاحك إنت — كل نداء بيتحسب على حسابك في جوجل مش علينا.',
+  },
   { key: 'pixels' as const, title: 'بكسلات الإعلانات', icon: Target, hint: 'بتقيس نتايج إعلاناتك وتحسّن استهدافها. الصق المعرّف بس — من غير أي كود.' },
   { key: 'analytics' as const, title: 'التحليلات', icon: BarChart3, hint: 'تقارير تفصيلية عن سلوك الزوّار في متجرك.' },
 ]
 
-export function PluginsManager({ installed }: { installed: PluginRow[] }) {
+export function PluginsManager({
+  installed,
+  gemini,
+}: {
+  installed: PluginRow[]
+  gemini: GeminiSaved
+}) {
   const bySlug = new Map(installed.map((p) => [p.slug, p]))
 
   return (
@@ -32,9 +45,13 @@ export function PluginsManager({ installed }: { installed: PluginRow[] }) {
               </div>
             </div>
             <div className="flex flex-col gap-3">
-              {items.map((def) => (
-                <PluginCard key={def.slug} def={def} saved={bySlug.get(def.slug)} />
-              ))}
+              {items.map((def) =>
+                def.custom === 'gemini' ? (
+                  <GeminiCard key={def.slug} def={def} saved={gemini} />
+                ) : (
+                  <PluginCard key={def.slug} def={def} saved={bySlug.get(def.slug)} />
+                ),
+              )}
             </div>
           </section>
         )

@@ -8,6 +8,7 @@ import { Alert, Button, Card, Field, Input, Textarea } from '@/components/ui'
 import { ImageUpload } from '@/components/ui/image-upload'
 import { formatMoney, fromMinorUnits, toMinorUnits } from '@/lib/utils'
 import { SeoFields } from '@/components/dashboard/seo-fields'
+import { ImproveButton } from '@/components/dashboard/improve-button'
 
 type Product = {
   id: string
@@ -53,6 +54,7 @@ export function ProductForm({
     ما بتوريش النتيجة مالهاش لازمة.
   */
   const [name, setName] = useState(product?.name ?? '')
+  const [description, setDescription] = useState(product?.description ?? '')
   const [brand, setBrand] = useState(product?.brand ?? '')
   const [categoryId, setCategoryId] = useState(product?.categoryId ?? '')
   const [sku, setSku] = useState(product?.sku ?? '')
@@ -82,7 +84,24 @@ export function ProductForm({
         {/* العمود الأساسي */}
         <div className="flex flex-col gap-6">
           <Card className="flex flex-col gap-5 p-5">
-            <Field label="اسم المنتج" required htmlFor="name" error={state?.fieldErrors?.name}>
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label htmlFor="name" className="text-sm font-medium">
+                  اسم المنتج <span className="text-[var(--color-danger)]">*</span>
+                </label>
+                <ImproveButton
+                  task="product_name"
+                  value={name}
+                  onApply={setName}
+                  fields={{
+                    'القسم': categories.find((c) => c.id === categoryId)?.name,
+                    'الماركة': brand,
+                    'السعر': price ? `${price} ${currency}` : undefined,
+                    'الوصف': description.slice(0, 300),
+                  }}
+                  compact
+                />
+              </div>
               <Input
                 id="name"
                 name="name"
@@ -91,21 +110,41 @@ export function ProductForm({
                 onChange={(e) => setName(e.target.value)}
                 placeholder="تيشيرت قطن رجالي"
               />
-            </Field>
+              {state?.fieldErrors?.name && (
+                <p className="text-xs text-[var(--color-danger)]">{state.fieldErrors.name}</p>
+              )}
+            </div>
 
-            <Field
-              label="الوصف"
-              htmlFor="description"
-              hint="اكتب المقاسات والخامة وأي تفصيلة العميل هيسأل عنها."
-            >
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label htmlFor="description" className="text-sm font-medium">
+                  الوصف
+                </label>
+                <ImproveButton
+                  task="product_description"
+                  value={description}
+                  onApply={setDescription}
+                  fields={{
+                    'اسم المنتج': name,
+                    'القسم': categories.find((c) => c.id === categoryId)?.name,
+                    'الماركة': brand,
+                    'السعر': price ? `${price} ${currency}` : undefined,
+                  }}
+                  compact
+                />
+              </div>
               <Textarea
                 id="description"
                 name="description"
                 rows={5}
-                defaultValue={product?.description ?? ''}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
                 placeholder="قطن ١٠٠٪، متوفر بمقاسات M و L و XL…"
               />
-            </Field>
+              <p className="text-xs text-[var(--fg-muted)]">
+                اكتب المقاسات والخامة وأي تفصيلة العميل هيسأل عنها.
+              </p>
+            </div>
           </Card>
 
           <Card className="p-5">
@@ -198,6 +237,13 @@ export function ProductForm({
 
           <Card className="p-5">
             <SeoFields
+              improveFields={{
+                'اسم المنتج': name,
+                'القسم': categories.find((c) => c.id === categoryId)?.name,
+                'الماركة': brand,
+                'السعر': price ? `${price} ${currency}` : undefined,
+                'الوصف': description.slice(0, 300),
+              }}
               defaultTitle={product?.seoTitle}
               defaultSlug={product?.slug}
               defaultDescription={product?.seoDescription}

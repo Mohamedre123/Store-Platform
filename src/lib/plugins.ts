@@ -18,10 +18,19 @@ export type PluginDef = {
   name: string
   desc: string
   /** المجموعة في الواجهة */
-  group: 'pixels' | 'analytics'
+  group: 'pixels' | 'analytics' | 'ai'
   fields: PluginField[]
   /** إزاي التاجر يجيب المعرّف — بيوفّر عليه بحث */
   where?: string
+  /**
+   * إضافة ليها شاشة إعداد خاصة بدل حقول النص العادية.
+   *
+   * إضافات الذكاء الاصطناعي محتاجة تحقّق من المفتاح واختيار موديل
+   * ووصف للمتجر — ده مش «الصق معرّفًا واقفل».
+   */
+  custom?: 'gemini'
+  /** بيتحفظ في العمود المشفّر لا في config — مفتاح API مش معرّف عام */
+  secretFields?: string[]
 }
 
 export const PLUGINS: PluginDef[] = [
@@ -67,6 +76,20 @@ export const PLUGINS: PluginDef[] = [
       { key: 'conversionLabel', label: 'ليبل التحويل (اختياري)', placeholder: 'abcDEF123' },
     ],
     where: 'من Google Ads ← Tools ← Conversions.',
+  },
+
+  {
+    slug: 'gemini',
+    name: 'Gemini — مساعد الكتابة',
+    desc:
+      'زرار «تحسين» جنب كل حقل نص في لوحتك: اسم المنتج، وصفه، عنوان صفحته في جوجل. ' +
+      'وبوت للعملاء في متجرك بيرد على أسئلتهم عن منتجاتك وأسعارك.',
+    group: 'ai',
+    custom: 'gemini',
+    secretFields: ['apiKey'],
+    fields: [{ key: 'apiKey', label: 'مفتاح Gemini API', placeholder: 'مفتاحك من Google AI Studio' }],
+    where:
+      'من aistudio.google.com ← Get API key. المفتاح المجاني بيشتغل بحد يومي؛ لو متجرك عليه حركة، فعّل الفوترة عشان البوت ما يقفش.',
   },
 ]
 

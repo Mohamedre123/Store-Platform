@@ -4,6 +4,7 @@ import { storePlugins } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
+import { getAiConfig, GEMINI_SLUG } from '@/lib/ai/settings'
 import { PluginsManager, type PluginRow } from './plugins-manager'
 
 export const metadata = { title: 'الإضافات' }
@@ -20,15 +21,34 @@ export default async function PluginsPage() {
     .from(storePlugins)
     .where(eq(storePlugins.storeId, store.id))
 
+  /*
+    إعدادات Gemini بتتقرا لوحدها عشان المفتاح يفضل على الخادم.
+    بنمرّر hasKey بس — المفتاح نفسه ما بيرجعش للمتصفح أبدًا حتى
+    مقنّعًا، لأن أي حاجة توصل للمتصفح ممكن تتقرا.
+  */
+  const gemini = await getAiConfig(store.id, GEMINI_SLUG)
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="الإضافات"
-        description="اربط أدوات القياس بمتجرك. الصق المعرّف وفعّل — الكود بيتحط في متجرك تلقائيًا."
+        description="اربط أدوات القياس والذكاء الاصطناعي بمتجرك — من غير أي كود."
       />
 
       <Reveal>
-        <PluginsManager installed={rows as PluginRow[]} />
+        <PluginsManager
+          installed={rows as PluginRow[]}
+          gemini={{
+            enabled: gemini.enabled,
+            hasKey: Boolean(gemini.apiKey),
+            model: gemini.model,
+            brief: gemini.brief,
+            botEnabled: gemini.botEnabled,
+            botGreeting: gemini.botGreeting,
+            botDailyLimit: gemini.botDailyLimit,
+            botVisitorLimit: gemini.botVisitorLimit,
+          }}
+        />
       </Reveal>
     </div>
   )

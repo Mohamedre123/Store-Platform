@@ -2,6 +2,8 @@
 
 import { useRef, useState } from 'react'
 import { FileText, Link2, Search, Type } from 'lucide-react'
+import { ImproveButton } from './improve-button'
+import type { TaskKey } from '@/lib/ai/tasks'
 import {
   SEO_LIMITS,
   SEO_VARIABLES,
@@ -29,12 +31,15 @@ export function SeoFields({
   defaultSlug,
   defaultDescription,
   context,
+  improveFields,
 }: {
   defaultTitle?: string | null
   defaultSlug?: string | null
   defaultDescription?: string | null
   /** بيانات المنتج الحيّة — بتتغيّر وهو بيكتب فالمعاينة بتتحرّك معاه */
   context: SeoContext
+  /** بيانات بتتبعت للتحسين — من غيرها الاقتراح بيطلع كلام عام */
+  improveFields?: Record<string, string | null | undefined>
 }) {
   const [title, setTitle] = useState(defaultTitle ?? '')
   const [slug, setSlug] = useState(defaultSlug ?? '')
@@ -66,6 +71,8 @@ export function SeoFields({
         field="title"
         limit={SEO_LIMITS.title}
         rendered={renderSeo(title, context)}
+        improve="seo_title"
+        improveFields={improveFields}
       />
 
       <SeoField
@@ -92,6 +99,8 @@ export function SeoFields({
         limit={SEO_LIMITS.description}
         multiline
         rendered={previewDesc}
+        improve="seo_description"
+        improveFields={improveFields}
       />
 
       {/* معاينة نتيجة البحث */}
@@ -129,6 +138,8 @@ function SeoField({
   dir,
   hint,
   rendered,
+  improve,
+  improveFields,
 }: {
   icon: typeof Type
   label: string
@@ -142,6 +153,9 @@ function SeoField({
   dir?: 'ltr' | 'rtl'
   hint?: string
   rendered: string
+  /** نوع التحسين — لو مبعوت، بيظهر زرار جنب الليبل */
+  improve?: TaskKey
+  improveFields?: Record<string, string | null | undefined>
 }) {
   const ref = useRef<HTMLInputElement | HTMLTextAreaElement>(null)
   const [focused, setFocused] = useState(false)
@@ -177,10 +191,21 @@ function SeoField({
 
   return (
     <div className="flex flex-col gap-2">
-      <label htmlFor={name} className="flex items-center gap-1.5 text-sm font-medium">
-        <Icon className="h-3.5 w-3.5 text-[var(--fg-subtle)]" aria-hidden="true" />
-        {label}
-      </label>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <label htmlFor={name} className="flex items-center gap-1.5 text-sm font-medium">
+          <Icon className="h-3.5 w-3.5 text-[var(--fg-subtle)]" aria-hidden="true" />
+          {label}
+        </label>
+        {improve && (
+          <ImproveButton
+            task={improve}
+            value={value}
+            onApply={onChange}
+            fields={improveFields}
+            compact
+          />
+        )}
+      </div>
 
       {multiline ? (
         <textarea

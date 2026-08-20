@@ -2,7 +2,7 @@ import { pgTable, uuid, text, boolean, integer, jsonb, timestamp, index, uniqueI
 import { stores } from './tenancy'
 import { createdAt, updatedAt, money } from './_shared'
 
-export type Channel = 'sms' | 'whatsapp' | 'telegram' | 'email' | 'push'
+export type Channel = 'sms' | 'whatsapp' | 'telegram' | 'email' | 'push' | 'chat'
 
 /** أحداث الطلب التي يمكن أن تُطلق رسالة تلقائية */
 export type AutomationEvent =
