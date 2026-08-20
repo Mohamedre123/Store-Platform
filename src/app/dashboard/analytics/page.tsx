@@ -9,6 +9,8 @@ import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { Card } from '@/components/ui'
 import { RevenueChart } from './revenue-chart'
+import { Funnel } from './funnel'
+import { getFunnel } from '@/lib/analytics-events'
 
 export const metadata = { title: 'التحليلات' }
 
@@ -24,7 +26,7 @@ export default async function AnalyticsPage() {
   const { store } = await getDashboardContext()
   const sid = store.id
 
-  const [[kpi], daily, statusRows, topProducts] = await Promise.all([
+  const [[kpi], daily, statusRows, topProducts, funnel] = await Promise.all([
     // مؤشرات آخر ٣٠ يوم مقابل الـ٣٠ اللي قبلها — الاتنين في استعلام واحد
     db
       .select({
@@ -62,6 +64,8 @@ export default async function AnalyticsPage() {
       .where(and(eq(products.storeId, sid), gt(products.soldCount, 0)))
       .orderBy(desc(products.soldCount))
       .limit(6),
+
+    getFunnel(sid, 30),
   ])
 
   const revCur = Number(kpi?.revCur ?? 0)
@@ -93,6 +97,10 @@ export default async function AnalyticsPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="التحليلات" description="أداء متجرك في آخر ٣٠ يوم." />
+
+      <Reveal>
+        <Funnel data={funnel} />
+      </Reveal>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {kpis.map((k, i) => (

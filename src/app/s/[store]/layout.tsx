@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import { getStore, getStorePixels, getStoreTheme, listCartUpsell, listCategories, listFooterPages } from '@/lib/storefront'
 import { StorePixels } from '@/components/storefront/pixels'
+import { Tracker } from '@/components/storefront/tracker'
 import { CartProvider } from '@/components/storefront/cart'
 import { StoreHeader } from '@/components/storefront/chrome'
 import { PreviewBridge } from '@/components/storefront/preview-bridge'
@@ -125,7 +126,12 @@ export default async function StorefrontLayout({
 
   return (
     <StoreLinkProvider base={base}>
-      <CartProvider storeSlug={store.slug} mode={custom.cart.mode}>
+      <CartProvider
+        storeSlug={store.slug}
+        storeIdentifier={identifier}
+        mode={custom.cart.mode}
+        track={!isPreview}
+      >
       <div
         style={vars}
         data-zawya-store
@@ -135,6 +141,8 @@ export default async function StorefrontLayout({
         <div style={{ background: 'var(--sf-bg)', color: 'var(--sf-text)' }} className="flex min-h-full flex-1 flex-col">
           <PreviewBridge />
           <StorePixels pixels={pixels} preview={isPreview} />
+          {/* التاجر بيعاين متجره كتير — لو قِسنا زياراته، أرقامه تبقى كذب */}
+          {!isPreview && <Tracker storeIdentifier={identifier} />}
 
           {custom.preloader.enabled && (
             <StorePreloader

@@ -108,7 +108,7 @@ export default async function LandingPage({
 
   return (
     <StoreLinkProvider base={base}>
-      <CartProvider storeSlug={store.slug}>
+      <CartProvider storeSlug={store.slug} storeIdentifier={identifier}>
         <div style={vars} className="min-h-screen-safe">
           <div className="mx-auto px-4 sm:px-6" style={{ maxWidth: WIDTH_PX[tokens.width] }}>
             {blocks.length === 0 ? (

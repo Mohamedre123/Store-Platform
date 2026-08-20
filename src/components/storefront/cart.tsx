@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { send as trackEvent } from './tracker'
 
 /**
  * السلة.
@@ -47,11 +48,18 @@ const sameLine = (a: CartItem, productId: string, variantId?: string) =>
 
 export function CartProvider({
   storeSlug,
+  storeIdentifier,
   mode = 'drawer',
+  track = true,
   children,
 }: {
+  /** مفتاح تخزين السلة — لازم يفضل ثابت مهما اختلف طريق الوصول */
   storeSlug: string
+  /** المعرّف اللي الـAPI بيفهمه (سلَج أو نطاق) — للقياس */
+  storeIdentifier: string
   mode?: 'drawer' | 'page'
+  /** يتقفل في المعاينة — تجارب التاجر مش سلوك عملاء */
+  track?: boolean
   children: ReactNode
 }) {
   const [items, setItems] = useState<CartItem[]>([])
@@ -103,6 +111,9 @@ export function CartProvider({
           }
           return [...prev, { ...item, quantity }]
         })
+        // القُمع محتاج يعرف كام واحد ضاف فعلًا مقابل كام واحد شاف
+        if (track) trackEvent(storeIdentifier, 'add_to_cart', undefined, item.productId)
+
         // في وضع الصفحة مفيش درج يفتح — الزرار نفسه بيأكّد الإضافة،
         // ونقل العميل لصفحة السلة مع كل إضافة كان هيقطع تصفّحه
         if (mode === 'drawer') setOpen(true)
@@ -128,7 +139,7 @@ export function CartProvider({
         setItems([])
       },
     }
-  }, [items, isOpen, ready, mode])
+  }, [items, isOpen, ready, mode, track, storeIdentifier])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }
