@@ -6,6 +6,10 @@ import { regionsFor } from '@/lib/regions'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { ShippingForm } from './shipping-form'
+import { CarriersManager } from './carriers-manager'
+import { readCarrierProviders, hasActiveCarrier } from '@/lib/provider-store'
+import { CARRIER_PROVIDERS } from '@/lib/providers'
+import { platformOrigin } from '@/lib/domain'
 
 export const metadata = { title: 'الشحن' }
 
@@ -27,15 +31,35 @@ export default async function ShippingPage() {
 
   const rates = Object.fromEntries(rateRows.map((r) => [r.city, { price: r.price, enabled: r.enabled }]))
 
+  const [carriers, carrierActive] = await Promise.all([
+    readCarrierProviders(store.id, CARRIER_PROVIDERS),
+    hasActiveCarrier(store.id),
+  ])
+
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
         title="الشحن"
-        description="حدّد سعر التوصيل لكل محافظة، والحد اللي بعده الشحن يبقى مجاني."
+        description="اربط شركة شحن، أو حدّد أسعارك بنفسك لكل محافظة."
       />
 
+      {/*
+        الشركات فوق التسعير اليدوي: التاجر اللي عنده شركة بيربطها
+        وخلاص، واللي مالوش بينزل يحطّ أسعاره. الترتيب العكسي كان
+        بيخلّي اللي عنده شركة يملا ٢٧ محافظة على الفاضي.
+      */}
       <Reveal>
+        <CarriersManager
+          providers={carriers}
+          origin={platformOrigin()}
+          storeId={store.id}
+          currency={store.currency}
+        />
+      </Reveal>
+
+      <Reveal delay={60}>
         <ShippingForm
+          lockedByCarrier={carrierActive}
           country={store.country}
           currency={store.currency}
           regions={regionsFor(store.country)}

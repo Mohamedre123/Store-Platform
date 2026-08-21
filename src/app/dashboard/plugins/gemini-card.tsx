@@ -27,7 +27,21 @@ type Model = { id: string; label: string }
  * ما تظهرش غير بعد ما يتأكّد إنه شغّال. التاجر اللي بيملا ٦ حقول
  * وبعدين يكتشف إن المفتاح غلط بيسيب الصفحة.
  */
-export function GeminiCard({ def, saved }: { def: PluginDef; saved?: GeminiSaved }) {
+export function GeminiCard({
+  def,
+  saved,
+  embedded = false,
+}: {
+  def: PluginDef
+  saved?: GeminiSaved
+  /**
+   * جوّه نافذة تفاصيل التطبيق؟
+   *
+   * ساعتها الكارت بيتشال إطاره: الكارت جوّه كارت بيعمل حدّين
+   * متداخلين وحشّين، والمساحة على الموبايل ضيقة أصلًا.
+   */
+  embedded?: boolean
+}) {
   const [enabled, setEnabled] = useState(saved?.enabled ?? false)
   const [apiKey, setApiKey] = useState('')
   const [models, setModels] = useState<Model[]>([])
@@ -84,8 +98,10 @@ export function GeminiCard({ def, saved }: { def: PluginDef; saved?: GeminiSaved
       }
     })
 
+  const Wrapper = embedded ? ('div' as const) : Card
+
   return (
-    <Card className="flex flex-col gap-4 p-5">
+    <Wrapper className={embedded ? 'flex flex-col gap-4' : 'flex flex-col gap-4 p-5'}>
       <div className="flex items-start gap-3">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#8b5cf6] to-[#ec4899] text-white">
           <Sparkles className="h-5 w-5" aria-hidden="true" />
@@ -291,6 +307,6 @@ export function GeminiCard({ def, saved }: { def: PluginDef; saved?: GeminiSaved
           </button>
         </div>
       </div>
-    </Card>
+    </Wrapper>
   )
 }

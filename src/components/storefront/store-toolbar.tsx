@@ -71,8 +71,14 @@ export function StoreToolbar({
           target="_blank"
           rel="noopener noreferrer"
           aria-label="تواصل على واتساب"
-          className={`flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg transition-transform hover:scale-105 ${
-            toolbar.showOnMobile ? '' : 'hidden'
+          title="كلّمنا على واتساب"
+          /*
+            حلقة بيضا رفيعة حوالين الزرار عشان يفضل باين على أي خلفية
+            — الأخضر على صورة بانر خضرا بيختفي، والعميل اللي عنده
+            سؤال بيسيب المتجر بدل ما يسأل.
+          */
+          className={`flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg ring-2 ring-white/70 transition-transform hover:scale-105 active:scale-95 ${
+            toolbar.showOnMobile ? 'flex' : 'hidden'
           } ${toolbar.showOnDesktop ? 'md:flex' : 'md:hidden'}`}
           style={{ background: '#25D366' }}
         >

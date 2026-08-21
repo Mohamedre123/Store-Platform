@@ -1,9 +1,12 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Banknote, Check, Landmark, Lock, Wallet } from 'lucide-react'
+import { Banknote, Check, Landmark, Lock, Truck } from 'lucide-react'
 import { savePaymentMethodAction, type PaymentInput } from './actions'
 import { Alert, Card } from '@/components/ui'
+import { ProviderCard, type ProviderState } from '@/components/dashboard/provider-card'
+import { PAYMENT_PROVIDERS, webhookPath } from '@/lib/providers'
+import { savePaymentProviderAction } from './provider-actions'
 import { fromMinorUnits } from '@/lib/utils'
 
 export type PaymentRow = {
@@ -47,56 +50,97 @@ const METHODS: MethodDef[] = [
   },
 ]
 
-// بوابات محتاجة عقد ومفاتيح API — معروضة عشان التاجر يعرف إنها جاية
-const GATEWAYS = [
-  { name: 'باي موب (Paymob)', desc: 'فيزا/ماستر كارد ومحافظ' },
-  { name: 'فوري (Fawry)', desc: 'دفع بكود في أي فرع' },
-  { name: 'كاشير (Kashier)', desc: 'بطاقات ومحافظ' },
-  { name: 'تابي / تمارا', desc: 'قسّط على دفعات' },
-]
-
-export function PaymentsManager({ methods }: { methods: PaymentRow[] }) {
+export function PaymentsManager({
+  methods,
+  providers,
+  origin,
+  storeId,
+  codEnabled,
+}: {
+  methods: PaymentRow[]
+  /** حالة كل بوابة — من غير أي مفتاح */
+  providers: Record<string, ProviderState>
+  /** أصل المنصة — الويب هوك لازم يكون رابطًا مطلقًا عشان يشتغل عندهم */
+  origin: string
+  storeId: string
+  /**
+   * الدفع عند الاستلام مفتوح؟
+   *
+   * مفتاحه في إعدادات الشحن لا هنا: هو قرار شحن قبل ما يبقى قرار
+   * دفع — التاجر بيقفله لما شركة الشحن ما بتحصّلش، أو لما نسبة
+   * الرفض تعلى. مفتاحين لنفس الحاجة في صفحتين بيخلّي الحالة غامضة.
+   */
+  codEnabled: boolean
+}) {
   const byGateway = new Map(methods.map((m) => [m.gateway, m]))
 
   return (
-    <div className="flex flex-col gap-4">
-      {METHODS.map((def) => (
-        <MethodCard key={def.gateway} def={def} saved={byGateway.get(def.gateway)} />
-      ))}
-
-      <Card className="flex flex-col gap-3 p-5 opacity-95">
-        <div className="flex items-center gap-2">
-          <Lock className="h-4 w-4 text-[var(--fg-subtle)]" aria-hidden="true" />
-          <h2 className="font-semibold">بوابات الدفع الإلكتروني</h2>
+    <div className="flex flex-col gap-8">
+      {/*
+        الطرق المباشرة الأول: دي اللي شغّالة من غير أي طرف تالت،
+        والدفع عند الاستلام هو أغلب مبيعات المتجر المصري.
+      */}
+      <section className="flex flex-col gap-4">
+        <div>
+          <h2 className="font-semibold">طرق من غير وسيط</h2>
+          <p className="mt-1 text-sm text-[var(--fg-muted)]">
+            شغّالة على طول — من غير حساب ولا مفاتيح ولا عمولة لحد.
+          </p>
         </div>
-        <p className="text-sm text-[var(--fg-muted)]">
-          الدفع بالبطاقة والمحافظ عبر بوابة — محتاج حساب وعقد مع البوابة ومفاتيح API. جاهزين للربط
-          أول ما تبعت المفاتيح.
-        </p>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {GATEWAYS.map((g) => (
-            <div
-              key={g.name}
-              className="flex items-center gap-3 rounded-lg border border-[var(--border)] px-3 py-2.5"
-            >
-              <Wallet className="h-4 w-4 shrink-0 text-[var(--fg-subtle)]" aria-hidden="true" />
-              <div className="min-w-0 flex-1">
-                <span className="block text-sm font-medium">{g.name}</span>
-                <span className="block text-xs text-[var(--fg-subtle)]">{g.desc}</span>
-              </div>
-              <span className="shrink-0 rounded-md bg-[var(--surface-2)] px-2 py-1 text-xs text-[var(--fg-muted)]">
-                محتاج تكامل
-              </span>
-            </div>
+
+        <div className="grid gap-4 lg:grid-cols-2">
+          {METHODS.map((def) => (
+            <MethodCard
+              key={def.gateway}
+              def={def}
+              saved={byGateway.get(def.gateway)}
+              codEnabled={codEnabled}
+            />
           ))}
         </div>
-      </Card>
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <div className="flex items-start gap-2">
+          <Lock className="mt-1 h-4 w-4 shrink-0 text-[var(--fg-subtle)]" aria-hidden="true" />
+          <div>
+            <h2 className="font-semibold">بوابات الدفع الإلكتروني</h2>
+            <p className="mt-1 text-sm text-[var(--fg-muted)]">
+              افتح حسابك عند البوابة، هات مفاتيحك، والزقها هنا — وفلوس طلباتك بتنزل
+              حسابك إنت مباشرة. إحنا مش وسيط ومش بناخد عمولة.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {PAYMENT_PROVIDERS.map((def) => (
+            <ProviderCard
+              key={def.slug}
+              def={def}
+              state={providers[def.slug]}
+              webhookUrl={def.webhook ? origin + webhookPath('pay', def.slug, storeId) : null}
+              onSave={savePaymentProviderAction}
+              kindLabel="بوابة دفع"
+            />
+          ))}
+        </div>
+      </section>
     </div>
   )
 }
 
-function MethodCard({ def, saved }: { def: MethodDef; saved?: PaymentRow }) {
-  const [enabled, setEnabled] = useState(saved?.enabled ?? def.gateway === 'cod')
+function MethodCard({
+  def,
+  saved,
+  codEnabled,
+}: {
+  def: MethodDef
+  saved?: PaymentRow
+  codEnabled: boolean
+}) {
+  // الدفع عند الاستلام بيتفتح ويتقفل من إعدادات الشحن
+  const controlled = def.gateway === 'cod'
+  const [enabled, setEnabled] = useState(controlled ? codEnabled : (saved?.enabled ?? false))
   const [displayName, setDisplayName] = useState(saved?.displayName ?? def.defaultName)
   const [instructions, setInstructions] = useState(saved?.instructions ?? '')
   const [fee, setFee] = useState(saved?.fixedFee ? String(fromMinorUnits(saved.fixedFee)) : '')
@@ -108,7 +152,7 @@ function MethodCard({ def, saved }: { def: MethodDef; saved?: PaymentRow }) {
   function save(nextEnabled?: boolean) {
     const payload: PaymentInput = {
       gateway: def.gateway,
-      enabled: nextEnabled ?? enabled,
+      enabled: controlled ? codEnabled : (nextEnabled ?? enabled),
       displayName,
       instructions,
       fixedFee: def.hasFee ? fee : '',
@@ -130,29 +174,44 @@ function MethodCard({ def, saved }: { def: MethodDef; saved?: PaymentRow }) {
           <h2 className="font-semibold">{def.title}</h2>
           <p className="mt-0.5 text-sm text-[var(--fg-muted)]">{def.desc}</p>
         </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={enabled}
-          aria-label={enabled ? `إيقاف ${def.title}` : `تفعيل ${def.title}`}
-          disabled={pending}
-          onClick={() => {
-            setEnabled(!enabled)
-            save(!enabled)
-          }}
-          className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors ${
-            enabled ? 'bg-[var(--primary)]' : 'bg-[var(--border-strong)]'
-          }`}
-        >
-          <span
-            className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
-              enabled ? 'start-0.5' : 'start-[1.375rem]'
+        {controlled ? (
+          <a
+            href="/dashboard/shipping"
+            className={`mt-0.5 flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition-colors ${
+              enabled
+                ? 'bg-[var(--color-success-soft)] text-[var(--color-success)]'
+                : 'bg-[var(--surface-2)] text-[var(--fg-muted)]'
             }`}
-          />
-        </button>
+            title="بيتفتح ويتقفل من إعدادات الشحن"
+          >
+            <Truck className="h-3.5 w-3.5" aria-hidden="true" />
+            {enabled ? 'مفتوح' : 'مقفول'}
+          </a>
+        ) : (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={enabled}
+            aria-label={enabled ? `إيقاف ${def.title}` : `تفعيل ${def.title}`}
+            disabled={pending}
+            onClick={() => {
+              setEnabled(!enabled)
+              save(!enabled)
+            }}
+            className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors ${
+              enabled ? 'bg-[var(--primary)]' : 'bg-[var(--border-strong)]'
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
+                enabled ? 'start-0.5' : 'start-[1.375rem]'
+              }`}
+            />
+          </button>
+        )}
       </div>
 
-      {enabled && (
+      {(enabled || controlled) && (
         <div className="flex flex-col gap-4 border-t border-[var(--border)] pt-4">
           {msg && <Alert tone={msg.ok ? 'success' : 'danger'}>{msg.text}</Alert>}
 
@@ -164,6 +223,16 @@ function MethodCard({ def, saved }: { def: MethodDef; saved?: PaymentRow }) {
               className="h-11 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-sm focus:border-[var(--primary)] focus:outline-none"
             />
           </label>
+
+          {controlled && (
+            <p className="rounded-lg bg-[var(--surface-2)] px-3 py-2 text-xs leading-relaxed text-[var(--fg-muted)]">
+              فتح الدفع عند الاستلام وقفله من{' '}
+              <a href="/dashboard/shipping" className="font-medium text-[var(--primary)] hover:underline">
+                إعدادات الشحن
+              </a>
+              . هنا بتظبّط اسمه ورسومه بس.
+            </p>
+          )}
 
           {def.hasFee && (
             <label className="flex flex-col gap-1.5">

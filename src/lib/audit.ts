@@ -67,7 +67,8 @@ export function auditLabel(action: string): string {
 
 export async function recordAudit(input: {
   storeId: string
-  userId: string
+  /** null لما اللي عمل الإجراء نظام خارجي — بوابة دفع أو شركة شحن */
+  userId: string | null
   action: AuditAction
   /** نوع العنصر: product | order | coupon … */
   resource?: string
@@ -81,7 +82,7 @@ export async function recordAudit(input: {
 
     await db.insert(auditLog).values({
       storeId: input.storeId,
-      userId: input.userId,
+      userId: input.userId ?? null,
       action: input.action,
       resource: input.resource ?? null,
       resourceId: input.resourceId ?? null,

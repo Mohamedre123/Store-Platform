@@ -237,3 +237,44 @@ export const suppliers = pgTable(
   },
   (t) => [index('suppliers_store_idx').on(t.storeId)],
 )
+
+/**
+ * حساب التاجر عند شركة شحن.
+ *
+ * نفس شكل `paymentMethods` عن قصد: الاتنين «مزوّد خارجي بمفاتيح
+ * التاجر»، فالتعامل معاهم في اللوحة والتحقق منهم بيمشي بنفس المنطق.
+ *
+ * `credentials` مشفّرة زي كل الأسرار. `config` للإعدادات اللي مش
+ * سرّ (وضع تجريبي، مكان الاستلام) — دي بتتقرا في اللوحة.
+ */
+export const carrierAccounts = pgTable(
+  'carrier_accounts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    storeId: uuid('store_id').notNull().references(() => stores.id, { onDelete: 'cascade' }),
+    /** bosta | mylerz | jt | aramex | r2s | sprint | wavex */
+    carrier: text('carrier').notNull(),
+    enabled: boolean('enabled').notNull().default(false),
+    displayName: text('display_name'),
+    credentials: text('credentials'),
+    config: jsonb('config').$type<Record<string, unknown>>().notNull().default({}),
+    testMode: boolean('test_mode').notNull().default(true),
+    /**
+     * سعر ثابت بالوحدة الصغرى لما الشركة مش بترجّع تسعير.
+     * الشركات اللي بترجّع سعر بيغلب ده.
+     */
+    flatRate: money('flat_rate'),
+    /** الشحن مجاني فوق المبلغ ده — صفر يعني مفيش */
+    freeOver: money('free_over'),
+    /** آخر خطأ من الشركة — بيظهر للتاجر على الكارت */
+    lastError: text('last_error'),
+    lastSyncAt: timestamp('last_sync_at', { withTimezone: true }),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('carrier_accounts_unique').on(t.storeId, t.carrier),
+    index('carrier_accounts_store_idx').on(t.storeId, t.enabled),
+  ],
+)

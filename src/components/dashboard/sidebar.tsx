@@ -111,18 +111,25 @@ export const NAV: NavSection[] = [
       { href: '/dashboard/settings/pages', label: 'صفحات المتجر' },
     ],
   },
+  /*
+    الدفع والشحن والإضافات أقسام مستقلة لا بنود جوّه الإعدادات.
+
+    التلاتة دول التاجر بيدخلهم وهو بيجهّز متجره وكل ما يضيف مزوّد —
+    مش «إعداد بيتظبّط مرة». ودفنهم جوّه قائمة منسدلة كان بيخلّي
+    ربط بوابة الدفع يبان خطوة إدارية، وهي أهم خطوة في المتجر كله.
+  */
+  { href: '/dashboard/payments', label: 'الدفع', icon: CreditCard },
+  { href: '/dashboard/shipping', label: 'الشحن', icon: Truck },
+  { href: '/dashboard/plugins', label: 'الإضافات', icon: Plug },
   {
     href: '/dashboard/settings',
     label: 'الإعدادات',
     icon: Settings,
     children: [
       { href: '/dashboard/settings', label: 'بيانات المتجر' },
-      { href: '/dashboard/shipping', label: 'الشحن' },
-      { href: '/dashboard/payments', label: 'الدفع' },
       { href: '/dashboard/settings/domain', label: 'النطاق' },
       { href: '/dashboard/messages', label: 'سجل الرسايل' },
       { href: '/dashboard/settings/activity', label: 'سجل النشاط' },
-      { href: '/dashboard/plugins', label: 'الإضافات' },
       { href: '/dashboard/developers', label: 'المطوّرون' },
     ],
   },

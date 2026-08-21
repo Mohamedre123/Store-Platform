@@ -82,6 +82,28 @@ export function isReady(cfg: AiConfig): cfg is AiConfig & { apiKey: string; mode
   return cfg.enabled && Boolean(cfg.apiKey) && Boolean(cfg.model)
 }
 
+/**
+ * المساعد المنفّذ جاهز للاستخدام؟
+ *
+ * «مفعّل» لوحدها مش كفاية: التاجر ممكن يدوس المفتاح قبل ما يحط
+ * مفتاح Gemini. لو عرضنا أيقونة الشات ساعتها، بيفتحها ويكتب سؤالًا
+ * ويستنّى — والرد الوحيد اللي بييجي رسالة خطأ. الأيقونة لازم
+ * تظهر لما تبقى **شغّالة**.
+ *
+ * ولو Pro مالهاش مفتاح خاص، بتستعير مفتاح Gemini العادي — نفس
+ * المنطق اللي في المساعد نفسه بالظبط، عشان اللي بيظهر يبقى هو
+ * اللي بيشتغل.
+ */
+export async function isAssistantReady(storeId: string): Promise<boolean> {
+  const pro = await getAiConfig(storeId, GEMINI_PRO_SLUG)
+  if (!pro.enabled) return false
+
+  if (pro.apiKey && pro.model) return true
+
+  const base = await getAiConfig(storeId, GEMINI_SLUG)
+  return Boolean(base.apiKey && (pro.model ?? base.model))
+}
+
 export const CLAUDE_SLUG = 'claude'
 
 export type ClaudeConfig = {

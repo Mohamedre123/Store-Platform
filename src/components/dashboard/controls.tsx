@@ -40,17 +40,25 @@ export function Toggle({
   hint,
   checked,
   onChange,
+  srLabel,
 }: {
   label: string
   hint?: string
   checked: boolean
   onChange: (v: boolean) => void
+  /**
+   * اسم للقارئ الصوتي لما العنوان الظاهر يبقى فاضي.
+   *
+   * بيحصل لما الكارت نفسه فيه العنوان والشرح والمفتاح جنبه — من
+   * غيره المفتاح بيوصل لمستخدم القارئ الصوتي بلا اسم خالص.
+   */
+  srLabel?: string
 }) {
   const id = useId()
   return (
     <div className="flex items-start justify-between gap-4 py-1">
       <label htmlFor={id} className="flex-1 cursor-pointer">
-        <span className="block text-sm font-medium">{label}</span>
+        {label && <span className="block text-sm font-medium">{label}</span>}
         {hint && <span className="mt-0.5 block text-xs leading-relaxed text-[var(--fg-subtle)]">{hint}</span>}
       </label>
       <button
@@ -58,7 +66,7 @@ export function Toggle({
         type="button"
         role="switch"
         aria-checked={checked}
-        aria-label={label}
+        aria-label={srLabel || label}
         onClick={() => onChange(!checked)}
         className={cn(
           'relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors',

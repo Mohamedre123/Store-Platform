@@ -103,3 +103,14 @@ export function isValidSlug(slug: string): boolean {
   if (RESERVED_SLUGS.has(slug)) return false
   return /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(slug)
 }
+
+/**
+ * أصل المنصة — للروابط اللي بتتلزق عند طرف تالت.
+ *
+ * الويب هوك بيتلزق في لوحة بوابة الدفع أو شركة الشحن، فلازم يكون
+ * رابطًا كاملًا مطلقًا. الرابط النسبي بيشتغل عندنا وبيفشل عندهم،
+ * والتاجر ما يكتشفش غير لما أول طلب مايتحدّثش.
+ */
+export function platformOrigin(): string {
+  return `${protocol()}://${ROOT_DOMAIN}`
+}

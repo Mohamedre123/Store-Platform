@@ -1,10 +1,8 @@
 import { notFound } from 'next/navigation'
-import { and, eq } from 'drizzle-orm'
-import { db } from '@/db'
-import { shippingRates, shippingZones } from '@/db/schema'
 import { getStore } from '@/lib/storefront'
-import { getCheckoutSettings, getPaymentMethods } from '@/lib/checkout'
+import { getCheckoutSettings, getDisplayShipping, getPaymentMethods } from '@/lib/checkout'
 import { regionsFor } from '@/lib/regions'
+import { paymentProvider } from '@/lib/providers'
 import { CheckoutForm } from './checkout-form'
 import { EmptyCart } from './empty-cart'
 
@@ -16,25 +14,64 @@ export default async function CheckoutPage({ params }: { params: Promise<{ store
   const store = await getStore(identifier)
   if (!store) notFound()
 
-  const [settings, payments] = await Promise.all([
+  const [settings, payments, ship] = await Promise.all([
     getCheckoutSettings(store.id),
     getPaymentMethods(store.id),
+    getDisplayShipping(store.id, store.country),
   ])
 
-  const [zone] = await db
-    .select()
-    .from(shippingZones)
-    .where(and(eq(shippingZones.storeId, store.id), eq(shippingZones.country, store.country)))
-    .limit(1)
+  /**
+   * قايمة طرق الدفع اللي العميل بيشوفها.
+   *
+   * الدفع عند الاستلام بيتحكم فيه إعداد الشحن لا صفّه في طرق الدفع:
+   * مفتاحه هناك، ولو قريناه من هنا كان التاجر يقفله ويلاقيه ظاهر.
+   *
+   * والبوابات المربوطة بتتعرض بلونها واسمها الحقيقي — «Paymob» بحروف
+   * إنجليزي جنب زرار رمادي مش بيطمّن حد على بطاقته.
+   */
+  const codOn = ship.codEnabled
 
-  const rates = zone
-    ? await db
-        .select({ city: shippingRates.city, price: shippingRates.price })
-        .from(shippingRates)
-        .where(and(eq(shippingRates.zoneId, zone.id), eq(shippingRates.enabled, true)))
-    : []
+  const options = payments
+    .filter((p) => p.gateway !== 'cod')
+    .map((p) => {
+      const def = paymentProvider(p.gateway)
+      return {
+        gateway: p.gateway,
+        displayName: p.displayName ?? def?.name ?? p.gateway,
+        instructions: p.instructions,
+        brand: def?.brand ?? null,
+        color: def?.color ?? null,
+        online: Boolean(def),
+      }
+    })
 
-  const shippingByCity = Object.fromEntries(rates.map((r) => [r.city, r.price]))
+  if (codOn) {
+    const saved = payments.find((p) => p.gateway === 'cod')
+    options.unshift({
+      gateway: 'cod',
+      displayName: saved?.displayName ?? 'الدفع عند الاستلام',
+      instructions: saved?.instructions ?? 'تدفع كاش للمندوب لما الطلب يوصلك.',
+      brand: null,
+      color: null,
+      online: false,
+    })
+  }
+
+  /*
+    مفيش ولا طريقة؟ الدفع عند الاستلام بيرجع كخيار أخير.
+    شيك أوت من غير أي طريقة دفع زرار «أكّد الطلب» فيه ما بيعملش
+    حاجة — والعميل بيسيب السلة وهو فاكر إن الموقع باظ.
+  */
+  if (options.length === 0) {
+    options.push({
+      gateway: 'cod',
+      displayName: 'الدفع عند الاستلام',
+      instructions: null,
+      brand: null,
+      color: null,
+      online: false,
+    })
+  }
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
@@ -46,18 +83,11 @@ export default async function CheckoutPage({ params }: { params: Promise<{ store
           currency={store.currency}
           country={store.country}
           regions={regionsFor(store.country)}
-          shippingByCity={shippingByCity}
-          defaultShipping={zone?.defaultPrice ?? 0}
-          freeOver={zone?.freeShippingEnabled ? zone.freeOverAmount : null}
-          payments={
-            payments.length
-              ? payments.map((p) => ({
-                  gateway: p.gateway,
-                  displayName: p.displayName,
-                  instructions: p.instructions,
-                }))
-              : [{ gateway: 'cod', displayName: 'الدفع عند الاستلام', instructions: null }]
-          }
+          shippingByCity={ship.byCity}
+          defaultShipping={ship.defaultPrice}
+          freeOver={ship.freeOver}
+          carrierName={ship.carrierName}
+          payments={options}
           config={{
             fieldName: settings?.fieldName ?? 'required',
             fieldPhone: settings?.fieldPhone ?? 'required',

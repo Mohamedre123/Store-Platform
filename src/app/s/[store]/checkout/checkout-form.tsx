@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { Banknote, CheckCircle2, Loader2, Tag, Truck } from 'lucide-react'
+import { Banknote, CheckCircle2, Loader2, Lock, Tag, Truck } from 'lucide-react'
 import { useCart } from '@/components/storefront/cart'
 import { useStoreHref } from '@/components/storefront/store-link'
 import {
@@ -39,6 +39,11 @@ export type PaymentOption = {
   gateway: string
   displayName: string | null
   instructions: string | null
+  /** اسم الشركة زي ما هو — بيطمّن العميل إنه بيدفع لجهة معروفة */
+  brand: string | null
+  color: string | null
+  /** بوابة أونلاين (هيتحوّل لصفحة دفع) ولا تحصيل بره النظام؟ */
+  online: boolean
 }
 
 export function CheckoutForm({
@@ -51,6 +56,7 @@ export function CheckoutForm({
   shippingByCity,
   defaultShipping,
   freeOver,
+  carrierName,
 }: {
   storeIdentifier: string
   currency: string
@@ -61,6 +67,8 @@ export function CheckoutForm({
   shippingByCity: Record<string, number>
   defaultShipping: number
   freeOver: number | null
+  /** اسم شركة الشحن لما سعرها هو اللي بيحكم — بيطمّن العميل مين هيوصّله */
+  carrierName?: string | null
 }) {
   const { items, subtotal, clear } = useCart()
   const router = useRouter()
@@ -89,6 +97,7 @@ export function CheckoutForm({
     } catch {}
   }, [])
   const [gateway, setGateway] = useState(payments[0]?.gateway ?? 'cod')
+  const selectedOnline = payments.find((p) => p.gateway === gateway)?.online ?? false
   const [error, setError] = useState<string | null>(null)
 
   // الكوبون
@@ -243,7 +252,28 @@ export function CheckoutForm({
       try {
         localStorage.removeItem('zw_cart_note')
       } catch {}
-      router.push(href(`/order/${result.orderNumber}`) + `?t=${encodeURIComponent(result.token)}`)
+
+      /**
+       * التحويل لصفحة البوابة.
+       *
+       * `location.assign` لا `router.push`: الرابط برّه الموقع،
+       * وموجّه Next بيتعامل مع الروابط الداخلية بس — كان هيحاول
+       * يجيب صفحة من عندنا بالمسار ده ويقع في ٤٠٤.
+       */
+      if (result.redirectUrl) {
+        window.location.assign(result.redirectUrl)
+        return
+      }
+
+      const orderHref =
+        href(`/order/${result.orderNumber}`) + `?t=${encodeURIComponent(result.token)}`
+
+      /*
+        البوابة رفضت تفتح جلسة. الطلب اتسجّل خلاص، فبنودّي العميل
+        لصفحته ومعاه السبب وزرار «ادفع دلوقتي» — أحسن من رسالة خطأ
+        بتخلّيه يفتكر إن الطلب ضاع فيطلب تاني.
+      */
+      router.push(result.paymentError ? `${orderHref}&pay_error=1` : orderHref)
     })
   }
 
@@ -355,21 +385,53 @@ export function CheckoutForm({
               key={p.gateway}
               type="button"
               onClick={() => setGateway(p.gateway)}
-              className={`flex items-start gap-3 rounded-[var(--sf-radius)] border p-4 text-start transition-colors ${
+              aria-pressed={gateway === p.gateway}
+              className={`flex min-h-16 items-start gap-3 rounded-[var(--sf-radius)] border p-4 text-start transition-colors ${
                 gateway === p.gateway
                   ? 'border-[var(--sf-primary)] bg-[var(--sf-primary)]/6'
                   : 'border-[var(--sf-text)]/15'
               }`}
             >
-              <Banknote className="mt-0.5 h-5 w-5 shrink-0 text-[var(--sf-primary)]" aria-hidden="true" />
-              <span className="flex-1">
+              {/*
+                البوابة بلونها وأول حرفين من اسمها، والتحصيل النقدي
+                بأيقونة. العميل بيتعرّف على «باي موب» من اللون قبل ما
+                يقرا الاسم — والثقة دي هي اللي بتخلّيه يكمّل.
+              */}
+              {p.color ? (
+                <span
+                  className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold text-white"
+                  style={{ background: p.color }}
+                  aria-hidden="true"
+                >
+                  {(p.brand ?? p.displayName ?? '').slice(0, 2).toUpperCase()}
+                </span>
+              ) : (
+                <Banknote
+                  className="mt-1 h-5 w-5 shrink-0 text-[var(--sf-primary)]"
+                  aria-hidden="true"
+                />
+              )}
+
+              <span className="min-w-0 flex-1">
                 <span className="block font-medium">
                   {p.displayName ?? (p.gateway === 'cod' ? 'الدفع عند الاستلام' : p.gateway)}
                 </span>
-                {p.instructions && <span className="block text-sm opacity-65">{p.instructions}</span>}
+                {p.instructions && (
+                  <span className="mt-0.5 block text-sm leading-relaxed opacity-65">{p.instructions}</span>
+                )}
+                {p.online && (
+                  <span className="mt-1 inline-flex items-center gap-1 text-xs opacity-60">
+                    <Lock className="h-3 w-3" aria-hidden="true" />
+                    هتتحوّل لصفحة {p.brand ?? p.displayName} الآمنة
+                  </span>
+                )}
               </span>
+
               {gateway === p.gateway && (
-                <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--sf-primary)]" aria-hidden="true" />
+                <CheckCircle2
+                  className="mt-0.5 h-5 w-5 shrink-0 text-[var(--sf-primary)]"
+                  aria-hidden="true"
+                />
               )}
             </button>
           ))}
@@ -471,7 +533,8 @@ export function CheckoutForm({
             <div className="flex justify-between">
               <dt className="flex items-center gap-1.5 opacity-65">
                 <Truck className="h-3.5 w-3.5" aria-hidden="true" />
-                الشحن
+                {/* اسم الشركة لما تكون هي اللي بتوصّل — العميل بيعرف مين هيرنّله */}
+                {carrierName ? `الشحن · ${carrierName}` : 'الشحن'}
               </dt>
               <dd className="tabular">
                 {shipping === 0 ? <span className="text-green-600">مجاني</span> : formatMoney(shipping, currency)}
@@ -547,7 +610,20 @@ export function CheckoutForm({
             className="flex min-h-13 w-full items-center justify-center gap-2 rounded-[var(--sf-radius)] bg-[var(--sf-primary)] px-6 font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
           >
             {pending && <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />}
-            {pending ? 'جاري تأكيد الطلب…' : 'تأكيد الطلب'}
+            {/*
+              الزرار بيقول اللي هيحصل فعلًا.
+
+              «تأكيد الطلب» على بوابة أونلاين بيخلّي العميل يتفاجئ
+              بصفحة دفع ويفتكر إن حاجة غلط حصلت — والمفاجأة دي وقت
+              الدفع بتضيّع البيعة.
+            */}
+            {pending
+              ? selectedOnline
+                ? 'بنجهّز صفحة الدفع…'
+                : 'جاري تأكيد الطلب…'
+              : selectedOnline
+                ? `تأكيد والدفع · ${formatMoney(total, currency)}`
+                : 'تأكيد الطلب'}
           </button>
 
           <p className="text-center text-xs opacity-55">

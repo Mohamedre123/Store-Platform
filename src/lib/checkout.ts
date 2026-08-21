@@ -1,7 +1,7 @@
 import 'server-only'
 import { and, eq, inArray } from 'drizzle-orm'
 import { db } from '@/db'
-import { checkoutSettings, paymentMethods, products, productVariants, shippingRates, shippingZones, stores } from '@/db/schema'
+import { carrierAccounts, checkoutSettings, paymentMethods, products, productVariants, shippingRates, shippingZones, stores } from '@/db/schema'
 import { applyBps } from './utils'
 import { assignBucket, getRunningPriceExperiments, variantValue } from './experiments'
 
@@ -181,7 +181,29 @@ export async function priceCart(storeId: string, lines: CartLine[], visitorId?: 
 }
 
 /** سعر الشحن للمحافظة المختارة */
+/**
+ * سعر الشحن.
+ *
+ * **الشركة المربوطة بتغلب التسعير اليدوي.** لو التاجر ربط شركة،
+ * سعرها هو اللي بيتحسب — ولو سبنا اليدوي شغّالًا معاها، العميل ياخد
+ * سعرًا والتاجر يتحاسب بسعر تاني والفرق من جيبه في كل طلب.
+ *
+ * ولو الشركة مالهاش سعر مسجّل، بنرجع للتسعير اليدوي بدل ما نخلّي
+ * الشحن بصفر — الصفر هنا معناه التاجر بيشحن ببلاش من غير ما يقصد.
+ */
 export async function shippingFor(storeId: string, country: string, city: string | null) {
+  const [carrier] = await db
+    .select({
+      name: carrierAccounts.displayName,
+      carrier: carrierAccounts.carrier,
+      flatRate: carrierAccounts.flatRate,
+      freeOver: carrierAccounts.freeOver,
+    })
+    .from(carrierAccounts)
+    .where(and(eq(carrierAccounts.storeId, storeId), eq(carrierAccounts.enabled, true)))
+    .orderBy(carrierAccounts.sortOrder)
+    .limit(1)
+
   const [zone] = await db
     .select()
     .from(shippingZones)
@@ -189,7 +211,16 @@ export async function shippingFor(storeId: string, country: string, city: string
     .limit(1)
 
   if (!zone || !zone.enabled) {
-    return { price: 0, minDays: null as number | null, maxDays: null as number | null, zone: null, available: false }
+    return {
+      price: 0,
+      minDays: null as number | null,
+      maxDays: null as number | null,
+      zone: null,
+      available: false,
+      carrierName: null as string | null,
+      carrierSlug: null as string | null,
+      freeOver: 0,
+    }
   }
 
   let price = zone.defaultPrice
@@ -210,7 +241,34 @@ export async function shippingFor(storeId: string, country: string, city: string
     }
   }
 
-  return { price, minDays, maxDays, zone, available: true }
+  if (carrier && carrier.flatRate && carrier.flatRate > 0) {
+    price = carrier.flatRate
+  }
+
+  /*
+    حد الشحن المجاني: بتاع الشركة بيغلب بتاع المنطقة لما يكون
+    مكتوبًا. التاجر اللي اتفق مع الشركة على «مجاني فوق ألف» لازم
+    يشوف نفس الرقم في متجره — رقمين مختلفين معناهم إن حد هيدفع
+    الفرق، وهو التاجر.
+  */
+  const freeOver =
+    carrier && carrier.freeOver > 0
+      ? carrier.freeOver
+      : zone.freeShippingEnabled
+        ? zone.freeOverAmount
+        : 0
+
+  return {
+    price,
+    minDays,
+    maxDays,
+    zone,
+    available: true,
+    /** اسم الشركة — بيظهر للعميل في الشيك أوت */
+    carrierName: carrier?.name ?? null,
+    carrierSlug: carrier?.carrier ?? null,
+    freeOver,
+  }
 }
 
 /** الإجمالي النهائي — مصدر الحقيقة الوحيد للمبالغ */
@@ -230,9 +288,8 @@ export async function computeTotals(options: {
   const costTotal = lines.reduce((n, l) => n + (l.costPrice ?? 0) * l.quantity, 0)
 
   const ship = await shippingFor(storeId, country, city)
-  const zone = ship.zone
 
-  const freeThreshold = zone?.freeShippingEnabled ? zone.freeOverAmount : 0
+  const freeThreshold = ship.freeOver
   const freeShippingApplied = couponFreeShipping || Boolean(freeThreshold && subtotal - discount >= freeThreshold)
   const shipping = freeShippingApplied ? 0 : ship.price
 
@@ -270,6 +327,57 @@ export async function computeTotals(options: {
     freeShippingApplied,
     freeShippingRemaining:
       freeThreshold && !freeShippingApplied ? Math.max(0, freeThreshold - (subtotal - discount)) : null,
+  }
+}
+
+/**
+ * التسعيرة اللي الشيك أوت بيعرضها للعميل.
+ *
+ * **لازم تطلع من نفس المصدر اللي بيحاسب.** الشيك أوت بيحسب الشحن في
+ * المتصفح عشان الرقم يتحرّك مع اختيار المحافظة من غير رحلة للخادم —
+ * ولو الأرقام اللي بيحسب بيها جت من مكان تاني غير `shippingFor`،
+ * العميل بيشوف ٥٠ ويتحاسب ٧٥، والفرق بيطلع من جيب التاجر في كل طلب.
+ *
+ * فلما تبقى فيه شركة مربوطة بسعر، سعرها بيغطّي كل المحافظات: هي
+ * بتحاسب التاجر بسعر واحد، وجدول المحافظات بتاعه بيبقى بلا معنى
+ * لحد ما يوقفها.
+ */
+export async function getDisplayShipping(storeId: string, country: string) {
+  const [carrier] = await db
+    .select({
+      name: carrierAccounts.displayName,
+      flatRate: carrierAccounts.flatRate,
+      freeOver: carrierAccounts.freeOver,
+    })
+    .from(carrierAccounts)
+    .where(and(eq(carrierAccounts.storeId, storeId), eq(carrierAccounts.enabled, true)))
+    .orderBy(carrierAccounts.sortOrder)
+    .limit(1)
+
+  const [zone] = await db
+    .select()
+    .from(shippingZones)
+    .where(and(eq(shippingZones.storeId, storeId), eq(shippingZones.country, country)))
+    .limit(1)
+
+  const rates = zone
+    ? await db
+        .select({ city: shippingRates.city, price: shippingRates.price })
+        .from(shippingRates)
+        .where(and(eq(shippingRates.zoneId, zone.id), eq(shippingRates.enabled, true)))
+    : []
+
+  const carrierFlat = carrier && carrier.flatRate > 0 ? carrier.flatRate : 0
+
+  const zoneFree = zone?.freeShippingEnabled ? zone.freeOverAmount : 0
+  const freeOver = carrier && carrier.freeOver > 0 ? carrier.freeOver : zoneFree
+
+  return {
+    byCity: carrierFlat ? {} : Object.fromEntries(rates.map((r) => [r.city, r.price])),
+    defaultPrice: carrierFlat || zone?.defaultPrice || 0,
+    freeOver: freeOver || null,
+    carrierName: carrierFlat ? (carrier?.name ?? null) : null,
+    codEnabled: zone?.codEnabled ?? true,
   }
 }
 

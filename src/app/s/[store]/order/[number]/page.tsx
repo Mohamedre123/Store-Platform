@@ -8,6 +8,8 @@ import { orderItems, orders, returns, thankYouSettings } from '@/db/schema'
 import { getStore } from '@/lib/storefront'
 import { returnStatusMeta } from '@/lib/returns-meta'
 import { ReturnForm } from './return-form'
+import { PayNowButton } from './pay-button'
+import { paymentProvider } from '@/lib/providers'
 import { formatMoney, formatDateTime } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
@@ -25,10 +27,10 @@ export default async function OrderPage({
   searchParams,
 }: {
   params: Promise<{ store: string; number: string }>
-  searchParams: Promise<{ t?: string }>
+  searchParams: Promise<{ t?: string; pay_error?: string }>
 }) {
   const { store: identifier, number } = await params
-  const { t } = await searchParams
+  const { t, pay_error: payError } = await searchParams
 
   const store = await getStore(identifier)
   if (!store) notFound()
@@ -68,6 +70,17 @@ export default async function OrderPage({
   const stageIndex = Math.max(0, STAGES.findIndex((s) => s.key === order.status))
   const address = order.shippingAddress
 
+  /*
+    الطلب اللي اختار بوابة أونلاين ولسه ما اتدفعش لازم يلاقي طريقًا
+    يكمّل بيه. الملغي والمرتجع مستثنيين — زرار دفع على طلب اتلغى
+    بياخد فلوس على حاجة مش هتتشحن.
+  */
+  const gatewayDef = order.paymentGateway ? paymentProvider(order.paymentGateway) : undefined
+  const awaitingPayment =
+    Boolean(gatewayDef) &&
+    order.paymentStatus !== 'paid' &&
+    !['cancelled', 'returned', 'delivered'].includes(order.status)
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6 sm:py-14">
       <div className="flex flex-col items-center gap-3 text-center">
@@ -84,6 +97,16 @@ export default async function OrderPage({
         </p>
         {settings?.customMessage && <p className="mt-1 opacity-70">{settings.customMessage}</p>}
       </div>
+
+      {awaitingPayment && gatewayDef && (
+        <PayNowButton
+          storeIdentifier={identifier}
+          orderNumber={order.orderNumber}
+          token={t}
+          gatewayName={gatewayDef.name}
+          hadError={payError === '1'}
+        />
+      )}
 
       {(settings?.showProgressTracker ?? true) && (
         <div className="mt-10 flex items-center">

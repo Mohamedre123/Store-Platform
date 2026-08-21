@@ -7,7 +7,11 @@ import { db } from '@/db'
 import { orderEvents, orders, shipments } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { recordAudit } from '@/lib/audit'
-import { shipmentStatusMeta, type ShipmentStatus } from '@/lib/carriers'
+import { type ShipmentStatus } from '@/lib/carriers'
+import { applyShipmentStatus } from '@/lib/order-flow'
+import { queueShipmentForOrder } from '@/lib/shipment-dispatch'
+import { activeCarrier } from '@/lib/provider-store'
+import { carrierProvider } from '@/lib/providers'
 import { updateOrderStatusAction } from '@/app/dashboard/orders/actions'
 
 export type ShipmentState = { ok?: boolean; error?: string } | null
@@ -98,44 +102,41 @@ export async function updateShipmentStatusAction(
 ): Promise<ShipmentState> {
   const { store, user } = await getDashboardContext()
 
-  const [row] = await db
-    .select({ id: shipments.id, orderId: shipments.orderId, status: shipments.status })
-    .from(shipments)
-    .where(and(eq(shipments.id, id), eq(shipments.storeId, store.id)))
-    .limit(1)
-
-  if (!row) return { error: 'الشحنة مش موجودة' }
-  if (row.status === status) return { ok: true }
-
-  const event = { at: new Date().toISOString(), status, note: note?.trim() || undefined }
-
-  await db.transaction(async (tx) => {
-    await tx
-      .update(shipments)
-      .set({
-        status,
-        // الإضافة في SQL لا في الذاكرة: قراءة السجل وكتابته تاني كانت
-        // هتضيّع أي حدث اتسجّل بينهم
-        events: sql`${shipments.events} || ${JSON.stringify([event])}::jsonb`,
-      })
-      .where(eq(shipments.id, id))
-
-    await tx.insert(orderEvents).values({
-      orderId: row.orderId,
-      storeId: store.id,
-      type: 'status_changed',
-      message: `الشحنة: ${shipmentStatusMeta(status).label}${note ? ` — ${note}` : ''}`,
-      actorType: 'merchant',
-      actorId: user.id,
-    })
-  })
-
-  if (status === 'delivered') await updateOrderStatusAction(row.orderId, 'delivered')
-  else if (status === 'returned') await updateOrderStatusAction(row.orderId, 'returned')
+  const res = await applyShipmentStatus(store, id, status, { type: 'merchant', userId: user.id }, note)
+  if (res.error) return res
 
   revalidatePath('/dashboard/shipments')
-  revalidatePath(`/dashboard/orders/${row.orderId}`)
+  revalidatePath('/dashboard/orders')
   return { ok: true }
+}
+
+/**
+ * تسجيل الشحنة عند الشركة المربوطة بضغطة.
+ *
+ * بيتنادى تلقائيًا عند تأكيد الطلب، بس التاجر محتاج الزرار برضه:
+ * لو الشركة كانت واقعة ساعتها، أو لو العنوان كان ناقص وصلّحه —
+ * من غيره كان لازم يلغي الطلب ويعمله تاني عشان تتبعت المحاولة.
+ */
+export async function dispatchShipmentAction(orderId: string): Promise<ShipmentState> {
+  const { store } = await getDashboardContext()
+
+  const carrier = await activeCarrier(store.id)
+  if (!carrier) return { error: 'مفيش شركة شحن مربوطة. اربط واحدة من صفحة الشحن.' }
+
+  const res = await queueShipmentForOrder(store.id, orderId)
+  if (!res.ok) return { error: res.error ?? 'ما اتسجّلتش الشحنة' }
+
+  revalidatePath('/dashboard/shipments')
+  revalidatePath(`/dashboard/orders/${orderId}`)
+  return { ok: true }
+}
+
+/** اسم الشركة المربوطة — الواجهة بتعرضه على زرار التسجيل التلقائي */
+export async function activeCarrierNameAction(): Promise<string | null> {
+  const { store } = await getDashboardContext()
+  const carrier = await activeCarrier(store.id)
+  if (!carrier) return null
+  return carrierProvider(carrier.slug)?.name ?? carrier.slug
 }
 
 /**

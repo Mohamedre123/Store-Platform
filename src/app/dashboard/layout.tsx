@@ -4,7 +4,7 @@ import { SectionTabs } from '@/components/dashboard/section-tabs'
 import { AuroraBackground } from '@/components/motion'
 import { Preloader } from '@/components/preloader'
 import { AssistantPanel } from '@/components/dashboard/assistant-panel'
-import { getAiConfig, GEMINI_PRO_SLUG } from '@/lib/ai/settings'
+import { isAssistantReady } from '@/lib/ai/settings'
 import { storeUrl } from '@/lib/domain'
 import { logoutAction } from '@/app/(auth)/actions'
 import { ExternalLink, LogOut } from 'lucide-react'
@@ -12,12 +12,12 @@ import { ExternalLink, LogOut } from 'lucide-react'
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, store } = await getDashboardContext()
 
-  /*
-    المساعد بيتحمّل بس لو الإضافة مفعّلة: اللوحة العائمة ملف عميل
-    كامل، وتحميله على كل تاجر مش مفعّلها بيبطّئ اللوحة على اللي مش
-    مستفيد منها أصلًا.
+/*
+    المساعد بيتحمّل بس لما يبقى شغّال فعلًا: اللوحة العائمة ملف عميل
+    كامل، وتحميله على كل تاجر مش مستخدمها بيبطّئ اللوحة على اللي مش
+    مستفيد منها أصلًا. و«مفعّل من غير مفتاح» بيدّي أيقونة بترد بخطأ.
   */
-  const pro = await getAiConfig(store.id, GEMINI_PRO_SLUG)
+  const assistantReady = await isAssistantReady(store.id)
 
   return (
     <div className="min-h-screen-safe">
@@ -61,7 +61,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             <SectionTabs />
           </div>
           {children}
-          {pro.enabled && <AssistantPanel />}
+          {assistantReady && <AssistantPanel />}
         </main>
       </div>
     </div>

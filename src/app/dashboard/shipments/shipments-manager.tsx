@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useMemo, useState, useTransition } from 'react'
-import { Banknote, ChevronDown, ExternalLink, Package, Phone, Plus, Trash2 } from 'lucide-react'
+import { Banknote, ChevronDown, ExternalLink, Package, Phone, Plus, Trash2, Zap } from 'lucide-react'
 import {
   CARRIERS,
   SHIPMENT_STATUSES,
@@ -15,6 +15,7 @@ import { Card } from '@/components/ui'
 import { formatDate, formatDateTime, formatMoney } from '@/lib/utils'
 import {
   createShipmentAction,
+  dispatchShipmentAction,
   deleteShipmentAction,
   settleCodAction,
   updateShipmentStatusAction,
@@ -51,6 +52,7 @@ export type PendingOrder = {
 type Filter = 'all' | 'active' | 'unsettled' | 'problem'
 
 export function ShipmentsManager({
+  autoCarrier,
   shipments,
   pending,
   currency,
@@ -58,6 +60,8 @@ export function ShipmentsManager({
   shipments: ShipmentRow[]
   pending: PendingOrder[]
   currency: string
+  /** الشركة المربوطة بربط تلقائي — null لو التاجر بيسجّل بإيده */
+  autoCarrier: string | null
 }) {
   const [filter, setFilter] = useState<Filter>('all')
 
@@ -103,7 +107,7 @@ export function ShipmentsManager({
             <span className="tabular font-normal text-[var(--fg-muted)]">({pending.length})</span>
           </h2>
           {pending.map((o) => (
-            <PendingCard key={o.id} order={o} currency={currency} />
+            <PendingCard key={o.id} order={o} currency={currency} autoCarrier={autoCarrier} />
           ))}
         </section>
       )}
@@ -141,7 +145,22 @@ export function ShipmentsManager({
 }
 
 /** طلب مؤكّد لسه مالوش بوليصة — بينشحن من هنا على طول */
-function PendingCard({ order, currency }: { order: PendingOrder; currency: string }) {
+function PendingCard({
+  order,
+  currency,
+  autoCarrier,
+}: {
+  order: PendingOrder
+  currency: string
+  /**
+   * اسم الشركة المربوطة بربط تلقائي، أو null.
+   *
+   * لما تكون موجودة، التاجر بيبعت الشحنة بضغطة بدل ما يفتح لوحتهم
+   * وينسخ رقم البوليصة. الخانات بتفضل موجودة برضه: التسجيل التلقائي
+   * ممكن يفشل، والتاجر لازم يلاقي طريقًا تانيًا في نفس الشاشة.
+   */
+  autoCarrier: string | null
+}) {
   const [open, setOpen] = useState(false)
   const [pending, start] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -171,14 +190,41 @@ function PendingCard({ order, currency }: { order: PendingOrder; currency: strin
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          className="flex min-h-10 items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 text-sm font-medium text-[var(--primary-fg)]"
-        >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          سجّل شحنة
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {autoCarrier && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() =>
+                start(async () => {
+                  setError(null)
+                  const res = await dispatchShipmentAction(order.id)
+                  if (res?.error) {
+                    setError(res.error)
+                    setOpen(true)
+                  }
+                })
+              }
+              className="flex min-h-10 items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 text-sm font-medium text-[var(--primary-fg)] disabled:opacity-60"
+            >
+              <Zap className="h-4 w-4" aria-hidden="true" />
+              {pending ? 'بيتبعت…' : `سجّل عند ${autoCarrier}`}
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className={`flex min-h-10 items-center gap-1.5 rounded-lg px-4 text-sm font-medium ${
+              autoCarrier
+                ? 'border border-[var(--border-strong)] text-[var(--fg-muted)] hover:bg-[var(--surface-2)]'
+                : 'bg-[var(--primary)] text-[var(--primary-fg)]'
+            }`}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            {autoCarrier ? 'سجّل بإيدك' : 'سجّل شحنة'}
+          </button>
+        </div>
       </div>
 
       {open && (

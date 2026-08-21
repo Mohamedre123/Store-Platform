@@ -123,6 +123,16 @@ export function AssistantPanel() {
 
   return (
     <>
+      {/*
+        على الشمال تحت — القايمة الجانبية على اليمين في الواجهة
+        العربية، فالمساعد على الشمال ما بيغطّيش حاجة. في RTL الـstart
+        يمين والـend شمال — الفرق ده مش تفصيلة شكلية، الزرار كان بيقع
+        فوق القايمة.
+
+        والزرار **بيقول اسمه** على الشاشات الكبيرة بدل ما يفضل أيقونة
+        بنفسجية غامضة: التاجر اللي لسه مفعّل الإضافة مش عارف الدايرة
+        دي بتعمل إيه، وأغلب الناس ما بتضغطش على حاجة ما تعرفهاش.
+      */}
       <button
         type="button"
         onClick={() => {
@@ -131,15 +141,26 @@ export function AssistantPanel() {
         }}
         aria-label={open ? 'إغلاق المساعد' : 'افتح مساعد المتجر'}
         aria-expanded={open}
-        /*
-          على الشمال تحت — القايمة الجانبية على اليمين في الواجهة
-          العربية، فالمساعد على الشمال ما بيغطّيش حاجة.
-          في RTL الـstart يمين والـend شمال — الفرق ده مش تفصيلة شكلية،
-          الزرار كان بيقع فوق القايمة.
-        */
-        className="fixed bottom-5 end-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-[#8b5cf6] to-[#ec4899] text-white shadow-xl transition-transform hover:scale-105"
+        className={`group fixed bottom-5 end-5 z-40 flex h-14 items-center justify-center gap-2 rounded-full bg-gradient-to-br from-[#8b5cf6] to-[#ec4899] text-white shadow-xl ring-1 ring-white/20 transition-all hover:shadow-2xl active:scale-95 ${
+          open ? 'w-14' : 'w-14 lg:w-auto lg:ps-5 lg:pe-4'
+        }`}
       >
-        {open ? <X className="h-6 w-6" /> : <Sparkles className="h-6 w-6" />}
+        {open ? (
+          <X className="h-6 w-6" aria-hidden="true" />
+        ) : (
+          <>
+            <span className="hidden text-sm font-semibold lg:inline">مساعد المتجر</span>
+            <span className="relative flex h-6 w-6 items-center justify-center">
+              {/*
+                نبضة خفيفة على الأيقونة وهي مقفولة — بتشدّ العين مرة
+                من غير ما تتحوّل لحاجة بتلفّ طول الوقت وتلهّي التاجر
+                عن شغله.
+              */}
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/40 [animation-duration:3s] motion-reduce:hidden" />
+              <Sparkles className="relative h-6 w-6" aria-hidden="true" />
+            </span>
+          </>
+        )}
       </button>
 
       {open && (

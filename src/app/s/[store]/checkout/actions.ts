@@ -29,6 +29,8 @@ import { recordReferral } from '@/lib/referrals'
 import { trackExperimentConversions } from '@/lib/experiments'
 import { generateToken } from '@/lib/crypto'
 import { normalizePhone } from '@/lib/utils'
+import { startPayment } from '@/lib/payment-dispatch'
+import { paymentProvider } from '@/lib/providers'
 
 /**
  * معرّف الزائر من الكوكي.
@@ -42,7 +44,21 @@ async function visitorId(): Promise<string | null> {
 }
 
 export type PlaceOrderState =
-  | { ok: true; orderNumber: number; token: string }
+  | {
+      ok: true
+      orderNumber: number
+      token: string
+      /** رابط صفحة الدفع — المتصفح بيتحوّل عليه فورًا لما يكون موجود */
+      redirectUrl?: string
+      /**
+       * البوابة رفضت تعمل جلسة دفع.
+       *
+       * الطلب اتسجّل برضه — بنوصّل العميل لصفحة الطلب ومعاه الرسالة
+       * وزرار «ادفع دلوقتي». إلغاء الطلب هنا كان بيضيّع بيعة عشان
+       * عطل مؤقّت عند طرف تالت.
+       */
+      paymentError?: string
+    }
   | { ok: false; error: string }
   | null
 
@@ -582,7 +598,54 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
     customerPhone: phone,
   })
 
+  /**
+   * جلسة الدفع — بعد ما الطلب اتسجّل بالكامل.
+   *
+   * الترتيب ده مقصود: الطلب موجود عند التاجر أول بأول، ولو البوابة
+   * وقعت التاجر بيشوف الطلب ويكلّم العميل. العكس كان بيخلّي الطلب
+   * يختفي كأن محدش حاول.
+   */
+  if (paymentProvider(input.paymentGateway)) {
+    const session = await startPayment(store.id, result.orderId!)
+    if (session.ok) {
+      return { ok: true, orderNumber: result.orderNumber, token, redirectUrl: session.redirectUrl }
+    }
+    return { ok: true, orderNumber: result.orderNumber, token, paymentError: session.error }
+  }
+
   return { ok: true, orderNumber: result.orderNumber, token }
+}
+
+/**
+ * إعادة محاولة الدفع من صفحة الطلب.
+ *
+ * العميل اللي قفل صفحة البوابة أو فشل دفعه لازم يلاقي طريقًا يرجع
+ * بيه — من غيره بيكلّم التاجر على واتساب، والتاجر بيلغي الطلب.
+ *
+ * الرمز في الرابط هو الإذن: من غيره أي حد يقدر يفتح جلسة دفع على
+ * طلب مش بتاعه ويشوف بياناته.
+ */
+export async function retryPaymentAction(input: {
+  storeIdentifier: string
+  orderNumber: number
+  token: string
+}): Promise<{ ok: true; redirectUrl: string } | { ok: false; error: string }> {
+  const store = await getStore(input.storeIdentifier)
+  if (!store) return { ok: false, error: 'المتجر مش موجود' }
+
+  const [order] = await db
+    .select({ id: orders.id, token: orders.recoveryToken })
+    .from(orders)
+    .where(and(eq(orders.storeId, store.id), eq(orders.orderNumber, input.orderNumber)))
+    .limit(1)
+
+  if (!order || !order.token || order.token !== input.token) {
+    return { ok: false, error: 'الرابط مش صحيح' }
+  }
+
+  const res = await startPayment(store.id, order.id)
+  if (!res.ok) return { ok: false, error: res.error }
+  return { ok: true, redirectUrl: res.redirectUrl }
 }
 
 /** يجمع بيانات الطلب ويبعت رسالتين: تأكيد للعميل وإشعار للتاجر */

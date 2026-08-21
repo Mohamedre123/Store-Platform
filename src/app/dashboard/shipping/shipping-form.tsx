@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Check, Save, Wand2 } from 'lucide-react'
-import { saveRatesAction, saveZoneAction } from './actions'
+import { Banknote, Check, Lock, Save, Wand2 } from 'lucide-react'
+import { saveCodAction, saveRatesAction, saveZoneAction } from './actions'
 import type { Region } from '@/lib/regions'
 import { Alert, Button, Card, Field, Input } from '@/components/ui'
 import { Toggle } from '@/components/dashboard/controls'
@@ -26,12 +26,21 @@ export function ShippingForm({
   regions,
   zone,
   rates,
+  lockedByCarrier = false,
 }: {
   country: string
   currency: string
   regions: Region[]
   zone: Zone
   rates: Record<string, { price: number; enabled: boolean }>
+  /**
+   * فيه شركة شحن مربوطة؟
+   *
+   * ساعتها أسعارها هي اللي بتحكم، والتسعير اليدوي بيتقفل. القيم
+   * بتفضل محفوظة زي ما هي — التاجر اللي يوقف الشركة بيلاقي أسعاره
+   * مستنياه، مش بيبدأ من الأول.
+   */
+  lockedByCarrier?: boolean
 }) {
   const [enabled, setEnabled] = useState(zone.enabled)
   const [defaultPrice, setDefaultPrice] = useState(asAmount(zone.defaultPrice))
@@ -47,6 +56,27 @@ export function ShippingForm({
 
   const [pending, start] = useTransition()
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
+  const [codMsg, setCodMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [, startCod] = useTransition()
+
+  /**
+   * الدفع عند الاستلام بيتحفظ لحظة ما المفتاح يتحرّك.
+   *
+   * لأنه مش جزء من نموذج التسعير: التاجر اللي بيقفله عايزه يتقفل
+   * دلوقتي، مش يفتكر إنه قفله ويكتشف بعد طلبين إنه نسي يدوس «حفظ».
+   */
+  function saveCod(next: boolean) {
+    setCodMsg(null)
+    startCod(async () => {
+      const res = await saveCodAction(country, next)
+      if (res?.error) {
+        setCod(!next)
+        setCodMsg({ ok: false, text: res.error })
+      } else {
+        setCodMsg({ ok: true, text: next ? 'مفتوح — هيظهر للعميل في الشيك أوت' : 'مقفول — مش هيظهر للعميل' })
+      }
+    })
+  }
 
   function saveAll() {
     setMessage(null)
@@ -85,6 +115,65 @@ export function ShippingForm({
   return (
     <div className="flex flex-col gap-6">
       {message && <Alert tone={message.ok ? 'success' : 'danger'}>{message.text}</Alert>}
+
+      {/*
+        الدفع عند الاستلام برّه أي قفل.
+
+        هو مش بند تسعير — هو قرار «أقبل فلوس على الباب ولا لأ»،
+        وبيفضل قرار التاجر حتى لو ربط شركة شحن بتحصّل عنه. قفله
+        مع التسعير كان بيخلّي التاجر اللي ربط شركة يفقد أهم طريقة
+        دفع في السوق المصري من غير ما يقصد.
+      */}
+      <Card className="flex flex-col gap-4 p-5">
+        <div className="flex items-start gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
+            <Banknote className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 className="font-semibold">الدفع عند الاستلام</h2>
+            <p className="mt-0.5 text-sm text-[var(--fg-muted)]">
+              العميل بيدفع كاش للمندوب. أغلب مبيعات المتاجر المصرية بتيجي منه —
+              اقفله بس لو شركة الشحن عندك ما بتحصّلش، أو نسبة الرفض عالية عندك.
+            </p>
+          </div>
+          <Toggle
+            label=""
+            srLabel="الدفع عند الاستلام"
+            checked={cod}
+            onChange={(v) => {
+              setCod(v)
+              saveCod(v)
+            }}
+          />
+        </div>
+        {codMsg && (
+          <p
+            className="rounded-lg px-3 py-2 text-xs"
+            style={{
+              background: codMsg.ok ? 'var(--color-success-soft)' : 'var(--color-danger-soft)',
+              color: codMsg.ok ? 'var(--color-success)' : 'var(--color-danger)',
+            }}
+          >
+            {codMsg.text}
+          </p>
+        )}
+      </Card>
+
+      {lockedByCarrier && (
+        <div className="flex items-start gap-2 rounded-[var(--radius-card)] border border-[var(--color-info)]/35 bg-[var(--color-info-soft)] px-4 py-3 text-sm text-[var(--color-info)]">
+          <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>
+            <strong>التسعير اليدوي متوقّف</strong> — فيه شركة شحن مربوطة، وأسعارها هي
+            اللي بتظهر للعميل. أسعارك محفوظة زي ما هي، وهترجع تشتغل أول ما توقف
+            الشركات كلها.
+          </span>
+        </div>
+      )}
+
+      <fieldset
+        disabled={lockedByCarrier}
+        className={`flex flex-col gap-6 border-0 p-0 ${lockedByCarrier ? 'pointer-events-none opacity-55' : ''}`}
+      >
 
       {/* الإعدادات العامة */}
       <Card className="flex flex-col gap-5 p-5">
@@ -137,12 +226,6 @@ export function ShippingForm({
             />
           </Field>
         </div>
-
-        <Toggle
-          label="الدفع عند الاستلام متاح"
-          checked={cod}
-          onChange={setCod}
-        />
 
         <div className="border-t border-[var(--border)] pt-5">
           <Toggle
@@ -221,6 +304,7 @@ export function ShippingForm({
           حفظ إعدادات الشحن
         </Button>
       </div>
+      </fieldset>
     </div>
   )
 }

@@ -57,6 +57,43 @@ export async function saveZoneAction(input: {
 }
 
 /**
+ * فتح وقفل الدفع عند الاستلام لوحده.
+ *
+ * منفصل عن حفظ المنطقة عن قصد: المفتاح ده بيتحرّك وحده والتاجر
+ * مستنّي أثره فورًا. لو كان جزءًا من نموذج التسعير، التاجر اللي
+ * ربط شركة شحن (والتسعير عنده متوقّف) ما كانش هيقدر يقفله أصلًا.
+ *
+ * ولو لسه مفيش منطقة شحن، بننشئ واحدة بالإعدادات الافتراضية —
+ * التاجر اللي أول يوم ليه لازم يقفل الدفع عند الاستلام من غير ما
+ * يظبّط ٢٧ محافظة الأول.
+ */
+export async function saveCodAction(country: string, enabled: boolean): Promise<ShippingState> {
+  const { store } = await getDashboardContext()
+
+  const [existing] = await db
+    .select({ id: shippingZones.id })
+    .from(shippingZones)
+    .where(and(eq(shippingZones.storeId, store.id), eq(shippingZones.country, country)))
+    .limit(1)
+
+  if (existing) {
+    await db
+      .update(shippingZones)
+      .set({ codEnabled: enabled })
+      .where(eq(shippingZones.id, existing.id))
+  } else {
+    const label = COUNTRIES.find((c) => c.code === country)?.name ?? country
+    await db
+      .insert(shippingZones)
+      .values({ storeId: store.id, country, name: label, codEnabled: enabled })
+  }
+
+  revalidatePath('/dashboard/shipping')
+  revalidatePath('/dashboard/payments')
+  return { ok: true }
+}
+
+/**
  * أسعار المحافظات.
  *
  * تُحفظ دفعة واحدة لا واحدة واحدة: التاجر بيظبط ٢٧ محافظة في جلسة

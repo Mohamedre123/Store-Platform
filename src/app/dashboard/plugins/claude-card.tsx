@@ -14,7 +14,21 @@ export type ClaudeSaved = {
 
 type Model = { id: string; label: string }
 
-export function ClaudeCard({ def, saved }: { def: PluginDef; saved?: ClaudeSaved }) {
+export function ClaudeCard({
+  def,
+  saved,
+  embedded = false,
+}: {
+  def: PluginDef
+  saved?: ClaudeSaved
+  /**
+   * جوّه نافذة تفاصيل التطبيق؟
+   *
+   * ساعتها الكارت بيتشال إطاره: الكارت جوّه كارت بيعمل حدّين
+   * متداخلين وحشّين، والمساحة على الموبايل ضيقة أصلًا.
+   */
+  embedded?: boolean
+}) {
   const [enabled, setEnabled] = useState(saved?.enabled ?? false)
   const [apiKey, setApiKey] = useState('')
   const [models, setModels] = useState<Model[]>([])
@@ -58,8 +72,10 @@ export function ClaudeCard({ def, saved }: { def: PluginDef; saved?: ClaudeSaved
       }
     })
 
+  const Wrapper = embedded ? ('div' as const) : Card
+
   return (
-    <Card className="flex flex-col gap-4 p-5">
+    <Wrapper className={embedded ? 'flex flex-col gap-4' : 'flex flex-col gap-4 p-5'}>
       <div className="flex items-start gap-3">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#d97757] to-[#8b5cf6] text-white">
           <Palette className="h-5 w-5" aria-hidden="true" />
@@ -191,6 +207,6 @@ export function ClaudeCard({ def, saved }: { def: PluginDef; saved?: ClaudeSaved
           </button>
         </div>
       </div>
-    </Card>
+    </Wrapper>
   )
 }

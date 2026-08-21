@@ -115,7 +115,8 @@ export function StoreBot({
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? 'إغلاق المساعد' : 'اسأل مساعد المتجر'}
         aria-expanded={open}
-        className="flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg transition-transform hover:scale-105"
+        title="اسأل مساعد المتجر"
+        className="flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg ring-2 ring-white/70 transition-transform hover:scale-105 active:scale-95"
         style={{ background: accent }}
       >
         {open ? (

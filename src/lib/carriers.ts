@@ -4,13 +4,24 @@
  * من غير `server-only`: نفس القوائم بتستخدمها لوحة التاجر (متصفح)
  * وصفحة تتبّع الطلب في المتجر — المصدر واحد والاتنين بيقروا منه.
  *
- * الربط بالـAPI بتاع كل شركة محتاج تعاقد وحساب تجاري. لحد ما ده
- * يحصل، التاجر بيسجّل الشحنة يدويًا (بيعمل البوليصة على لوحة الشركة
- * وينسخ رقم التتبّع هنا) — وده اللي ٩٠٪ من التجّار الصغيرين بيعملوه
- * أصلًا. رابط التتبّع بيخلّي الرقم قابل للضغط، للتاجر وللعميل.
+ * القايمة دي للعرض والتتبّع بس. الربط الفعلي بمفاتيح التاجر معرّف
+ * في `src/lib/providers.ts` وبيتنفّذ في `src/lib/integrations/shipping.ts`.
+ * الشركة المربوطة بتسجّل الشحنة لوحدها، واللي مش مربوطة التاجر
+ * بيعمل بوليصتها عندهم وينسخ رقمها هنا. رابط التتبّع بيخلّي الرقم
+ * قابل للضغط في الحالتين، للتاجر وللعميل.
  */
 
-export type CarrierKey = 'bosta' | 'mylerz' | 'jt' | 'wavex' | 'sprint' | 'r2s' | 'aramex' | 'other'
+export type CarrierKey =
+  | 'bosta'
+  | 'mylerz'
+  | 'jt'
+  | 'shipblu'
+  | 'voo'
+  | 'wavex'
+  | 'sprint'
+  | 'r2s'
+  | 'aramex'
+  | 'other'
 
 export type Carrier = {
   key: CarrierKey
@@ -23,6 +34,8 @@ export const CARRIERS: Carrier[] = [
   { key: 'bosta', label: 'بوسطة', trackUrl: 'https://bosta.co/tracking-shipments?tracking-number={n}' },
   { key: 'mylerz', label: 'مايلرز', trackUrl: 'https://mylerz.net/tracking?awb={n}' },
   { key: 'jt', label: 'J&T Express', trackUrl: 'https://www.jtexpress-eg.com/trajectoryQuery?waybillNo={n}' },
+  { key: 'shipblu', label: 'شيب بلو', trackUrl: 'https://shipblu.com/tracking?tracking_number={n}' },
+  { key: 'voo', label: 'VOO', trackUrl: null },
   { key: 'wavex', label: 'ويف إكس', trackUrl: null },
   { key: 'sprint', label: 'سبرينت', trackUrl: null },
   { key: 'r2s', label: 'R2S', trackUrl: null },

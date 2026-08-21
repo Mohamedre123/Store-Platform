@@ -24,7 +24,21 @@ type Model = { id: string; label: string }
  * تاجر مفتكر إنه بيكتب نصوص وبيلاقي منتج اتضاف مش هيثق في المنصة
  * تاني، حتى لو هو اللي وافق.
  */
-export function GeminiProCard({ def, saved }: { def: PluginDef; saved?: GeminiProSaved }) {
+export function GeminiProCard({
+  def,
+  saved,
+  embedded = false,
+}: {
+  def: PluginDef
+  saved?: GeminiProSaved
+  /**
+   * جوّه نافذة تفاصيل التطبيق؟
+   *
+   * ساعتها الكارت بيتشال إطاره: الكارت جوّه كارت بيعمل حدّين
+   * متداخلين وحشّين، والمساحة على الموبايل ضيقة أصلًا.
+   */
+  embedded?: boolean
+}) {
   const [enabled, setEnabled] = useState(saved?.enabled ?? false)
   const [apiKey, setApiKey] = useState('')
   const [models, setModels] = useState<Model[]>([])
@@ -68,8 +82,10 @@ export function GeminiProCard({ def, saved }: { def: PluginDef; saved?: GeminiPr
       }
     })
 
+  const Wrapper = embedded ? ('div' as const) : Card
+
   return (
-    <Card className="flex flex-col gap-4 p-5">
+    <Wrapper className={embedded ? 'flex flex-col gap-4' : 'flex flex-col gap-4 p-5'}>
       <div className="flex items-start gap-3">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#f59e0b] to-[#ec4899] text-white">
           <Wand2 className="h-5 w-5" aria-hidden="true" />
@@ -225,6 +241,6 @@ export function GeminiProCard({ def, saved }: { def: PluginDef; saved?: GeminiPr
           </button>
         </div>
       </div>
-    </Card>
+    </Wrapper>
   )
 }

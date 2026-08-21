@@ -7,12 +7,21 @@ import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { Card } from '@/components/ui'
 import { formatMoney } from '@/lib/utils'
+import { activeCarrier } from '@/lib/provider-store'
+import { carrierProvider } from '@/lib/providers'
 import { ShipmentsManager, type PendingOrder, type ShipmentRow } from './shipments-manager'
 
 export const metadata = { title: 'الشحنات' }
 
 export default async function ShipmentsPage() {
   const { store } = await getDashboardContext()
+
+  /*
+    الشركة المربوطة بربط تلقائي — اللي التاجر يقدر يبعتلها بضغطة.
+    اليدوية مش بتتحسب هنا: زرار «ابعت» عليها كان هيفشل كل مرة.
+  */
+  const carrier = await activeCarrier(store.id)
+  const autoCarrierName = carrier ? (carrierProvider(carrier.slug)?.name ?? null) : null
 
   const rows = await db
     .select({
@@ -138,6 +147,7 @@ export default async function ShipmentsPage() {
             shipments={rows as ShipmentRow[]}
             pending={pending}
             currency={store.currency}
+            autoCarrier={autoCarrierName}
           />
         </Reveal>
       )}
