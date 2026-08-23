@@ -548,3 +548,33 @@
     transform: none !important;
   }
 }
+
+/* ─────────────── فقاعة المساعد في مكانه ─────────────── */
+
+/**
+ * ظهور سريع من تحت التحديد.
+ *
+ * ٠٫١٨ ثانية بس: الفقاعة دي بتطلع مع كل تحديد، وأي حركة أطول من
+ * كده بتتحوّل لتأخير محسوس بيقطع شغل التاجر بدل ما يساعده.
+ */
+.zw-assist-pop {
+  animation: zw-assist-in 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: top center;
+}
+
+@keyframes zw-assist-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zw-assist-pop {
+    animation: none;
+  }
+}

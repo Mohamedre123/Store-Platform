@@ -12,6 +12,31 @@ import 'server-only'
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta'
 
+/**
+ * نداء مع إعادة محاولة على أخطاء الخادم.
+ *
+ * جوجل بترجّع ٥٠٠ و٥٠٣ بشكل متقطّع — خصوصًا على موديلات المعاينة.
+ * ده اللي كان بيخلّي البوت يرد على رسالة ويفشل في اللي بعدها بنفس
+ * المفتاح ونفس السؤال. إعادة محاولتين بتباعد قصير بتخفي التقطّع ده
+ * تمامًا عن العميل.
+ *
+ * **بنعيد على ٥xx بس.** المفتاح الباطل والكوته الخالصة مش هيتصلّحوا
+ * بإعادة المحاولة — إعادتهم بتضيّع وقت العميل وبتستهلك حصّة التاجر.
+ */
+async function callWithRetry(url: string, init: RequestInit, attempts = 3): Promise<Response> {
+  let last: Response | null = null
+
+  for (let i = 0; i < attempts; i++) {
+    const res = await fetch(url, { ...init, cache: 'no-store', signal: AbortSignal.timeout(45_000) })
+    if (res.status < 500) return res
+
+    last = res
+    if (i < attempts - 1) await new Promise((r) => setTimeout(r, 400 * (i + 1)))
+  }
+
+  return last!
+}
+
 export type GeminiError =
   | { kind: 'invalid_key'; message: string }
   | { kind: 'quota'; message: string }
@@ -70,9 +95,7 @@ export type GeminiModel = {
  */
 export async function listModels(apiKey: string): Promise<GeminiResult<GeminiModel[]>> {
   try {
-    const res = await fetch(`${BASE}/models?key=${encodeURIComponent(apiKey)}&pageSize=100`, {
-      cache: 'no-store',
-    })
+    const res = await callWithRetry(`${BASE}/models?key=${encodeURIComponent(apiKey)}&pageSize=100`, {})
 
     if (!res.ok) return { ok: false, error: classify(res.status, await res.text()) }
 
@@ -139,12 +162,11 @@ export async function generate(input: {
   temperature?: number
 }): Promise<GeminiResult<string>> {
   try {
-    const res = await fetch(
+    const res = await callWithRetry(
       `${BASE}/models/${encodeURIComponent(input.model)}:generateContent?key=${encodeURIComponent(input.apiKey)}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        cache: 'no-store',
         body: JSON.stringify({
           contents: input.messages.map((m) => ({
             role: m.role,
@@ -234,6 +256,37 @@ export type ToolDef = {
 
 export type ToolCall = { name: string; args: Record<string, unknown> }
 
+/**
+ * تنظيف تعريف الأداة قبل ما يتبعت.
+ *
+ * **ده كان سبب خطأ ٤٠٠ اللي بيوقّف المساعد كله.** تعريفات الأدوات
+ * عندنا فيها حقول داخلية (`kind` بيفرّق بين القراءة والكتابة،
+ * و`describe` بيكتب وصف الإجراء للتاجر). `describe` دالة فبتختفي
+ * في التحويل لـJSON، لكن `kind` نصّ فبيتسرّب — وجوجل بترفض أي حقل
+ * مش من حقولها وبترجّع ٤٠٠ قبل ما تقرا الرسالة أصلًا.
+ *
+ * والأداة اللي مالهاش معاملات بنشيل `parameters` منها خالص بدل ما
+ * نبعت كائنًا فاضيًا — الكائن الفاضي بيترفض كمان.
+ */
+function cleanTool(t: ToolDef) {
+  const params = t.parameters
+  const hasProps = Object.keys(params?.properties ?? {}).length > 0
+
+  return {
+    name: t.name,
+    description: t.description,
+    ...(hasProps
+      ? {
+          parameters: {
+            type: params.type,
+            properties: params.properties,
+            ...(params.required?.length ? { required: params.required } : {}),
+          },
+        }
+      : {}),
+  }
+}
+
 /** صورة مرفقة — بتتبعت للموديل عشان يفهم المنتج من صورته */
 export type InlineImage = { mimeType: string; dataBase64: string }
 
@@ -293,12 +346,11 @@ export async function agentTurn(input: {
   maxTokens?: number
 }): Promise<GeminiResult<AgentTurn>> {
   try {
-    const res = await fetch(
+    const res = await callWithRetry(
       `${BASE}/models/${encodeURIComponent(input.model)}:generateContent?key=${encodeURIComponent(input.apiKey)}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        cache: 'no-store',
         body: JSON.stringify({
           contents: input.messages.map((m) => ({
             // جوجل بتسمّي دور نتيجة الأداة «user» — مش «tool»
@@ -307,7 +359,7 @@ export async function agentTurn(input: {
           })),
           systemInstruction: { parts: [{ text: input.system }] },
           tools: input.tools.length
-            ? [{ functionDeclarations: input.tools }]
+            ? [{ functionDeclarations: input.tools.map(cleanTool) }]
             : undefined,
           generationConfig: {
             maxOutputTokens: input.maxTokens ?? 1200,
@@ -344,6 +396,134 @@ export async function agentTurn(input: {
     }
 
     return { ok: true, data: { text, calls } }
+  } catch (e) {
+    return { ok: false, error: { kind: 'network', message: String(e).slice(0, 200) } }
+  }
+}
+
+/* ══════════════════ الصور ══════════════════ */
+
+/**
+ * موديلات الصور.
+ *
+ * جوجل بتعلّم موديلات الصور بإن اسمها فيه «image»، وبتدعم
+ * `responseModalities` — بترجّع صورة مش نص. القايمة بتتجاب من
+ * المفتاح نفسه زي موديلات النص بالظبط، فلو جوجل طلّعت واحدًا جديدًا
+ * بيبان لوحده من غير ما نعدّل سطر.
+ */
+export function isImageModel(id: string): boolean {
+  return /image/i.test(id) && !/embed/i.test(id)
+}
+
+/** موديلات الصور المتاحة للمفتاح ده */
+export async function listImageModels(apiKey: string): Promise<GeminiResult<GeminiModel[]>> {
+  try {
+    const res = await callWithRetry(
+      `${BASE}/models?key=${encodeURIComponent(apiKey)}&pageSize=200`,
+      {},
+    )
+
+    if (!res.ok) return { ok: false, error: classify(res.status, await res.text()) }
+
+    const data = (await res.json()) as {
+      models?: Array<{ name: string; displayName?: string; supportedGenerationMethods?: string[] }>
+    }
+
+    const models = (data.models ?? [])
+      .map((m) => {
+        const id = m.name.replace(/^models\//, '')
+        return {
+          id,
+          label: m.displayName ?? id,
+          usable: (m.supportedGenerationMethods ?? []).includes('generateContent'),
+        }
+      })
+      .filter((m) => m.usable && isImageModel(m.id))
+      .sort((a, b) => rank(b.id) - rank(a.id) || b.id.localeCompare(a.id))
+
+    return { ok: true, data: models }
+  } catch (e) {
+    return { ok: false, error: { kind: 'network', message: String(e).slice(0, 200) } }
+  }
+}
+
+export type GeneratedImage = { mimeType: string; dataBase64: string }
+
+/**
+ * تعديل صورة أو توليد واحدة.
+ *
+ * لو بعتّ صورة، الموديل بيعدّلها؛ لو ما بعتّش، بيولّد واحدة من
+ * الوصف. الاتنين نفس النداء عند جوجل — الفرق إن الصورة بتتحطّ
+ * كجزء `inlineData` جنب الوصف.
+ *
+ * **بيرجّع الصورة خام لا رابط.** الرفع للتخزين قرار الطبقة اللي
+ * فوق: التاجر ممكن يجرّب خمس تعديلات ويختار واحدًا، ورفع الخمسة
+ * كان هيملا التخزين بأربع صور محدش هيشوفها.
+ */
+export async function editImage(input: {
+  apiKey: string
+  model: string
+  prompt: string
+  /** الصورة الأصلية — سيبها فاضية عشان يولّد من الصفر */
+  image?: InlineImage
+}): Promise<GeminiResult<GeneratedImage>> {
+  try {
+    const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = []
+    if (input.image) {
+      parts.push({ inlineData: { mimeType: input.image.mimeType, data: input.image.dataBase64 } })
+    }
+    parts.push({ text: input.prompt })
+
+    const res = await callWithRetry(
+      `${BASE}/models/${encodeURIComponent(input.model)}:generateContent?key=${encodeURIComponent(input.apiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts }],
+          generationConfig: {
+            /*
+              لازم نطلب الصورة صراحةً.
+
+              من غير `responseModalities` الموديل بيرد بنص بيوصف
+              التعديل بدل ما يعمله — والتاجر بيقرا فقرة عن صورته
+              وهو مستنّي صورة.
+            */
+            responseModalities: ['IMAGE'],
+          },
+        }),
+      },
+    )
+
+    if (!res.ok) return { ok: false, error: classify(res.status, await res.text()) }
+
+    const data = (await res.json()) as {
+      candidates?: Array<{
+        content?: { parts?: Array<{ inlineData?: { mimeType?: string; data?: string } }> }
+      }>
+      promptFeedback?: { blockReason?: string }
+    }
+
+    if (data.promptFeedback?.blockReason) {
+      return {
+        ok: false,
+        error: { kind: 'blocked', message: 'الطلب اتمنع من فلاتر جوجل. غيّر الوصف وجرّب تاني.' },
+      }
+    }
+
+    const img = data.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data)?.inlineData
+
+    if (!img?.data) {
+      return {
+        ok: false,
+        error: { kind: 'unknown', message: 'الموديل ما رجّعش صورة. جرّب موديل صور تاني.' },
+      }
+    }
+
+    return {
+      ok: true,
+      data: { mimeType: img.mimeType ?? 'image/png', dataBase64: img.data },
+    }
   } catch (e) {
     return { ok: false, error: { kind: 'network', message: String(e).slice(0, 200) } }
   }

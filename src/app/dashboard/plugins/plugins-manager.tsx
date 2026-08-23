@@ -25,9 +25,9 @@ const LOOKS: Record<string, { initials: string; gradient: string; badge?: string
   snapchat_pixel: { initials: 'SC', gradient: '#fffc00' },
   google_analytics: { initials: 'GA', gradient: 'linear-gradient(135deg,#f9ab00,#e37400)' },
   google_ads: { initials: 'AD', gradient: 'linear-gradient(135deg,#4285f4,#34a853)' },
-  gemini: { initials: 'GE', gradient: 'linear-gradient(135deg,#8b5cf6,#ec4899)' },
+  gemini: { initials: 'رد', gradient: 'linear-gradient(135deg,#8b5cf6,#ec4899)' },
   gemini_pro: {
-    initials: 'PR',
+    initials: 'إد',
     gradient: 'linear-gradient(135deg,#f59e0b,#ec4899)',
     badge: 'بيغيّر في متجرك',
   },

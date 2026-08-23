@@ -151,6 +151,12 @@ export function GeminiCard({
       <div className="flex flex-col gap-4 border-t border-[var(--border)] pt-4">
         {msg && <Alert tone={msg.ok ? 'success' : 'danger'}>{msg.text}</Alert>}
 
+        <p className="rounded-lg bg-[var(--color-info-soft)] px-3 py-2.5 text-xs leading-relaxed text-[var(--color-info)]">
+          <strong>الحصّة المجانية محدودة.</strong> البوت بيرد على زوّارك، ولو خلصت حصّته
+          في نص اليوم بيقف قدام عميل بيسأل. فعّل الفوترة من Google AI Studio —
+          ولو حطّيت مفتاحًا مدفوعًا في «مساعدك في الإدارة»، البوت بيرجعله تلقائي بدل ما يقف.
+        </p>
+
         {/* المفتاح */}
         <div className="flex flex-col gap-1.5">
           <label htmlFor="gemini-key" className="flex items-center gap-1.5 text-sm font-medium">

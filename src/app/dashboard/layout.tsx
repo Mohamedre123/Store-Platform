@@ -4,7 +4,8 @@ import { SectionTabs } from '@/components/dashboard/section-tabs'
 import { AuroraBackground } from '@/components/motion'
 import { Preloader } from '@/components/preloader'
 import { AssistantPanel } from '@/components/dashboard/assistant-panel'
-import { isAssistantReady } from '@/lib/ai/settings'
+import { AssistBubble } from '@/components/dashboard/assist-bubble'
+import { getAiConfig, isAssistantReady, GEMINI_PRO_SLUG, GEMINI_SLUG } from '@/lib/ai/settings'
 import { storeUrl } from '@/lib/domain'
 import { logoutAction } from '@/app/(auth)/actions'
 import { ExternalLink, LogOut } from 'lucide-react'
@@ -18,6 +19,17 @@ export default async function DashboardLayout({ children }: { children: React.Re
     مستفيد منها أصلًا. و«مفعّل من غير مفتاح» بيدّي أيقونة بترد بخطأ.
   */
   const assistantReady = await isAssistantReady(store.id)
+
+  /*
+    فقاعة «حدّد واسأل» بتظهر بأي مفتاح Gemini شغّال — مش مربوطة
+    بمساعد اللوحة وحده. التاجر اللي حطّ مفتاح البوت بس كان بيتحرم
+    من تعديل نص بضغطة من غير سبب.
+  */
+  const [gemini, pro] = await Promise.all([
+    getAiConfig(store.id, GEMINI_SLUG),
+    getAiConfig(store.id, GEMINI_PRO_SLUG),
+  ])
+  const hasAnyKey = Boolean(gemini.apiKey || pro.apiKey)
 
   return (
     <div className="min-h-screen-safe">
@@ -70,6 +82,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </div>
           {children}
           {assistantReady && <AssistantPanel />}
+          {hasAnyKey && <AssistBubble />}
         </main>
       </div>
     </div>

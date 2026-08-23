@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { getStore } from '@/lib/storefront'
-import { getAiConfig, isReady } from '@/lib/ai/settings'
+import { getAiConfig, isReady, GEMINI_PRO_SLUG } from '@/lib/ai/settings'
 import { getStoreBrief } from '@/lib/ai/store-context'
 import { buildBotSystem, checkLimits, logBotMessage } from '@/lib/ai/bot'
 import { generate, type ChatMessage } from '@/lib/ai/gemini'
@@ -58,7 +58,11 @@ export async function POST(req: NextRequest) {
 
   if (!limit.ok) {
     // ٢٠٠ لا ٤٢٩: ده مش خطأ، ده رد مقصود العميل لازم يقراه
-    return NextResponse.json({ reply: limit.message, exhausted: true })
+    return NextResponse.json({
+      reply: limit.message,
+      exhausted: true,
+      whatsapp: store.whatsapp ?? null,
+    })
   }
 
   const brief = await getStoreBrief(store.id, cfg.brief)
@@ -73,15 +77,43 @@ export async function POST(req: NextRequest) {
     .slice(-6)
     .map((m) => ({ role: m.role as 'user' | 'model', text: String(m.text).slice(0, 500) }))
 
-  const res = await generate({
+  const system = buildBotSystem(brief, store.name)
+  const messages: ChatMessage[] = [...history, { role: 'user', text: message }]
+
+  let res = await generate({
     apiKey: cfg.apiKey,
     model: cfg.model,
-    system: buildBotSystem(brief, store.name),
-    messages: [...history, { role: 'user', text: message }],
+    system,
+    messages,
     // حرارة منخفضة: الرد لازم يلتزم بالأسعار المكتوبة لا يبدع فيها
     temperature: 0.4,
     maxTokens: 400,
   })
+
+  /**
+   * الرجوع لمفتاح المساعد لو كوته البوت خلصت.
+   *
+   * **المتجر ما يصحّش يقف قدام العميل عشان حصّة مجانية خلصت.**
+   * التاجر اللي حاطط مفتاحًا عليه فوترة للمساعد، بيستخدمه هنا كشبكة
+   * أمان — رسالة عميل واحدة أرخص بكتير من بيعة ضايعة.
+   *
+   * بيحصل على الكوته بس: المفتاح الباطل والمحتوى الممنوع مش هيتصلّحوا
+   * بمفتاح تاني، وإعادة المحاولة بيهم بتستهلك المفتاح المدفوع على
+   * الفاضي.
+   */
+  if (!res.ok && res.error.kind === 'quota') {
+    const pro = await getAiConfig(store.id, GEMINI_PRO_SLUG)
+    if (pro.apiKey && pro.apiKey !== cfg.apiKey) {
+      res = await generate({
+        apiKey: pro.apiKey,
+        model: pro.model ?? cfg.model,
+        system,
+        messages,
+        temperature: 0.4,
+        maxTokens: 400,
+      })
+    }
+  }
 
   if (!res.ok) {
     await logBotMessage({
@@ -95,10 +127,15 @@ export async function POST(req: NextRequest) {
     /*
       الرسالة الحقيقية للتاجر في سجل الرسايل، والعميل بياخد رسالة
       مفيدة. «مفتاحك خلص رصيده» مش كلام يتقال لعميل بيسأل عن مقاس.
+
+      و**بنرجّع رقم الواتساب مع الرد**: العميل اللي البوت وقف معاه
+      لازم يلاقي طريقًا لبني آدم في نفس الفقاعة. «كلّمنا على واتساب»
+      من غير رابط بتخلّيه يدوّر — وأغلبهم بيسيب.
     */
     return NextResponse.json({
-      reply: 'معلش، حصلت مشكلة عندي. كلّمنا على واتساب وهنساعدك فورًا.',
+      reply: 'معلش، مقدرتش أجاوبك دلوقتي. كلّمنا على واتساب وهنساعدك فورًا.',
       exhausted: true,
+      whatsapp: store.whatsapp ?? null,
     })
   }
 

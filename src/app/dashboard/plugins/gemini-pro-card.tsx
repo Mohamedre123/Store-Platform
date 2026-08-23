@@ -11,7 +11,7 @@ export type GeminiProSaved = {
   hasOwnKey: boolean
   model: string | null
   brief: string | null
-  /** إضافة Gemini العادية متظبّطة؟ لو أيوه، Pro تقدر تستعير مفتاحها */
+  /** إضافة الردّ على العملاء متظبّطة؟ لو أيوه، المساعد يقدر يستعير مفتاحها */
   baseReady: boolean
 }
 
@@ -20,7 +20,7 @@ type Model = { id: string; label: string }
 /**
  * شاشة إعداد المساعد المنفّذ.
  *
- * الفرق عن Gemini العادي متكتوب صراحة فوق: **ده بيغيّر في متجرك.**
+ * الفرق عن بوت العملاء متكتوب صراحة فوق: **ده بيغيّر في متجرك.**
  * تاجر مفتكر إنه بيكتب نصوص وبيلاقي منتج اتضاف مش هيثق في المنصة
  * تاني، حتى لو هو اللي وافق.
  */
@@ -51,7 +51,7 @@ export function GeminiProCard({
   const [verifying, startVerify] = useTransition()
   const [saving, startSave] = useTransition()
 
-  // شغّالة لو ليها مفتاحها أو لو Gemini العادية متظبّطة
+  // شغّالة لو ليها مفتاحها أو لو مفتاح البوت متظبّط
   const usable = saved?.hasOwnKey || saved?.baseReady || models.length > 0
 
   const verify = () =>
@@ -138,33 +138,45 @@ export function GeminiProCard({
       <div className="flex flex-col gap-4 border-t border-[var(--border)] pt-4">
         {msg && <Alert tone={msg.ok ? 'success' : 'danger'}>{msg.text}</Alert>}
 
-        {/* الفرق بين الاتنين */}
+{/*
+          الفرق بالوظيفة لا بالاسم.
+
+          «عادي» و«برو» ما بيقولوش للتاجر حاجة — لازم يعرف ده بيكلّم
+          مين وده بيعمل إيه، عشان يقرّر يشغّل أنهي واحد.
+        */}
         <div className="grid gap-2 sm:grid-cols-2">
           <div className="rounded-lg border border-[var(--border)] p-3">
             <span className="flex items-center gap-1.5 text-xs font-semibold">
               <Sparkles className="h-3.5 w-3.5 text-[var(--primary)]" aria-hidden="true" />
-              Gemini العادي
+              الردّ على عملائك
             </span>
-            <p className="mt-1 text-xs text-[var(--fg-muted)]">
-              بيكتب ويقترح. <strong>ما بيغيّرش حاجة في متجرك.</strong>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--fg-muted)]">
+              بيكلّم <strong>زوّار متجرك</strong> ويرد على أسئلتهم.
+              ما بيغيّرش حاجة في متجرك.
             </p>
           </div>
           <div className="rounded-lg border border-[var(--color-warning)]/40 bg-[var(--color-warning-soft)]/40 p-3">
             <span className="flex items-center gap-1.5 text-xs font-semibold">
               <Bot className="h-3.5 w-3.5 text-[var(--color-warning)]" aria-hidden="true" />
-              Pro
+              مساعدك في الإدارة
             </span>
-            <p className="mt-1 text-xs text-[var(--fg-muted)]">
-              <strong>بينفّذ</strong> — بيضيف منتجات ويعدّل أسعار ويغيّر حالة طلبات.
-              بموافقتك على كل إجراء.
+            <p className="mt-1 text-xs leading-relaxed text-[var(--fg-muted)]">
+              بيكلّمك <strong>إنت في اللوحة</strong> و<strong>بينفّذ</strong>: بيضيف
+              منتجات ويعدّل أسعار وصور ويغيّر حالة طلبات — بموافقتك على كل إجراء.
             </p>
           </div>
         </div>
 
+        <p className="rounded-lg bg-[var(--color-warning-soft)] px-3 py-2.5 text-xs leading-relaxed text-[var(--color-warning)]">
+          <strong>محتاج مفتاح عليه فوترة.</strong> المساعد ده بيقرا بيانات متجرك في كل
+          سؤال وبيعدّل الصور، فاستهلاكه أعلى بكتير من البوت — والمفتاح المجاني بيقف
+          معاه من أول شوية. فعّل الفوترة من Google AI Studio.
+        </p>
+
         {saved?.baseReady && !saved.hasOwnKey && (
           <p className="rounded-lg bg-[var(--surface-2)] px-3 py-2.5 text-xs text-[var(--fg-muted)]">
-            هيشتغل بمفتاح Gemini اللي فوق. حط مفتاحًا هنا بس لو عايز تفصل فاتورة
-            المساعد.
+            هيشتغل بمفتاح «الردّ على عملائك». حط مفتاحًا هنا بس لو عايز تفصل فاتورة
+            المساعد — أو لو مفتاح البوت مجاني والمساعد محتاج فوترة.
           </p>
         )}
 

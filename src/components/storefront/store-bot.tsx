@@ -32,6 +32,15 @@ export function StoreBot({
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [exhausted, setExhausted] = useState(false)
+  /**
+   * رقم واتساب جاي مع رد الخادم.
+   *
+   * الشريط العائم ممكن يكون متقفل من التخصيص، وساعتها `whatsappHref`
+   * بييجي فاضي — والعميل اللي البوت وقف معاه بيتقفل عليه الباب.
+   * الخادم بيرجّع رقم المتجر مع الرد اللي فيه فشل، فالطريق لبني آدم
+   * بيفضل مفتوح مهما كان إعداد الشريط.
+   */
+  const [fallbackWa, setFallbackWa] = useState<string | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -85,7 +94,12 @@ export function StoreBot({
         }),
       })
 
-      const data = (await res.json()) as { reply?: string; error?: string; exhausted?: boolean }
+      const data = (await res.json()) as {
+        reply?: string
+        error?: string
+        exhausted?: boolean
+        whatsapp?: string | null
+      }
 
       setMessages((m) => [
         ...m,
@@ -95,6 +109,7 @@ export function StoreBot({
         },
       ])
       if (data.exhausted) setExhausted(true)
+      if (data.whatsapp) setFallbackWa(data.whatsapp)
     } catch {
       setMessages((m) => [
         ...m,
@@ -107,6 +122,19 @@ export function StoreBot({
   }
 
   const suggestions = ['عندكم إيه؟', 'الأسعار كام؟', 'الشحن بيوصل امتى؟']
+
+  /*
+    الرابط المعروف الأول، وبعدين اللي جه مع الرد.
+    الترتيب ده بيخلّي الرسالة الجاهزة اللي التاجر كتبها في التخصيص
+    تفضل شغّالة، والرقم الخام بيبقى شبكة أمان بس.
+  */
+  const waLink =
+    whatsappHref ??
+    (fallbackWa
+      ? `https://wa.me/${fallbackWa.replace(/[^d]/g, '')}?text=${encodeURIComponent(
+          'أهلًا، كنت بسأل المساعد وعايز مساعدة.',
+        )}`
+      : null)
 
   return (
     <>
@@ -187,9 +215,9 @@ export function StoreBot({
               </div>
             )}
 
-            {exhausted && whatsappHref && (
+            {exhausted && waLink && (
               <a
-                href={whatsappHref}
+                href={waLink}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-3 flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-semibold text-white"

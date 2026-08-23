@@ -2,7 +2,8 @@
 
 import { useRef, useState } from 'react'
 import Image from 'next/image'
-import { ImagePlus, Loader2, Monitor, Smartphone, Star, X } from 'lucide-react'
+import { ImagePlus, Loader2, Monitor, Smartphone, Star, Wand2, X } from 'lucide-react'
+import { ImageStudio } from '@/components/dashboard/image-studio'
 import { IMAGE_SPECS } from '@/lib/themes'
 import { cn } from '@/lib/utils'
 
@@ -39,6 +40,7 @@ export function ImageUpload({
   label,
   multiple = false,
   max = 8,
+  aiEdit = false,
 }: {
   value: string[]
   onChange: (urls: string[]) => void
@@ -47,11 +49,21 @@ export function ImageUpload({
   label?: string
   multiple?: boolean
   max?: number
+  /**
+   * زرار تعديل الصورة بالذكاء الاصطناعي.
+   *
+   * **في المنتجات بس.** ده المكان اللي التعديل فيه بيفرق في البيع —
+   * صورة المنتج الوحشة بتقلّل التحويل أكتر من أي حاجة تانية. البانرات
+   * والشعارات التاجر بيجهّزهم مرة وخلاص.
+   */
+  aiEdit?: boolean
 }) {
   const input = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
+  /** الصورة المفتوحة في الاستوديو — سلسلة فاضية يعني توليد من الصفر */
+  const [studio, setStudio] = useState<string | null>(null)
 
   async function upload(files: FileList | File[]) {
     setError(null)
@@ -109,6 +121,18 @@ export function ImageUpload({
             >
               <X className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
+
+            {aiEdit && (
+              <button
+                type="button"
+                onClick={() => setStudio(url)}
+                aria-label="عدّل الصورة بالذكاء الاصطناعي"
+                title="عدّل بالذكاء الاصطناعي"
+                className="absolute bottom-1.5 end-1.5 flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-[#8b5cf6] to-[#ec4899] text-white shadow-lg"
+              >
+                <Wand2 className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            )}
           </div>
         ))}
 
@@ -147,6 +171,17 @@ export function ImageUpload({
         )}
       </div>
 
+      {aiEdit && canAdd && (
+        <button
+          type="button"
+          onClick={() => setStudio('')}
+          className="flex min-h-10 w-fit items-center gap-1.5 rounded-lg border border-[var(--border-strong)] px-3 text-xs font-medium text-[var(--fg-muted)] transition-colors hover:border-[var(--primary)] hover:text-[var(--primary)]"
+        >
+          <Wand2 className="h-3.5 w-3.5" aria-hidden="true" />
+          ولّد صورة بالذكاء الاصطناعي
+        </button>
+      )}
+
       <input
         ref={input}
         type="file"
@@ -158,6 +193,22 @@ export function ImageUpload({
           e.target.value = ''
         }}
       />
+
+      {studio !== null && (
+        <ImageStudio
+          sourceUrl={studio || null}
+          onClose={() => setStudio(null)}
+          onApply={(url) => {
+            /*
+              الناتج بيتضاف جنب الأصل ما بيستبدلوش.
+              التاجر بيشوف الاتنين ويمسح اللي مش عاجبه — الاستبدال
+              المباشر كان هيضيّع صورة أصلية محصلش ليها نسخة تانية.
+            */
+            onChange(multiple ? [...value, url].slice(0, max) : [url])
+            setStudio(null)
+          }}
+        />
+      )}
 
       {error && <p className="text-xs text-[var(--color-danger)]">{error}</p>}
       {multiple && value.length > 1 && (

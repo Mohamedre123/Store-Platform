@@ -156,6 +156,7 @@ export function ProductForm({
               specKey="productImage"
               multiple
               max={8}
+              aiEdit
             />
           </Card>
 
