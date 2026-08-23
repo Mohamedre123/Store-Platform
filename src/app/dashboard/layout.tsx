@@ -23,7 +23,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
     <div className="min-h-screen-safe">
       <Preloader />
       <AuroraBackground />
-      <Sidebar storeName={store.name} storeSlug={store.slug} storeLogo={store.logoLight} />
+      <Sidebar
+        storeName={store.name}
+        storeSlug={store.slug}
+        storeLogo={store.logoLight}
+        storeUrl={storeUrl(store.slug)}
+        userName={user.name}
+        userEmail={user.email}
+        onLogout={logoutAction}
+      />
 
       <div className="lg:ms-64">
         {/* الشريط العلوي */}

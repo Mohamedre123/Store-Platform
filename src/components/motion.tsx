@@ -1,6 +1,23 @@
 'use client'
 
-import { useEffect, useRef, useState, type ElementType, type ReactNode } from 'react'
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ElementType,
+  type ReactNode,
+} from 'react'
+
+/**
+ * تأثير بيشتغل قبل أول رسم في المتصفح، وبيرجع للعادي على الخادم.
+ *
+ * `useLayoutEffect` بيحذّر لما يشتغل على الخادم، بس ده بالظبط اللي
+ * محتاجينه هنا: القرار «العنصر ظاهر خلاص ولا لأ» لازم يتاخد **قبل**
+ * الرسم، وإلا المحتوى بيختفي إطارًا واحدًا وبيرجع — وده اللي بيخلّي
+ * الصفحة تبان بتلعب.
+ */
+const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
 
 /**
  * دخول لمحتوى أول الشاشة — حركة CSS خالصة، من غير جافاسكربت.
@@ -54,7 +71,7 @@ export function Reveal({
   const ref = useRef<HTMLElement>(null)
   const [shown, setShown] = useState(false)
 
-  useEffect(() => {
+  useIsoLayoutEffect(() => {
     const node = ref.current
     if (!node) return
 
@@ -71,6 +88,26 @@ export function Reveal({
       return
     }
 
+    /**
+     * **اللي ظاهر على الشاشة خلاص بيتعرض فورًا من غير حركة.**
+     *
+     * ده أهم سطر في الملف. من غيره كان اللي بيحصل: الخادم بيرسم
+     * المحتوى ظاهر، وأول ما React يشتغل بيحطّ `zw-hydrated` فيختفي
+     * كله، وبعدين يرجع يظهر واحد واحد بتأخير. يعني المستخدم بيشوف
+     * الصفحة بتظهر وتختفي وترجع — وبيحسّ إن الموقع بطيء وهو مش بطيء.
+     *
+     * وفي التنقّل بين الصفحات كان أسوأ: الصفحة الجديدة بتبدأ مخفية،
+     * فالضغطة على الزرار كأنها ما عملتش حاجة لنص ثانية.
+     *
+     * القرار بيتاخد قبل الرسم (layout effect) عشان مفيش ولا إطار
+     * واحد بيتعرض فيه العنصر مخفي.
+     */
+    const rect = node.getBoundingClientRect()
+    if (rect.top < window.innerHeight) {
+      setShown(true)
+      return
+    }
+
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -81,7 +118,7 @@ export function Reveal({
         }
       },
       // نبدأ الحركة قبل ما العنصر يدخل الشاشة بشوية عشان تبقى ناعمة
-      { rootMargin: '0px 0px -12% 0px', threshold: 0.08 },
+      { rootMargin: '0px 0px -8% 0px', threshold: 0.05 },
     )
 
     observer.observe(node)
@@ -125,6 +162,7 @@ export function SpotlightCard({
   className?: string
 }) {
   const ref = useRef<HTMLDivElement>(null)
+  const frame = useRef(0)
 
   return (
     <div
@@ -135,9 +173,21 @@ export function SpotlightCard({
         if (e.pointerType !== 'mouse') return
         const el = ref.current
         if (!el) return
-        const rect = el.getBoundingClientRect()
-        el.style.setProperty('--zw-mx', `${e.clientX - rect.left}px`)
-        el.style.setProperty('--zw-my', `${e.clientY - rect.top}px`)
+
+        /*
+          تحديث واحد لكل إطار.
+
+          `getBoundingClientRect` بيجبر المتصفح يحسب التخطيط، وحدث
+          حركة الماوس بيتنادى عشرات المرات في الثانية. من غير التجميع
+          ده، تحريك الماوس على شبكة كروت بيعمل تقطيع واضح.
+        */
+        const { clientX, clientY } = e
+        cancelAnimationFrame(frame.current)
+        frame.current = requestAnimationFrame(() => {
+          const rect = el.getBoundingClientRect()
+          el.style.setProperty('--zw-mx', `${clientX - rect.left}px`)
+          el.style.setProperty('--zw-my', `${clientY - rect.top}px`)
+        })
       }}
     >
       {children}

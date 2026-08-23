@@ -20,6 +20,7 @@ import {
   SpotlightCard,
 } from "@/components/motion";
 import { Logo } from "@/components/logo";
+import { Rail } from "@/components/rail";
 import { brand } from "@/lib/brand";
 import { Preloader } from "@/components/preloader";
 import {
@@ -278,9 +279,13 @@ export default function HomePage() {
               </p>
             </Reveal>
 
-            <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Rail
+              className="mt-12"
+              desktop="sm:grid sm:grid-cols-2 lg:grid-cols-3"
+              itemWidth="basis-[80%]"
+            >
               {features.map(({ icon: Icon, title, body }, i) => (
-                <Reveal key={title} delay={(i % 3) * 90}>
+                <Reveal key={title} delay={(i % 3) * 90} className="h-full">
                   <SpotlightCard className="flex h-full flex-col gap-2.5 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5">
                     <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--primary-soft)] text-[var(--primary)]">
                       <Icon className="h-5 w-5" aria-hidden="true" />
@@ -292,7 +297,7 @@ export default function HomePage() {
                   </SpotlightCard>
                 </Reveal>
               ))}
-            </div>
+            </Rail>
           </div>
         </section>
 
@@ -305,10 +310,10 @@ export default function HomePage() {
               </h2>
             </Reveal>
 
-            <ol className="mt-12 grid gap-8 sm:grid-cols-3">
+            <Rail as="ol" className="mt-12 sm:gap-8" desktop="sm:grid sm:grid-cols-3">
               {steps.map((s, i) => (
                 <Reveal as="li" key={s.t} delay={i * 120}>
-                  <div className="flex flex-col gap-2">
+                  <div className="flex h-full flex-col gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5 sm:border-0 sm:bg-transparent sm:p-0">
                     <span className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-strong)] bg-[var(--surface)] text-sm font-bold text-[var(--primary)]">
                       {["١", "٢", "٣"][i]}
                     </span>
@@ -319,7 +324,7 @@ export default function HomePage() {
                   </div>
                 </Reveal>
               ))}
-            </ol>
+            </Rail>
           </div>
         </section>
 

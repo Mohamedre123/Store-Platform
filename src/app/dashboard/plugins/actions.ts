@@ -1,6 +1,5 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { storePlugins } from '@/db/schema'
@@ -54,6 +53,16 @@ export async function savePluginAction(input: {
     await db.insert(storePlugins).values({ ...values, storeId: store.id, pluginSlug: input.slug })
   }
 
-  revalidatePath('/dashboard/plugins')
+  /*
+    **مفيش `revalidatePath` هنا عن قصد.**
+
+    الصفحة ديناميكية أصلًا (بتقرا الكوكي)، فأي زيارة جاية بتيجي من
+    قاعدة البيانات على طول. اللي كان `revalidatePath` بيعمله هو إنه
+    يجبر المتصفح يعيد جلب الصفحة كلها بعد كل ضغطة مفتاح — استعلامات
+    الإضافات وإعدادات الذكاء الاصطناعي التلاتة من تاني — فالمفتاح
+    كان بياخد نص ثانية على ما يستقر، والكروت كلها بترفّ.
+
+    الكارت بيمسك حالته بنفسه، والعدّاد فوق بيتحدّث من الحالة دي.
+  */
   return { ok: true }
 }

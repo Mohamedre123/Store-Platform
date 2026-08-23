@@ -68,7 +68,7 @@ export const PAYMENT_PROVIDERS: ProviderDef[] = [
     brand: 'Paymob',
     desc: 'فيزا وماستر كارد ومحافظ إلكترونية وميزة. الأشهر في مصر.',
     color: '#f0592a',
-    signupUrl: 'https://paymob.com/en/register',
+    signupUrl: 'https://paymob.com/',
     where:
       'المفتاح من Settings ← Account Info، وأرقام التكامل من Developers ← Payment Integrations، والـiFrame من Developers ← iframes.',
     mode: 'api',

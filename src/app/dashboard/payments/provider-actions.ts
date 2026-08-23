@@ -50,7 +50,11 @@ export async function savePaymentProviderAction(raw: unknown): Promise<SaveResul
     },
   })
 
-  revalidatePath('/dashboard/payments')
+  /*
+    من غير إعادة تحميل: الكارت بيمسك حالته، والصفحة ديناميكية
+    فأي زيارة جاية بتقرا من قاعدة البيانات. إجبار إعادة الجلب على
+    كل مفتاح كان بيخلّي التفعيل يبان تقيلًا من غير أي فايدة.
+  */
   return { ok: true }
 }
 
@@ -74,6 +78,11 @@ export async function saveCarrierProviderAction(raw: unknown): Promise<SaveResul
     after: { carrier: def.name, enabled: parsed.data.enabled, testMode: parsed.data.testMode },
   })
 
+  /*
+    الشحن **بيتعاد تحميله** على عكس الدفع: قفل التسعير اليدوي
+    بيتحسب على الخادم من أسعار الشركات، فلو ما اتعادش، التاجر
+    بيقفل الشركة ويلاقي التسعير لسه مقفول.
+  */
   revalidatePath('/dashboard/shipping')
   return { ok: true }
 }

@@ -31,6 +31,7 @@ export function GeminiCard({
   def,
   saved,
   embedded = false,
+  onToggle,
 }: {
   def: PluginDef
   saved?: GeminiSaved
@@ -41,6 +42,8 @@ export function GeminiCard({
    * متداخلين وحشّين، والمساحة على الموبايل ضيقة أصلًا.
    */
   embedded?: boolean
+  /** بيبلّغ المعرض بالحالة الجديدة — العدّاد والنقطة بيتحرّكوا منها */
+  onToggle?: (slug: string, active: boolean) => void
 }) {
   const [enabled, setEnabled] = useState(saved?.enabled ?? false)
   const [apiKey, setApiKey] = useState('')
@@ -94,6 +97,7 @@ export function GeminiCard({
         setEnabled(saved?.enabled ?? false)
       } else {
         setApiKey('')
+        onToggle?.(def.slug, nextEnabled ?? enabled)
         setMsg({ ok: true, text: (nextEnabled ?? enabled) ? 'اتفعّلت وشغّالة' : 'اتوقفت' })
       }
     })
@@ -124,8 +128,10 @@ export function GeminiCard({
           role="switch"
           aria-checked={enabled}
           aria-label={enabled ? 'إيقاف Gemini' : 'تفعيل Gemini'}
-          disabled={saving || (!configured && !enabled)}
+          aria-busy={saving}
+          disabled={!configured && !enabled}
           onClick={() => {
+            if (saving) return
             const next = !enabled
             setEnabled(next)
             save(next)

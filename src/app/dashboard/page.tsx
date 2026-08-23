@@ -2,6 +2,7 @@ import Link from "next/link";
 import { and, count, eq, gte, sum } from "drizzle-orm";
 import {
   ArrowLeft,
+  Check,
   CreditCard,
   Package,
   Palette,
@@ -22,6 +23,7 @@ import { getDashboardContext } from "@/lib/store-context";
 import { storeUrl } from "@/lib/domain";
 import { formatMoney } from "@/lib/utils";
 import { Card } from "@/components/ui";
+import { Rail } from "@/components/rail";
 import { Reveal, SpotlightCard } from "@/components/motion";
 import { PublishBanner } from "./publish-banner";
 
@@ -164,7 +166,7 @@ export default async function DashboardHome() {
       </Reveal>
 
       {/* الأرقام */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <Rail desktop="sm:grid sm:grid-cols-2 lg:grid-cols-4" itemWidth="basis-[46%]">
         {stats.map(({ label, value, icon: Icon, href, highlight }, i) => {
           const body = (
             <SpotlightCard className="flex h-full flex-col gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-4">
@@ -185,7 +187,7 @@ export default async function DashboardHome() {
             </SpotlightCard>
           );
           return (
-            <Reveal key={label} delay={i * 70}>
+            <Reveal key={label} delay={i * 70} className="h-full">
               {href ? (
                 <Link href={href} className="block h-full">
                   {body}
@@ -196,33 +198,45 @@ export default async function DashboardHome() {
             </Reveal>
           );
         })}
-      </div>
+      </Rail>
 
       {/* خطوات التجهيز */}
       {remaining.length > 0 && (
         <Reveal delay={120}>
-          <Card className="overflow-hidden">
-            <div className="border-b border-[var(--border)] px-5 py-4">
-              <h2 className="font-semibold">جهّز متجرك</h2>
-            </div>
-            <ul className="divide-y divide-[var(--border)]">
+          <div className="flex flex-col gap-3">
+            <h2 className="font-semibold">جهّز متجرك</h2>
+
+            {/*
+              الخطوات جنب بعض على الموبايل بتمرير بالإصبع.
+              فوق بعض كانت بتاخد نص الشاشة وتزقّ باقي اللوحة تحت،
+              والتاجر اللي خلّص خطوتين بيفضل يمرّر عليهم كل مرة.
+            */}
+            <Rail
+              as="ul"
+              desktop="sm:grid sm:grid-cols-2 lg:grid-cols-4"
+              itemWidth="basis-[70%]"
+            >
               {setup.map(({ done, label, href, icon: Icon }) => (
-                <li key={label}>
+                <li key={label} className="h-full">
                   <Link
                     href={href}
-                    className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-[var(--surface-2)]"
+                    className="flex h-full items-center gap-3 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-4 transition-colors hover:bg-[var(--surface-2)]"
                   >
                     <span
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
                         done
                           ? "bg-[var(--color-success-soft)] text-[var(--color-success)]"
                           : "bg-[var(--surface-2)] text-[var(--fg-subtle)]"
                       }`}
                     >
-                      <Icon className="h-4 w-4" aria-hidden="true" />
+                      {done ? (
+                        <Check className="h-4 w-4" aria-hidden="true" />
+                      ) : (
+                        <Icon className="h-4 w-4" aria-hidden="true" />
+                      )}
                     </span>
                     <span
-                      className={`flex-1 text-sm ${
+                      className={`min-w-0 flex-1 text-sm ${
                         done
                           ? "text-[var(--fg-subtle)] line-through"
                           : "font-medium"
@@ -239,8 +253,8 @@ export default async function DashboardHome() {
                   </Link>
                 </li>
               ))}
-            </ul>
-          </Card>
+            </Rail>
+          </div>
         </Reveal>
       )}
 

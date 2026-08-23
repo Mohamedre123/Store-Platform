@@ -18,6 +18,7 @@ export function ClaudeCard({
   def,
   saved,
   embedded = false,
+  onToggle,
 }: {
   def: PluginDef
   saved?: ClaudeSaved
@@ -28,6 +29,8 @@ export function ClaudeCard({
    * متداخلين وحشّين، والمساحة على الموبايل ضيقة أصلًا.
    */
   embedded?: boolean
+  /** بيبلّغ المعرض بالحالة الجديدة — العدّاد والنقطة بيتحرّكوا منها */
+  onToggle?: (slug: string, active: boolean) => void
 }) {
   const [enabled, setEnabled] = useState(saved?.enabled ?? false)
   const [apiKey, setApiKey] = useState('')
@@ -64,6 +67,7 @@ export function ClaudeCard({
         setMsg({ ok: false, text: res.error })
         setEnabled(saved?.enabled ?? false)
       } else {
+        onToggle?.(def.slug, nextEnabled ?? enabled)
         setApiKey('')
         setMsg({
           ok: true,
@@ -98,8 +102,10 @@ export function ClaudeCard({
           role="switch"
           aria-checked={enabled}
           aria-label={enabled ? 'إيقاف Claude' : 'تفعيل Claude'}
-          disabled={saving || (!configured && !enabled)}
+          aria-busy={saving}
+          disabled={!configured && !enabled}
           onClick={() => {
+            if (saving) return
             const next = !enabled
             setEnabled(next)
             save(next)

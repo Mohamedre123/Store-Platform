@@ -69,7 +69,7 @@ export function PluginsManager({
   const bySlug = new Map(installed.map((p) => [p.slug, p]))
 
   /** مفعّل فعلًا: الإضافة شغّالة **ومعاها** اللي محتاجاه عشان تشتغل */
-  const isActive = (slug: string) => {
+  const initialActive = (slug: string) => {
     if (slug === 'gemini') return gemini.enabled && gemini.hasKey
     if (slug === 'gemini_pro') return pro.enabled && (pro.hasOwnKey || pro.baseReady)
     if (slug === 'claude') return claude.enabled && claude.hasKey
@@ -78,7 +78,7 @@ export function PluginsManager({
   }
 
   /** فيه إعدادات محفوظة؟ بيغيّر نص الزرار من «فعّل» لـ«تفاصيل» */
-  const isConfigured = (slug: string) => {
+  const initialConfigured = (slug: string) => {
     if (slug === 'gemini') return gemini.hasKey
     if (slug === 'gemini_pro') return pro.hasOwnKey || pro.baseReady
     if (slug === 'claude') return claude.hasKey
@@ -86,7 +86,26 @@ export function PluginsManager({
     return Boolean(row && Object.values(row.config ?? {}).some(Boolean))
   }
 
-  const activeCount = PLUGINS.filter((p) => isActive(p.slug)).length
+  /**
+   * حالة التفعيل في المتصفح.
+   *
+   * الخادم مش بيعيد تحميل الصفحة بعد كل مفتاح (وده مقصود — إعادة
+   * التحميل كانت بتخلّي المفتاح يبان تقيلًا)، فالعدّاد فوق والنقطة
+   * على كل كارت لازم يتحرّكوا من هنا. الكارت بيبلّغ لما يحفظ بنجاح.
+   */
+  const [live, setLive] = useState<Record<string, { active: boolean; configured: boolean }>>(() =>
+    Object.fromEntries(
+      PLUGINS.map((d) => [
+        d.slug,
+        { active: initialActive(d.slug), configured: initialConfigured(d.slug) },
+      ]),
+    ),
+  )
+
+  const report = (slug: string, active: boolean) =>
+    setLive((v) => ({ ...v, [slug]: { active, configured: active || (v[slug]?.configured ?? false) } }))
+
+  const activeCount = PLUGINS.filter((d) => live[d.slug]?.active).length
 
   return (
     <div className="flex flex-col gap-8">
@@ -128,17 +147,17 @@ export function PluginsManager({
                     initials={look.initials}
                     gradient={look.gradient}
                     badge={look.badge}
-                    active={isActive(def.slug)}
-                    configured={isConfigured(def.slug)}
+                    active={live[def.slug]?.active ?? false}
+                    configured={live[def.slug]?.configured ?? false}
                   >
                     {def.custom === 'gemini' ? (
-                      <GeminiCard def={def} saved={gemini} embedded />
+                      <GeminiCard def={def} saved={gemini} embedded onToggle={report} />
                     ) : def.custom === 'gemini_pro' ? (
-                      <GeminiProCard def={def} saved={pro} embedded />
+                      <GeminiProCard def={def} saved={pro} embedded onToggle={report} />
                     ) : def.custom === 'claude' ? (
-                      <ClaudeCard def={def} saved={claude} embedded />
+                      <ClaudeCard def={def} saved={claude} embedded onToggle={report} />
                     ) : (
-                      <PluginCard def={def} saved={bySlug.get(def.slug)} />
+                      <PluginCard def={def} saved={bySlug.get(def.slug)} onToggle={report} />
                     )}
                   </AppCard>
                 )
@@ -151,7 +170,15 @@ export function PluginsManager({
   )
 }
 
-function PluginCard({ def, saved }: { def: PluginDef; saved?: PluginRow }) {
+function PluginCard({
+  def,
+  saved,
+  onToggle,
+}: {
+  def: PluginDef
+  saved?: PluginRow
+  onToggle?: (slug: string, active: boolean) => void
+}) {
   const [enabled, setEnabled] = useState(saved?.enabled ?? false)
   const [config, setConfig] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {}
@@ -174,6 +201,7 @@ function PluginCard({ def, saved }: { def: PluginDef; saved?: PluginRow }) {
         setMsg({ ok: false, text: res.error })
         setEnabled(saved?.enabled ?? false) // رجّع المفتاح لأنه ما اتحفظش
       } else {
+        onToggle?.(def.slug, willEnable)
         setMsg({ ok: true, text: willEnable ? 'اتفعّل وشغّال على متجرك' : 'اتوقف' })
       }
     })
@@ -199,8 +227,9 @@ function PluginCard({ def, saved }: { def: PluginDef; saved?: PluginRow }) {
           role="switch"
           aria-checked={enabled}
           aria-label={enabled ? `إيقاف ${def.name}` : `تفعيل ${def.name}`}
-          disabled={pending}
+          aria-busy={pending}
           onClick={() => {
+            if (pending) return
             const next = !enabled
             setEnabled(next)
             save(next)

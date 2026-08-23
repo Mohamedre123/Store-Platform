@@ -110,7 +110,15 @@ export function isValidSlug(slug: string): boolean {
  * الويب هوك بيتلزق في لوحة بوابة الدفع أو شركة الشحن، فلازم يكون
  * رابطًا كاملًا مطلقًا. الرابط النسبي بيشتغل عندنا وبيفشل عندهم،
  * والتاجر ما يكتشفش غير لما أول طلب مايتحدّثش.
+ *
+ * **ولازم يكون المضيف اللي بيرد فعلًا لا اللي بيحوّل.** `ROOT_DOMAIN`
+ * بتتشال منه بادئة `www` عشان حساب النطاقات الفرعية للمتاجر يظبط،
+ * فلو الموقع بيرد على `www` والجذر بيعمل تحويل، الويب هوك بيوصل
+ * لتحويل — و**التحويل بيضيّع حمولة الـPOST**، يعني تأكيد دفع بيتبعت
+ * وما بيوصلش. `NEXT_PUBLIC_SITE_URL` هي اللي بتحسم المضيف الصح.
  */
 export function platformOrigin(): string {
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/+$/, '')
+  if (explicit) return explicit.startsWith('http') ? explicit : `https://${explicit}`
   return `${protocol()}://${ROOT_DOMAIN}`
 }

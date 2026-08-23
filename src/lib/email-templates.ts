@@ -135,6 +135,64 @@ export function verificationEmail(code: string, name?: string) {
   }
 }
 
+/**
+ * رمز استعادة كلمة المرور.
+ *
+ * منفصل عن رسالة التأكيد عن قصد: الاتنين رمز في بريد، لكن ده بيوصل
+ * لحد **مش** طالبه في أغلب حالات إساءة الاستخدام. فالرسالة لازم
+ * تقول بوضوح إن حد طلب تغيير كلمة السر وإن التجاهل بيكفي — وإلا
+ * صاحب الحساب يفتكر إن حسابك اخترق ويفزع.
+ */
+export function passwordResetEmail(code: string, name?: string) {
+  const greeting = name ? `أهلًا ${name}،` : 'أهلًا،'
+  const spaced = code.split('').join(' ')
+
+  const inner = `
+    <p style="margin:0 0 14px;font-size:16px;line-height:1.9;font-weight:600;">${greeting}</p>
+
+    <p style="margin:0 0 24px;font-size:15px;line-height:1.9;color:${COLORS.muted};">
+      وصلنا طلب لتغيير كلمة السر بتاعة حسابك. اكتب الرمز ده في صفحة الاستعادة
+      وبعدها اختار كلمة سر جديدة.
+    </p>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+      <tr>
+        <td align="center" style="background-color:${COLORS.primarySoft};border:1px solid #d8cfec;border-radius:12px;padding:22px 12px;">
+          <div style="font-size:12px;letter-spacing:1px;color:${COLORS.muted};margin-bottom:10px;">رمز الاستعادة</div>
+          <div dir="ltr" style="font-family:'Courier New',Consolas,monospace;font-size:34px;font-weight:700;letter-spacing:6px;color:${COLORS.primary};line-height:1;">${spaced}</div>
+        </td>
+      </tr>
+    </table>
+
+    <p style="margin:22px 0 0;font-size:14px;line-height:1.9;color:${COLORS.muted};">
+      الرمز صالح لمدة <strong style="color:${COLORS.ink};">١٠ دقايق</strong>.
+    </p>
+
+    <hr style="border:0;border-top:1px solid ${COLORS.border};margin:24px 0;">
+
+    <p style="margin:0;font-size:13px;line-height:1.9;color:${COLORS.subtle};">
+      <strong style="color:${COLORS.ink};">لو مش إنت اللي طلبت ده، تجاهل الرسالة.</strong>
+      كلمة سرّك زي ما هي، ومحدش يقدر يغيّرها من غير الرمز اللي فوق.
+    </p>
+  `
+
+  return {
+    subject: `${code} هو رمز استعادة كلمة السر في ${brand.name}`,
+    html: layout(inner, `رمز الاستعادة: ${code} — صالح ١٠ دقايق`),
+    text: [
+      greeting,
+      '',
+      `رمز استعادة كلمة السر في ${brand.name}: ${code}`,
+      'الرمز صالح لمدة ١٠ دقائق.',
+      '',
+      'لو مش إنت اللي طلبته، تجاهل الرسالة — كلمة سرّك زي ما هي.',
+      '',
+      `${brand.name} — ${brand.tagline}`,
+      SITE,
+    ].join('\n'),
+  }
+}
+
 /** ترحيب بعد تأكيد الحساب */
 export function welcomeEmail(name: string, storeName: string, storeLink: string) {
   const inner = `

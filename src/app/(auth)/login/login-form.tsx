@@ -32,7 +32,17 @@ export function LoginForm() {
           />
         </Field>
 
-        <Field label="كلمة المرور" required htmlFor="password" error={state?.fieldErrors?.password}>
+        {/*
+          «نسيت كلمة السر؟» جنب الحقل نفسه لا تحت الفورم.
+          اللي بينسى بيلاقيها وهو بيبص على الخانة اللي وقّفته — مش
+          بعد ما يجرّب كلمة سر غلط ويستنّى الخطأ.
+        */}
+        <Field
+          label="كلمة المرور"
+          required
+          htmlFor="password"
+          error={state?.fieldErrors?.password}
+        >
           <Input
             id="password"
             name="password"
@@ -41,6 +51,15 @@ export function LoginForm() {
             required
           />
         </Field>
+
+        <div className="-mt-2 text-start">
+          <Link
+            href="/reset"
+            className="text-sm font-medium text-[var(--primary)] hover:underline"
+          >
+            نسيت كلمة السر؟
+          </Link>
+        </div>
 
         <Button type="submit" size="lg" loading={pending} className="mt-1 w-full">
           دخول

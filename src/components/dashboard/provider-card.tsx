@@ -223,13 +223,15 @@ export function ProviderCard({
               role="switch"
               aria-checked={enabled}
               aria-label={enabled ? `إيقاف ${def.name}` : `تفعيل ${def.name}`}
-              disabled={pending}
+              aria-busy={pending}
               onClick={() => {
+                // الضغط المتكرّر بيتجاهل هنا بدل ما نقفل المفتاح ويبان معطّلًا
+                if (pending) return
                 const next = !enabled
                 setEnabled(next)
                 save(next)
               }}
-              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
+              className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
                 enabled ? 'bg-[var(--primary)]' : 'bg-[var(--border-strong)]'
               }`}
             >

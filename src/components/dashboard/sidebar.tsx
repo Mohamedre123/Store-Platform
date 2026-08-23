@@ -9,6 +9,8 @@ import {
   Boxes,
   CreditCard,
   Crown,
+  ExternalLink,
+  LogOut,
   LayoutDashboard,
   Megaphone,
   Menu,
@@ -155,10 +157,26 @@ export function Sidebar({
   storeName,
   storeSlug,
   storeLogo,
+  storeUrl,
+  userName,
+  userEmail,
+  onLogout,
 }: {
   storeName: string
   storeSlug: string
   storeLogo: string | null
+  /**
+   * كل حاجة كانت في الشريط العلوي بتاع الديسكتوب بتتمرّر هنا كمان.
+   *
+   * الشريط ده `hidden lg:flex`، يعني على الموبايل كان **مفيش تسجيل
+   * خروج ولا رابط للمتجر خالص** — التاجر اللي بيشتغل من موبايله
+   * ما كانش يقدر يخرج من حسابه. القايمة الجانبية هي المكان الطبيعي
+   * ليهم على الشاشة الصغيرة.
+   */
+  storeUrl: string
+  userName: string
+  userEmail: string
+  onLogout: () => void
 }) {
   const pathname = usePathname()
   const search = useSearchParams()
@@ -272,27 +290,91 @@ export function Sidebar({
     <div className="border-t border-[var(--border)] p-3">
       <Link
         href="/dashboard/subscription"
+        onClick={() => setOpen(false)}
         className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[var(--fg-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--fg)]"
       >
         <Crown className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
         الاشتراك
       </Link>
+
+      {/*
+        دول على الموبايل بس: على الديسكتوب مكانهم الشريط العلوي،
+        وتكرارهم في الاتنين بيخلّي زرارين لنفس الإجراء في الشاشة
+        الواحدة.
+      */}
+      <div className="mt-2 flex flex-col gap-1 border-t border-[var(--border)] pt-2 lg:hidden">
+        <a
+          href={storeUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[var(--fg-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--fg)]"
+        >
+          <ExternalLink className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+          عرض المتجر
+        </a>
+
+        <div className="flex items-center gap-3 rounded-lg px-3 py-2">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--primary-soft)] text-xs font-bold text-[var(--primary)]">
+            {userName.trim().slice(0, 2) || '؟'}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium">{userName}</span>
+            <span dir="ltr" className="block truncate text-start text-xs text-[var(--fg-subtle)]">
+              {userEmail}
+            </span>
+          </span>
+        </div>
+
+        <button
+          type="button"
+          onClick={onLogout}
+          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-start text-sm font-medium text-[var(--color-danger)] transition-colors hover:bg-[var(--color-danger-soft)]"
+        >
+          <LogOut className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+          تسجيل الخروج
+        </button>
+      </div>
     </div>
   )
 
   return (
     <>
-      {/* شريط الموبايل */}
-      <div className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-[var(--border)] bg-[var(--surface)]/85 px-4 backdrop-blur-md lg:hidden">
+{/*
+        شريط الموبايل.
+
+        **لونه صلب لا شفّاف.** الشفافية كانت بتخلّي الخلفية المتحركة
+        تبان من وراه بلون مختلف شوية عن الصفحة، فيبان كأنه شريحة
+        سايبة مش جزء من الصفحة. و`safe-top` بيدّيه مساحة النوتش
+        عشان ما يتحشرش تحت ساعة التليفون.
+      */}
+      <div className="safe-top sticky top-0 z-40 flex items-center gap-2 border-b border-[var(--border)] bg-[var(--surface)] px-3 lg:hidden">
         <button
           type="button"
           onClick={() => setOpen(true)}
           aria-label="فتح القائمة"
-          className="-ms-2 flex h-10 w-10 items-center justify-center rounded-lg text-[var(--fg-muted)] hover:bg-[var(--surface-2)]"
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-[var(--fg-muted)] transition-colors hover:bg-[var(--surface-2)]"
         >
           <Menu className="h-5 w-5" aria-hidden="true" />
         </button>
-        <span className="truncate text-sm font-semibold">{storeName}</span>
+
+        <Image
+          src={storeLogo || brand.logo}
+          alt=""
+          width={28}
+          height={28}
+          className="h-7 w-7 shrink-0 rounded-lg object-contain"
+        />
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold">{storeName}</span>
+
+        <a
+          href={storeUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="عرض المتجر"
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-[var(--fg-muted)] transition-colors hover:bg-[var(--surface-2)]"
+        >
+          <ExternalLink className="h-5 w-5" aria-hidden="true" />
+        </a>
       </div>
 
       {/* الدرج على الموبايل */}
