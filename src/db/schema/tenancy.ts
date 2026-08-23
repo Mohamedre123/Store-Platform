@@ -71,6 +71,17 @@ export const stores = pgTable(
     // التشغيل
     inventoryEnabled: boolean('inventory_enabled').notNull().default(false),
     bookingsEnabled: boolean('bookings_enabled').notNull().default(false),
+    /**
+     * مواعيد العمل: أيام الأسبوع وساعات الفتح وطول الفترة.
+     *
+     * jsonb لا أعمدة منفصلة: الشكل ده بيتغيّر (إجازات، فترتين في
+     * اليوم، مواعيد مختلفة لكل فرع)، والهجرة على كل تغيير في حاجة
+     * لسه بتتشكّل بتكلّف أكتر ما بتفيد.
+     */
+    bookingHours: jsonb('booking_hours')
+      .$type<{ days: number[]; from: string; to: string; slotMinutes: number }>()
+      .notNull()
+      .default({ days: [6, 0, 1, 2, 3, 4], from: '10:00', to: '22:00', slotMinutes: 60 }),
     status: text('status').$type<StoreStatus>().notNull().default('trial'),
     trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }),
     subscribedUntil: timestamp('subscribed_until', { withTimezone: true }),

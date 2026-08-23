@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { sendAbandonedCartReminders } from '@/lib/abandoned-carts'
 import { rollupAllStores } from '@/lib/analytics-events'
+import { drainJobs, pruneJobs } from '@/lib/jobs'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -45,5 +46,24 @@ export async function GET(req: NextRequest) {
     console.error('فشل تجميع الإحصاءات:', e)
   }
 
-  return NextResponse.json({ ok: true, ...result, rolledUp })
+  /*
+    طابور المهام بيتسحب هنا كمان.
+
+    **مش مهمة مجدولة لوحدها عن قصد**: خطة Vercel المجانية بتسمح
+    بمهمة واحدة، ومهمتين بيرفضوا النشر كله — وده حصل فعلًا قبل كده.
+    فبنسحب الطابور مع نفس المهمة اليومية.
+
+    ولو الطابور احتاج سحبًا أكتر من مرة في اليوم، المسار
+    `/api/cron/jobs` موجود ومفتوح لأي جدولة خارجية بنفس السرّ —
+    من غير ما نغيّر حاجة في الكود.
+  */
+  let jobs = { picked: 0, done: 0, failed: 0, retried: 0 }
+  try {
+    jobs = await drainJobs(40)
+    await pruneJobs()
+  } catch (e) {
+    console.error('فشل سحب طابور المهام:', e)
+  }
+
+  return NextResponse.json({ ok: true, ...result, rolledUp, jobs })
 }

@@ -239,6 +239,26 @@ export function CheckoutForm({
         notes: notes || undefined,
         paymentGateway: gateway,
         couponCode: coupon?.code || undefined,
+        /*
+          مواعيد الخدمات اللي العميل اختارها في صفحة المنتج.
+          متخزّنة محليًا زي السلة بالظبط — لو بعتناها من السلة نفسها
+          كان لازم نغيّر شكلها، وأي سلة قديمة في متصفح عميل كانت
+          هتبوظ.
+        */
+        slots: (() => {
+          try {
+            const raw = localStorage.getItem('zw_bookings')
+            if (!raw) return undefined
+            const map = JSON.parse(raw) as Record<string, string>
+            const ids = new Set(items.map((i) => i.productId))
+            const out: Record<string, string> = {}
+            for (const [id, at] of Object.entries(map)) if (ids.has(id)) out[id] = at
+            return Object.keys(out).length ? out : undefined
+          } catch {
+            return undefined
+          }
+        })(),
+
         lines: items.map((i) => ({ productId: i.productId, quantity: i.quantity, variantId: i.variantId })),
         draftToken: draftToken.current,
       })
@@ -251,6 +271,7 @@ export function CheckoutForm({
       clear()
       try {
         localStorage.removeItem('zw_cart_note')
+        localStorage.removeItem('zw_bookings')
       } catch {}
 
       /**

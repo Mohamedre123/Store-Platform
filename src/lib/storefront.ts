@@ -42,6 +42,8 @@ export type StorefrontStore = {
   vatEnabled: boolean
   vatRate: number
   vatIncludedInPrice: boolean
+  /** الحجوزات مفتوحة؟ منتجات «الخدمة» بتاخد تقويم بدل زرار كمية */
+  bookingsEnabled: boolean
 }
 
 /** يحلّ المتجر من النطاق الفرعي أو النطاق المخصّص */
@@ -64,6 +66,7 @@ export const getStore = cache(async (identifier: string): Promise<StorefrontStor
       isPublished: stores.isPublished,
       vatEnabled: stores.vatEnabled,
       vatRate: stores.vatRate,
+      bookingsEnabled: stores.bookingsEnabled,
       vatIncludedInPrice: stores.vatIncludedInPrice,
       deletedAt: stores.deletedAt,
     })

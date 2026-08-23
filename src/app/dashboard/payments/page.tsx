@@ -8,6 +8,7 @@ import { PaymentsManager, type PaymentRow } from './payments-manager'
 import { readPaymentProviders } from '@/lib/provider-store'
 import { PAYMENT_PROVIDERS } from '@/lib/providers'
 import { platformOrigin } from '@/lib/domain'
+import { PaymentAttempts } from './attempts'
 
 export const metadata = { title: 'الدفع' }
 
@@ -58,6 +59,14 @@ export default async function PaymentsPage() {
           storeId={store.id}
           codEnabled={zone?.codEnabled ?? true}
         />
+      </Reveal>
+
+      {/*
+        سجل المحاولات تحت الإعدادات لا فوقها: التاجر بيدخل الصفحة
+        دي عشان يربط، ويرجعلها عشان يشوف ليه محاولة فشلت.
+      */}
+      <Reveal delay={60}>
+        <PaymentAttempts storeId={store.id} currency={store.currency} />
       </Reveal>
     </div>
   )

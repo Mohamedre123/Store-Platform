@@ -28,6 +28,7 @@ const REASONS: Record<string, string> = {
   manual: 'تعديل يدوي',
   restock: 'توريد',
   import: 'استيراد',
+  transfer: 'نقل بين الفروع',
 }
 
 export default async function InventoryPage({

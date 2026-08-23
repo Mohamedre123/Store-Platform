@@ -1,4 +1,7 @@
-import { Check, Crown, Sparkles } from 'lucide-react'
+import { desc, eq } from 'drizzle-orm'
+import { Check, Crown, Receipt, Sparkles } from 'lucide-react'
+import { db } from '@/db'
+import { subscriptions } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { PLANS, STATUS_LABEL, daysLeft } from '@/lib/plans'
 import { brand } from '@/lib/brand'
@@ -20,8 +23,40 @@ function contactHref(planName: string, storeName: string) {
   return `mailto:${brand.supportEmail}?subject=${encodeURIComponent('طلب اشتراك')}&body=${encodeURIComponent(message)}`
 }
 
+const SUB_STATUS: Record<string, { label: string; bg: string; fg: string }> = {
+  trialing: { label: 'تجريبي', bg: 'var(--color-warning-soft)', fg: 'var(--color-warning)' },
+  active: { label: 'شغّال', bg: 'var(--color-success-soft)', fg: 'var(--color-success)' },
+  past_due: { label: 'متأخّر', bg: 'var(--color-danger-soft)', fg: 'var(--color-danger)' },
+  cancelled: { label: 'ملغي', bg: 'var(--surface-2)', fg: 'var(--fg-muted)' },
+}
+
 export default async function SubscriptionPage() {
   const { store } = await getDashboardContext()
+
+  /*
+    سجل الاشتراكات.
+
+    حالة المتجر بتقول «مشترك لحد امتى» بس. السجل بيقول **إيه اللي
+    اتدفع وإمتى** — وده اللي التاجر بيحتاجه لما يسأل «أنا دفعت
+    الشهر ده ولا لأ» أو يطلب فاتورة.
+  */
+  const history = await db
+    .select({
+      id: subscriptions.id,
+      plan: subscriptions.plan,
+      status: subscriptions.status,
+      amount: subscriptions.amount,
+      currency: subscriptions.currency,
+      interval: subscriptions.interval,
+      startedAt: subscriptions.startedAt,
+      currentPeriodEnd: subscriptions.currentPeriodEnd,
+      autoRenew: subscriptions.autoRenew,
+      paymentReference: subscriptions.paymentReference,
+    })
+    .from(subscriptions)
+    .where(eq(subscriptions.storeId, store.id))
+    .orderBy(desc(subscriptions.createdAt))
+    .limit(24)
 
   const isTrial = store.status === 'trial'
   const until = isTrial ? store.trialEndsAt : store.subscribedUntil
@@ -123,6 +158,74 @@ export default async function SubscriptionPage() {
           </Reveal>
         ))}
       </div>
+
+      {history.length > 0 && (
+        <Reveal>
+          <section className="flex flex-col gap-3">
+            <div className="flex items-start gap-2">
+              <Receipt
+                className="mt-1 h-4 w-4 shrink-0 text-[var(--fg-subtle)]"
+                aria-hidden="true"
+              />
+              <div>
+                <h2 className="font-semibold">سجل الاشتراكات</h2>
+                <p className="mt-0.5 text-sm text-[var(--fg-muted)]">
+                  كل فترة اشتراك مرّت على متجرك.
+                </p>
+              </div>
+            </div>
+
+            <Card className="overflow-hidden p-0">
+              <div className="scroll-x">
+                <table className="w-full min-w-[34rem] text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
+                      <th className="p-3 text-start font-medium">الخطة</th>
+                      <th className="p-3 text-start font-medium">المبلغ</th>
+                      <th className="p-3 text-start font-medium">من</th>
+                      <th className="p-3 text-start font-medium">لحد</th>
+                      <th className="p-3 text-start font-medium">الحالة</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {history.map((h) => {
+                      const meta = SUB_STATUS[h.status] ?? SUB_STATUS.trialing
+                      return (
+                        <tr key={h.id} className="border-b border-[var(--border)] last:border-0">
+                          <td className="p-3">
+                            {PLANS.find((p) => p.key === h.plan)?.name ?? h.plan}
+                            <span className="block text-xs text-[var(--fg-subtle)]">
+                              {h.interval === 'year' ? 'سنوي' : 'شهري'}
+                              {h.autoRenew ? ' · بيتجدّد تلقائي' : ''}
+                            </span>
+                          </td>
+                          <td className="tabular whitespace-nowrap p-3">
+                            {h.amount > 0 ? formatMoney(h.amount, h.currency) : '—'}
+                          </td>
+                          <td className="whitespace-nowrap p-3 text-xs text-[var(--fg-muted)]">
+                            {h.startedAt ? formatDate(h.startedAt) : '—'}
+                          </td>
+                          <td className="whitespace-nowrap p-3 text-xs text-[var(--fg-muted)]">
+                            {h.currentPeriodEnd ? formatDate(h.currentPeriodEnd) : '—'}
+                          </td>
+                          <td className="p-3">
+                            <span
+                              className="inline-block rounded-md px-2 py-0.5 text-xs font-medium"
+                              style={{ background: meta.bg, color: meta.fg }}
+                            >
+                              {meta.label}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </section>
+        </Reveal>
+      )}
 
       <Reveal>
         <p className="text-sm text-[var(--fg-subtle)]">

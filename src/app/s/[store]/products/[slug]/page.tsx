@@ -30,6 +30,7 @@ import { WishlistButton } from '@/components/storefront/wishlist-button'
 import { VariantPicker } from '@/components/storefront/variant-picker'
 import { StickyBuyBar } from '@/components/storefront/sticky-buy-bar'
 import { AddToCart } from '@/components/storefront/add-to-cart'
+import { SlotPicker } from '@/components/storefront/slot-picker'
 
 export const dynamic = 'force-dynamic'
 
@@ -297,6 +298,21 @@ export default async function ProductPage({
             <span className="-mt-2 text-xs text-[var(--sf-text)]/50">
               كود المنتج: <bdi dir="ltr">{product.sku}</bdi>
             </span>
+          )}
+
+          {/*
+            الخدمة بتتحجز بمعاد لا بكمية.
+
+            المنتقي بيظهر فوق زرار الإضافة عشان العميل يختار معاده
+            الأول — لو ظهر تحته، هيضيف للسلة وينسى المعاد، ويوصل
+            الشيك أوت بحجز بلا وقت.
+          */}
+          {store.bookingsEnabled && product.type === 'service' && (
+            <SlotPicker
+              storeIdentifier={identifier}
+              productId={product.id}
+              accent={theme.custom.identity.primary}
+            />
           )}
 
           {/*

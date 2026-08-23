@@ -24,6 +24,7 @@ import { dispatchWebhook } from '@/lib/webhooks'
 import { runAutomations } from '@/lib/automation'
 import { shipmentStatusMeta, type ShipmentStatus } from '@/lib/carriers'
 import { queueShipmentForOrder } from '@/lib/shipment-dispatch'
+import { notifyTeam } from '@/lib/notify-team'
 import type { OrderStatus } from '@/db/schema'
 
 /**
@@ -270,6 +271,32 @@ export async function applyOrderStatus(
         recoveryToken: order.recoveryToken,
       })
     })().catch((e) => console.error('فشل محفّز الأتمتة:', e))
+  }
+
+  /*
+    الفريق بيتبلّغ بتغيّر الحالة زي ما بيتبلّغ بالطلب الجديد.
+
+    أهمها «اتلغى»: الطلب اللي بيتلغي بعد ما اتغلّف بيرجع بضاعة
+    للمخزن ومصاريف شحن على التاجر — واللي بيعرف بيه بدري بيوقّف
+    الشحنة قبل ما تخرج.
+  */
+  const TEAM_EVENT: Partial<Record<OrderStatus, Parameters<typeof notifyTeam>[0]>> = {
+    confirmed: 'order_confirmed',
+    shipped: 'order_shipped',
+    delivered: 'order_delivered',
+    cancelled: 'order_cancelled',
+  }
+  const teamEvent = TEAM_EVENT[status]
+  if (teamEvent) {
+    notifyTeam(teamEvent, {
+      storeId: store.id,
+      storeName: store.name,
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      total: order.total,
+      currency: order.currency,
+      customerName: order.customerName,
+    })
   }
 
   dispatchWebhook(store.id, 'order.status_changed', {

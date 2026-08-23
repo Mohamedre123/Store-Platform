@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import { pgTable, uuid, text, boolean, integer, jsonb, index, uniqueIndex, timestamp } from 'drizzle-orm/pg-core'
 import { stores } from './tenancy'
 import { createdAt, updatedAt, deletedAt, money, moneyNullable } from './_shared'
@@ -63,6 +64,15 @@ export const products = pgTable(
       بيفرّغ العمود من فعل الحذف نفسه.
     */
     supplierId: uuid('supplier_id'),
+
+    /**
+     * مدة الحجز بالدقايق — للمنتجات من نوع «خدمة» بس.
+     *
+     * كل خدمة ومدتها: قص شعر نص ساعة وجلسة علاج ساعتين. المدة
+     * الموحّدة على مستوى المتجر كانت هتخلّي المواعيد تتصادم أو
+     * تسيب فراغات — والاتنين خسارة يوم شغل.
+     */
+    bookingDuration: integer('booking_duration').notNull().default(60),
 
     // المخزون
     trackInventory: boolean('track_inventory').notNull().default(true),
@@ -204,7 +214,21 @@ export const inventoryLocations = pgTable(
     isActive: boolean('is_active').notNull().default(true),
     createdAt: createdAt(),
   },
-  (t) => [index('inventory_locations_store_idx').on(t.storeId)],
+  (t) => [
+    index('inventory_locations_store_idx').on(t.storeId),
+    /*
+      فرع افتراضي واحد بس لكل متجر — بقيد في قاعدة البيانات لا
+      بفحص في الكود.
+
+      الفحص في الكود («فيه فرع؟ لأ؟ اعمل واحد») بيقع مع أول
+      طلبين متوازيين: الاتنين بيقروا «مفيش» والاتنين بيعملوا واحد.
+      وده حصل فعلًا — تلات نسخ من «المخزن الرئيسي». القيد هنا
+      بيخلّي التاني يفشل بدل ما ينجح ويكرّر.
+    */
+    uniqueIndex('inventory_locations_one_default')
+      .on(t.storeId)
+      .where(sql`${t.isDefault}`),
+  ],
 )
 
 export const inventoryLevels = pgTable(
@@ -234,7 +258,7 @@ export const inventoryMovements = pgTable(
     variantId: uuid('variant_id'),
     locationId: uuid('location_id'),
     delta: integer('delta').notNull(),
-    reason: text('reason').$type<'order' | 'return' | 'manual' | 'import' | 'cancel' | 'restock'>().notNull(),
+    reason: text('reason').$type<'order' | 'return' | 'manual' | 'import' | 'cancel' | 'restock' | 'transfer'>().notNull(),
     referenceId: uuid('reference_id'),
     note: text('note'),
     createdBy: uuid('created_by'),

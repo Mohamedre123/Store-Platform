@@ -60,6 +60,18 @@ export function runAutomations(trigger: TriggerKey, ctx: AutomationContext) {
   )
 }
 
+/**
+ * نفس التنفيذ بس بانتظار — لطابور المهام.
+ *
+ * المهمة المؤجَّلة لازم تعرف نجحت ولا لأ عشان الطابور يقرّر يعيد
+ * المحاولة. النسخة اللي فوق بترجع فورًا وبتبلع الخطأ، وده صح لما
+ * اللي بينادي طلب عميل — وغلط لما اللي بينادي عامل بيحاسب على
+ * النتيجة.
+ */
+export async function runAutomationsNow(trigger: TriggerKey, ctx: AutomationContext) {
+  await execute(trigger, ctx)
+}
+
 async function execute(trigger: TriggerKey, ctx: AutomationContext) {
   const rules = await db
     .select()

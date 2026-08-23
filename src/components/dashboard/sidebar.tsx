@@ -66,6 +66,7 @@ export const NAV: NavSection[] = [
       { href: '/dashboard/orders?filter=incomplete', label: 'السلات المتروكة' },
       { href: '/dashboard/shipments', label: 'الشحنات' },
       { href: '/dashboard/returns', label: 'المرتجعات' },
+      { href: '/dashboard/bookings', label: 'الحجوزات' },
     ],
   },
   {
@@ -76,6 +77,7 @@ export const NAV: NavSection[] = [
       { href: '/dashboard/products', label: 'كل المنتجات' },
       { href: '/dashboard/products/categories', label: 'الأقسام' },
       { href: '/dashboard/inventory', label: 'المخزون' },
+      { href: '/dashboard/inventory/branches', label: 'الفروع والمخازن' },
       { href: '/dashboard/suppliers', label: 'الموردون' },
     ],
   },
@@ -100,6 +102,7 @@ export const NAV: NavSection[] = [
       { href: '/dashboard/automations', label: 'الأتمتة' },
       { href: '/dashboard/analytics', label: 'التحليلات' },
       { href: '/dashboard/experiments', label: 'تجارب A/B' },
+      { href: '/dashboard/marketplace', label: 'ربط الكتالوج' },
     ],
   },
   {

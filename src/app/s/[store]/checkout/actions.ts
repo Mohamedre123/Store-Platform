@@ -30,6 +30,9 @@ import { trackExperimentConversions } from '@/lib/experiments'
 import { generateToken } from '@/lib/crypto'
 import { normalizePhone } from '@/lib/utils'
 import { startPayment } from '@/lib/payment-dispatch'
+import { consumeFromDefaultBranch } from '@/lib/branches'
+import { notifyTeam } from '@/lib/notify-team'
+import { createBooking } from '@/lib/bookings'
 import { paymentProvider } from '@/lib/providers'
 
 /**
@@ -84,6 +87,14 @@ const orderSchema = z.object({
   lines: z.array(lineSchema).min(1, 'السلة فاضية'),
   /** يربط الطلب المكتمل بالسجل الناقص اللي اتحفظ وهو بيكتب */
   draftToken: z.string().optional(),
+  /**
+   * مواعيد الخدمات: معرّف المنتج → وقت البداية بصيغة ISO.
+   *
+   * جاي من المتصفح، فبيتحقّق منه على الخادم قبل التسجيل — الوقت
+   * اللي بعت من غير فحص ممكن يبقى اتحجز في اللحظة اللي بين اختياره
+   * وإرساله.
+   */
+  slots: z.record(z.string().uuid(), z.string()).optional(),
 })
 
 /**
@@ -482,6 +493,61 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
   const token = row?.token ?? ''
 
   /**
+   * تسجيل مواعيد الخدمات.
+   *
+   * بعد الطلب لا قبله: الحجز بيشاور على طلب، والطلب لازم يكون
+   * موجود. ولو معاد اتحجز في اللحظة الأخيرة، بنسجّل السبب على
+   * الطلب — **وما بنلغيش الطلب**: العميل دفع، والتاجر هو اللي
+   * بيكلّمه ويتفقوا على معاد تاني.
+   */
+  if (input.slots && Object.keys(input.slots).length > 0) {
+    void (async () => {
+      for (const [productId, startsAt] of Object.entries(input.slots ?? {})) {
+        // الخدمة لازم تكون في الطلب فعلًا — مش أي معرّف بيتبعت
+        if (!lines.some((l) => l.productId === productId)) continue
+
+        const res = await createBooking({
+          storeId: store.id,
+          orderId: result.orderId!,
+          productId,
+          customerId: result.customerId,
+          customerName: input.name ?? null,
+          customerPhone: phone,
+          startsAt,
+          notes: input.notes ?? null,
+        })
+
+        if (!res.ok) {
+          await db.insert(orderEvents).values({
+            orderId: result.orderId!,
+            storeId: store.id,
+            type: 'note',
+            message: `ما اتسجّلش معاد للخدمة: ${res.error}. كلّم العميل واتفقوا على معاد.`,
+            actorType: 'system',
+          })
+        }
+      }
+    })().catch((e) => console.error('فشل تسجيل الحجز:', e))
+  }
+
+  /*
+    خصم البيع من توزيع الفروع.
+
+    بعد المعاملة وبغير await: التوزيع بيانات إدارية بتقول «البضاعة
+    فين»، والخصم الحقيقي اتعمل جوّه المعاملة على `products.stock`.
+    طلب بيقع عشان صف مفقود في جدول توزيع خسارة حقيقية مقابل رقم
+    تقريبي.
+  */
+  void consumeFromDefaultBranch(
+    store.id,
+    lines.map((l) => ({
+      productId: l.productId,
+      variantId: l.variantId ?? null,
+      quantity: l.quantity,
+    })),
+  ).catch((e) => console.error('فشل خصم مخزون الفرع:', e))
+
+  /**
    * تقييد البيعة للمسوّق لو العميل جه من رابطه.
    *
    * العمولة على المنتجات بعد الخصم لا على الإجمالي: الشحن مش ربح
@@ -584,6 +650,23 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
     customerOrders: customerOrdersBefore,
     recoveryToken: token,
   }
+
+  /*
+    إشعار الفريق قبل قواعد الأتمتة: ده اللي بيخلّي اللي بيغلّف يعرف
+    إن فيه طلب وهو في المخزن. القواعد ممكن تكون فاضية، والإشعار ده
+    بيشتغل من غير أي إعداد غير إن التاجر يضيف نفسه.
+  */
+  notifyTeam('order_placed', {
+    storeId: store.id,
+    storeName: store.name,
+    orderId: result.orderId!,
+    orderNumber: result.orderNumber,
+    total: totals.total,
+    currency: store.currency,
+    customerName: input.name ?? null,
+    customerPhone: phone,
+    city: input.city ?? null,
+  })
 
   runAutomations('order.created', autoCtx)
   if (isNewCustomer) runAutomations('customer.created', autoCtx)
