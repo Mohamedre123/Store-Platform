@@ -29,6 +29,7 @@ import { recordReferral } from '@/lib/referrals'
 import { trackExperimentConversions } from '@/lib/experiments'
 import { generateToken } from '@/lib/crypto'
 import { normalizePhone } from '@/lib/utils'
+import { getCurrentCustomer } from '@/lib/customer-auth'
 import { startPayment } from '@/lib/payment-dispatch'
 import { consumeFromDefaultBranch } from '@/lib/branches'
 import { notifyTeam } from '@/lib/notify-team'
@@ -225,6 +226,18 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
   if (!store) return { ok: false, error: 'المتجر مش موجود' }
   if (!store.isPublished) return { ok: false, error: 'المتجر مش متاح للطلب دلوقتي' }
 
+  /**
+   * الطلب لازم يكون ليه صاحب مسجّل.
+   *
+   * **الفحص هنا لا في الصفحة بس.** الصفحة بتوجّه للدخول، لكن الفعل
+   * ده ممكن يتنادى مباشرةً — وإخفاء الزرار مش حماية. من غير الفحص
+   * ده حد يقدر يعمل طلبات باسم أرقام مش بتاعته.
+   */
+  const account = await getCurrentCustomer(store.id)
+  if (!account) {
+    return { ok: false, error: 'لازم تسجّل دخول الأول عشان طلبك يتحفظ في حسابك' }
+  }
+
   const { lines, issue } = await priceCart(store.id, input.lines, await visitorId())
   if (issue) {
     const messages = {
@@ -294,15 +307,25 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
   }
 
   const result = await db.transaction(async (tx) => {
-    // عميل واحد لكل رقم في كل متجر
-    const [customer] = await tx
-      .insert(customers)
-      .values({ storeId: store.id, name: input.name || null, phone, email: input.email || null })
-      .onConflictDoUpdate({
-        target: [customers.storeId, customers.phone],
-        set: { name: input.name || null, lastOrderAt: new Date() },
+    /*
+      الطلب بيتقيّد على **الحساب اللي داخل**، لا على الرقم المكتوب.
+
+      لو قيّدناه على الرقم، حد يكتب رقم غيره ويربط الطلب بحسابه —
+      والعميل التاني يلاقي في حسابه طلبًا ما عملهوش. والبيانات
+      المكتوبة بتتحدّث على نفس الحساب عشان التاجر يشوف آخر عنوان
+      وتليفون.
+    */
+    await tx
+      .update(customers)
+      .set({
+        name: input.name || undefined,
+        phone: phone || undefined,
+        email: input.email || undefined,
+        lastOrderAt: new Date(),
       })
-      .returning({ id: customers.id })
+      .where(and(eq(customers.id, account.id), eq(customers.storeId, store.id)))
+
+    const customer = { id: account.id }
 
     /**
      * لو العميل كان بيكتب واتحفظله طلب ناقص، بنكمّله بدل ما ننشئ
@@ -773,6 +796,12 @@ async function sendOrderEmails(ctx: {
     await sendEmail({
       to: input.email,
       ...mail,
+      /*
+        الرد على بريد التاجر لا على عنوان لا يُرد عليه.
+        العميل اللي عايز يغيّر عنوانه بيرد على الرسالة — والرسالة
+        اللي مالهاش رد بتبان لفلاتر السبام كإشعار آلي مجهول.
+      */
+      replyTo: store.email ?? undefined,
       log: { storeId: store.id, event: 'order_confirmation', orderId },
     })
   }

@@ -6,6 +6,8 @@ import { CheckCircle2, Clock, MessageCircle, Package, Truck } from 'lucide-react
 import { db } from '@/db'
 import { orderItems, orders, returns, thankYouSettings } from '@/db/schema'
 import { getStore } from '@/lib/storefront'
+import { getCurrentCustomer } from '@/lib/customer-auth'
+import { CustomerLoginForm } from '../../account/login-form'
 import { returnStatusMeta } from '@/lib/returns-meta'
 import { ReturnForm } from './return-form'
 import { PayNowButton } from './pay-button'
@@ -47,11 +49,45 @@ export default async function OrderPage({
   if (!order) notFound()
 
   /**
-   * الطلب فيه اسم العميل وعنوانه وتليفونه — ما ينفعش يتفتح برقمه
-   * وحده، وإلا أي حد يعدّ الأرقام ويقرأ بيانات العملاء. الرمز في
-   * الرابط هو اللي بيثبت إن صاحب الطلب هو اللي بيفتحه.
+   * مين يشوف الطلب ده؟
+   *
+   * **صاحبه المسجّل دخوله بس.** الرمز في الرابط لوحده مكانش كفاية:
+   * الرابط بيتبعت في إيميل، وأي حد يفتح الإيميل — على جهاز مشترك،
+   * أو بعد ما الإيميل يتحوّل — كان بيشوف اسم العميل وعنوانه
+   * وتليفونه وكل طلباته.
+   *
+   * الرمز بيفضل شرطًا كمان: بيمنع عميل مسجّل من إنه يعدّ الأرقام
+   * ويقرا طلبات عملاء تانيين لو حصل خلل في ربط الحساب.
    */
   if (!t || t !== order.recoveryToken) notFound()
+
+  const customer = await getCurrentCustomer(store.id)
+
+  if (!customer) {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-12 sm:px-6 sm:py-16">
+        <div className="mb-8 flex flex-col gap-2 text-center">
+          <h1 className="text-2xl font-bold tracking-tight">سجّل دخولك عشان تشوف طلبك</h1>
+          <p className="text-sm opacity-65">
+            بياناتك مقفولة على حسابك — عشان محدش غيرك يشوفها لو الرابط وصل لحد تاني.
+          </p>
+        </div>
+
+        <CustomerLoginForm
+          storeIdentifier={identifier}
+          redirectTo={`/order/${orderNumber}?t=${encodeURIComponent(t)}`}
+          compact
+        />
+      </div>
+    )
+  }
+
+  /*
+    الطلب لازم يكون بتاع الحساب اللي داخل.
+    الطلبات القديمة اللي اتعملت قبل إلزام الدخول ممكن تكون بلا عميل —
+    ديّ بيكفيها الرمز، وإلا كان التاجر هيخسر متابعة كل طلب قديم.
+  */
+  if (order.customerId && order.customerId !== customer.id) notFound()
 
   const items = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id))
   const [settings] = await db

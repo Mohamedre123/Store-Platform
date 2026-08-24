@@ -1,6 +1,7 @@
 import 'server-only'
 import { db } from '@/db'
 import { messageLog } from '@/db/schema'
+import { toPlainText } from './email-plain'
 
 /**
  * إرسال البريد.
@@ -20,13 +21,12 @@ export function isEmailConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM)
 }
 
-/**
- * سياق التسجيل.
- *
- * لما يتبعت، الرسالة بتتقيّد في سجل المتجر. من غيره ما بيتسجّلش —
- * رسايل المنصة نفسها (تأكيد بريد التاجر مثلًا) مالهاش متجر تتقيّد
- * تحته، والعمود مش بيقبل فاضي.
- */
+/** بريد إلغاء الاشتراك — بيتقرا من عنوان المرسل نفسه */
+function unsubscribeAddress(): string {
+  const from = process.env.EMAIL_FROM ?? ''
+  return from.match(/<([^>]+)>/)?.[1] ?? (from.trim() || 'no-reply@localhost')
+}
+
 export type MessageContext = {
   storeId: string
   /** نوع الرسالة: order_confirmation | abandoned_cart | otp … */
@@ -41,8 +41,10 @@ export async function sendEmail(options: {
   html: string
   text?: string
   log?: MessageContext
+  /** الرد يروح لمين — بريد التاجر عشان العميل يقدر يرد فعلًا */
+  replyTo?: string
 }): Promise<SendResult> {
-  const { to, subject, html, text, log } = options
+  const { to, subject, html, text, log, replyTo } = options
 
   if (!isEmailConfigured()) {
     console.warn(
@@ -60,12 +62,36 @@ export async function sendEmail(options: {
         Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
         'Content-Type': 'application/json',
       },
+      /**
+       * الترويسات اللي بتفرق بين «وارد» و«سبام».
+       *
+       * فلاتر البريد بتقيّم الرسالة على حاجات محدّدة، وإحنا كنا
+       * ناقصين تلاتة منها:
+       *
+       * ١. **نسخة نصّية.** الرسالة HTML بس علامة كلاسيكية على
+       *    الإرسال الآلي المجهول. بنولّدها من الـHTML لو مش متوفّرة
+       *    بدل ما نبعت من غيرها.
+       * ٢. **`Reply-To` حقيقي.** الرسالة اللي مالهاش رد ممكن بتبان
+       *    كإشعار من روبوت. بنحطّ بريد التاجر عشان العميل يرد عليه.
+       * ٣. **`List-Unsubscribe`.** جيميل بيرفعها لصالح المرسل حتى
+       *    في الرسايل المعاملاتية — وجودها بيقول «ده مرسل بيحترم
+       *    المستقبل».
+       *
+       * **الباقي عند صاحب النطاق لا عندنا:** SPF وDKIM وDMARC لازم
+       * تتظبط في سجلات DNS، ومن غيرها أي رسالة هتفضل مشكوك فيها
+       * مهما عملنا في الكود.
+       */
       body: JSON.stringify({
         from: process.env.EMAIL_FROM,
         to: [to],
         subject,
         html,
-        text,
+        text: text ?? toPlainText(html),
+        ...(replyTo ? { reply_to: replyTo } : {}),
+        headers: {
+          'List-Unsubscribe': `<mailto:${unsubscribeAddress()}?subject=unsubscribe>`,
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        },
       }),
     })
 

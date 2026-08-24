@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation'
 import { getStore } from '@/lib/storefront'
+import { getCurrentCustomer } from '@/lib/customer-auth'
+import { CustomerLoginForm } from '../account/login-form'
 import { getCheckoutSettings, getDisplayShipping, getPaymentMethods } from '@/lib/checkout'
 import { regionsFor } from '@/lib/regions'
 import { paymentProvider } from '@/lib/providers'
@@ -13,6 +15,34 @@ export default async function CheckoutPage({ params }: { params: Promise<{ store
   const { store: identifier } = await params
   const store = await getStore(identifier)
   if (!store) notFound()
+
+  /**
+   * الدخول قبل الطلب.
+   *
+   * **مش خطوة زيادة — هي اللي بتخلّي الطلب يبقى ليه صاحب.** من غيرها
+   * الطلب بيبقى مربوطًا برابط في إيميل، وأي حد يفتح الإيميل بيشوف
+   * اسم العميل وعنوانه وتليفونه. وكمان العميل ما بيقدرش يتابع طلبه
+   * ولا يشوف اللي فات.
+   *
+   * والدخول برمز مش بكلمة سر، فالتكلفة على العميل خانة واحدة ورمز —
+   * والمكسب إن بياناته مقفولة على حسابه.
+   */
+  const customer = await getCurrentCustomer(store.id)
+
+  if (!customer) {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-12 sm:px-6 sm:py-16">
+        <div className="mb-8 flex flex-col gap-2 text-center">
+          <h1 className="text-2xl font-bold tracking-tight">خطوة واحدة وتكمّل</h1>
+          <p className="text-sm opacity-65">
+            سجّل دخولك عشان طلبك يتحفظ في حسابك وتقدر تتابع حالته. رقمك أو بريدك كفاية.
+          </p>
+        </div>
+
+        <CustomerLoginForm storeIdentifier={identifier} redirectTo="/checkout" compact />
+      </div>
+    )
+  }
 
   const [settings, payments, ship] = await Promise.all([
     getCheckoutSettings(store.id),

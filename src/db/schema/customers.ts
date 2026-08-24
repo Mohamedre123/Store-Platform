@@ -89,6 +89,14 @@ export const customerSessions = pgTable(
     userAgent: text('user_agent'),
     ip: text('ip'),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    /**
+     * آخر نشاط.
+     *
+     * الجلسة بتموت بعد ٢٤ ساعة سكون حتى لو صلاحيتها لسه طويلة.
+     * جهاز مشترك أو موبايل ضايع ما ينفعش يفضل فاتح على حساب فيه
+     * عناوين العميل وتاريخ طلباته لشهرين.
+     */
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull().defaultNow(),
     createdAt: createdAt(),
   },
   (t) => [

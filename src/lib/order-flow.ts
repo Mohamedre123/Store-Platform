@@ -64,12 +64,14 @@ type FlowStore = {
   name: string
   slug: string
   logoLight: string | null
+  /** بريد التاجر — بيتحط كـReply-To في رسايل العملاء */
+  email?: string | null
 }
 
 /** بيانات المتجر اللي التحوّلات محتاجاها — للمسارات اللي مالهاش سياق لوحة */
 export async function loadFlowStore(storeId: string): Promise<FlowStore | null> {
   const [row] = await db
-    .select({ id: stores.id, name: stores.name, slug: stores.slug, logoLight: stores.logoLight })
+    .select({ id: stores.id, name: stores.name, slug: stores.slug, logoLight: stores.logoLight, email: stores.email })
     .from(stores)
     .where(eq(stores.id, storeId))
     .limit(1)
@@ -334,6 +336,7 @@ export async function applyOrderStatus(
   if (order.customerEmail && isEmailableStatus(status) && isEmailConfigured()) {
     void (async () => {
       const theme = await getStoreTheme(store.id)
+      const storeEmail = store.email
       const mail = orderStatusEmail(
         { name: store.name, logo: store.logoLight, primary: theme.custom.identity.primary },
         status,
@@ -350,6 +353,8 @@ export async function applyOrderStatus(
       await sendEmail({
         to: order.customerEmail!,
         ...mail,
+        // الرد على التاجر — العميل بيرد على رسالة الحالة كتير
+        replyTo: storeEmail ?? undefined,
         log: {
           storeId: store.id,
           event: `order_${status}`,
