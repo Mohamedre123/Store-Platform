@@ -6,6 +6,7 @@ import {
   Check,
   ImagePlus,
   MessageSquarePlus,
+  RotateCcw,
   Send,
   Sparkles,
   Trash2,
@@ -43,6 +44,8 @@ export function AssistantPanel() {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [showList, setShowList] = useState(false)
   const [input, setInput] = useState('')
+  /** آخر رسالة ما وصلتش — بتتعلّم في المحادثة بدل ما ترجع للخانة */
+  const [failed, setFailed] = useState(false)
   const [images, setImages] = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<{ text: string; setup?: boolean } | null>(null)
@@ -67,16 +70,33 @@ export function AssistantPanel() {
   const refreshList = () =>
     listConversationsAction().then((rows) => setConversations(rows as Conversation[]))
 
+  /**
+   * الرسالة بتبان أول ما تتبعت، زي أي شات.
+   *
+   * كانت بتستنّى رد الخادم عشان تظهر: الخانة بتتفضّى، والكلام
+   * بيختفي، ومفيش حاجة في المحادثة لحد ما الرد يوصل. التاجر بيفتكر
+   * إن رسالته ضاعت فيكتبها تاني.
+   *
+   * ولو فشلت، كانت بترجع للخانة — فهو بيلاقي كلامه اللي بعته رجع
+   * مكانه ومش فاهم اتبعت ولا لأ. دلوقتي بتفضل في المحادثة معلَّمة
+   * إنها ما وصلتش، والخطأ مكتوب تحتها.
+   */
   const send = () => {
     const text = input.trim()
     if (!text || pending) return
 
-    start(async () => {
-      setError(null)
-      setInput('')
-      const sent = [...images]
-      setImages([])
+    const sent = [...images]
 
+    /* برّه الانتقال: التفاعل الفوري ما ينفعش يتأجّل مع الشغل البطيء */
+    setInput('')
+    setImages([])
+    setError(null)
+    setMessages((m) => [
+      ...m,
+      { id: `local-${Date.now()}`, role: 'user', text, images: sent, toolCalls: [] },
+    ])
+
+    start(async () => {
       const res = await sendToAssistantAction({
         conversationId: conversationId ?? undefined,
         message: text,
@@ -85,10 +105,11 @@ export function AssistantPanel() {
 
       if (!res.ok) {
         setError({ text: res.error, setup: res.needsSetup })
-        setInput(text)
+        setFailed(true)
         return
       }
 
+      setFailed(false)
       setConversationId(res.conversationId)
       setMessages(res.messages)
       void refreshList()
@@ -184,7 +205,7 @@ export function AssistantPanel() {
               type="button"
               onClick={() => {
                 setConversationId(null)
-                setMessages([])
+                setMessages([]); setFailed(false)
                 setShowList(false)
                 setError(null)
               }}
@@ -218,6 +239,7 @@ export function AssistantPanel() {
                           if (res.ok) {
                             setConversationId(res.conversationId)
                             setMessages(res.messages)
+                            setFailed(false)
                             setShowList(false)
                           }
                         })
@@ -233,7 +255,7 @@ export function AssistantPanel() {
                           await deleteConversationAction(c.id)
                           if (conversationId === c.id) {
                             setConversationId(null)
-                            setMessages([])
+                            setMessages([]); setFailed(false)
                           }
                           void refreshList()
                         })
@@ -276,8 +298,25 @@ export function AssistantPanel() {
               </div>
             )}
 
-            {messages.map((m) => (
-              <Message key={m.id} msg={m} onDecide={decide} busy={pending} />
+            {messages.map((m, i) => (
+              <div key={m.id}>
+                <Message msg={m} onDecide={decide} busy={pending} />
+                {/* آخر رسالة ما وصلتش — علامة مكانها بدل ما ترجع للخانة */}
+                {failed && i === messages.length - 1 && m.role === 'user' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMessages((prev) => prev.slice(0, -1))
+                      setFailed(false)
+                      setInput(m.text)
+                    }}
+                    className="mb-2 ms-auto flex items-center gap-1.5 text-xs text-[var(--color-warning)] hover:underline"
+                  >
+                    <RotateCcw className="h-3 w-3" aria-hidden="true" />
+                    ما وصلتش — جرّب تاني
+                  </button>
+                )}
+              </div>
             ))}
 
             {pending && (

@@ -38,7 +38,7 @@ export function CartPageClient({
   upsell: UpsellProduct[]
   upsellTitle: string
 }) {
-  const { items, subtotal, count, ready } = useCart()
+  const { items, subtotal, count, ready, needsOptions } = useCart()
 
   // قبل ما نقرا التخزين ما نعرضش «سلتك فاضية» — رسالة غلط لثانية
   // بتخلّي العميل يفتكر إن سلّته ضاعت
@@ -86,12 +86,24 @@ export function CartPageClient({
           </div>
           <p className="mb-4 text-xs opacity-55">الشحن بيتحسب في الخطوة الجاية.</p>
 
-          <Link
-            href="/checkout"
-            className="flex min-h-12 w-full items-center justify-center rounded-xl bg-[var(--sf-primary)] px-5 font-semibold text-white transition-opacity hover:opacity-90"
-          >
-            إتمام الطلب
-          </Link>
+          {/* الطلب الناقص مقاسه بيترفض على الخادم — العميل يعرف من هنا */}
+          {needsOptions ? (
+            <div className="flex flex-col gap-1.5">
+              <span className="flex min-h-12 w-full cursor-not-allowed items-center justify-center rounded-xl bg-[var(--sf-primary)]/40 px-5 font-semibold text-white">
+                إتمام الطلب
+              </span>
+              <span className="text-center text-xs font-medium text-[var(--sf-primary)]">
+                اختار خيارات المنتج فوق عشان تكمّل
+              </span>
+            </div>
+          ) : (
+            <Link
+              href="/checkout"
+              className="flex min-h-12 w-full items-center justify-center rounded-xl bg-[var(--sf-primary)] px-5 font-semibold text-white transition-opacity hover:opacity-90"
+            >
+              إتمام الطلب
+            </Link>
+          )}
           <Link
             href="/products"
             className="mt-2 flex min-h-11 w-full items-center justify-center text-sm opacity-70 transition-opacity hover:opacity-100"

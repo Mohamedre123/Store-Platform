@@ -1,15 +1,13 @@
 'use client'
 
 import Image from 'next/image'
+import { useEffect, useState } from 'react'
 import { SLink as Link } from './store-link'
 import { Minus, Plus, Trash2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
 import { useCart } from './cart'
 import { CartLineOptions } from './cart-line-options'
-import { cartOptionsAction } from '@/app/s/[store]/cart-options-actions'
 import { formatMoney } from '@/lib/utils'
 import type { UpsellProduct } from '@/lib/storefront'
-import type { ProductOptionSet } from '@/lib/product-options'
 
 /**
  * أجزاء السلة المشتركة.
@@ -31,34 +29,9 @@ export function CartLines({
   onNavigate?: () => void
   compact?: boolean
 }) {
-  const { items, setQuantity, remove, storeIdentifier } = useCart()
+  const { items, setQuantity, remove, pendingOptions } = useCart()
   const size = compact ? 'h-20 w-20' : 'h-24 w-24'
 
-  /*
-    الخيارات بتتجاب للسطور اللي مالهاش متغيّر بس.
-
-    العميل اللي ضاف منتج ليه مقاسات بضغطة واحدة لازم يقدر يحدّد
-    مقاسه من هنا — تحويله لصفحة المنتج معناه إنه يسيب سلته ويبدأ
-    من الأول، ودي أكتر لحظة بيسيب فيها الطلب.
-
-    والمنتج البسيط ما بيرجّعش حاجة من الخادم أصلًا، فالسطر بتاعه
-    بيفضل زي ما هو.
-  */
-  const [optionSets, setOptionSets] = useState<Record<string, ProductOptionSet>>({})
-
-  const pending = items.filter((i) => !i.variantId).map((i) => i.productId)
-  const key = [...new Set(pending)].sort().join(',')
-
-  useEffect(() => {
-    if (!key) return
-    let alive = true
-    cartOptionsAction({ storeIdentifier, productIds: key.split(',') }).then((res) => {
-      if (alive) setOptionSets((prev) => ({ ...prev, ...res }))
-    })
-    return () => {
-      alive = false
-    }
-  }, [key, storeIdentifier])
 
   return (
     <ul className="divide-y divide-[var(--sf-text)]/8">
@@ -128,14 +101,14 @@ export function CartLines({
               <span className="text-xs opacity-60">دي آخر كمية متاحة</span>
             )}
 
-            {!item.variantId && optionSets[item.productId] && (
+            {!item.variantId && pendingOptions[item.productId] && (
               <CartLineOptions
                 productId={item.productId}
                 name={item.name}
                 slug={item.slug}
                 image={item.image}
                 quantity={item.quantity}
-                optionSet={optionSets[item.productId]}
+                optionSet={pendingOptions[item.productId]}
               />
             )}
           </div>

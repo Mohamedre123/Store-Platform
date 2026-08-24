@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { send as trackEvent } from './tracker'
+import { cartOptionsAction } from '@/app/s/[store]/cart-options-actions'
+import type { ProductOptionSet } from '@/lib/product-options'
 
 /**
  * السلة.
@@ -46,6 +48,17 @@ type CartContext = {
    * صفحة بتعرض سلة تفتكر تمرّره.
    */
   storeIdentifier: string
+  /**
+   * خيارات المنتجات اللي في السلة من غير اختيار.
+   *
+   * في السياق مش في المكوّن: قايمة البنود محتاجاها عشان تعرض
+   * الاختيار، وزر «إتمام الطلب» محتاجها عشان يتقفل لحد ما يختار.
+   * لو كل واحد فيهم جابها لوحده، بيبقى نداءان لنفس البيانات
+   * وحالتان ممكن يختلفوا.
+   */
+  pendingOptions: Record<string, ProductOptionSet>
+  /** فيه بند لسه محتاج مقاس أو لون؟ */
+  needsOptions: boolean
 }
 
 const Ctx = createContext<CartContext | null>(null)
@@ -74,6 +87,7 @@ export function CartProvider({
   const [isOpen, setOpen] = useState(false)
   // قبل القراءة من التخزين، ما نعرضش عدد السلة — وإلا يظهر صفر ثم يقفز
   const [ready, setReady] = useState(false)
+  const [pendingOptions, setPendingOptions] = useState<Record<string, ProductOptionSet>>({})
 
   useEffect(() => {
     try {
@@ -94,6 +108,38 @@ export function CartProvider({
     }
   }, [items, storeSlug, ready])
 
+  /*
+    بنسأل عن خيارات البنود اللي مالهاش متغيّر بس.
+
+    المنتج البسيط ما بيرجّعش حاجة، فالسلة بتفضل زي ما هي. والمفتاح
+    مبني من المعرّفات مرتّبة عشان نفس السلة ما تعملش نداءً جديدًا مع
+    كل تغيير كمية.
+  */
+  const bareKey = [...new Set(items.filter((i) => !i.variantId).map((i) => i.productId))]
+    .sort()
+    .join(',')
+
+  useEffect(() => {
+    if (!ready) return
+    if (!bareKey) {
+      setPendingOptions({})
+      return
+    }
+
+    let alive = true
+    cartOptionsAction({ storeIdentifier, productIds: bareKey.split(',') })
+      .then((res) => {
+        if (alive) setPendingOptions(res)
+      })
+      .catch(() => {
+        /* فشل النداء ما يقفلش السلة — الخادم بيرفض الطلب الناقص برضه */
+      })
+
+    return () => {
+      alive = false
+    }
+  }, [bareKey, storeIdentifier, ready])
+
   const value = useMemo<CartContext>(() => {
     const count = items.reduce((n, i) => n + i.quantity, 0)
     const subtotal = items.reduce((n, i) => n + i.price * i.quantity, 0)
@@ -107,6 +153,13 @@ export function CartProvider({
       ready,
       mode,
       storeIdentifier,
+      pendingOptions,
+      /*
+        البند اللي مالوش متغيّر ومنتجه ليه خيارات = ناقص.
+        الزر بيتقفل عليه: الخادم بيرفض الطلب ده أصلًا، والأحسن
+        إن العميل يعرف قبل ما يملا بياناته كلها.
+      */
+      needsOptions: items.some((i) => !i.variantId && pendingOptions[i.productId]),
 
       add(item, quantity = 1) {
         setItems((prev) => {
@@ -148,7 +201,7 @@ export function CartProvider({
         setItems([])
       },
     }
-  }, [items, isOpen, ready, mode, track, storeIdentifier])
+  }, [items, isOpen, ready, mode, track, storeIdentifier, pendingOptions])
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

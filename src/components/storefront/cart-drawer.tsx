@@ -28,7 +28,7 @@ export function CartDrawer({
   upsell?: UpsellProduct[]
   upsellTitle?: string
 }) {
-  const { items, isOpen, setOpen, subtotal, count } = useCart()
+  const { items, isOpen, setOpen, subtotal, count, needsOptions } = useCart()
 
   useEffect(() => {
     if (!isOpen) return
@@ -104,13 +104,29 @@ export function CartDrawer({
                 <span className="tabular text-lg font-bold">{formatMoney(subtotal, currency)}</span>
               </div>
               <p className="mb-3 text-xs opacity-55">الشحن بيتحسب في الخطوة الجاية.</p>
-              <Link
-                href="/checkout"
-                onClick={() => setOpen(false)}
-                className="flex min-h-12 w-full items-center justify-center rounded-xl bg-[var(--sf-primary)] px-5 font-semibold text-white transition-opacity hover:opacity-90"
-              >
-                إتمام الطلب
-              </Link>
+              {/*
+                الطلب اللي بينقصه مقاس بيترفض على الخادم برضه.
+                إن العميل يكتشف ده بعد ما يملا عنوانه ورقمه أسوأ
+                بكتير من إنه يشوف الزر مقفول ومكتوب تحته السبب.
+              */}
+              {needsOptions ? (
+                <div className="flex flex-col gap-1.5">
+                  <span className="flex min-h-12 w-full cursor-not-allowed items-center justify-center rounded-xl bg-[var(--sf-primary)]/40 px-5 font-semibold text-white">
+                    إتمام الطلب
+                  </span>
+                  <span className="text-center text-xs font-medium text-[var(--sf-primary)]">
+                    اختار خيارات المنتج فوق عشان تكمّل
+                  </span>
+                </div>
+              ) : (
+                <Link
+                  href="/checkout"
+                  onClick={() => setOpen(false)}
+                  className="flex min-h-12 w-full items-center justify-center rounded-xl bg-[var(--sf-primary)] px-5 font-semibold text-white transition-opacity hover:opacity-90"
+                >
+                  إتمام الطلب
+                </Link>
+              )}
             </div>
           </>
         )}

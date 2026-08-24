@@ -76,7 +76,35 @@ function classify(status: number, body: string): GeminiError {
   if (status >= 500) {
     return { kind: 'network', message: 'خدمة جوجل مش مستجيبة دلوقتي. جرّب بعد شوية.' }
   }
-  return { kind: 'unknown', message: `رد غير متوقّع من جوجل (${status}).` }
+  /*
+    السبب الحقيقي بيتقال، ما بيتبلعش.
+
+    «رد غير متوقّع (400)» ما بيقولش لا للتاجر ولا لينا حاجة، والرد
+    الأصلي من جوجل بيبقى فيه السبب حرفيًا («أول رسالة لازم تكون من
+    المستخدم»، «حقل مش معروف»...). كنا بنرميه ونسيب الاتنين يخمّنوا.
+
+    بنقصّه: الرد ممكن يبقى صفحة HTML كاملة، ورسالة بألف حرف مش رسالة.
+  */
+  const reason = extractReason(body)
+  return {
+    kind: 'unknown',
+    message: reason
+      ? `جوجل رفض الطلب (${status}): ${reason}`
+      : `رد غير متوقّع من جوجل (${status}).`,
+  }
+}
+
+/** بيطلّع نص الخطأ من رد جوجل مهما كان شكله */
+function extractReason(body: string): string | null {
+  try {
+    const parsed = JSON.parse(body) as { error?: { message?: string } }
+    const msg = parsed.error?.message?.trim()
+    if (msg) return msg.slice(0, 200)
+  } catch {
+    /* مش JSON — بنكمّل تحت */
+  }
+  const text = body.trim()
+  return text && !text.startsWith('<') ? text.slice(0, 200) : null
 }
 
 export type GeminiModel = {
@@ -315,7 +343,7 @@ function toParts(m: AgentMessage): Part[] {
     for (const img of m.images ?? []) {
       parts.push({ inlineData: { mimeType: img.mimeType, data: img.dataBase64 } })
     }
-    return parts.length ? parts : [{ text: '' }]
+    return parts
   }
 
   if (m.role === 'model') {
@@ -324,10 +352,37 @@ function toParts(m: AgentMessage): Part[] {
     for (const c of m.calls ?? []) {
       parts.push({ functionCall: { name: c.name, args: c.args } })
     }
-    return parts.length ? parts : [{ text: '' }]
+    return parts
   }
 
   return [{ functionResponse: { name: m.name, response: m.result } }]
+}
+
+/**
+ * تنضيف سجل المحادثة قبل ما يتبعت.
+ *
+ * جوجل بترفض الطلب كله (٤٠٠) في حالتين بيحصلوا فعلًا عندنا:
+ *
+ * 1. **رسالة بلا أجزاء.** كنا بنبعت `{ text: '' }` كبديل، والجزء
+ *    الفاضي مرفوض. الرسالة اللي مالهاش محتوى بتتشال أصلح.
+ *
+ * 2. **المحادثة مش بادئة برسالة مستخدم.** بيحصل لما التاجر يفتح
+ *    محادثة قديمة اتقطعت بعد نداء أداة: أول رسالة محفوظة بتبقى رد
+ *    موديل أو نتيجة أداة، وجوجل بترفض.
+ *
+ * الاتنين كانوا بيوصلوا للتاجر كـ«رد غير متوقّع (400)».
+ */
+function cleanHistory(messages: AgentMessage[]): Array<{ role: 'user' | 'model'; parts: Part[] }> {
+  const mapped = messages
+    .map((m) => ({
+      // جوجل بتسمّي دور نتيجة الأداة «user» — مش «tool»
+      role: (m.role === 'model' ? 'model' : 'user') as 'user' | 'model',
+      parts: toParts(m),
+    }))
+    .filter((m) => m.parts.length > 0)
+
+  const firstUser = mapped.findIndex((m) => m.role === 'user')
+  return firstUser <= 0 ? mapped : mapped.slice(firstUser)
 }
 
 /**
@@ -352,11 +407,7 @@ export async function agentTurn(input: {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: input.messages.map((m) => ({
-            // جوجل بتسمّي دور نتيجة الأداة «user» — مش «tool»
-            role: m.role === 'model' ? 'model' : 'user',
-            parts: toParts(m),
-          })),
+          contents: cleanHistory(input.messages),
           systemInstruction: { parts: [{ text: input.system }] },
           tools: input.tools.length
             ? [{ functionDeclarations: input.tools.map(cleanTool) }]
