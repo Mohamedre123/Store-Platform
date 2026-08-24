@@ -1,11 +1,14 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { BarChart3, Check, HelpCircle, Sparkles, Target } from 'lucide-react'
+import { BarChart3, Check, HelpCircle, MessageCircle, Sparkles, Target } from 'lucide-react'
 import { savePluginAction } from './actions'
 import { PLUGINS, type PluginDef } from '@/lib/plugins'
 import { Alert } from '@/components/ui'
 import { AppCard } from './app-card'
+import { WhatsappCard } from './whatsapp-card'
+import type { WhatsappSettings } from '@/lib/whatsapp'
+import type { Templates } from '@/lib/whatsapp-templates'
 import { GeminiCard, type GeminiSaved } from './gemini-card'
 import { GeminiProCard, type GeminiProSaved } from './gemini-pro-card'
 import { ClaudeCard, type ClaudeSaved } from './claude-card'
@@ -32,9 +35,16 @@ const LOOKS: Record<string, { initials: string; gradient: string; badge?: string
     badge: 'بيغيّر في متجرك',
   },
   claude: { initials: 'تص', gradient: 'linear-gradient(135deg,#d97757,#4285f4)' },
+  whatsapp: { initials: 'وا', gradient: 'linear-gradient(135deg,#25D366,#128C7E)' },
 }
 
 const GROUPS = [
+  {
+    key: 'messaging' as const,
+    title: 'رسايل العملاء',
+    icon: MessageCircle,
+    hint: 'رموز الدخول وتأكيد الطلبات وحالة الشحن — بتوصل لعملاءك باسم متجرك.',
+  },
   {
     key: 'ai' as const,
     title: 'الذكاء الاصطناعي',
@@ -57,11 +67,18 @@ const GROUPS = [
 
 export function PluginsManager({
   installed,
+  whatsapp,
   gemini,
   pro,
   claude,
 }: {
   installed: PluginRow[]
+  whatsapp: {
+    settings: WhatsappSettings
+    templates: Templates
+    storePhone: string | null
+    hasPlatformToken: boolean
+  }
   gemini: GeminiSaved
   pro: GeminiProSaved
   claude: ClaudeSaved
@@ -70,6 +87,10 @@ export function PluginsManager({
 
   /** مفعّل فعلًا: الإضافة شغّالة **ومعاها** اللي محتاجاه عشان تشتغل */
   const initialActive = (slug: string) => {
+    /* واتساب «شغّال» يعني مربوط ومعاه مفتاح — مش مجرد إن الصف موجود */
+    if (slug === 'whatsapp') {
+      return whatsapp.settings.provider !== 'off' && whatsapp.settings.hasKey
+    }
     if (slug === 'gemini') return gemini.enabled && gemini.hasKey
     if (slug === 'gemini_pro') return pro.enabled && (pro.hasOwnKey || pro.baseReady)
     if (slug === 'claude') return claude.enabled && claude.hasKey
@@ -150,7 +171,14 @@ export function PluginsManager({
                     active={live[def.slug]?.active ?? false}
                     configured={live[def.slug]?.configured ?? false}
                   >
-                    {def.custom === 'gemini' ? (
+                    {def.custom === 'whatsapp' ? (
+                      <WhatsappCard
+                        settings={whatsapp.settings}
+                        templates={whatsapp.templates}
+                        storePhone={whatsapp.storePhone}
+                        hasPlatformToken={whatsapp.hasPlatformToken}
+                      />
+                    ) : def.custom === 'gemini' ? (
                       <GeminiCard def={def} saved={gemini} embedded onToggle={report} />
                     ) : def.custom === 'gemini_pro' ? (
                       <GeminiProCard def={def} saved={pro} embedded onToggle={report} />

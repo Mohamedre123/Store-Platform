@@ -225,6 +225,13 @@ export const aiConversations = pgTable(
 export type AiToolCall = {
   name: string
   args: Record<string, unknown>
+  /**
+   * توقيع الموديل للنداء ده.
+   *
+   * بيتخزّن عشان يترجّع لجوجل لما المحادثة تكمّل — موديلات جيميني ٣
+   * بترفض الطلب لو النداء رجع من غيره. إحنا مش بنقراه ولا بنفسّره.
+   */
+  thoughtSignature?: string
   /** pending = مستنية موافقة التاجر · done = اتنفّذت · rejected = رفضها */
   status: 'pending' | 'done' | 'rejected' | 'failed'
   result?: string

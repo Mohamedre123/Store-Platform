@@ -282,7 +282,26 @@ export type ToolDef = {
   }
 }
 
-export type ToolCall = { name: string; args: Record<string, unknown> }
+/**
+ * نداء أداة من الموديل.
+ *
+ * `thoughtSignature` توقيع بيرجّعه الموديل مع كل نداء أداة، ولازم
+ * **يترجّع له زي ما هو** لما نبعت سجل المحادثة تاني. من غيره
+ * موديلات جيميني ٣ بترفض الطلب كله:
+ *
+ *   Function call is missing a thought_signature in functionCall parts
+ *
+ * كنا بنقرا الاسم والوسايط بس ونرمي التوقيع، فأول ما التاجر يسأل
+ * سؤالًا محتاج أداة والمحادثة تكمّل، الرد التاني بيترفض. والتاجر
+ * كان بيشوف «رد غير متوقّع (400)» ومش عارف السبب.
+ *
+ * إحنا مش بنفسّره ولا بنقراه — بنمرّره زي ما هو.
+ */
+export type ToolCall = {
+  name: string
+  args: Record<string, unknown>
+  thoughtSignature?: string
+}
 
 /**
  * تنظيف تعريف الأداة قبل ما يتبعت.
@@ -328,7 +347,7 @@ export type AgentTurn = {
 type Part =
   | { text: string }
   | { inlineData: { mimeType: string; data: string } }
-  | { functionCall: { name: string; args: Record<string, unknown> } }
+  | { functionCall: { name: string; args: Record<string, unknown> }; thoughtSignature?: string }
   | { functionResponse: { name: string; response: Record<string, unknown> } }
 
 export type AgentMessage =
@@ -350,7 +369,11 @@ function toParts(m: AgentMessage): Part[] {
     const parts: Part[] = []
     if (m.text) parts.push({ text: m.text })
     for (const c of m.calls ?? []) {
-      parts.push({ functionCall: { name: c.name, args: c.args } })
+      parts.push({
+        functionCall: { name: c.name, args: c.args },
+        /* التوقيع بيترجّع زي ما هو — من غيره الطلب بيترفض */
+        ...(c.thoughtSignature ? { thoughtSignature: c.thoughtSignature } : {}),
+      })
     }
     return parts
   }
@@ -440,7 +463,11 @@ export async function agentTurn(input: {
 
     const calls: ToolCall[] = parts
       .filter((p): p is Extract<Part, { functionCall: unknown }> => 'functionCall' in p)
-      .map((p) => ({ name: p.functionCall.name, args: p.functionCall.args ?? {} }))
+      .map((p) => ({
+        name: p.functionCall.name,
+        args: p.functionCall.args ?? {},
+        thoughtSignature: p.thoughtSignature,
+      }))
 
     if (!text && calls.length === 0) {
       return { ok: false, error: { kind: 'unknown', message: 'جوجل رجّعت رد فاضي.' } }

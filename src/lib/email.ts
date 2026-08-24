@@ -69,6 +69,15 @@ export async function sendEmail(options: {
   /** الرد يروح لمين — بريد التاجر عشان العميل يقدر يرد فعلًا */
   replyTo?: string
   /**
+   * رسالة واحد-لواحد ردًا على فعل من العميل (رمز دخول، تأكيد طلب).
+   *
+   * دي مش نشرة، ومالهاش «إلغاء اشتراك» — العميل هو اللي طلبها
+   * دلوقتي. وترويسة إلغاء الاشتراك على رسالة زي دي بتناقض نوعها،
+   * وفلاتر البريد بتقرا التناقض ده على إنه علامة على إرسال آلي
+   * مقنّع في شكل معاملة.
+   */
+  transactional?: boolean
+  /**
    * اسم المرسل الظاهر — اسم المتجر.
    *
    * سيبه فاضي لرسايل المنصة نفسها (تأكيد حساب التاجر، استعادة كلمة
@@ -76,7 +85,7 @@ export async function sendEmail(options: {
    */
   senderName?: string | null
 }): Promise<SendResult> {
-  const { to, subject, html, text, log, replyTo, senderName } = options
+  const { to, subject, html, text, log, replyTo, senderName, transactional } = options
 
   if (!isEmailConfigured()) {
     console.warn(
@@ -120,17 +129,21 @@ export async function sendEmail(options: {
         html,
         text: text ?? toPlainText(html),
         ...(replyTo ? { reply_to: replyTo } : {}),
-        headers: {
-          /*
-            `List-Unsubscribe-Post` اتشال.
+        /*
+          `List-Unsubscribe-Post` اتشال قبل كده: «إلغاء بضغطة واحدة»
+          بيوعد بعنوان https بيستقبل POST وإحنا مالناش، والوعد اللي
+          مش وراه تنفيذ بيتحسب عيبًا عند فلاتر جيميل.
 
-            «إلغاء بضغطة واحدة» بيوعد المستقبِل إن فيه عنوان https
-            بيستقبل POST — وإحنا مالناش. الوعد اللي مش وراه تنفيذ
-            بيتحسب عيبًا في الرسالة عند فلاتر جيميل، فبيضرّ أكتر
-            ما ينفع. الرابط البريدي وحده صالح وكفاية.
-          */
-          'List-Unsubscribe': `<mailto:${unsubscribeAddress()}?subject=unsubscribe>`,
-        },
+          والترويسة نفسها بتتشال من الرسايل المعاملاتية: رمز الدخول
+          مش نشرة، والعميل هو اللي طلبه دلوقتي.
+        */
+        ...(transactional
+          ? {}
+          : {
+              headers: {
+                'List-Unsubscribe': `<mailto:${unsubscribeAddress()}?subject=unsubscribe>`,
+              },
+            }),
       }),
     })
 

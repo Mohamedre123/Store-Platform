@@ -94,7 +94,11 @@ function toAgentMessages(rows: AgentMsg[]): AgentMessage[] {
       role: 'model',
       text: m.text || undefined,
       calls: m.toolCalls.length
-        ? m.toolCalls.map((c) => ({ name: c.name, args: c.args }))
+        ? m.toolCalls.map((c) => ({
+            name: c.name,
+            args: c.args,
+            thoughtSignature: c.thoughtSignature,
+          }))
         : undefined,
     })
 
@@ -241,6 +245,8 @@ export async function sendToAssistantAction(raw: unknown): Promise<AgentState> {
       pendingCalls = writes.map((c) => ({
         name: c.name,
         args: c.args,
+        /* بيترجّع لجوجل لما المحادثة تكمّل — من غيره بترفض الطلب */
+        thoughtSignature: c.thoughtSignature,
         status: 'pending' as const,
       }))
       break

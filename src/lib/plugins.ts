@@ -18,7 +18,7 @@ export type PluginDef = {
   name: string
   desc: string
   /** المجموعة في الواجهة */
-  group: 'pixels' | 'analytics' | 'ai'
+  group: 'pixels' | 'analytics' | 'ai' | 'messaging'
   fields: PluginField[]
   /** إزاي التاجر يجيب المعرّف — بيوفّر عليه بحث */
   where?: string
@@ -28,12 +28,25 @@ export type PluginDef = {
    * إضافات الذكاء الاصطناعي محتاجة تحقّق من المفتاح واختيار موديل
    * ووصف للمتجر — ده مش «الصق معرّفًا واقفل».
    */
-  custom?: 'gemini' | 'gemini_pro' | 'claude'
+  custom?: 'gemini' | 'gemini_pro' | 'claude' | 'whatsapp'
   /** بيتحفظ في العمود المشفّر لا في config — مفتاح API مش معرّف عام */
   secretFields?: string[]
 }
 
 export const PLUGINS: PluginDef[] = [
+  {
+    slug: 'whatsapp',
+    name: 'واتساب المتجر',
+    desc:
+      'رمز دخول العميل، وتأكيد الطلب، وكل تغيير في حالة الشحن — بتوصل على واتساب باسم متجرك ومن رقمك إنت. اربط بمسح كود زي واتساب ويب، واكتب نصوص الرسايل بصوتك.',
+    group: 'messaging',
+    custom: 'whatsapp',
+    secretFields: ['accessToken'],
+    fields: [],
+    where:
+      'محتاج حساب على wasenderapi.com (فيه تجربة مجانية) — تنسخ منه Personal Access Token وتلزقه هنا مرة واحدة، وبعدها كل حاجة من لوحتك. أو اربط واتساب بزنس الرسمي من ميتا لو عندك.',
+  },
+
   {
     slug: 'facebook_pixel',
     name: 'بكسل فيسبوك وإنستجرام',
