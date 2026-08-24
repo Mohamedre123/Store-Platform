@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { getDashboardContext } from '@/lib/store-context'
 import { Sidebar } from '@/components/dashboard/sidebar'
 import { SectionTabs } from '@/components/dashboard/section-tabs'
@@ -5,6 +6,7 @@ import { AuroraBackground } from '@/components/motion'
 import { Preloader } from '@/components/preloader'
 import { AssistantPanel } from '@/components/dashboard/assistant-panel'
 import { AssistBubble } from '@/components/dashboard/assist-bubble'
+import { Toaster } from '@/components/dashboard/toast'
 import { getAiConfig, isAssistantReady, GEMINI_PRO_SLUG, GEMINI_SLUG } from '@/lib/ai/settings'
 import { storeUrl } from '@/lib/domain'
 import { logoutAction } from '@/app/(auth)/actions'
@@ -83,6 +85,14 @@ export default async function DashboardLayout({ children }: { children: React.Re
           {children}
           {assistantReady && <AssistantPanel />}
           {hasAnyKey && <AssistBubble />}
+          {/*
+            تأكيد الحفظ. لازم يكون فوق اللوحة كلها عشان يشتغل مع أي
+            صفحة، وبعد التحويل كمان — التاجر اللي بيحفظ منتجًا بيتحوّل
+            لقائمة المنتجات، والرسالة لازم توصله هناك.
+          */}
+          <Suspense fallback={null}>
+            <Toaster />
+          </Suspense>
         </main>
       </div>
     </div>

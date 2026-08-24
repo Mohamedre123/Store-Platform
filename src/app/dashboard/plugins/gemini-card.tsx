@@ -228,7 +228,7 @@ export function GeminiCard({
                 value={brief}
                 onChange={(e) => setBrief(e.target.value)}
                 rows={3}
-                placeholder="متجر ملابس رجالي، تيشيرتات وبناطيل قطن، شحن لكل المحافظات…"
+                placeholder="بيبيع إيه، لمين، وإيه اللي يميّزه — وأي تفصيلة تحب البوت يعرفها…"
                 className="rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm focus:border-[var(--primary)] focus:outline-none"
               />
               <span className="text-xs text-[var(--fg-subtle)]">

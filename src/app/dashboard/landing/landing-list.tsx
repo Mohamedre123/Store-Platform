@@ -62,7 +62,7 @@ export function LandingList({
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="عرض التيشيرت"
+              placeholder="اسم الصفحة"
               className={field}
             />
           </label>

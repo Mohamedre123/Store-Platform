@@ -60,6 +60,139 @@ export default async function StoreHomePage({ params }: { params: Promise<{ stor
 
   const empty = latest.length === 0
 
+  /**
+   * أقسام الصفحة بترسم **بالترتيب اللي التاجر حفظه**.
+   *
+   * قبل كده كان الترتيب مكتوبًا في الكود، والإعداد بيتقرا عشان
+   * «مفعّل ولا لأ» بس — فالتاجر بينقل «المنتجات» فوق «الأقسام»،
+   * بيتحفظ فعلًا، وبيفتح متجره ويلاقيه زي ما هو. الحفظ كان شغّال
+   * والعرض هو اللي مكانش بيقرا.
+   *
+   * كل قسم عقدة في الخريطة دي، والترتيب بييجي من مصفوفة الإعدادات.
+   */
+  const blocks: Record<string, React.ReactNode> = {
+    categories: cats.length > 0 && (
+      <section key="categories" className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+        <SectionHead title="تسوّق حسب القسم" />
+        <div className="scroll-x flex gap-4 pb-2 sm:grid sm:grid-cols-4 lg:grid-cols-6">
+          {cats.map((c) => (
+            <Link
+              key={c.id}
+              href={`/category/${c.slug}`}
+              className="group flex w-28 shrink-0 flex-col items-center gap-2 sm:w-auto"
+            >
+              <span
+                className={`relative aspect-square w-full overflow-hidden bg-[var(--sf-text)]/6 ${
+                  theme.tokens.radius === 'full' ? 'rounded-full' : 'rounded-[var(--sf-radius)]'
+                }`}
+              >
+                {c.image ? (
+                  <Image src={c.image} alt="" fill sizes="120px" className="object-cover transition-transform duration-500 group-hover:scale-105" />
+                ) : (
+                  <span className="flex h-full items-center justify-center opacity-25">
+                    <Package className="h-6 w-6" aria-hidden="true" />
+                  </span>
+                )}
+              </span>
+              <span className="text-center text-sm font-medium">{c.name}</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+    ),
+
+    promo_banners: promos.length > 0 && (
+      <section key="promo_banners" className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
+        <div className="flex flex-col gap-4">
+          {promos.map((b) => (
+            <PromoBanner key={b.id} banner={b} />
+          ))}
+        </div>
+      </section>
+    ),
+
+    featured_products: featured.length > 0 && (
+      <section key="featured_products" className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+        <SectionHead title="منتجات مختارة" href="/products" />
+        <div className={gridClass}>
+          {featured.map((p) => (
+            <ProductCard key={p.id} product={p} {...cardProps} />
+          ))}
+        </div>
+      </section>
+    ),
+
+    sale_products: onSale.length > 0 && (
+      <section key="sale_products" className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+        <SectionHead title="التخفيضات" href="/products" />
+        <div className={gridClass}>
+          {onSale.map((p) => (
+            <ProductCard key={p.id} product={p} {...cardProps} />
+          ))}
+        </div>
+      </section>
+    ),
+
+    new_arrivals: (
+      <section key="new_arrivals" className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+        <SectionHead title="وصل حديثًا" href="/products" />
+        <div className={gridClass}>
+          {latest.map((p) => (
+            <ProductCard key={p.id} product={p} {...cardProps} />
+          ))}
+        </div>
+      </section>
+    ),
+
+    all_products: latest.length > 0 && (
+      <section key="all_products" className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
+        <SectionHead title="كل المنتجات" href="/products" />
+        <div className={gridClass}>
+          {latest.map((p) => (
+            <ProductCard key={p.id} product={p} {...cardProps} />
+          ))}
+        </div>
+      </section>
+    ),
+
+    trust_badges: (
+      <section key="trust_badges" className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+        <div className="grid grid-cols-2 gap-4 border-t border-[var(--sf-text)]/10 pt-8 md:grid-cols-4">
+          {[
+            { icon: Truck, t: 'شحن سريع', d: 'لكل المحافظات' },
+            { icon: CreditCard, t: 'دفع عند الاستلام', d: 'ادفع لما يوصلك' },
+            { icon: RotateCcw, t: 'إرجاع سهل', d: 'لو المنتج مش زي ما توقّعت' },
+            { icon: Package, t: 'تغليف آمن', d: 'يوصلك بحالته' },
+          ].map(({ icon: Icon, t, d }) => (
+            <div key={t} className="flex flex-col items-center gap-1.5 text-center">
+              <Icon className="h-6 w-6 text-[var(--sf-primary)]" aria-hidden="true" />
+              <span className="text-sm font-semibold">{t}</span>
+              <span className="text-xs opacity-60">{d}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+    ),
+  }
+
+  /*
+    الترتيب المحفوظ، ولو التاجر لسه ما رتّبش حاجة بنرجع لترتيب
+    افتراضي معقول بدل صفحة فاضية.
+  */
+  const DEFAULT_ORDER = [
+    'categories',
+    'promo_banners',
+    'featured_products',
+    'sale_products',
+    'new_arrivals',
+    'trust_badges',
+  ]
+
+  const ordered =
+    theme.sections.length > 0
+      ? theme.sections.filter((sec) => sec.enabled).map((sec) => sec.type)
+      : DEFAULT_ORDER
+
   return (
     <>
       {show('hero') && (
@@ -78,101 +211,14 @@ export default async function StoreHomePage({ params }: { params: Promise<{ stor
           <p className="opacity-65">المتجر بيتجهّز. ارجع تاني قريب.</p>
         </section>
       ) : (
-        <>
-          {show('categories') && cats.length > 0 && (
-            <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-              <SectionHead title="تسوّق حسب القسم" />
-              <div className="scroll-x flex gap-4 pb-2 sm:grid sm:grid-cols-4 lg:grid-cols-6">
-                {cats.map((c) => (
-                  <Link
-                    key={c.id}
-                    href={`/category/${c.slug}`}
-                    className="group flex w-28 shrink-0 flex-col items-center gap-2 sm:w-auto"
-                  >
-                    <span
-                      className={`relative aspect-square w-full overflow-hidden bg-[var(--sf-text)]/6 ${
-                        theme.tokens.radius === 'full' ? 'rounded-full' : 'rounded-[var(--sf-radius)]'
-                      }`}
-                    >
-                      {c.image ? (
-                        <Image src={c.image} alt="" fill sizes="120px" className="object-cover transition-transform duration-500 group-hover:scale-105" />
-                      ) : (
-                        <span className="flex h-full items-center justify-center opacity-25">
-                          <Package className="h-6 w-6" aria-hidden="true" />
-                        </span>
-                      )}
-                    </span>
-                    <span className="text-center text-sm font-medium">{c.name}</span>
-                  </Link>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* البانرات الترويجية — بتظهر بين الأقسام وبتختفي لوحدها لما العرض ينتهي */}
-          {promos.length > 0 && (
-            <section className="mx-auto max-w-6xl px-4 py-4 sm:px-6">
-              <div className="flex flex-col gap-4">
-                {promos.map((b) => (
-                  <PromoBanner key={b.id} banner={b} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {show('featured_products') && featured.length > 0 && (
-            <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-              <SectionHead title="منتجات مختارة" href="/products" />
-              <div className={gridClass}>
-                {featured.map((p) => (
-                  <ProductCard key={p.id} product={p} {...cardProps} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {show('sale_products') && onSale.length > 0 && (
-            <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-              <SectionHead title="التخفيضات" href="/products" />
-              <div className={gridClass}>
-                {onSale.map((p) => (
-                  <ProductCard key={p.id} product={p} {...cardProps} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {show('new_arrivals') && (
-            <section className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-              <SectionHead title="وصل حديثًا" href="/products" />
-              <div className={gridClass}>
-                {latest.map((p) => (
-                  <ProductCard key={p.id} product={p} {...cardProps} />
-                ))}
-              </div>
-            </section>
-          )}
-        </>
+        ordered.map((type) => blocks[type] ?? null)
       )}
 
-      {show('trust_badges') && (
-        <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-          <div className="grid grid-cols-2 gap-4 border-t border-[var(--sf-text)]/10 pt-8 md:grid-cols-4">
-            {[
-              { icon: Truck, t: 'شحن سريع', d: 'لكل المحافظات' },
-              { icon: CreditCard, t: 'دفع عند الاستلام', d: 'ادفع لما يوصلك' },
-              { icon: RotateCcw, t: 'إرجاع سهل', d: 'لو المنتج مش زي ما توقّعت' },
-              { icon: Package, t: 'تغليف آمن', d: 'يوصلك بحالته' },
-            ].map(({ icon: Icon, t, d }) => (
-              <div key={t} className="flex flex-col items-center gap-1.5 text-center">
-                <Icon className="h-6 w-6 text-[var(--sf-primary)]" aria-hidden="true" />
-                <span className="text-sm font-semibold">{t}</span>
-                <span className="text-xs opacity-60">{d}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      {/*
+        البانرات بتظهر برّه الترتيب كمان لو التاجر ما ضافش قسمًا ليها —
+        العرض اللي شغّال دلوقتي أهم من ترتيب مثالي.
+      */}
+      {!ordered.includes('promo_banners') && promos.length > 0 && blocks.promo_banners}
     </>
   )
 }

@@ -98,7 +98,19 @@ export function ImageUpload({
       {label && <span className="text-sm font-medium">{label}</span>}
       {specKey && <SpecLine specKey={specKey} />}
 
-      <div className={cn('grid gap-2.5', multiple ? 'grid-cols-3 sm:grid-cols-4' : 'grid-cols-1')}>
+      {/*
+        الصورة الواحدة بعرض محدود.
+
+        `grid-cols-1` مع `aspect-square` كانت بتخلّي خانة صورة القسم
+        مربّعًا بعرض الصفحة كلها — شاشة فاضية بحجم الشاشة عشان صورة
+        واحدة. الشبكة المتعدّدة سليمة زي ما هي لأن الأعمدة بتقسّمها.
+      */}
+      <div
+        className={cn(
+          'grid gap-2.5',
+          multiple ? 'grid-cols-3 sm:grid-cols-4' : 'w-full max-w-[16rem] grid-cols-1',
+        )}
+      >
         {value.map((url, i) => (
           <div
             key={url}

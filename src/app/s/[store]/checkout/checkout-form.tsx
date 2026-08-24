@@ -521,13 +521,20 @@ export function CheckoutForm({
                       onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), applyCoupon())}
                       placeholder="كود الخصم"
                       dir="ltr"
-                      className="h-11 flex-1 rounded-[var(--sf-radius)] border border-[var(--sf-text)]/18 bg-[var(--sf-surface)] px-3 text-start text-sm uppercase outline-none focus:border-[var(--sf-primary)]"
+                      /*
+                        `min-w-0` هي اللي بتمنع الخروج من الكادر.
+
+                        عنصر flex عرضه الأدنى الافتراضي `auto`، يعني
+                        بيرفض يصغّر عن عرض محتواه — فالخانة كانت
+                        بتزقّ زرار «تطبيق» برّه حدود ملخّص الطلب.
+                      */
+                      className="h-11 min-w-0 flex-1 rounded-[var(--sf-radius)] border border-[var(--sf-text)]/18 bg-[var(--sf-surface)] px-3 text-start text-sm uppercase outline-none focus:border-[var(--sf-primary)]"
                     />
                     <button
                       type="button"
                       onClick={applyCoupon}
                       disabled={applyingCoupon || !couponInput.trim()}
-                      className="shrink-0 rounded-[var(--sf-radius)] border border-[var(--sf-primary)] px-4 text-sm font-medium text-[var(--sf-primary)] transition-colors hover:bg-[var(--sf-primary)]/8 disabled:opacity-50"
+                      className="h-11 shrink-0 whitespace-nowrap rounded-[var(--sf-radius)] border border-[var(--sf-primary)] px-4 text-sm font-medium text-[var(--sf-primary)] transition-colors hover:bg-[var(--sf-primary)]/8 disabled:opacity-50"
                     >
                       {applyingCoupon ? '…' : 'تطبيق'}
                     </button>

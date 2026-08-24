@@ -14,9 +14,21 @@ type Category = {
   description: string | null
   image: string | null
   isActive: boolean
+  /** القسم الأب — null يعني قسم رئيسي */
+  parentId: string | null
   productCount: number
 }
 
+/**
+ * الأقسام على مستويين.
+ *
+ * التاجر بيعمل قسمًا عامًّا وبعدين قسمًا أخصّ منه — والتاني جوّه
+ * الأولى مش جنبها. من غير التداخل ده، قايمة المتجر بتبقى عشرين
+ * قسمًا في صف واحد والعميل بيتوه.
+ *
+ * **مستويان بس عن قصد.** التداخل بلا حدود بيخلّي قايمة المتجر
+ * تحتاج قوائم جوّه قوائم، وده بيكسر التصفّح على الموبايل تمامًا.
+ */
 export function CategoriesManager({ initial }: { initial: Category[] }) {
   const [editing, setEditing] = useState<Category | null>(null)
   const [creating, setCreating] = useState(false)
@@ -36,6 +48,7 @@ export function CategoriesManager({ initial }: { initial: Category[] }) {
       {open && (
         <CategoryForm
           category={editing}
+          all={initial}
           onClose={() => {
             setCreating(false)
             setEditing(null)
@@ -51,13 +64,21 @@ export function CategoriesManager({ initial }: { initial: Category[] }) {
           <div>
             <h2 className="text-lg font-semibold">لسه مافيش أقسام</h2>
             <p className="mt-1 max-w-sm text-sm text-[var(--fg-muted)]">
-              الأقسام بتساعد العميل يلاقي اللي بيدوّر عليه بسرعة. زي «تيشيرتات» و«بناطيل».
+              الأقسام بتساعد العميل يلاقي اللي بيدوّر عليه بسرعة — وتقدر تحطّ قسمًا جوّه قسم.
             </p>
           </div>
         </Card>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {initial.map((c) => (
+          {[...initial]
+            .sort((a, b) => {
+              // الأب قبل أولاده، والأولاد ورا أبوهم على طول
+              const rootA = a.parentId ?? a.id
+              const rootB = b.parentId ?? b.id
+              if (rootA !== rootB) return rootA.localeCompare(rootB)
+              return (a.parentId ? 1 : 0) - (b.parentId ? 1 : 0)
+            })
+            .map((c) => (
             <li key={c.id}>
               <Card className="flex items-center gap-3 p-3">
                 <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-[var(--surface-2)]">
@@ -122,12 +143,22 @@ export function CategoriesManager({ initial }: { initial: Category[] }) {
   )
 }
 
-function CategoryForm({ category, onClose }: { category: Category | null; onClose: () => void }) {
+function CategoryForm({
+  category,
+  onClose,
+  all,
+}: {
+  category: Category | null
+  onClose: () => void
+  /** كل الأقسام — عشان قايمة «تحت قسم» */
+  all: Category[]
+}) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(saveCategoryAction, null)
   const [image, setImage] = useState<string[]>(category?.image ? [category.image] : [])
   const [isActive, setIsActive] = useState(category?.isActive ?? true)
   const [name, setName] = useState(category?.name ?? '')
   const [description, setDescription] = useState(category?.description ?? '')
+  const [parentId, setParentId] = useState(category?.parentId ?? '')
 
   return (
     <Card className="p-5">
@@ -135,6 +166,7 @@ function CategoryForm({ category, onClose }: { category: Category | null; onClos
         {category && <input type="hidden" name="id" value={category.id} />}
         <input type="hidden" name="image" value={image[0] ?? ''} />
         <input type="hidden" name="isActive" value={String(isActive)} />
+        <input type="hidden" name="parentId" value={parentId} />
 
         <div className="flex items-center justify-between">
           <h2 className="font-semibold">{category ? 'تعديل القسم' : 'قسم جديد'}</h2>
@@ -157,8 +189,37 @@ function CategoryForm({ category, onClose }: { category: Category | null; onClos
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="تيشيرتات"
+            placeholder="اسم القسم"
           />
+        </Field>
+
+        {/*
+          «تحت قسم» — ده اللي بيعمل المستويين.
+
+          الاختيارات هي الأقسام الرئيسية بس: قسم جوّه قسم جوّه قسم
+          بيخلّي قايمة المتجر تحتاج قوائم متداخلة، وده بيكسر التصفّح
+          على الموبايل. والقسم نفسه مستبعد عشان ما يبقاش أبًا لنفسه.
+        */}
+        <Field
+          label="تحت قسم"
+          htmlFor="parentId"
+          hint="سيبه «قسم رئيسي» لو ده قسم مستقل. اختار أبًا عشان يبقى قسم فرعي جوّاه."
+        >
+          <select
+            id="parentId"
+            value={parentId}
+            onChange={(e) => setParentId(e.target.value)}
+            className="h-11 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-sm focus:border-[var(--primary)] focus:outline-none"
+          >
+            <option value="">قسم رئيسي</option>
+            {all
+              .filter((c) => !c.parentId && c.id !== category?.id)
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+          </select>
         </Field>
 
         <div className="flex flex-col gap-2">

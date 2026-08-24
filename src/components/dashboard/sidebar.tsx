@@ -114,6 +114,13 @@ export const NAV: NavSection[] = [
       { href: '/dashboard/storefront/banners', label: 'البانرات' },
       { href: '/dashboard/blog', label: 'المدوّنة' },
       { href: '/dashboard/settings/pages', label: 'صفحات المتجر' },
+      /*
+        صفحات الهبوط هنا كمان لا في التسويق بس.
+
+        التاجر بيدوّر عليها جنب «صفحات المتجر» لأن الاتنين صفحات —
+        ودفنها في التسويق كان بيخلّيه يفتكر إنها مش موجودة أصلًا.
+      */
+      { href: '/dashboard/landing', label: 'صفحات الهبوط' },
     ],
   },
   /*

@@ -20,6 +20,7 @@ export default async function CategoriesPage() {
       description: categories.description,
       image: categories.image,
       isActive: categories.isActive,
+      parentId: categories.parentId,
       productCount: count(products.id),
     })
     .from(categories)

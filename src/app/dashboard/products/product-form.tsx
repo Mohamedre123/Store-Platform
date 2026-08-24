@@ -108,7 +108,7 @@ export function ProductForm({
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="تيشيرت قطن رجالي"
+                placeholder="اسم المنتج زي ما العميل بيدوّر عليه"
               />
               {state?.fieldErrors?.name && (
                 <p className="text-xs text-[var(--color-danger)]">{state.fieldErrors.name}</p>
@@ -139,10 +139,10 @@ export function ProductForm({
                 rows={5}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="قطن ١٠٠٪، متوفر بمقاسات M و L و XL…"
+                placeholder="الخامة أو المكوّنات، الأبعاد أو المقاسات، طريقة الاستخدام…"
               />
               <p className="text-xs text-[var(--fg-muted)]">
-                اكتب المقاسات والخامة وأي تفصيلة العميل هيسأل عنها.
+                اكتب كل تفصيلة العميل هيسأل عنها قبل ما يشتري — دي اللي بتقفل البيعة.
               </p>
             </div>
           </Card>

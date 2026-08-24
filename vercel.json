@@ -5,5 +5,8 @@
       "path": "/api/cron/abandoned-carts",
       "schedule": "0 15 * * *"
     }
+  ],
+  "regions": [
+    "fra1"
   ]
 }

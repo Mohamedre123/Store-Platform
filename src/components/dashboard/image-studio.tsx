@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import Image from 'next/image'
-import { Check, Loader2, Sparkles, TriangleAlert, Wand2, X } from 'lucide-react'
+import { Check, ImagePlus, Loader2, Sparkles, TriangleAlert, Wand2, X } from 'lucide-react'
 import { assistImageAction, listImageModelsAction } from '@/app/dashboard/assist-actions'
 
 /**
@@ -39,6 +39,39 @@ export function ImageStudio({
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
 
+  /**
+   * صورة مرجعية بيرفعها التاجر هنا على طول.
+   *
+   * مش كل تاجر عنده صورة كويسة في المتجر يبني عليها — واحد مصوّر
+   * منتجه بالموبايل على السرير وعايز نفس المنتج بشكل احترافي.
+   * الرفع من جوّه الاستوديو بيوفّر عليه إنه يضيف الصورة الوحشة
+   * للمنتج الأول عشان يقدر يعدّلها.
+   */
+  const [uploaded, setUploaded] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  /* الصورة اللي هيشتغل عليها: المرفوعة تغلب لأنها أحدث اختيار */
+  const base = uploaded ?? sourceUrl ?? null
+
+  const pickFile = async (file: File) => {
+    setError(null)
+    setUploading(true)
+    try {
+      const body = new FormData()
+      body.append('file', file)
+      body.append('folder', 'products')
+      const res = await fetch('/api/upload', { method: 'POST', body })
+      const data = (await res.json()) as { url?: string; error?: string }
+      if (data.url) setUploaded(data.url)
+      else setError(data.error ?? 'فشل رفع الصورة')
+    } catch {
+      setError('مشكلة في الاتصال. جرّب تاني.')
+    } finally {
+      setUploading(false)
+    }
+  }
+
   useEffect(() => {
     void listImageModelsAction().then((res) => {
       if (res.ok) {
@@ -66,7 +99,7 @@ export function ImageStudio({
       setError(null)
       setResult(null)
       const res = await assistImageAction({
-        sourceUrl: sourceUrl || undefined,
+        sourceUrl: base || undefined,
         instruction: text,
         model: model || undefined,
       })
@@ -75,7 +108,7 @@ export function ImageStudio({
     })
   }
 
-  const presets = sourceUrl
+  const presets = base
     ? ['خلفية بيضا نضيفة', 'إضاءة أوضح وألوان أنقى', 'شيل اللي ورا المنتج', 'خلّيها مربّعة للمتجر']
     : ['صورة منتج على خلفية بيضا', 'صورة أجواء دافية للمنتج']
 
@@ -98,7 +131,7 @@ export function ImageStudio({
             <Wand2 className="h-4 w-4" aria-hidden="true" />
           </span>
           <div className="min-w-0 flex-1">
-            <h3 className="font-semibold">{sourceUrl ? 'عدّل الصورة' : 'ولّد صورة'}</h3>
+            <h3 className="font-semibold">{base ? 'عدّل الصورة' : 'ولّد صورة'}</h3>
             <p className="text-xs text-[var(--fg-subtle)]">
               بمفتاح Gemini بتاعك — كل تعديل بيتحاسب على حسابك.
             </p>
@@ -115,14 +148,53 @@ export function ImageStudio({
 
         <div className="safe-bottom flex-1 overflow-y-auto p-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            {sourceUrl && (
-              <figure className="flex flex-col gap-1.5">
-                <figcaption className="text-xs font-medium text-[var(--fg-muted)]">الأصلية</figcaption>
-                <span className="relative block aspect-square overflow-hidden rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface-2)]">
-                  <Image src={sourceUrl} alt="" fill sizes="(max-width: 640px) 90vw, 22rem" className="object-contain" />
-                </span>
-              </figure>
-            )}
+            <figure className="flex flex-col gap-1.5">
+              <figcaption className="flex items-center justify-between gap-2 text-xs font-medium text-[var(--fg-muted)]">
+                <span>{base ? 'الأصلية' : 'صورة مرجعية (اختياري)'}</span>
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  className="text-[var(--primary)] hover:underline"
+                >
+                  {base ? 'غيّرها' : 'ارفع صورة'}
+                </button>
+              </figcaption>
+
+              <button
+                type="button"
+                onClick={() => !base && fileRef.current?.click()}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  const f = e.dataTransfer.files?.[0]
+                  if (f) void pickFile(f)
+                }}
+                className="relative flex aspect-square items-center justify-center overflow-hidden rounded-[var(--radius-card)] border border-dashed border-[var(--border-strong)] bg-[var(--surface-2)]"
+              >
+                {uploading ? (
+                  <Loader2 className="h-6 w-6 animate-spin text-[var(--primary)]" aria-hidden="true" />
+                ) : base ? (
+                  <Image src={base} alt="" fill sizes="(max-width: 640px) 90vw, 22rem" className="object-contain" />
+                ) : (
+                  <span className="flex flex-col items-center gap-2 px-4 text-center text-sm text-[var(--fg-subtle)]">
+                    <ImagePlus className="h-6 w-6" aria-hidden="true" />
+                    ارفع صورة منتجك عشان يشتغل عليها — أو سيبها فاضية ويولّد من الوصف
+                  </span>
+                )}
+              </button>
+
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/avif"
+                hidden
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) void pickFile(f)
+                  e.target.value = ''
+                }}
+              />
+            </figure>
 
             <figure className="flex flex-col gap-1.5">
               <figcaption className="text-xs font-medium text-[var(--fg-muted)]">الناتج</figcaption>
@@ -195,7 +267,7 @@ export function ImageStudio({
           <button
             type="button"
             onClick={run}
-            disabled={pending || !instruction.trim()}
+            disabled={pending || uploading || !instruction.trim()}
             className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-fg)] disabled:opacity-60"
           >
             <Sparkles className="h-4 w-4" aria-hidden="true" />

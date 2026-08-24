@@ -53,6 +53,8 @@ const categorySchema = z.object({
   description: z.string().trim().optional(),
   image: z.string().trim().optional(),
   isActive: z.boolean(),
+  /** القسم الأب — فاضي يعني قسم رئيسي */
+  parentId: z.string().uuid().nullable().optional(),
 })
 
 export async function saveCategoryAction(_prev: FormState, formData: FormData): Promise<FormState> {
@@ -64,15 +66,31 @@ export async function saveCategoryAction(_prev: FormState, formData: FormData): 
     description: formData.get('description') || undefined,
     image: formData.get('image') || undefined,
     isActive: formData.get('isActive') !== 'false',
+    parentId: formData.get('parentId') || null,
   })
 
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) }
   const data = parsed.data
 
+  /*
+    القسم ما ينفعش يكون أبًا لنفسه.
+
+    ده مش احتمال نظري: التاجر بيفتح قسمًا يعدّله والقايمة قدامه
+    فيها اسمه، فبيختاره من غير ما ياخد باله. الحلقة دي بتخلّي شجرة
+    الأقسام تلفّ على نفسها للأبد وقت العرض.
+  */
+  const parentId = data.parentId && data.parentId !== id ? data.parentId : null
+
   if (id) {
     await db
       .update(categories)
-      .set({ name: data.name, description: data.description, image: data.image, isActive: data.isActive })
+      .set({
+        name: data.name,
+        description: data.description,
+        image: data.image,
+        isActive: data.isActive,
+        parentId,
+      })
       // الفلترة بـstoreId مش بالـid وحده — وإلا يقدر تاجر يعدّل قسم تاجر تاني
       .where(and(eq(categories.id, id), eq(categories.storeId, store.id)))
   } else {
@@ -83,11 +101,20 @@ export async function saveCategoryAction(_prev: FormState, formData: FormData): 
       description: data.description,
       image: data.image,
       isActive: data.isActive,
+      parentId,
     })
   }
 
-  revalidatePath('/dashboard/products')
-  redirect('/dashboard/products/categories')
+  /*
+    `layout` لا الافتراضي.
+
+    الافتراضي بيحدّث الصفحة دي بس، و**صفحة «منتج جديد» بتفضل
+    بقائمة أقسام قديمة** — التاجر بيعمل قسمًا ويروح يضيف منتج
+    وما بيلاقيهوش، ويفتكر إن القسم ما اتحفظش. `layout` بتحدّث
+    الفرع كله تحت `/dashboard/products`.
+  */
+  revalidatePath('/dashboard/products', 'layout')
+  redirect('/dashboard/products/categories?saved=' + encodeURIComponent('القسم اتحفظ'))
 }
 
 export async function deleteCategoryAction(id: string) {
@@ -99,7 +126,7 @@ export async function deleteCategoryAction(id: string) {
     .where(and(eq(products.categoryId, id), eq(products.storeId, store.id)))
 
   await db.delete(categories).where(and(eq(categories.id, id), eq(categories.storeId, store.id)))
-  revalidatePath('/dashboard/products')
+  revalidatePath('/dashboard/products', 'layout')
 }
 
 /* ══════════════════════════ المنتجات ══════════════════════════ */
@@ -260,7 +287,7 @@ export async function saveProductAction(_prev: FormState, formData: FormData): P
   }
 
   revalidatePath('/dashboard/products')
-  redirect('/dashboard/products')
+  redirect('/dashboard/products?saved=' + encodeURIComponent('المنتج اتحفظ'))
 }
 
 export async function deleteProductAction(id: string) {
