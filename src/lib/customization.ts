@@ -157,6 +157,32 @@ export type PreloaderSettings = {
   color: string
 }
 
+/* ────────────────────────── الحركة ────────────────────────── */
+
+/**
+ * حركة الظهور عند التمرير.
+ *
+ * الحركة مش زينة: هي اللي بتقول للعين «فيه حاجة جديدة هنا» وبتخلّي
+ * الصفحة الطويلة تتقرا على مراحل بدل ما تنزل كتلة واحدة.
+ *
+ * **وبتتقفل لوحدها لمن طالب بتقليل الحركة** في إعدادات نظامه — دي
+ * مش تفضيل شكلي، ناس بتتعبها الحركة فعلًا (دوخة وصداع).
+ */
+export type ScrollAnimation = 'none' | 'fade' | 'rise' | 'zoom' | 'blur' | 'slide'
+
+export type EffectsSettings = {
+  scroll: ScrollAnimation
+  speed: 'slow' | 'normal' | 'fast'
+  /** العناصر جوّه البلوك تظهر ورا بعض بدل مرة واحدة */
+  stagger: boolean
+  /** البطاقة بتطلع لفوق شوية تحت الماوس */
+  hoverLift: boolean
+  /** الصورة بتكبر جوّه إطارها عند المرور */
+  imageZoom: boolean
+  /** التمرير الناعم لروابط نفس الصفحة */
+  smoothScroll: boolean
+}
+
 /* ────────────────────────── المجموع ────────────────────────── */
 
 export type Customization = {
@@ -170,6 +196,7 @@ export type Customization = {
   footer: FooterSettings
   toolbar: ToolbarSettings
   preloader: PreloaderSettings
+  effects: EffectsSettings
 }
 
 export type PanelKey = keyof Customization
@@ -185,6 +212,7 @@ export const PANELS: Array<{ key: PanelKey; label: string; hint: string }> = [
   { key: 'footer', label: 'الفوتر', hint: 'الروابط والتواصل' },
   { key: 'toolbar', label: 'شريط الأدوات', hint: 'زر واتساب والتنقّل السفلي' },
   { key: 'preloader', label: 'شاشة التحميل', hint: 'اللي بيظهر لحظة فتح المتجر' },
+  { key: 'effects', label: 'الحركة', hint: 'ظهور الأقسام مع التمرير' },
 ]
 
 /** إعدادات افتراضية معقولة — متجر جديد يبان محترم من غير أي تعديل */
@@ -301,6 +329,14 @@ export function defaultCustomization(theme: {
       background: theme.palette.background,
       color: theme.palette.primary,
     },
+    effects: {
+      scroll: 'rise',
+      speed: 'normal',
+      stagger: true,
+      hoverLift: true,
+      imageZoom: true,
+      smoothScroll: true,
+    },
   }
 }
 
@@ -336,6 +372,7 @@ export function mergeCustomization(
     footer: pick('footer'),
     toolbar: pick('toolbar'),
     preloader: pick('preloader'),
+    effects: pick('effects'),
   }
 }
 

@@ -10,7 +10,9 @@ import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { ThemeGallery } from './theme-gallery'
 import { PublishControl } from './publish-control'
-import { ImageSpecHint, SectionEditor } from './section-editor'
+import { ImageSpecHint } from './image-spec-hint'
+import { PageBuilder } from './page-builder'
+import { listPickerCategories } from './picker-actions'
 import { ThemeDesigner } from './theme-designer'
 import { getClaudeConfig, isClaudeReady } from '@/lib/ai/settings'
 
@@ -26,6 +28,7 @@ export default async function StorefrontPage() {
     .limit(1)
 
   const claude = await getClaudeConfig(store.id)
+  const pickerCategories = await listPickerCategories()
   const current = getTheme(theme?.themeSlug ?? 'zawya')
   const sections = (theme?.homeSections ?? []) as Section[]
 
@@ -33,7 +36,7 @@ export default async function StorefrontPage() {
     <div className="flex flex-col gap-10">
       <PageHeader
         title="المتجر"
-        description="اختار شكل متجرك، ورتّب أقسام صفحته الرئيسية."
+        description="اختار شكل متجرك، وركّب صفحته الرئيسية بلوك بلوك."
         action={
           <div className="flex flex-wrap gap-2">
           <Link
@@ -86,14 +89,20 @@ export default async function StorefrontPage() {
       <section className="flex flex-col gap-4">
         <Reveal>
           <div>
-            <h2 className="text-lg font-semibold">أقسام الصفحة الرئيسية</h2>
+            <h2 className="text-lg font-semibold">الصفحة الرئيسية</h2>
             <p className="mt-1 text-sm text-[var(--fg-muted)]">
-              رتّب الأقسام وشغّل أو أطفي اللي مش محتاجه. الترتيب هنا هو نفسه اللي هيشوفه العميل.
+              زوّد الأقسام اللي تحبّها ورتّبها وظبّط كل واحد لوحده. تقدر تحطّ نفس النوع أكتر من
+              مرة — قسمين منتجات، تلات بانرات، عرضين بعدّاد. الترتيب هنا هو نفسه اللي هيشوفه
+              العميل.
             </p>
           </div>
         </Reveal>
         <Reveal delay={80}>
-          <SectionEditor initial={sections} />
+          <PageBuilder
+            initial={sections}
+            categories={pickerCategories}
+            currency={store.currency}
+          />
         </Reveal>
       </section>
 

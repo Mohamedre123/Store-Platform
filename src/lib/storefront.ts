@@ -163,6 +163,7 @@ export const getStoreTheme = cache(
             hero: draft.hero,
             toolbar: draft.toolbar,
             preloader: draft.preloader,
+            effects: draft.effects,
           })
 
     return {

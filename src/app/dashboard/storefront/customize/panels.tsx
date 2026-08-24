@@ -13,7 +13,7 @@ import {
   Toggle,
 } from '@/components/dashboard/controls'
 import { ImageUpload } from '@/components/ui/image-upload'
-import { ImageSpecHint } from '../section-editor'
+import { ImageSpecHint } from '../image-spec-hint'
 
 type Patch = <K extends PanelKey>(panel: K, values: Partial<Customization[K]>) => void
 
@@ -743,6 +743,78 @@ export function Panel({
     )
   }
 
+  /* ══════════════════ الحركة ══════════════════ */
+  if (panel === 'effects') {
+    const s = value.effects
+    return (
+      <>
+        <Group title="الظهور مع التمرير">
+          <Choice
+            label="نوع الحركة"
+            hint="كل قسم بيظهر بالحركة دي أول ما يوصل للشاشة. بتقول للعين «فيه حاجة جديدة هنا»، وبتخلّي الصفحة الطويلة تتقرا على مراحل."
+            value={s.scroll}
+            options={[
+              { value: 'none', label: 'بدون' },
+              { value: 'fade', label: 'ظهور' },
+              { value: 'rise', label: 'طلوع' },
+              { value: 'zoom', label: 'تكبير' },
+              { value: 'blur', label: 'وضوح' },
+              { value: 'slide', label: 'انزلاق' },
+            ]}
+            onChange={(v) => patch('effects', { scroll: v })}
+            columns={3}
+          />
+
+          {s.scroll !== 'none' && (
+            <>
+              <Choice
+                label="السرعة"
+                value={s.speed}
+                options={[
+                  { value: 'slow', label: 'هادية' },
+                  { value: 'normal', label: 'متوسطة' },
+                  { value: 'fast', label: 'سريعة' },
+                ]}
+                onChange={(v) => patch('effects', { speed: v })}
+              />
+
+              <Toggle
+                label="العناصر تظهر ورا بعض"
+                hint="المنتجات في الصف بتظهر واحد ورا التاني بدل مرة واحدة."
+                checked={s.stagger}
+                onChange={(v) => patch('effects', { stagger: v })}
+              />
+            </>
+          )}
+
+          <p className="text-xs leading-relaxed text-[var(--fg-subtle)]">
+            الحركة بتتقفل لوحدها لمن طالب «تقليل الحركة» في إعدادات جهازه — في ناس بتتعبها
+            الحركة فعلًا، ودي مش مسألة ذوق.
+          </p>
+        </Group>
+
+        <Group title="التفاعل">
+          <Toggle
+            label="البطاقة تطلع تحت الماوس"
+            hint="بتوضّح إنها قابلة للضغط. على الموبايل مالهاش أثر."
+            checked={s.hoverLift}
+            onChange={(v) => patch('effects', { hoverLift: v })}
+          />
+          <Toggle
+            label="الصورة تكبر جوّه إطارها"
+            checked={s.imageZoom}
+            onChange={(v) => patch('effects', { imageZoom: v })}
+          />
+          <Toggle
+            label="تمرير ناعم"
+            hint="لما العميل يضغط رابطًا بيوديه لمكان في نفس الصفحة."
+            checked={s.smoothScroll}
+            onChange={(v) => patch('effects', { smoothScroll: v })}
+          />
+        </Group>
+      </>
+    )
+  }
   /* ══════════════════ شريط الأدوات ══════════════════ */
   const s = value.toolbar
   return (

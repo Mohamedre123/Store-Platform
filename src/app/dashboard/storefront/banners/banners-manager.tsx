@@ -13,7 +13,7 @@ import { Alert, Button, Card } from '@/components/ui'
 import { ImproveButton } from '@/components/dashboard/improve-button'
 import { Choice, Toggle } from '@/components/dashboard/controls'
 import { ImageUpload } from '@/components/ui/image-upload'
-import { ImageSpecHint } from '../section-editor'
+import { ImageSpecHint } from '../image-spec-hint'
 
 export type BannerRow = {
   id: string

@@ -1,6 +1,6 @@
 import Image from 'next/image'
 import { SLink as Link } from './store-link'
-import { ImageOff, Star } from 'lucide-react'
+import { ImageOff, SlidersHorizontal, Star } from 'lucide-react'
 import type { StorefrontProduct } from '@/lib/storefront'
 import { discountPercent } from '@/lib/storefront'
 import { formatMoney } from '@/lib/utils'
@@ -21,27 +21,51 @@ export function ProductCard({
   imageRatio = 'square',
   showRating = true,
   showQuickAdd = false,
+  action,
+  className = '',
+  fill = false,
 }: {
   product: StorefrontProduct
   currency: string
   style?: CardStyle
   imageRatio?: 'square' | 'portrait' | 'wide'
   showRating?: boolean
+  /** الشكل القديم — «action» بيغلبه لما يتحدّد */
   showQuickAdd?: boolean
+  /**
+   * زر البطاقة.
+   *
+   * `add` = يضيف للسلة بضغطة. `options` = يودّي لصفحة المنتج.
+   * المنتج اللي ليه مقاسات أو ألوان، الإضافة بضغطة معناها إننا
+   * بنختار نيابةً عن العميل — وده بيرجّع مرتجعًا مش بيعة، فالتاجر
+   * بيقدر يبدّلها بـ«الخيارات» من محرّر الصفحة.
+   */
+  action?: 'add' | 'options' | 'none'
+  className?: string
+  /** بلاطة الفسيفساء — الصورة بتملا المساحة المضاعفة */
+  fill?: boolean
 }) {
+  const mode = action ?? (showQuickAdd ? 'add' : 'none')
   const soldOutForAdd = product.trackInventory && product.stock <= 0
 
+  const body = (
+    <ProductCardBody
+      product={product}
+      currency={currency}
+      style={style}
+      imageRatio={imageRatio}
+      showRating={showRating}
+      fill={fill}
+    />
+  )
+
+  if (mode === 'none') return className ? <div className={className}>{body}</div> : body
+
   // الزرار جنب الرابط مش جوّاه: <button> داخل <a> ترميز غير صالح
-  if (showQuickAdd) {
-    return (
-      <div className="flex flex-col">
-        <ProductCardBody
-          product={product}
-          currency={currency}
-          style={style}
-          imageRatio={imageRatio}
-          showRating={showRating}
-        />
+  return (
+    <div className={`flex flex-col ${className}`}>
+      {body}
+      {mode === 'add' ? (
         <QuickAdd
           product={{
             productId: product.id,
@@ -53,18 +77,16 @@ export function ProductCard({
           }}
           soldOut={soldOutForAdd}
         />
-      </div>
-    )
-  }
-
-  return (
-    <ProductCardBody
-      product={product}
-      currency={currency}
-      style={style}
-      imageRatio={imageRatio}
-      showRating={showRating}
-    />
+      ) : (
+        <Link
+          href={`/products/${product.slug}`}
+          className="mt-2 flex min-h-10 w-full items-center justify-center gap-1.5 rounded-[var(--sf-radius)] border border-[var(--sf-primary)] text-sm font-semibold text-[var(--sf-primary)] transition-colors hover:bg-[var(--sf-primary)] hover:text-white"
+        >
+          <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+          {soldOutForAdd ? 'شوف التفاصيل' : 'الخيارات'}
+        </Link>
+      )}
+    </div>
   )
 }
 
@@ -74,20 +96,28 @@ function ProductCardBody({
   style = 'clean',
   imageRatio = 'square',
   showRating = true,
+  fill = false,
 }: {
   product: StorefrontProduct
   currency: string
   style?: CardStyle
   imageRatio?: 'square' | 'portrait' | 'wide'
   showRating?: boolean
+  fill?: boolean
 }) {
   const off = discountPercent(product.price, product.compareAtPrice)
   const soldOut = product.trackInventory && product.stock <= 0
   const rating = showRating && product.ratingCount ? product.ratingSum / product.ratingCount : null
   const href = `/products/${product.slug}`
 
-  const aspect =
+  /*
+    بلاطة الفسيفساء بتملا ارتفاع الخانة المضاعفة بدل ما تفضل مربّعة
+    وتسيب فراغ تحتها. على الموبايل بترجع لنسبتها العادية — المساحة
+    المضاعفة في عمودين معناها منتج واحد بياخد الشاشة كلها.
+  */
+  const ratio =
     imageRatio === 'portrait' ? 'aspect-[3/4]' : imageRatio === 'wide' ? 'aspect-[4/3]' : 'aspect-square'
+  const aspect = fill ? `${ratio} md:aspect-auto md:h-full md:min-h-[22rem]` : ratio
 
   const picture = (
     <span className={`relative block w-full overflow-hidden bg-[var(--sf-text)]/6 ${aspect} rounded-[var(--sf-radius)]`}>
@@ -196,7 +226,10 @@ function ProductCardBody({
   /* clean و editorial */
   const editorial = style === 'editorial'
   return (
-    <Link href={href} className={`group flex flex-col ${editorial ? 'gap-3' : 'gap-2'}`}>
+    <Link
+      href={href}
+      className={`group flex flex-col ${editorial ? 'gap-3' : 'gap-2'} ${fill ? 'md:h-full' : ''}`}
+    >
       {picture}
       <span className={`line-clamp-2 ${editorial ? 'text-base' : 'text-sm'} font-medium`}>
         {product.name}

@@ -601,3 +601,118 @@
     animation: none;
   }
 }
+
+/* ─────────────── حركة بلوكات المتجر ─────────────── */
+
+/**
+ * الحركة اللي التاجر اختارها لمتجره.
+ *
+ * مشروطة بـ«sf-fx-on» اللي React بيحطّه بعد ما يشتغل فعلًا: لو وقع
+ * لأي سبب، الكلاس ما بيتحطّش والمحتوى يفضل ظاهرًا بدل ما يختفي للأبد.
+ *
+ * كل الحركات على `opacity` و`transform` و`filter` بس — التلاتة دول
+ * بيشتغلوا على كارت الشاشة، فبيفضلوا ناعمين على موبايل ضعيف. أي
+ * حركة على `height` أو `top` كانت هتخلّي الصفحة تتلعثم مع كل تمرير.
+ */
+.sf-fx-on .sf-ap {
+  opacity: 0;
+  transition:
+    opacity var(--sf-fx-dur, 700ms) cubic-bezier(0.22, 1, 0.36, 1) var(--sf-fx-delay, 0ms),
+    transform var(--sf-fx-dur, 700ms) cubic-bezier(0.22, 1, 0.36, 1) var(--sf-fx-delay, 0ms),
+    filter var(--sf-fx-dur, 700ms) cubic-bezier(0.22, 1, 0.36, 1) var(--sf-fx-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+.sf-fx-on .sf-ap[data-fx='rise'] {
+  transform: translate3d(0, 26px, 0);
+}
+
+.sf-fx-on .sf-ap[data-fx='zoom'] {
+  transform: scale3d(0.94, 0.94, 1);
+}
+
+.sf-fx-on .sf-ap[data-fx='blur'] {
+  filter: blur(12px);
+  transform: scale3d(1.02, 1.02, 1);
+}
+
+/* الانزلاق من جهة بداية السطر — مع RTL بييجي من اليمين لوحده */
+.sf-fx-on .sf-ap[data-fx='slide'] {
+  transform: translate3d(-40px, 0, 0);
+}
+
+[dir='rtl'] .sf-fx-on .sf-ap[data-fx='slide'],
+.sf-fx-on [dir='rtl'] .sf-ap[data-fx='slide'] {
+  transform: translate3d(40px, 0, 0);
+}
+
+.sf-fx-on .sf-ap--in {
+  opacity: 1;
+  transform: none;
+  filter: none;
+  will-change: auto;
+}
+
+/* ─────────────── شريط الشعارات المتحرّك ─────────────── */
+
+.sf-marquee {
+  display: flex;
+  width: max-content;
+  animation: sf-marquee-move var(--sf-marquee-dur, 30s) linear infinite;
+}
+
+.sf-marquee:hover {
+  animation-play-state: paused;
+}
+
+@keyframes sf-marquee-move {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  /* النصف بس: القايمة متكرّرة مرتين فبيرجع لنقطة مطابقة بالظبط */
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+/* ─────────────── تكبير الصورة عند المرور ─────────────── */
+
+.sf-zoom img {
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sf-zoom:hover img {
+  transform: scale(1.06);
+}
+
+/* ─────────────── ارتفاع البطاقة عند المرور ─────────────── */
+
+.sf-lift {
+  transition:
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.35s ease;
+}
+
+@media (hover: hover) {
+  .sf-lift:hover {
+    transform: translate3d(0, -4px, 0);
+    box-shadow: 0 12px 28px -12px rgb(0 0 0 / 0.28);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sf-fx-on .sf-ap {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+
+  .sf-marquee {
+    animation: none !important;
+  }
+
+  .sf-zoom:hover img,
+  .sf-lift:hover {
+    transform: none !important;
+  }
+}

@@ -131,6 +131,12 @@ export default async function StorefrontLayout({
     '--sf-font-heading': FONT_STACKS[custom.identity.fontHeading],
     '--sf-font-body': FONT_STACKS[custom.identity.fontBody],
     fontFamily: 'var(--sf-font-body)',
+    /*
+      التمرير الناعم على الحاوية لا على `html`.
+      لو حطّيناه على المستند كله كان هيأثّر على لوحة التاجر كمان
+      وهو بيعاين، وعلى صفحات المنصة اللي مالهاش علاقة بإعداد المتجر.
+    */
+    ...(custom.effects.smoothScroll ? { scrollBehavior: 'smooth' as const } : {}),
   } as React.CSSProperties
 
   return (
