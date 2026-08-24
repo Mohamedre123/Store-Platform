@@ -41,7 +41,19 @@ export function StoreToolbar({
   return (
     <div
       data-sf="whatsapp-float"
-      className={`fixed bottom-4 z-40 flex flex-col gap-2 ${side}`}
+      /**
+       * فوق شريط التنقّل السفلي على الموبايل.
+       *
+       * الشريط بيقعد على `bottom-0` بارتفاع ٤rem، والأزرار كانت على
+       * `bottom-4` بنفس `z-40` — فبتختفي وراه تمامًا. الإزاحة هنا
+       * بتفضل على الموبايل بس، وعلى الكمبيوتر مفيش شريط أصلًا.
+       *
+       * و`z-50` عشان لو الشريط اتقفل من التخصيص وفضل أي عنصر تاني
+       * على نفس المستوى.
+       */
+      className={`fixed z-50 flex flex-col gap-2 ${side} ${
+        toolbar.mobileNavEnabled ? 'bottom-[5.5rem] md:bottom-4' : 'bottom-4'
+      }`}
       style={{ display: toolbar.whatsappEnabled || toolbar.backToTop || bot ? undefined : 'none' }}
     >
       {toolbar.backToTop && (

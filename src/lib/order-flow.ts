@@ -355,6 +355,8 @@ export async function applyOrderStatus(
         ...mail,
         // الرد على التاجر — العميل بيرد على رسالة الحالة كتير
         replyTo: storeEmail ?? undefined,
+        // الرسالة بتيجي باسم متجره لا باسمنا
+        senderName: store.name,
         log: {
           storeId: store.id,
           event: `order_${status}`,

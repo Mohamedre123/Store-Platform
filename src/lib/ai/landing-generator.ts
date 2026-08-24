@@ -129,7 +129,6 @@ export async function generateLanding(input: {
     model: input.model,
     system: buildSystem(input),
     messages: [...input.history, { role: 'user', text: input.request }],
-    temperature: 0.8,
     // صفحة كاملة ببلوكاتها أطول بكتير من خطة ثيم
     maxTokens: 6000,
     prefill: '{',

@@ -32,6 +32,13 @@ type OrderInfo = {
   address?: string | null
   phone?: string | null
   trackUrl: string
+  /** رسوم الدفع عند الاستلام لو موجودة */
+  codFee?: number
+  tax?: number
+  /** «الدفع عند الاستلام» أو اسم البوابة */
+  paymentLabel?: string | null
+  shippingLabel?: string | null
+  placedAt?: Date | string | null
 }
 
 const INK = '#222540'
@@ -172,6 +179,135 @@ export function orderConfirmationEmail(store: StoreBrand, o: OrderInfo) {
 }
 
 /** إشعار التاجر بطلب جديد */
+/**
+ * فاتورة الطلب.
+ *
+ * **بتيجي بعد تأكيد الطلب مباشرةً، وبهوية التاجر.** العميل المصري
+ * بيطلب الفاتورة عشان يتطمّن إن اللي دفعه صح، وعشان يكون معاه ورقة
+ * لو حصل خلاف على المبلغ. اللي مالوش فاتورة بيتصل يسأل — والتاجر
+ * بيقعد يشرح على التليفون.
+ *
+ * **الكوبون بيظهر كـ«خصم» بس من غير كوده.** الفاتورة بتتصوّر
+ * وبتتشيّر، وكود الخصم فيها معناه إن العرض الخاص بيوصل لناس ما
+ * كانش المفروض توصلهم.
+ */
+export function orderInvoiceEmail(store: StoreBrand, o: OrderInfo) {
+  const greeting = o.customerName ? `أهلًا ${escapeHtml(o.customerName)}،` : 'أهلًا،'
+
+  const when = o.placedAt
+    ? new Date(o.placedAt).toLocaleDateString('ar-EG', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    : ''
+
+  const rows = o.lines
+    .map(
+      (l) => `
+      <tr>
+        <td style="padding:10px 0;border-bottom:1px solid ${BORDER};font-size:14px;">
+          ${escapeHtml(l.name)}
+          <span style="color:${MUTED};"> × ${l.quantity}</span>
+        </td>
+        <td style="padding:10px 0;border-bottom:1px solid ${BORDER};font-size:14px;text-align:left;white-space:nowrap;">
+          ${formatMoney(l.total, o.currency)}
+        </td>
+      </tr>`,
+    )
+    .join('')
+
+  const line = (label: string, value: string, strong = false) => `
+    <tr>
+      <td style="padding:6px 0;font-size:${strong ? '16px' : '14px'};${strong ? 'font-weight:bold;' : `color:${MUTED};`}">${label}</td>
+      <td style="padding:6px 0;font-size:${strong ? '16px' : '14px'};text-align:left;white-space:nowrap;${strong ? 'font-weight:bold;' : ''}">${value}</td>
+    </tr>`
+
+  const inner = `
+    <p style="margin:0 0 8px;font-size:16px;">${greeting}</p>
+    <p style="margin:0 0 20px;font-size:15px;line-height:1.8;color:${MUTED};">
+      دي فاتورة طلبك من ${escapeHtml(store.name)}.
+    </p>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+           style="background-color:#f8f8fc;border-radius:10px;margin-bottom:20px;">
+      <tr>
+        <td style="padding:14px 16px;">
+          <span style="font-size:13px;color:${MUTED};">فاتورة رقم</span><br>
+          <span style="font-size:20px;font-weight:bold;letter-spacing:1px;">#${o.orderNumber}</span>
+          ${when ? `<div style="font-size:13px;color:${MUTED};margin-top:4px;">${when}</div>` : ''}
+        </td>
+      </tr>
+    </table>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:6px;">
+      <tr>
+        <td style="padding:0 0 8px;font-size:13px;color:${MUTED};border-bottom:2px solid ${BORDER};">الصنف</td>
+        <td style="padding:0 0 8px;font-size:13px;color:${MUTED};text-align:left;border-bottom:2px solid ${BORDER};">الإجمالي</td>
+      </tr>
+      ${rows}
+    </table>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:14px;">
+      ${line('المنتجات', formatMoney(o.subtotal, o.currency))}
+      ${o.discount > 0 ? line('خصم', `− ${formatMoney(o.discount, o.currency)}`) : ''}
+      ${line(o.shippingLabel ? `الشحن · ${escapeHtml(o.shippingLabel)}` : 'الشحن', o.shipping > 0 ? formatMoney(o.shipping, o.currency) : 'مجاني')}
+      ${o.codFee && o.codFee > 0 ? line('رسوم الدفع عند الاستلام', formatMoney(o.codFee, o.currency)) : ''}
+      ${o.tax && o.tax > 0 ? line('ضريبة القيمة المضافة', formatMoney(o.tax, o.currency)) : ''}
+      <tr><td colspan="2" style="padding:6px 0;"><div style="border-top:2px solid ${BORDER};"></div></td></tr>
+      ${line('الإجمالي', formatMoney(o.total, o.currency), true)}
+    </table>
+
+    ${
+      o.paymentLabel
+        ? `<p style="margin:16px 0 0;font-size:14px;color:${MUTED};">طريقة الدفع: <strong style="color:${INK};">${escapeHtml(o.paymentLabel)}</strong></p>`
+        : ''
+    }
+    ${
+      o.address
+        ? `<p style="margin:6px 0 0;font-size:14px;color:${MUTED};">التوصيل إلى: <strong style="color:${INK};">${escapeHtml(o.address)}</strong></p>`
+        : ''
+    }
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;">
+      <tr>
+        <td align="center">
+          <a href="${o.trackUrl}"
+             style="display:inline-block;background-color:${store.primary};color:#ffffff;text-decoration:none;
+                    padding:13px 30px;border-radius:10px;font-size:15px;font-weight:bold;">
+            تابع طلبك
+          </a>
+        </td>
+      </tr>
+    </table>
+  `
+
+  return {
+    subject: `فاتورة طلبك #${o.orderNumber} من ${store.name}`,
+    html: layout(store, inner, `فاتورة طلب #${o.orderNumber} — ${formatMoney(o.total, o.currency)}`),
+    text: [
+      greeting,
+      '',
+      `فاتورة طلب رقم #${o.orderNumber} من ${store.name}`,
+      when,
+      '',
+      ...o.lines.map((l) => `${l.name} × ${l.quantity} — ${formatMoney(l.total, o.currency)}`),
+      '',
+      `المنتجات: ${formatMoney(o.subtotal, o.currency)}`,
+      o.discount > 0 ? `خصم: −${formatMoney(o.discount, o.currency)}` : '',
+      `الشحن: ${o.shipping > 0 ? formatMoney(o.shipping, o.currency) : 'مجاني'}`,
+      o.codFee && o.codFee > 0 ? `رسوم الدفع عند الاستلام: ${formatMoney(o.codFee, o.currency)}` : '',
+      o.tax && o.tax > 0 ? `ضريبة: ${formatMoney(o.tax, o.currency)}` : '',
+      `الإجمالي: ${formatMoney(o.total, o.currency)}`,
+      o.paymentLabel ? `طريقة الدفع: ${o.paymentLabel}` : '',
+      '',
+      `تابع طلبك: ${o.trackUrl}`,
+    ]
+      .filter(Boolean)
+      .join('\n'),
+  }
+}
+
 export function newOrderNotificationEmail(store: StoreBrand, o: OrderInfo, dashboardUrl: string) {
   const inner = `
     <p style="margin:0 0 20px;font-size:17px;font-weight:bold;">وصلك طلب جديد 🎉</p>

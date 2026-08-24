@@ -70,7 +70,6 @@ export async function generateTheme(input: {
     system: buildSystem(input.brief),
     messages: [...input.history, { role: 'user', text: input.request }],
     // التصميم محتاج تنوّعًا، بس مش لدرجة إنه يخرج عن الطلب
-    temperature: 0.7,
     maxTokens: 2000,
     // بنبدأ الرد بالقوس — فمش هيقدر يبدأ بمقدمة تكسر التحليل
     prefill: '{',

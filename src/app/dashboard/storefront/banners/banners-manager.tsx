@@ -147,13 +147,13 @@ export function BannersManager({ banners }: { banners: BannerRow[] }) {
           <ImageUpload
             label="صورة الكمبيوتر"
             value={form.imageDesktop ? [form.imageDesktop] : []}
-            onChange={(urls) => setForm({ ...form, imageDesktop: urls[0] ?? null })}
+            onChange={(urls) => setForm((f) => (f ? { ...f, imageDesktop: urls[0] ?? null } : f))}
             folder="banners"
           />
           <ImageUpload
             label="صورة الموبايل (اختياري)"
             value={form.imageMobile ? [form.imageMobile] : []}
-            onChange={(urls) => setForm({ ...form, imageMobile: urls[0] ?? null })}
+            onChange={(urls) => setForm((f) => (f ? { ...f, imageMobile: urls[0] ?? null } : f))}
             folder="banners"
           />
 

@@ -185,6 +185,7 @@ export async function issueCustomerOtp(input: {
     const sent = await sendEmail({
       to: emailTarget,
       ...mail,
+      senderName: input.storeName,
       log: { storeId: input.storeId, event: 'customer_login_otp' },
     })
     if (sent.ok) channel = 'email'

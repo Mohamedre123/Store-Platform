@@ -43,7 +43,14 @@ export function MobileNav({
       <div className="h-16 md:hidden" aria-hidden="true" />
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--sf-text)]/10 bg-[var(--sf-surface)]/95 backdrop-blur-md md:hidden"
+        /*
+          شفاف مع ضبابية.
+
+          المحتوى بيعدّي من تحته وهو بيمرّر، فالصفحة بتبان مستمرة
+          بدل ما تنتهي عند شريط مصمت — ودي أهم تفصيلة في إحساس
+          التطبيق على الموبايل.
+        */
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--sf-text)]/10 bg-[var(--sf-surface)]/70 backdrop-blur-xl md:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         aria-label="تنقّل سريع"
       >

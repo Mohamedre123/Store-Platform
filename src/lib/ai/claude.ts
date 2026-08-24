@@ -129,22 +129,76 @@ export async function generate(input: {
     const messages = input.messages.map((m) => ({ role: m.role, content: m.text }))
     if (input.prefill) messages.push({ role: 'assistant', content: input.prefill })
 
-    const res = await fetch(`${BASE}/messages`, {
-      method: 'POST',
-      headers: {
-        'x-api-key': input.apiKey,
-        'anthropic-version': VERSION,
-        'content-type': 'application/json',
-      },
-      cache: 'no-store',
-      body: JSON.stringify({
-        model: input.model,
-        max_tokens: input.maxTokens ?? 4000,
-        temperature: input.temperature ?? 0.7,
-        system: input.system,
-        messages,
-      }),
-    })
+    /**
+     * `temperature` بيتبعت بس لو اتطلب صراحةً.
+     *
+     * الموديلات الجديدة (Opus 4.8 وما بعده) **بترفض الطلب كله** لو
+     * الحقل موجود:
+     *
+     *     400 · `temperature` is deprecated for this model.
+     *
+     * ودي كانت بتوقّف توليد الثيمات وصفحات الهبوط تمامًا، لأننا
+     * كنا بنبعته دايمًا بقيمة افتراضية. القيمة الافتراضية بتاعة
+     * المزوّد كويسة، ومفيش سبب نفرض واحدة.
+     */
+    const payload: Record<string, unknown> = {
+      model: input.model,
+      max_tokens: input.maxTokens ?? 4000,
+      system: input.system,
+      messages,
+    }
+    if (input.temperature !== undefined) payload.temperature = input.temperature
+
+    const call = (body: Record<string, unknown>) =>
+      fetch(`${BASE}/messages`, {
+        method: 'POST',
+        headers: {
+          'x-api-key': input.apiKey,
+          'anthropic-version': VERSION,
+          'content-type': 'application/json',
+        },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(120_000),
+        body: JSON.stringify(body),
+      })
+
+    let res = await call(payload)
+
+    /*
+      المحاولة التانية من غير `temperature`.
+
+      شبكة أمان للموديلات اللي بترفضه: بدل ما التاجر يشوف خطأ ٤٠٠
+      غامض ويقف، بنشيل الحقل ونعيد — ونفس النتيجة بتطلع.
+    */
+    if (res.status === 400 && payload.temperature !== undefined) {
+      const body = await res.clone().text()
+      if (body.toLowerCase().includes('temperature')) {
+        delete payload.temperature
+        res = await call(payload)
+      }
+    }
+
+    /**
+     * المحاولة التالتة من غير بادئة الرد.
+     *
+     * الموديلات الجديدة بترفض إن المحادثة تنتهي برسالة مساعد:
+     *
+     *     400 · This model does not support assistant message prefill.
+     *
+     * البادئة كانت حيلة عشان الرد يبدأ بـ`{` على طول، بس هي مش
+     * ضرورية — استخراج أول كائن JSON من النص بيوصل لنفس النتيجة،
+     * وشغّال مع كل الموديلات القديمة والجديدة.
+     */
+    let usedPrefill = Boolean(input.prefill)
+
+    if (res.status === 400 && usedPrefill) {
+      const body = await res.clone().text()
+      if (body.toLowerCase().includes('prefill')) {
+        payload.messages = input.messages.map((m) => ({ role: m.role, content: m.text }))
+        usedPrefill = false
+        res = await call(payload)
+      }
+    }
 
     if (!res.ok) return { ok: false, error: classify(res.status, await res.text()) }
 
@@ -166,7 +220,7 @@ export async function generate(input: {
       البادئة مش بترجع في الرد — بنلزقها قدامه عشان النص يبقى كاملًا.
       من غير كده الـJSON بيبدأ من غير القوس الأول ومش بيتحلّل.
     */
-    return { ok: true, data: (input.prefill ?? '') + text }
+    return { ok: true, data: usedPrefill ? (input.prefill ?? '') + text : text }
   } catch (e) {
     return { ok: false, error: { kind: 'network', message: String(e).slice(0, 200) } }
   }

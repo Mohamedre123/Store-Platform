@@ -27,6 +27,31 @@ function unsubscribeAddress(): string {
   return from.match(/<([^>]+)>/)?.[1] ?? (from.trim() || 'no-reply@localhost')
 }
 
+/**
+ * اسم المرسل.
+ *
+ * **رسايل العميل بتيجي باسم متجره لا باسمنا.**
+ *
+ * العميل اشترى من «أتلوسا» مش من «زاوية» — ورسالة جاية باسم منصة
+ * ما يعرفهاش بتبان مشبوهة، وبيبلّغ عنها سبام أو يتجاهلها. إحنا
+ * البنية التحتية، والواجهة للتاجر.
+ *
+ * العنوان نفسه بيفضل بتاعنا (هو المتحقَّق منه في DNS)، والاسم
+ * الظاهر بس هو اللي بيتغيّر — ودي الحتة اللي العميل بيقراها.
+ */
+function fromHeader(senderName?: string | null): string {
+  const configured = process.env.EMAIL_FROM ?? ''
+  if (!senderName?.trim()) return configured
+
+  const address = configured.match(/<([^>]+)>/)?.[1] ?? configured.trim()
+  /*
+    الاقتباس المزدوج والشرطة المايلة بيكسروا ترويسة العنوان.
+    اسم متجر فيه علامة اقتباس كان هيخلّي الرسالة كلها تترفض.
+  */
+  const clean = senderName.replace(/["\<>]/g, '').trim().slice(0, 60)
+  return `${clean} <${address}>`
+}
+
 export type MessageContext = {
   storeId: string
   /** نوع الرسالة: order_confirmation | abandoned_cart | otp … */
@@ -43,8 +68,15 @@ export async function sendEmail(options: {
   log?: MessageContext
   /** الرد يروح لمين — بريد التاجر عشان العميل يقدر يرد فعلًا */
   replyTo?: string
+  /**
+   * اسم المرسل الظاهر — اسم المتجر.
+   *
+   * سيبه فاضي لرسايل المنصة نفسها (تأكيد حساب التاجر، استعادة كلمة
+   * سرّه) — دي جاية مننا فعلًا وباسمنا صح.
+   */
+  senderName?: string | null
 }): Promise<SendResult> {
-  const { to, subject, html, text, log, replyTo } = options
+  const { to, subject, html, text, log, replyTo, senderName } = options
 
   if (!isEmailConfigured()) {
     console.warn(
@@ -82,7 +114,7 @@ export async function sendEmail(options: {
        * مهما عملنا في الكود.
        */
       body: JSON.stringify({
-        from: process.env.EMAIL_FROM,
+        from: fromHeader(senderName),
         to: [to],
         subject,
         html,

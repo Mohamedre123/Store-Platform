@@ -17,7 +17,11 @@ import {
 import { getStore, getStoreTheme } from '@/lib/storefront'
 import { computeTotals, getCheckoutSettings, priceCart } from '@/lib/checkout'
 import { isEmailConfigured, sendEmail } from '@/lib/email'
-import { newOrderNotificationEmail, orderConfirmationEmail } from '@/lib/store-emails'
+import {
+  newOrderNotificationEmail,
+  orderConfirmationEmail,
+  orderInvoiceEmail,
+} from '@/lib/store-emails'
 import { dashboardUrl, storeUrl } from '@/lib/domain'
 import { validateCoupon, recordCouponUse } from '@/lib/coupons'
 import { issueOrderOtp, isPhoneVerifiedForOrder, verifyOrderOtp } from '@/lib/order-otp'
@@ -754,6 +758,18 @@ export async function retryPaymentAction(input: {
   return { ok: true, redirectUrl: res.redirectUrl }
 }
 
+/**
+ * اسم طريقة الدفع زي ما العميل بيعرفها.
+ *
+ * الفاتورة اللي مكتوب فيها `cod` أو `paymob` مش فاتورة — دي شفرة
+ * داخلية. العميل لازم يقرا «الدفع عند الاستلام».
+ */
+function paymentLabel(gateway: string): string {
+  if (gateway === 'cod') return 'الدفع عند الاستلام'
+  if (gateway === 'manual') return 'تحويل بنكي أو محفظة'
+  return paymentProvider(gateway)?.name ?? gateway
+}
+
 /** يجمع بيانات الطلب ويبعت رسالتين: تأكيد للعميل وإشعار للتاجر */
 async function sendOrderEmails(ctx: {
   store: Awaited<ReturnType<typeof getStore>>
@@ -761,8 +777,23 @@ async function sendOrderEmails(ctx: {
   orderNumber: number
   token: string
   lines: Array<{ name: string; quantity: number; total: number }>
-  totals: { subtotal: number; shipping: number; discount: number; total: number }
-  input: { email?: string; name?: string; city?: string; area?: string; street?: string; building?: string }
+  totals: {
+    subtotal: number
+    shipping: number
+    discount: number
+    total: number
+    codFee: number
+    tax: number
+  }
+  input: {
+    email?: string
+    name?: string
+    city?: string
+    area?: string
+    street?: string
+    building?: string
+    paymentGateway: string
+  }
   phone: string
 }) {
   const { store, orderId, orderNumber, token, lines, totals, input, phone } = ctx
@@ -788,10 +819,32 @@ async function sendOrderEmails(ctx: {
     currency: store.currency,
     address,
     phone,
+    codFee: totals.codFee,
+    tax: totals.tax,
+    paymentLabel: paymentLabel(input.paymentGateway),
+    placedAt: new Date(),
     trackUrl: `${storeUrl(store.slug)}/order/${orderNumber}?t=${encodeURIComponent(token)}`,
   }
 
   if (input.email) {
+    /**
+     * الفاتورة بتتبعت مع التأكيد.
+     *
+     * رسالتين لا واحدة: التأكيد بيطمّن العميل إن الطلب وصل (بيتقرا
+     * في ثانية)، والفاتورة ورقة رسمية بيحتفظ بيها ويرجعلها. دمجهم
+     * في رسالة واحدة بيخلّي التأكيد طويلًا والفاتورة صعبة اللقيان.
+     *
+     * والفاتورة بتتبعت بغير انتظار: الطلب اتسجّل خلاص، ورسالة
+     * فشلت ما يصحّش تأخّر رد الشيك أوت.
+     */
+    void sendEmail({
+      to: input.email,
+      ...orderInvoiceEmail(brandInfo, order),
+      replyTo: store.email ?? undefined,
+      senderName: store.name,
+      log: { storeId: store.id, event: 'order_invoice', orderId },
+    }).catch((e) => console.error('فشل إرسال الفاتورة:', e))
+
     const mail = orderConfirmationEmail(brandInfo, order)
     await sendEmail({
       to: input.email,
@@ -802,6 +855,7 @@ async function sendOrderEmails(ctx: {
         اللي مالهاش رد بتبان لفلاتر السبام كإشعار آلي مجهول.
       */
       replyTo: store.email ?? undefined,
+      senderName: store.name,
       log: { storeId: store.id, event: 'order_confirmation', orderId },
     })
   }
@@ -812,6 +866,7 @@ async function sendOrderEmails(ctx: {
     await sendEmail({
       to: store.email,
       ...mail,
+      senderName: store.name,
       log: { storeId: store.id, event: 'merchant_new_order', orderId },
     })
   }

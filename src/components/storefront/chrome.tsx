@@ -150,7 +150,15 @@ export function StoreHeader({
 
   return (
     <>
-      <header className={`${sticky ? 'sticky top-0' : ''} z-40 border-b border-[var(--sf-text)]/10 bg-[var(--sf-surface)]/90 backdrop-blur-md`}>
+      {/*
+        الهيدر أشفّ على الموبايل منه على الكمبيوتر.
+
+        على الشاشة الصغيرة الهيدر بياخد نسبة أكبر من المساحة، والشفافية
+        بتخلّي المحتوى يبان من تحته وهو بيمرّر — فالصفحة تحسّ إنها أطول.
+      */}
+      <header
+        className={`${sticky ? 'sticky top-0' : ''} z-40 border-b border-[var(--sf-text)]/10 bg-[var(--sf-surface)]/70 backdrop-blur-xl md:bg-[var(--sf-surface)]/90 md:backdrop-blur-md`}
+      >
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div
             className={`flex h-16 items-center gap-4 ${

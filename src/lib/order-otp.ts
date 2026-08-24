@@ -55,6 +55,7 @@ export async function issueOrderOtp(input: {
 
   const spaced = code.split('').join(' ')
   await sendEmail({
+    senderName: input.storeName,
     log: { storeId: input.storeId, event: 'order_otp' },
     to: input.email,
     subject: `رمز تأكيد طلبك: ${code}`,
