@@ -2,6 +2,7 @@
 
 import { cookies } from 'next/headers'
 import { after } from 'next/server'
+import { whatsappOrderPlaced } from '@/lib/order-whatsapp'
 import { and, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/db'
@@ -665,6 +666,21 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
    *
    * `after` بيقول للمنصة: متجمّديش لحد ما ده يخلص.
    */
+  /*
+    واتساب أول حاجة: هو الطريق الوحيد للعميل اللي مساب بريده،
+    والبريد بيتخطّى تمامًا لو المزوّد مش مضبوط.
+  */
+  after(
+    whatsappOrderPlaced(store!, {
+      orderNumber: result.orderNumber,
+      phone,
+      total: totals.total,
+      currency: store!.currency,
+      cod: input.paymentGateway === 'cod',
+      trackUrl: `${publicStoreUrl(store!)}/order/${result.orderNumber}?t=${encodeURIComponent(token)}`,
+    }).catch((e) => console.error('فشل إرسال واتساب الطلب:', e)),
+  )
+
   after(
     sendOrderEmails({
     store,

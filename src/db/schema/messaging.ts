@@ -32,7 +32,17 @@ export const messagingSettings = pgTable('messaging_settings', {
   smsCredentials: text('sms_credentials'),
   smsSenderId: text('sms_sender_id'),
 
-  whatsappProvider: text('whatsapp_provider').$type<'platform' | 'custom' | 'off'>().notNull().default('off'),
+  /**
+   * مزوّد واتساب.
+   *
+   * `wasender` بوابة بتربط رقمًا عاديًا بمسح كود — دقايق وبتشتغل.
+   * `cloud` الطريق الرسمي من ميتا. و`platform`/`custom` قيم قديمة
+   * بتتقرا على إنها `cloud` عشان المتاجر المحفوظة ما تتكسرش.
+   */
+  whatsappProvider: text('whatsapp_provider')
+    .$type<'platform' | 'custom' | 'off' | 'wasender' | 'cloud'>()
+    .notNull()
+    .default('off'),
   whatsappCredentials: text('whatsapp_credentials'),
   whatsappPhoneId: text('whatsapp_phone_id'),
 

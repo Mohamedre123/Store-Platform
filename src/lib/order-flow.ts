@@ -25,6 +25,8 @@ import { runAutomations } from '@/lib/automation'
 import { shipmentStatusMeta, type ShipmentStatus } from '@/lib/carriers'
 import { queueShipmentForOrder } from '@/lib/shipment-dispatch'
 import { notifyTeam } from '@/lib/notify-team'
+import { whatsappOrderStatus } from '@/lib/order-whatsapp'
+import { after } from 'next/server'
 import type { OrderStatus } from '@/db/schema'
 
 /**
@@ -114,6 +116,7 @@ export async function applyOrderStatus(
       orderNumber: orders.orderNumber,
       customerName: orders.customerName,
       customerEmail: orders.customerEmail,
+      customerPhone: orders.customerPhone,
       total: orders.total,
       currency: orders.currency,
       recoveryToken: orders.recoveryToken,
@@ -383,6 +386,32 @@ export async function applyOrderStatus(
         },
       })
     })().catch((e) => console.error('فشل إرسال بريد حالة الطلب:', e))
+  }
+
+  /**
+   * وواتساب — للعميل اللي مساب بريده.
+   *
+   * ده مش بديل للبريد، ده الطريق الوحيد لجزء كبير من العملاء:
+   * الشراء من الموبايل بيسيب خانة البريد فاضية غالبًا، والرقم
+   * مطلوب في الطلب أصلًا. من غير ده، العميل ما بيعرفش إن طلبه
+   * اتشحن إلا لو فتح المتجر بنفسه.
+   *
+   * بيسكت لو الواتساب مش مربوط — الحالة اتغيّرت فعلًا ومينفعش
+   * إشعار يوقّعها.
+   */
+  if (order.customerPhone) {
+    const notify = whatsappOrderStatus(store, {
+      orderNumber: order.orderNumber,
+      phone: order.customerPhone,
+      status,
+      trackUrl: `${publicStoreUrl(store)}/order/${order.orderNumber}?t=${encodeURIComponent(order.recoveryToken ?? '')}`,
+    }).catch((e) => console.error('فشل إرسال واتساب حالة الطلب:', e))
+
+    try {
+      after(notify)
+    } catch {
+      void notify
+    }
   }
 }
 

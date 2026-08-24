@@ -1,8 +1,9 @@
 import 'server-only'
 import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm'
 import { db } from '@/db'
-import { customers, messagingSettings, verificationTokens } from '@/db/schema'
-import { decrypt, generateOtp, hashToken } from './crypto'
+import { customers, verificationTokens } from '@/db/schema'
+import { generateOtp, hashToken } from './crypto'
+import { sendWhatsapp } from './whatsapp'
 import { isEmailConfigured, sendEmail } from './email'
 import { customerCodeEmail, type StoreBrand } from './store-emails'
 import { config } from './config'
@@ -62,51 +63,6 @@ function mask(identity: Identity): string {
   }
   const d = identity.value.replace(/\D/g, '')
   return `${d.slice(0, 4)}${'*'.repeat(Math.max(0, d.length - 7))}${d.slice(-3)}`
-}
-
-/**
- * إرسال واتساب.
- *
- * بيشتغل بحساب واتساب بزنس بتاع التاجر نفسه — إحنا مش وسيط ومش
- * شايلين تكلفة رسايله. لو مش مربوط بنرجّع false والطبقة اللي فوق
- * بتنزل للبديل بدل ما تدّعي إنها بعتت.
- */
-async function sendWhatsapp(storeId: string, phone: string, code: string): Promise<boolean> {
-  const [settings] = await db
-    .select({
-      provider: messagingSettings.whatsappProvider,
-      creds: messagingSettings.whatsappCredentials,
-      phoneId: messagingSettings.whatsappPhoneId,
-    })
-    .from(messagingSettings)
-    .where(eq(messagingSettings.storeId, storeId))
-    .limit(1)
-
-  if (settings?.provider !== 'custom' || !settings.creds || !settings.phoneId) return false
-
-  let token: string
-  try {
-    token = decrypt(settings.creds)
-  } catch {
-    return false
-  }
-
-  try {
-    const res = await fetch(`https://graph.facebook.com/v21.0/${settings.phoneId}/messages`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        to: phone.replace(/\D/g, ''),
-        type: 'text',
-        text: { body: `رمز الدخول: ${code}\nصالح ${TTL} دقايق. لو مش إنت اللي طلبته، تجاهل الرسالة.` },
-      }),
-      signal: AbortSignal.timeout(12_000),
-    })
-    return res.ok
-  } catch {
-    return false
-  }
 }
 
 /**
@@ -183,7 +139,19 @@ export async function issueCustomerOtp(input: {
   let channel: Channel | null = null
 
   if (input.identity.kind === 'phone') {
-    if (await sendWhatsapp(input.storeId, input.identity.value, code)) channel = 'whatsapp'
+    /*
+      الرسالة باسم المتجر لا باسمنا: العميل بيشتري من التاجر ومش
+      عارفنا، ورمز جاي من اسم غريب ما بيتكتبش.
+    */
+    const wa = await sendWhatsapp(
+      input.storeId,
+      input.identity.value,
+      [
+        `رمز دخولك على ${input.brand.name}: ${code}`,
+        `صالح ${TTL} دقايق. لو مش إنت اللي طلبته، تجاهل الرسالة.`,
+      ].join('\n'),
+    )
+    if (wa.ok) channel = 'whatsapp'
   }
 
   if (!channel && emailTarget && isEmailConfigured()) {

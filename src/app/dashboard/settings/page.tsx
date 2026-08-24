@@ -5,6 +5,8 @@ import { db } from '@/db'
 import { storeThemes } from '@/db/schema'
 import { getTheme } from '@/lib/themes'
 import { getDashboardContext } from '@/lib/store-context'
+import { readWhatsapp } from '@/lib/whatsapp'
+import { WhatsappIcon } from '@/components/storefront/whatsapp-icon'
 import { storeUrl } from '@/lib/domain'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
@@ -27,6 +29,7 @@ export default async function SettingsPage() {
     .where(eq(storeThemes.storeId, store.id))
     .limit(1)
 
+  const whatsapp = await readWhatsapp(store.id)
   const palette = getTheme(themeRow?.slug ?? '').palette
   const tokens = (themeRow?.tokens ?? {}) as { primary?: string; accent?: string }
   const colors = {
@@ -63,6 +66,32 @@ export default async function SettingsPage() {
           >
             <FileText className="h-4 w-4" aria-hidden="true" />
             تعديل الصفحات
+          </Link>
+        </Card>
+      </Reveal>
+
+      {/* واتساب — الطريق الوحيد للعميل اللي مساب بريده */}
+      <Reveal delay={70}>
+        <Card className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#25D366]/12 text-[#25D366]">
+              <WhatsappIcon className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="font-semibold">واتساب المتجر</h2>
+              <p className="mt-0.5 text-sm text-[var(--fg-muted)]">
+                رموز الدخول وتأكيد الطلبات وحالة الشحن توصل لعملاءك على واتساب — باسم متجرك ومن
+                رقمك.
+              </p>
+            </div>
+          </div>
+
+          <Link
+            href="/dashboard/settings/whatsapp"
+            className="flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-strong)] px-4 text-sm font-medium text-[var(--fg-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--fg)]"
+          >
+            <WhatsappIcon className="h-4 w-4" />
+            {whatsapp.provider === 'off' ? 'اربط واتساب' : 'إدارة الربط'}
           </Link>
         </Card>
       </Reveal>
