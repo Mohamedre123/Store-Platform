@@ -151,18 +151,38 @@ export function suggestBrief(brief: StoreBrief): string {
   return (head + body + price).trim()
 }
 
+/**
+ * الكتالوج كامل ولا مقصوص؟
+ *
+ * الفرق ده هو اللي بيخلّي البوت يجاوب بثقة أو يتمتم.
+ *
+ * القايمة كانت بتتبعتله من غير ما حد يقوله إنها الكل، فكان بيتصرّف
+ * على إنها **عيّنة**: العميل يسأل عن منتج مش فيها فيقول «مش متأكد
+ * من توفره» — حتى لو المتجر فيه منتج واحد وهو شايفه قدامه. والرد
+ * ده بيخلّي العميل يفتكر إن المتجر مش عارف بضاعته هو.
+ *
+ * لما القايمة تبقى كاملة، «مش موجود في القايمة» بيبقى **حقيقة** لا
+ * تخمين — والبوت يقولها كده.
+ */
+export function catalogIsComplete(brief: StoreBrief, limit = 40): boolean {
+  return (
+    brief.productCount > 0 &&
+    brief.productCount <= limit &&
+    brief.sample.length >= brief.productCount
+  )
+}
+
 /** كتالوج مختصر — بيتحط في تعليمات البوت عشان يرد بأسعار حقيقية */
 export function catalogBlock(brief: StoreBrief, limit = 40): string {
-  if (brief.sample.length === 0) return 'المتجر لسه مافيهوش منتجات.'
+  if (brief.sample.length === 0) return 'المتجر لسه مافيهوش أي منتج معروض.'
 
   const lines = brief.sample
     .slice(0, limit)
     .map((p) => `- ${p.name}${p.category ? ` [${p.category}]` : ''} — ${p.price} — ${p.stock}`)
 
-  const more =
-    brief.productCount > lines.length
-      ? `\n(وفيه ${brief.productCount - lines.length} منتج تاني مش مذكورين هنا)`
-      : ''
+  const note = catalogIsComplete(brief, limit)
+    ? `(القايمة دي كل منتجات المتجر — عددها ${brief.productCount}. مفيش غيرها خالص.)`
+    : `(دي ${lines.length} منتج من إجمالي ${brief.productCount} — فيه منتجات تانية مش مذكورة هنا.)`
 
-  return lines.join('\n') + more
+  return `${note}\n${lines.join('\n')}`
 }

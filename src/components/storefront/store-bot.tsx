@@ -3,7 +3,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { Send, Sparkles, X } from 'lucide-react'
 
-type Msg = { role: 'user' | 'model'; text: string }
+type Msg = {
+  role: 'user' | 'model'
+  text: string
+  /**
+   * رابط واتساب برسالة جاهزة عن سؤال العميل.
+   *
+   * بييجي مع الرد اللي البوت قال فيه إن الحاجة مش معروضة. مربوط
+   * بالرسالة نفسها لا بالمحادثة كلها: العميل بيلاقيه في اللحظة
+   * اللي محتاجه فيها بالظبط، وفيه سؤاله هو مكتوب جاهز.
+   */
+  whatsappHref?: string | null
+}
 
 /**
  * مساعد المتجر.
@@ -99,6 +110,7 @@ export function StoreBot({
         error?: string
         exhausted?: boolean
         whatsapp?: string | null
+        whatsappHref?: string | null
       }
 
       setMessages((m) => [
@@ -106,6 +118,7 @@ export function StoreBot({
         {
           role: 'model',
           text: data.reply ?? 'معلش، حصلت مشكلة. جرّب تاني.',
+          whatsappHref: data.whatsappHref ?? null,
         },
       ])
       if (data.exhausted) setExhausted(true)
@@ -128,10 +141,16 @@ export function StoreBot({
     الترتيب ده بيخلّي الرسالة الجاهزة اللي التاجر كتبها في التخصيص
     تفضل شغّالة، والرقم الخام بيبقى شبكة أمان بس.
   */
+  /*
+    كان مكتوب `[^d]` مكان `D` — يعني الريجيكس كان بيشيل كل حاجة
+    ما عدا حرف الـd، فالرقم بيطلع فاضي والرابط `wa.me/?text=…`
+    بيفتح واتساب على شاشة «الرقم غير صحيح». العميل اللي البوت وقف
+    معاه كان بيتقفل عليه آخر باب.
+  */
   const waLink =
     whatsappHref ??
     (fallbackWa
-      ? `https://wa.me/${fallbackWa.replace(/[^d]/g, '')}?text=${encodeURIComponent(
+      ? `https://wa.me/${fallbackWa.replace(/D/g, '')}?text=${encodeURIComponent(
           'أهلًا، كنت بسأل المساعد وعايز مساعدة.',
         )}`
       : null)
@@ -185,7 +204,10 @@ export function StoreBot({
             <Bubble role="model" text={greeting} />
 
             {messages.map((m, i) => (
-              <Bubble key={i} role={m.role} text={m.text} />
+              <div key={i}>
+                <Bubble role={m.role} text={m.text} />
+                {m.whatsappHref && <WhatsappOffer href={m.whatsappHref} />}
+              </div>
             ))}
 
             {busy && (
@@ -274,5 +296,32 @@ function Bubble({ role, text }: { role: 'user' | 'model'; text: string }) {
         {text}
       </p>
     </div>
+  )
+}
+
+/**
+ * زر «اتأكد على واتساب» تحت رد البوت.
+ *
+ * بيظهر لما البوت يقول إن حاجة مش معروضة. السبب إن «مش موجود» مش
+ * دايمًا آخر الكلام: التاجر ممكن يكون عنده المنتج وما ضافهوش
+ * للمتجر لسه، والعميل اللي بيسأل عنه بالاسم ده عميل جاهز يشتري —
+ * خساره يمشي على رد آلي.
+ *
+ * والرسالة بتفتح مكتوبة بسؤاله هو، فمحدّش محتاج يعيد الشرح.
+ */
+function WhatsappOffer({ href }: { href: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mb-2 flex min-h-11 w-fit max-w-[85%] items-center gap-2 rounded-2xl px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+      style={{ background: '#25D366' }}
+    >
+      <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 fill-current" aria-hidden="true">
+        <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2Zm5.8 14.14c-.25.69-1.44 1.32-1.99 1.37-.53.05-1.02.24-3.45-.72-2.9-1.14-4.74-4.1-4.88-4.29-.14-.19-1.16-1.55-1.16-2.95 0-1.4.73-2.09.99-2.37.26-.28.57-.35.76-.35.19 0 .38 0 .55.01.18.01.41-.07.64.49.24.57.81 1.97.88 2.11.07.14.12.31.02.5-.09.19-.14.31-.28.47-.14.16-.29.36-.42.48-.14.14-.28.29-.12.57.16.28.72 1.19 1.55 1.93 1.07.95 1.97 1.25 2.25 1.39.28.14.44.12.6-.07.16-.19.69-.81.88-1.09.19-.28.37-.23.63-.14.26.09 1.65.78 1.93.92.28.14.47.21.54.33.07.12.07.69-.18 1.38Z" />
+      </svg>
+      اتأكد على واتساب
+    </a>
   )
 }

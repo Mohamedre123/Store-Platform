@@ -2,11 +2,31 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { getStore } from '@/lib/storefront'
 import { getAiConfig, isReady, GEMINI_PRO_SLUG } from '@/lib/ai/settings'
 import { getStoreBrief } from '@/lib/ai/store-context'
-import { buildBotSystem, checkLimits, logBotMessage } from '@/lib/ai/bot'
+import { buildBotSystem, checkLimits, logBotMessage, splitWhatsappMarker } from '@/lib/ai/bot'
 import { generate, type ChatMessage } from '@/lib/ai/gemini'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
+
+/**
+ * رابط واتساب برسالة جاهزة عن اللي العميل سأل عنه بالظبط.
+ *
+ * الرسالة الجاهزة بتفرق: العميل اللي بيفتح واتساب على شاشة فاضية
+ * بيقفلها، واللي بيلاقي سؤاله مكتوب بيبعت. والتاجر بيوصله السؤال
+ * كامل فيعرف يرد من غير لفّ.
+ */
+function whatsappLink(phone: string | null, storeName: string, question: string): string | null {
+  const digits = (phone ?? '').replace(/\D/g, '')
+  if (digits.length < 8) return null
+
+  const text = [
+    `أهلًا ${storeName} 👋`,
+    `سألت المساعد عن: «${question.slice(0, 180)}»`,
+    'ممكن أتأكد لو ده متاح عندكم؟',
+  ].join('\n')
+
+  return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`
+}
 
 /**
  * بوت المتجر.
@@ -77,7 +97,7 @@ export async function POST(req: NextRequest) {
     .slice(-6)
     .map((m) => ({ role: m.role as 'user' | 'model', text: String(m.text).slice(0, 500) }))
 
-  const system = buildBotSystem(brief, store.name)
+  const system = buildBotSystem(brief, store.name, Boolean(store.whatsapp))
   const messages: ChatMessage[] = [...history, { role: 'user', text: message }]
 
   let res = await generate({
@@ -153,5 +173,17 @@ export async function POST(req: NextRequest) {
 
   await logBotMessage({ storeId: store.id, visitorId, question: message, status: 'sent' })
 
-  return NextResponse.json({ reply: res.data })
+  /*
+    البوت بيعلّم على الرد اللي قال فيه «مش معروض»، وإحنا بنحوّل
+    العلامة لزر واتساب برسالة فيها سؤال العميل نفسه.
+
+    العلامة بتتشال دايمًا حتى لو المتجر مش مربوط بواتساب — العميل
+    ما يصحّش يشوف رمزًا داخليًا في المحادثة.
+  */
+  const { text, offer } = splitWhatsappMarker(res.data)
+
+  return NextResponse.json({
+    reply: text,
+    whatsappHref: offer ? whatsappLink(store.whatsapp, store.name, message) : null,
+  })
 }
