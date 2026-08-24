@@ -2,7 +2,7 @@
 
 import { and, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm'
 import { db } from '@/db'
-import { categories, products } from '@/db/schema'
+import { categories, pages, products } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 
 /**
@@ -138,4 +138,58 @@ export async function resolvePickerProducts(ids: string[]): Promise<PickerProduc
       status: r!.status,
       categoryName: r!.categoryName,
     }))
+}
+
+/* ────────────────────────── وجهات الروابط ────────────────────────── */
+
+export type LinkTarget = { value: string; label: string; group: string }
+
+/**
+ * الأماكن اللي زر في المتجر ممكن يوديها.
+ *
+ * التاجر كان بيكتب المسار بإيده — `/category/رجالي` — وأي حرف غلط
+ * بيوصّل العميل لصفحة مش موجودة، والتاجر ما بيكتشفش غير لما حد
+ * يشتكي. وأصلًا مين يعرف إن مسار القسم بيبدأ بـ`category/`؟
+ *
+ * هنا بيختار من قايمة بأسماء يعرفها، وإحنا بنبني المسار الصح.
+ * وسايبين «رابط مخصّص» لأي حاجة برّه المتجر (صفحة إعلان، واتساب،
+ * قناة تيليجرام).
+ */
+export async function listLinkTargets(): Promise<LinkTarget[]> {
+  const { store } = await getDashboardContext()
+
+  const [cats, pageRows] = await Promise.all([
+    db
+      .select({ name: categories.name, slug: categories.slug, parentId: categories.parentId })
+      .from(categories)
+      .where(and(eq(categories.storeId, store.id), eq(categories.isActive, true)))
+      .orderBy(categories.sortOrder),
+
+    db
+      .select({ title: pages.title, slug: pages.slug })
+      .from(pages)
+      .where(and(eq(pages.storeId, store.id), eq(pages.isPublished, true)))
+      .orderBy(pages.title),
+  ])
+
+  return [
+    { value: '/', label: 'الصفحة الرئيسية', group: 'المتجر' },
+    { value: '/products', label: 'كل المنتجات', group: 'المتجر' },
+    { value: '/blog', label: 'المدوّنة', group: 'المتجر' },
+    { value: '/cart', label: 'السلة', group: 'المتجر' },
+    { value: '/account', label: 'حساب العميل', group: 'المتجر' },
+
+    ...cats.map((c) => ({
+      value: `/category/${c.slug}`,
+      /* الفرعي بيبان تحت أبوه — الأسماء بتتكرر بين الأقسام كتير */
+      label: c.parentId ? `‏— ${c.name}` : c.name,
+      group: 'الأقسام',
+    })),
+
+    ...pageRows.map((p) => ({
+      value: `/pages/${p.slug}`,
+      label: p.title,
+      group: 'الصفحات',
+    })),
+  ]
 }

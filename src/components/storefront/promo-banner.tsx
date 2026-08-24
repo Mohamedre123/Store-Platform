@@ -21,7 +21,14 @@ export type PromoBannerData = {
  */
 export function PromoBanner({ banner: b }: { banner: PromoBannerData }) {
   const hasImage = Boolean(b.imageDesktop)
-  const hasText = Boolean(b.title || b.subtitle)
+  /*
+    الزر جزء من «فيه كلام فوق الصورة» زي العنوان بالظبط.
+
+    كان مستثنى، فالتاجر اللي رفع بانر جاهز وكتب نص زر بس — من غير
+    عنوان — كان بيلاقي البانر صورة صامتة والزر مختفي. الخانة اللي
+    ملاها ما عملتش حاجة، وما فيش حاجة بتقوله ليه.
+  */
+  const hasText = Boolean(b.title || b.subtitle || b.ctaLabel)
 
   const inner = (
     <>

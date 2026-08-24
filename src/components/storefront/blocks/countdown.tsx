@@ -153,7 +153,8 @@ export function CountdownBlockView({ block }: { block: CountdownBlock }) {
             {block.ctaLabel && block.ctaUrl && (
               <Link
                 href={block.ctaUrl}
-                className="mt-1 inline-flex min-h-11 items-center rounded-[var(--sf-radius)] bg-[var(--sf-primary)] px-7 text-sm font-semibold text-white transition-transform hover:scale-[1.03]"
+                className="mt-1 inline-flex min-h-11 items-center rounded-[var(--sf-radius)] px-7 text-sm font-semibold shadow-sm transition-transform hover:scale-[1.03]"
+                style={{ background: block.ctaBg || 'var(--sf-primary)', color: block.ctaColor || '#ffffff' }}
               >
                 {block.ctaLabel}
               </Link>

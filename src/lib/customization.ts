@@ -68,6 +68,17 @@ export type HeroSlide = {
   ctaUrl: string
   textPosition: 'start' | 'center' | 'end'
   overlay: number
+  /** ضبابية خلف النص والزر — بتفصلهم عن الصورة من غير ما تغطّيها */
+  blur?: number
+  /**
+   * لون الزر ونصّه.
+   *
+   * الافتراضي أبيض بلون المتجر جوّاه، وده بيشتغل فوق أغلب الصور —
+   * لكن مش كلها. البانر الفاتح بيبلع الزر الأبيض تمامًا، والتاجر
+   * بيقعد يبصّ ومش فاهم الزر راح فين.
+   */
+  ctaBg?: string
+  ctaColor?: string
 }
 
 export type HeroSettings = {

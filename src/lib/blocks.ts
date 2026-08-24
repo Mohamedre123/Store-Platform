@@ -60,6 +60,14 @@ export type SlideItem = {
   blur: number
   textPosition: 'start' | 'center' | 'end'
   textColor: string
+  /**
+   * لون الزر ونصّه.
+   *
+   * الزر بلون المتجر بيختفي فوق بانر بنفس درجة اللون، والتاجر بيقعد
+   * يبصّ ومش فاهم الزر راح فين. اللون هنا بيحسمها للشريحة دي وحدها.
+   */
+  ctaBg: string
+  ctaColor: string
 }
 
 export type ProductSource = 'featured' | 'new' | 'sale' | 'best' | 'category' | 'manual'
@@ -135,6 +143,8 @@ export type CountdownBlock = {
   textColor: string
   ctaLabel: string
   ctaUrl: string
+  ctaBg: string
+  ctaColor: string
   overlay: number
   blur: number
 }
@@ -144,6 +154,8 @@ export type RichTextBlock = {
   body: string
   ctaLabel: string
   ctaUrl: string
+  ctaBg: string
+  ctaColor: string
   align: 'start' | 'center'
   background: BgKey
   width: 'narrow' | 'wide'
@@ -242,6 +254,8 @@ export function newSlide(id: string): SlideItem {
     blur: 0,
     textPosition: 'center',
     textColor: '#ffffff',
+    ctaBg: '#ffffff',
+    ctaColor: '#111111',
   }
 }
 
@@ -314,6 +328,8 @@ const DEFAULTS: DefaultsMap = {
     textColor: '#ffffff',
     ctaLabel: 'اطلب دلوقتي',
     ctaUrl: '/products',
+    ctaBg: '#ffffff',
+    ctaColor: '#111111',
     overlay: 40,
     blur: 0,
   },
@@ -322,6 +338,8 @@ const DEFAULTS: DefaultsMap = {
     body: '',
     ctaLabel: '',
     ctaUrl: '',
+    ctaBg: '',
+    ctaColor: '',
     align: 'center',
     background: 'soft',
     width: 'narrow',

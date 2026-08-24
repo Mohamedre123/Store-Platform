@@ -14,6 +14,7 @@ import {
 import { ImageUpload } from '@/components/ui/image-upload'
 import { ProductPicker } from './product-picker'
 import { BackgroundField, DeadlineField, ItemList, SlideFields, makeSlide } from './block-fields'
+import { LinkPicker } from '@/components/dashboard/link-picker'
 import { FEATURE_ICONS, FEATURE_ICON_LABELS } from '@/components/storefront/blocks/content'
 import type { PickerCategory } from './picker-actions'
 import {
@@ -288,16 +289,15 @@ function ProductsSettings({
         />
 
         {b.moreEnabled && (
-          <div className="grid gap-4 sm:grid-cols-2">
+          <>
             <TextField label="نص الزر" value={b.moreLabel} onChange={(v) => set({ moreLabel: v })} />
-            <TextField
-              label="رابط مخصّص"
+            <LinkPicker
+              label="وجهة الزر"
+              hint="سيبها «من غير رابط» عشان يودّي للقسم اللي البلوك بيعرضه."
               value={b.moreUrl}
               onChange={(v) => set({ moreUrl: v })}
-              placeholder="سيبه فاضي = القسم نفسه"
-              ltr
             />
-          </div>
+          </>
         )}
       </Group>
 
@@ -572,10 +572,19 @@ function CountdownSettings({ settings, onChange }: { settings: Record<string, un
           }
         />
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <TextField label="نص الزر" value={b.ctaLabel} onChange={(v) => set({ ctaLabel: v })} />
-          <TextField label="رابط الزر" value={b.ctaUrl} onChange={(v) => set({ ctaUrl: v })} ltr />
-        </div>
+        <TextField label="نص الزر" value={b.ctaLabel} onChange={(v) => set({ ctaLabel: v })} />
+        <LinkPicker value={b.ctaUrl} onChange={(v) => set({ ctaUrl: v })} />
+
+        {b.ctaLabel.trim() && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <ColorField label="لون الزر" value={b.ctaBg || '#ffffff'} onChange={(v) => set({ ctaBg: v })} />
+            <ColorField
+              label="لون نص الزر"
+              value={b.ctaColor || '#111111'}
+              onChange={(v) => set({ ctaColor: v })}
+            />
+          </div>
+        )}
       </Group>
 
       <Group title="الشكل">
@@ -627,10 +636,23 @@ function RichTextSettings({ settings, onChange }: { settings: Record<string, unk
           multiline
           hint="كل سطر بيبقى فقرة لوحدها"
         />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <TextField label="نص الزر" value={b.ctaLabel} onChange={(v) => set({ ctaLabel: v })} />
-          <TextField label="رابط الزر" value={b.ctaUrl} onChange={(v) => set({ ctaUrl: v })} ltr />
-        </div>
+        <TextField label="نص الزر" value={b.ctaLabel} onChange={(v) => set({ ctaLabel: v })} />
+        <LinkPicker value={b.ctaUrl} onChange={(v) => set({ ctaUrl: v })} />
+
+        {b.ctaLabel.trim() && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <ColorField
+              label="لون الزر"
+              value={b.ctaBg || '#000000'}
+              onChange={(v) => set({ ctaBg: v })}
+            />
+            <ColorField
+              label="لون نص الزر"
+              value={b.ctaColor || '#ffffff'}
+              onChange={(v) => set({ ctaColor: v })}
+            />
+          </div>
+        )}
       </Group>
 
       <Group title="الشكل">
@@ -918,7 +940,7 @@ function LogosSettings({ settings, onChange }: { settings: Record<string, unknow
                 folder="logos"
               />
               <TextField label="الاسم" value={item.alt} onChange={(v) => patch({ alt: v })} />
-              <TextField label="رابط (اختياري)" value={item.url} onChange={(v) => patch({ url: v })} ltr />
+              <LinkPicker label="يودّي فين" value={item.url} onChange={(v) => patch({ url: v })} />
             </>
           )}
         />
@@ -969,7 +991,7 @@ function GallerySettings({ settings, onChange }: { settings: Record<string, unkn
                 folder="misc"
               />
               <TextField label="التعليق" value={item.caption} onChange={(v) => patch({ caption: v })} />
-              <TextField label="رابط (اختياري)" value={item.url} onChange={(v) => patch({ url: v })} ltr />
+              <LinkPicker label="يودّي فين" value={item.url} onChange={(v) => patch({ url: v })} />
             </>
           )}
         />

@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from 'react'
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react'
 import { Choice, ColorField, NumberField, Row, TextField, Toggle } from '@/components/dashboard/controls'
+import { LinkPicker } from '@/components/dashboard/link-picker'
 import { ImageUpload } from '@/components/ui/image-upload'
 import { BG_LABELS, newSlide, type BgKey, type SlideItem } from '@/lib/blocks'
 import { cn } from '@/lib/utils'
@@ -178,17 +179,29 @@ export function SlideFields({
       <TextField label="العنوان" value={slide.heading} onChange={(v) => patch({ heading: v })} />
       <TextField label="النص" value={slide.text} onChange={(v) => patch({ text: v })} multiline />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <TextField label="نص الزر" value={slide.ctaLabel} onChange={(v) => patch({ ctaLabel: v })} />
-        <TextField
-          label="رابط الزر"
-          value={slide.ctaUrl}
-          onChange={(v) => patch({ ctaUrl: v })}
-          placeholder="/products"
-          ltr
-          hint="رابط جوّه متجرك زي /products أو /category/رجالي"
-        />
-      </div>
+      <TextField
+        label="نص الزر"
+        value={slide.ctaLabel}
+        onChange={(v) => patch({ ctaLabel: v })}
+        hint="سيبه فاضي لو مش عايز زر."
+      />
+
+      <LinkPicker value={slide.ctaUrl} onChange={(v) => patch({ ctaUrl: v })} />
+
+      {slide.ctaLabel.trim() && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <ColorField
+            label="لون الزر"
+            value={slide.ctaBg || '#ffffff'}
+            onChange={(v) => patch({ ctaBg: v })}
+          />
+          <ColorField
+            label="لون نص الزر"
+            value={slide.ctaColor || '#111111'}
+            onChange={(v) => patch({ ctaColor: v })}
+          />
+        </div>
+      )}
 
       <Choice
         label="مكان النص"

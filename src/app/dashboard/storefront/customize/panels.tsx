@@ -14,6 +14,7 @@ import {
 } from '@/components/dashboard/controls'
 import { ImageUpload } from '@/components/ui/image-upload'
 import { ImageSpecHint } from '../image-spec-hint'
+import { LinkPicker } from '@/components/dashboard/link-picker'
 
 type Patch = <K extends PanelKey>(panel: K, values: Partial<Customization[K]>) => void
 
@@ -338,17 +339,29 @@ export function Panel({
                   />
                   <TextField
                     label="نص الزر"
+                    hint="سيبه فاضي لو مش عايز زر على الشريحة دي."
                     value={slide.ctaLabel}
                     onChange={(v) => setSlide(slide.id, { ctaLabel: v })}
                     placeholder="تسوّق دلوقتي"
                   />
-                  <TextField
-                    label="رابط الزر"
+
+                  <LinkPicker
                     value={slide.ctaUrl}
                     onChange={(v) => setSlide(slide.id, { ctaUrl: v })}
-                    placeholder="/products"
-                    ltr
                   />
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <ColorField
+                      label="لون الزر"
+                      value={slide.ctaBg ?? '#ffffff'}
+                      onChange={(v) => setSlide(slide.id, { ctaBg: v })}
+                    />
+                    <ColorField
+                      label="لون نص الزر"
+                      value={slide.ctaColor ?? value.identity.primary}
+                      onChange={(v) => setSlide(slide.id, { ctaColor: v })}
+                    />
+                  </div>
                   <Choice
                     label="مكان النص"
                     value={slide.textPosition}
@@ -361,12 +374,22 @@ export function Panel({
                   />
                   <NumberField
                     label="تعتيم الصورة"
-                    hint="زوّده لو النص مش واضح فوق الصورة."
+                    hint="بيغمّق الصورة كلها — زوّده لو النص أو الزر مش واضح فوقها."
                     value={slide.overlay}
                     onChange={(v) => setSlide(slide.id, { overlay: v })}
                     min={0}
                     max={80}
                     suffix="%"
+                  />
+
+                  <NumberField
+                    label="ضبابية خلف النص"
+                    hint="بتضبّب الخلفية ورا النص والزر بس — الصورة تفضل واضحة والزر يبان."
+                    value={slide.blur ?? 0}
+                    onChange={(v) => setSlide(slide.id, { blur: Math.min(24, Math.max(0, v)) })}
+                    min={0}
+                    max={24}
+                    suffix="px"
                   />
                 </div>
               ))}
@@ -387,6 +410,9 @@ export function Panel({
                         ctaUrl: '/products',
                         textPosition: 'start' as const,
                         overlay: 30,
+                        blur: 0,
+                        ctaBg: '#ffffff',
+                        ctaColor: value.identity.primary,
                       },
                     ],
                   })

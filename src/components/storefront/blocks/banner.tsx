@@ -141,7 +141,10 @@ export function BannerCard({
               </span>
             )}
             {item.ctaLabel && (
-              <span className="mt-1 inline-flex w-fit items-center rounded-[var(--sf-radius)] bg-[var(--sf-primary)] px-5 py-2.5 text-sm font-semibold text-white transition-transform group-hover:scale-[1.03]">
+              <span
+              className="mt-1 inline-flex w-fit items-center rounded-[var(--sf-radius)] px-5 py-2.5 text-sm font-semibold shadow-sm transition-transform group-hover:scale-[1.03]"
+              style={{ background: item.ctaBg || 'var(--sf-primary)', color: item.ctaColor || '#ffffff' }}
+            >
                 {item.ctaLabel}
               </span>
             )}

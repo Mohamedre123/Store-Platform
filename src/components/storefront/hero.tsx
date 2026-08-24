@@ -61,10 +61,25 @@ export function Hero({
    */
   const showText = hasImage ? Boolean(active?.title || active?.subtitle) : true
 
+  /**
+   * الزر قراره منفصل عن العنوان.
+   *
+   * كان مربوطًا بيه، فالتاجر اللي رفع بانر جاهز (النص مرسوم جوّه
+   * الصورة) وكتب «تسوّق الان» في خانة الزر، كان بيحفظ ويفتح متجره
+   * فما يلاقيش زر — والخانة اللي ملاها ما عملتش حاجة.
+   *
+   * فبنعرضه لما يكون **هو كتبه بنفسه**. والافتراضي بيظهر في حالة
+   * واحدة بس: مافيش صورة أصلًا، يعني إحنا اللي بنرسم البانر
+   * وبيحتاج مخرجًا.
+   */
+  const typedCta = Boolean(active?.ctaLabel?.trim())
+  const showCta = typedCta || !hasImage
+
   const title = active?.title || storeName
   const subtitle = active?.subtitle || tagline || 'اطلب دلوقتي والتوصيل لباب البيت'
-  const ctaLabel = active?.ctaLabel || 'تسوّق دلوقتي'
+  const ctaLabel = active?.ctaLabel?.trim() || 'تسوّق دلوقتي'
   const ctaUrl = active?.ctaUrl || '/products'
+  const blur = active?.blur ?? 0
   const align =
     active?.textPosition === 'center'
       ? 'items-center text-center'
@@ -75,7 +90,11 @@ export function Hero({
   const cta = (
     <Link
       href={ctaUrl}
-      className="mt-2 inline-flex min-h-12 items-center gap-2 rounded-[var(--sf-radius)] bg-white px-6 font-semibold text-[var(--sf-primary)] transition-opacity hover:opacity-90"
+      className="mt-2 inline-flex min-h-12 items-center gap-2 rounded-[var(--sf-radius)] px-6 font-semibold shadow-sm transition-opacity hover:opacity-90"
+      style={{
+        background: active?.ctaBg || '#ffffff',
+        color: active?.ctaColor || 'var(--sf-primary)',
+      }}
     >
       {ctaLabel}
       <ArrowLeft className="h-4 w-4" aria-hidden="true" />
@@ -91,7 +110,11 @@ export function Hero({
           <p className="text-lg opacity-70">{subtitle}</p>
           <Link
             href={ctaUrl}
-            className="mt-2 inline-flex min-h-12 w-fit items-center gap-2 rounded-[var(--sf-radius)] bg-[var(--sf-primary)] px-6 font-semibold text-white"
+            className="mt-2 inline-flex min-h-12 w-fit items-center gap-2 rounded-[var(--sf-radius)] px-6 font-semibold shadow-sm transition-opacity hover:opacity-90"
+            style={{
+              background: active?.ctaBg || 'var(--sf-primary)',
+              color: active?.ctaColor || '#ffffff',
+            }}
           >
             {ctaLabel}
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
@@ -134,7 +157,8 @@ export function Hero({
         />
       )}
 
-      {hasImage && showText && (
+      {/* التعتيم بيشتغل للزر زي النص — الزر الأبيض على صورة فاتحة بيختفي */}
+      {hasImage && (showText || showCta) && (
         <span
           className="absolute inset-0 bg-black"
           style={{ opacity: (active?.overlay ?? 35) / 100 }}
@@ -142,16 +166,41 @@ export function Hero({
         />
       )}
 
-      {showText && (
+      {(showText || showCta) && (
         <div className={`relative z-10 mx-auto flex w-full max-w-6xl flex-col gap-4 ${align}`}>
-          <h1 className="text-balance text-3xl font-bold tracking-tight text-white sm:text-5xl">{title}</h1>
-          <p className="max-w-lg text-white/85">{subtitle}</p>
-          {cta}
+          <div
+            className={`flex flex-col gap-4 rounded-[var(--sf-radius)] ${align}`}
+            style={
+              blur > 0
+                ? {
+                    /*
+                      الضبابية خلف النص والزر بس، مش على الصورة كلها:
+                      كده الزر يبان والصورة تفضل واضحة — الضبابية على
+                      الصورة كلها بتضيّع اللي التاجر رفعها عشانه.
+                    */
+                    backdropFilter: `blur(${blur}px)`,
+                    WebkitBackdropFilter: `blur(${blur}px)`,
+                    background: 'rgba(0,0,0,0.16)',
+                    padding: '1.25rem 1.5rem',
+                  }
+                : undefined
+            }
+          >
+            {showText && (
+              <>
+                <h1 className="text-balance text-3xl font-bold tracking-tight text-white sm:text-5xl">
+                  {title}
+                </h1>
+                <p className="max-w-lg text-white/85">{subtitle}</p>
+              </>
+            )}
+            {showCta && cta}
+          </div>
         </div>
       )}
 
-      {/* الصورة وحدها قابلة للضغط لو مافيش نص فوقها */}
-      {hasImage && !showText && (
+      {/* الصورة وحدها قابلة للضغط لو مافيش نص ولا زر فوقها */}
+      {hasImage && !showText && !showCta && (
         <Link href={ctaUrl} className="absolute inset-0 z-10" aria-label={ctaLabel} />
       )}
 

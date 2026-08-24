@@ -8,6 +8,7 @@ import {
   defaultCustomization,
   mergeCustomization,
   type Customization,
+  type HeroSlide,
   type PanelKey,
 } from './customization'
 import type { SortKey } from './sort-options'
@@ -97,22 +98,19 @@ export const getStore = cache(async (identifier: string): Promise<StorefrontStor
   return rest
 })
 
+/**
+ * البانر الرئيسي كما هو مخزَّن في المسوّدة.
+ *
+ * الشريحة هي `HeroSlide` نفسها — الوصف كان متكرّرًا هنا، وأي حقل
+ * جديد كان لازم يتكتب في المكانين وإلا الواجهة ما تشوفهوش. النسخة
+ * الواحدة بتمنع الفرق ده من الأساس.
+ */
 export type HeroDraft = {
   style?: 'fullbleed' | 'boxed' | 'split' | 'stacked' | 'none'
   height?: 'sm' | 'md' | 'lg' | 'full'
   autoplay?: boolean
   intervalSeconds?: number
-  slides?: Array<{
-    id: string
-    imageDesktop: string | null
-    imageMobile: string | null
-    title: string
-    subtitle: string
-    ctaLabel: string
-    ctaUrl: string
-    textPosition: 'start' | 'center' | 'end'
-    overlay: number
-  }>
+  slides?: HeroSlide[]
 }
 
 export type StoreTheme = {

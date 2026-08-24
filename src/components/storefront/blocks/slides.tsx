@@ -187,7 +187,10 @@ function Slide({ item, index, total }: { item: SlideItem; index: number; total: 
             </span>
           )}
           {item.ctaLabel && (
-            <span className="mt-1 inline-flex w-fit items-center rounded-[var(--sf-radius)] bg-[var(--sf-primary)] px-6 py-3 text-sm font-semibold text-white">
+            <span
+              className="mt-1 inline-flex w-fit items-center rounded-[var(--sf-radius)] px-6 py-3 text-sm font-semibold shadow-sm"
+              style={{ background: item.ctaBg || 'var(--sf-primary)', color: item.ctaColor || '#ffffff' }}
+            >
               {item.ctaLabel}
             </span>
           )}
