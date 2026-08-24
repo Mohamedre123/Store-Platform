@@ -2,14 +2,23 @@
 
 import { revalidatePath } from 'next/cache'
 import { getDashboardContext } from '@/lib/store-context'
-import { readWhatsapp, saveWhatsapp, sendWhatsapp, type WhatsappProvider } from '@/lib/whatsapp'
+import {
+  mergeSecrets,
+  readAccessToken,
+  readWhatsapp,
+  saveTemplates,
+  saveWhatsapp,
+  sendWhatsapp,
+  type WhatsappProvider,
+} from '@/lib/whatsapp'
 import { normalizePhone } from '@/lib/utils'
+import { checkTemplates, type Templates } from '@/lib/whatsapp-templates'
 import QRCode from 'qrcode'
 import {
   connectSession,
   createSession,
   deleteSession,
-  platformWhatsappEnabled,
+  platformToken,
   sessionStatus,
 } from '@/lib/whatsapp-onboard'
 
@@ -63,7 +72,7 @@ export async function testWhatsappAction(phone: string): Promise<WaState> {
   return res.ok ? { ok: true, note: 'اتبعتت. شوف واتسابك.' } : { error: res.error }
 }
 
-/* ────────────────────────── الربط السهل ────────────────────────── */
+/* ────────────────────────── الربط بمسح كود ────────────────────────── */
 
 export type LinkState =
   | { ok: true; status: 'connected' }
@@ -71,10 +80,31 @@ export type LinkState =
   | { ok: false; error: string }
 
 /**
- * ربط رقم التاجر من غير ما يفتح حساب عند حد.
+ * توكن حساب التاجر عند البوابة.
  *
- * المنصة عندها الحساب، وبتعمل للتاجر جلسة باسمه، وبترجّع كود مسح
- * يظهر في لوحته. هو بيمسحه بموبايله زي واتساب ويب — وخلاص.
+ * الحساب باسمه والفاتورة عليه — إحنا بنشيل خطوات الإعداد بس.
+ * ولو المنصة حاطّة توكنًا عامًا، بيشتغل كبديل للي مالوش واحد.
+ */
+async function tokenFor(storeId: string): Promise<string | null> {
+  return (await readAccessToken(storeId)) ?? platformToken()
+}
+
+/** بيحفظ توكن حساب التاجر — أول وآخر حاجة بيلزقها */
+export async function saveAccessTokenAction(token: string): Promise<WaState> {
+  const { store } = await getDashboardContext()
+  const clean = token.trim()
+  if (clean.length < 10) return { error: 'التوكن قصير أوي — راجعه' }
+
+  await mergeSecrets(store.id, { accessToken: clean })
+  revalidatePath('/dashboard/settings/whatsapp')
+  return { ok: true, note: 'اتحفظ. اكتب رقمك ودوس اربط.' }
+}
+
+/**
+ * ربط رقم التاجر من جوّه لوحته.
+ *
+ * بننشئ له جلسة بتوكنه، ونجيب كود المسح، ونعرضه. هو بيمسحه
+ * بموبايله زي واتساب ويب — وخلاص.
  *
  * الكود بيتحوّل لصورة على الخادم: البوابة بترجّع نصًا خامًا، ولو
  * بعتناه للمتصفح زي ما هو مش هيبقى قدام التاجر غير حروف مالهاش معنى.
@@ -82,24 +112,28 @@ export type LinkState =
 export async function linkWhatsappAction(phone: string): Promise<LinkState> {
   const { store } = await getDashboardContext()
 
-  if (!platformWhatsappEnabled()) {
-    return { ok: false, error: 'الربط السهل مش مفعّل — استعمل الربط اليدوي تحت' }
-  }
+  const token = await tokenFor(store.id)
+  if (!token) return { ok: false, error: 'حطّ توكن حسابك على البوابة الأول' }
 
   const to = normalizePhone(phone, store.country === 'EG' ? '20' : '966')
   if (to.replace(/\D/g, '').length < 10) return { ok: false, error: 'اكتب رقم واتساب صحيح' }
 
-  /* جلسة موجودة؟ نكمّل عليها بدل ما نستهلك واحدة جديدة */
+  /* جلسة موجودة؟ نكمّل عليها بدل ما نستهلك واحدة جديدة من باقته */
   const current = await readWhatsapp(store.id)
   let sessionId = current.provider === 'wasender' ? current.phoneId : null
 
   if (!sessionId) {
-    const created = await createSession({ storeId: store.id, storeName: store.name, phone: to })
+    const created = await createSession({
+      token,
+      storeId: store.id,
+      storeName: store.name,
+      phone: to,
+    })
     if (!created.ok) return { ok: false, error: created.error }
     sessionId = created.sessionId
   }
 
-  const res = await connectSession(sessionId)
+  const res = await connectSession(token, sessionId)
   if (!res.ok) return { ok: false, error: res.error }
 
   revalidatePath('/dashboard/settings/whatsapp')
@@ -110,24 +144,48 @@ export async function linkWhatsappAction(phone: string): Promise<LinkState> {
   return { ok: true, status: 'scan', qrImage }
 }
 
-/** الصفحة بتسأل كل شوية: العميل مسح الكود ولا لسه؟ */
+/** الصفحة بتسأل كل شوية: التاجر مسح الكود ولا لسه؟ */
 export async function whatsappStatusAction(): Promise<'connected' | 'waiting' | 'unknown'> {
   const { store } = await getDashboardContext()
   const current = await readWhatsapp(store.id)
   if (current.provider !== 'wasender' || !current.phoneId) return 'unknown'
-  return sessionStatus(current.phoneId)
+
+  const token = await tokenFor(store.id)
+  if (!token) return 'unknown'
+  return sessionStatus(token, current.phoneId)
 }
 
-/** فصل الرقم — بيتشال من البوابة كمان عشان ما ياكلش من حد الاشتراك */
+/** فصل الرقم — بيتشال من البوابة كمان عشان ما ياكلش من حد باقته */
 export async function unlinkWhatsappAction(): Promise<WaState> {
   const { store } = await getDashboardContext()
   const current = await readWhatsapp(store.id)
+  const token = await tokenFor(store.id)
 
-  if (current.provider === 'wasender' && current.phoneId && platformWhatsappEnabled()) {
-    await deleteSession(current.phoneId)
+  if (current.provider === 'wasender' && current.phoneId && token) {
+    await deleteSession(token, current.phoneId)
   }
 
   await saveWhatsapp(store.id, { provider: 'off' })
   revalidatePath('/dashboard/settings/whatsapp')
   return { ok: true, note: 'الرقم اتفصل' }
+}
+
+/* ────────────────────────── نصوص الرسايل ────────────────────────── */
+
+/**
+ * حفظ نصوص التاجر.
+ *
+ * الفحص قبل الحفظ لا بعده: قالب رمز الدخول من غير `{{كود}}` بيخلّي
+ * العميل ياخد رسالة مالهاش لازمة ومش قادر يدخل — ودي حاجة التاجر
+ * ما بيكتشفهاش غير لما حد يشتكي.
+ */
+export async function saveTemplatesAction(templates: Templates): Promise<WaState> {
+  const { store } = await getDashboardContext()
+
+  const issues = checkTemplates(templates)
+  if (issues.length) return { error: issues[0].message }
+
+  await saveTemplates(store.id, templates)
+  revalidatePath('/dashboard/settings/whatsapp')
+  return { ok: true, note: 'النصوص اتحفظت' }
 }

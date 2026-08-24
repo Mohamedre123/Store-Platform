@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { messagingSettings } from '@/db/schema'
 import { decryptJson, encryptJson } from './crypto'
+import type { Templates } from './whatsapp-templates'
 
 /**
  * إرسال واتساب — بمزوّد يختاره التاجر.
@@ -27,13 +28,24 @@ export type WhatsappProvider = 'off' | 'wasender' | 'cloud'
 
 export type WhatsappSettings = {
   provider: WhatsappProvider
-  /** مفتاح البوابة — بيتخزّن مشفّرًا وما بيرجعش للمتصفح أبدًا */
+  /** مفتاح الجلسة — بيتخزّن مشفّرًا وما بيرجعش للمتصفح أبدًا */
   hasKey: boolean
-  /** معرّف رقم الهاتف — للطريق الرسمي بس */
+  /** توكن حساب التاجر — بيه بيتعمل الربط بمسح الكود */
+  hasAccessToken: boolean
+  /** معرّف رقم الهاتف أو الجلسة */
   phoneId: string | null
 }
 
-type Secrets = { apiKey?: string; token?: string }
+/**
+ * أسرار واتساب المتجر.
+ *
+ * `accessToken` توكن حساب **التاجر** عند البوابة — بيه بننشئ له
+ * جلسة ونجيب كود المسح من جوّه لوحته. `apiKey` مفتاح الجلسة نفسها،
+ * وبيه بيتم الإرسال.
+ *
+ * الاتنين بتوعه هو: الحساب باسمه والفاتورة عليه.
+ */
+type Secrets = { apiKey?: string; token?: string; accessToken?: string }
 
 /* ────────────────────────── القراءة والحفظ ────────────────────────── */
 
@@ -48,11 +60,50 @@ export async function readWhatsapp(storeId: string): Promise<WhatsappSettings> {
     .where(eq(messagingSettings.storeId, storeId))
     .limit(1)
 
+  const secrets = decryptJson<Secrets>(row?.creds ?? null)
+
   return {
     provider: normalizeProvider(row?.provider),
-    hasKey: Boolean(row?.creds),
+    hasKey: Boolean(secrets?.apiKey ?? secrets?.token),
+    hasAccessToken: Boolean(secrets?.accessToken),
     phoneId: row?.phoneId ?? null,
   }
+}
+
+/** توكن حساب التاجر — للاستعمال الداخلي وقت الربط */
+export async function readAccessToken(storeId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ creds: messagingSettings.whatsappCredentials })
+    .from(messagingSettings)
+    .where(eq(messagingSettings.storeId, storeId))
+    .limit(1)
+
+  return decryptJson<Secrets>(row?.creds ?? null)?.accessToken ?? null
+}
+
+/**
+ * دمج سرّ جديد فوق الموجود.
+ *
+ * الحفظ الكامل كان بيمسح اللي مش متبعت: التاجر يحطّ توكن حسابه،
+ * وبعدين الربط يحفظ مفتاح الجلسة — فيمسح التوكن ويبقى مش قادر
+ * يعيد الربط من غير ما يعرف ليه.
+ */
+export async function mergeSecrets(storeId: string, patch: Secrets): Promise<void> {
+  const [row] = await db
+    .select({ creds: messagingSettings.whatsappCredentials })
+    .from(messagingSettings)
+    .where(eq(messagingSettings.storeId, storeId))
+    .limit(1)
+
+  const merged = encryptJson({ ...(decryptJson<Secrets>(row?.creds ?? null) ?? {}), ...patch })
+
+  await db
+    .insert(messagingSettings)
+    .values({ storeId, whatsappCredentials: merged })
+    .onConflictDoUpdate({
+      target: messagingSettings.storeId,
+      set: { whatsappCredentials: merged },
+    })
 }
 
 /**
@@ -85,8 +136,9 @@ export async function saveWhatsapp(
     معرّف الرقم بس بيبعت خانة مفتاح فاضية — ولو خدناها على ظاهرها
     كنّا هنمسح مفتاحه وهو مش عارف.
   */
+  const existing = decryptJson<Secrets>(current[0]?.creds ?? null) ?? {}
   const secrets: string | null = input.apiKey?.trim()
-    ? encryptJson({ apiKey: input.apiKey.trim() } satisfies Secrets)
+    ? encryptJson({ ...existing, apiKey: input.apiKey.trim() } satisfies Secrets)
     : (current[0]?.creds ?? null)
 
   const values = {
@@ -212,4 +264,34 @@ async function sendViaCloud(
 export async function whatsappReady(storeId: string): Promise<boolean> {
   const s = await readWhatsapp(storeId)
   return s.provider !== 'off' && s.hasKey
+}
+
+/* ────────────────────────── القوالب ────────────────────────── */
+
+/** نصوص التاجر — الفاضي معناه «استعمل الافتراضي» */
+export async function readTemplates(storeId: string): Promise<Templates> {
+  const [row] = await db
+    .select({ t: messagingSettings.whatsappTemplates })
+    .from(messagingSettings)
+    .where(eq(messagingSettings.storeId, storeId))
+    .limit(1)
+
+  return (row?.t ?? {}) as Templates
+}
+
+export async function saveTemplates(storeId: string, templates: Templates): Promise<void> {
+  /* الفاضي بيتشال بدل ما يتخزّن — عشان يرجع للافتراضي فعلًا */
+  const clean: Templates = {}
+  for (const [k, v] of Object.entries(templates)) {
+    const text = v?.trim()
+    if (text) clean[k as keyof Templates] = text
+  }
+
+  await db
+    .insert(messagingSettings)
+    .values({ storeId, whatsappTemplates: clean })
+    .onConflictDoUpdate({
+      target: messagingSettings.storeId,
+      set: { whatsappTemplates: clean },
+    })
 }

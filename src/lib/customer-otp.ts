@@ -3,7 +3,8 @@ import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { customers, verificationTokens } from '@/db/schema'
 import { generateOtp, hashToken } from './crypto'
-import { sendWhatsapp } from './whatsapp'
+import { readTemplates, sendWhatsapp } from './whatsapp'
+import { fillTemplate, templateFor } from './whatsapp-templates'
 import { isEmailConfigured, sendEmail } from './email'
 import { customerCodeEmail, type StoreBrand } from './store-emails'
 import { config } from './config'
@@ -143,13 +144,15 @@ export async function issueCustomerOtp(input: {
       الرسالة باسم المتجر لا باسمنا: العميل بيشتري من التاجر ومش
       عارفنا، ورمز جاي من اسم غريب ما بيتكتبش.
     */
+    const templates = await readTemplates(input.storeId)
     const wa = await sendWhatsapp(
       input.storeId,
       input.identity.value,
-      [
-        `رمز دخولك على ${input.brand.name}: ${code}`,
-        `صالح ${TTL} دقايق. لو مش إنت اللي طلبته، تجاهل الرسالة.`,
-      ].join('\n'),
+      fillTemplate(templateFor(templates, 'otp'), {
+        اسم_المتجر: input.brand.name,
+        كود: code,
+        دقايق: String(TTL),
+      }),
     )
     if (wa.ok) channel = 'whatsapp'
   }

@@ -1,5 +1,6 @@
 import 'server-only'
-import { sendWhatsapp } from './whatsapp'
+import { readTemplates, sendWhatsapp } from './whatsapp'
+import { fillTemplate, templateFor, type TemplateKey } from './whatsapp-templates'
 import { formatMoney } from './utils'
 
 /**
@@ -28,52 +29,65 @@ export type OrderMessage = {
 
 export async function whatsappOrderPlaced(
   store: Store,
-  o: OrderMessage & { total: number; currency: string; cod: boolean },
+  o: OrderMessage & { total: number; currency: string; cod: boolean; customerName?: string | null },
 ): Promise<void> {
-  await send(store, o.phone, [
-    `أهلًا 👋 استلمنا طلبك من ${store.name}`,
-    ``,
-    `رقم الطلب: #${o.orderNumber}`,
-    `الإجمالي: ${formatMoney(o.total, o.currency)}`,
-    o.cod ? `الدفع: عند الاستلام` : `الدفع: أونلاين`,
-    ``,
-    `تقدر تتابع حالته من هنا:`,
-    o.trackUrl,
-  ])
+  await send(store, o.phone, 'order_placed', {
+    اسم_المتجر: store.name,
+    اسم_العميل: o.customerName ?? '',
+    رقم_الطلب: String(o.orderNumber),
+    الإجمالي: formatMoney(o.total, o.currency),
+    طريقة_الدفع: o.cod ? 'عند الاستلام' : 'أونلاين',
+    الرابط: o.trackUrl,
+  })
 }
 
-/**
- * نصوص الحالات.
- *
- * مكتوبة بصيغة الخبر لا بصيغة النظام: «طلبك خرج مع المندوب» بتقول
- * للعميل يعمل إيه، و«الحالة اتغيّرت لـshipped» ما بتقولش حاجة.
- */
-const STATUS_TEXT: Record<string, (n: number) => string> = {
-  confirmed: (n) => `طلبك #${n} اتأكد وبنجهّزه دلوقتي ✅`,
-  processing: (n) => `طلبك #${n} تحت التجهيز 📦`,
-  shipped: (n) => `طلبك #${n} خرج مع المندوب 🚚 — استنّى مكالمته`,
-  delivered: (n) => `طلبك #${n} اتسلّم ✅ — شكرًا إنك اشتريت مننا`,
-  cancelled: (n) => `طلبك #${n} اتلغى. لو ده مش صح كلّمنا وهنظبّطها`,
-  returned: (n) => `طلب الإرجاع للطلب #${n} اتسجّل`,
-}
+/** الحالات اللي ليها رسالة — الباقي بيعدّي بلا إزعاج */
+const STATUS_KEYS = new Set<TemplateKey>([
+  'confirmed',
+  'processing',
+  'shipped',
+  'delivered',
+  'cancelled',
+  'returned',
+])
 
 export function whatsappHasStatusText(status: string): boolean {
-  return status in STATUS_TEXT
+  return STATUS_KEYS.has(status as TemplateKey)
 }
 
 export async function whatsappOrderStatus(
   store: Store,
-  o: OrderMessage & { status: string },
+  o: OrderMessage & { status: string; customerName?: string | null },
 ): Promise<void> {
-  const line = STATUS_TEXT[o.status]
-  if (!line) return
+  if (!whatsappHasStatusText(o.status)) return
 
-  await send(store, o.phone, [line(o.orderNumber), ``, `تفاصيل الطلب:`, o.trackUrl])
+  await send(store, o.phone, o.status as TemplateKey, {
+    اسم_المتجر: store.name,
+    اسم_العميل: o.customerName ?? '',
+    رقم_الطلب: String(o.orderNumber),
+    الرابط: o.trackUrl,
+  })
 }
 
-async function send(store: Store, phone: string, lines: string[]): Promise<void> {
+/**
+ * بيجيب نص التاجر، يملاه، ويبعت.
+ *
+ * النص الفاضي بعد الملء معناه إن التاجر مسحه عن قصد — فمفيش
+ * رسالة. إرسال رسالة فاضية أسوأ من عدم الإرسال.
+ */
+async function send(
+  store: Store,
+  phone: string,
+  key: TemplateKey,
+  vars: Record<string, string>,
+): Promise<void> {
   if (!phone) return
-  const res = await sendWhatsapp(store.id, phone, lines.join('\n'))
+
+  const templates = await readTemplates(store.id)
+  const text = fillTemplate(templateFor(templates, key), vars)
+  if (!text) return
+
+  const res = await sendWhatsapp(store.id, phone, text)
   if (!res.ok && res.error !== 'واتساب مش مربوط') {
     console.error('فشل إرسال واتساب الطلب:', res.error)
   }

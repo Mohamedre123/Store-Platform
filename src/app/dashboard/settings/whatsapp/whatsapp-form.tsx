@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from 'react'
 import { Check, ExternalLink, Loader2, QrCode, Save, Send, ShieldAlert } from 'lucide-react'
 import {
   linkWhatsappAction,
+  saveAccessTokenAction,
   saveWhatsappAction,
   testWhatsappAction,
   unlinkWhatsappAction,
@@ -25,11 +26,13 @@ export function WhatsappForm({
   initial,
   easyLink,
   storePhone,
+  hasPlatformToken,
 }: {
   initial: WhatsappSettings
-  /** الربط السهل مفعّل على المنصة؟ */
   easyLink: boolean
   storePhone: string | null
+  /** المنصة حاطّة توكنًا عامًا؟ ساعتها التاجر مش محتاج حساب أصلًا */
+  hasPlatformToken: boolean
 }) {
   const [provider, setProvider] = useState<WhatsappProvider>(initial.provider)
   const [apiKey, setApiKey] = useState('')
@@ -41,6 +44,8 @@ export function WhatsappForm({
   const [linked, setLinked] = useState(initial.provider === 'wasender' && initial.hasKey)
   const [linking, startLink] = useTransition()
   const [advanced, setAdvanced] = useState(false)
+  const [accessToken, setAccessToken] = useState('')
+  const [hasToken, setHasToken] = useState(initial.hasAccessToken || hasPlatformToken)
   const [saving, startSave] = useTransition()
   const [testing, startTest] = useTransition()
 
@@ -64,6 +69,16 @@ export function WhatsappForm({
 
     return () => clearInterval(id)
   }, [qr, linked])
+
+  const saveToken = () =>
+    startLink(async () => {
+      const res = await saveAccessTokenAction(accessToken)
+      setMsg(res)
+      if (res?.ok) {
+        setHasToken(true)
+        setAccessToken('')
+      }
+    })
 
   const link = () =>
     startLink(async () => {
@@ -114,6 +129,62 @@ export function WhatsappForm({
             </p>
           </div>
 
+          {/*
+            التوكن أول خطوة — ومرة واحدة.
+
+            الحساب باسم التاجر والفاتورة عليه، فلازم يجيب توكنه هو.
+            بعد كده كل حاجة بتحصل هنا: الجلسة والكود والحالة والإرسال.
+          */}
+          {!hasToken && !linked && (
+            <div className="flex flex-col gap-3 rounded-lg bg-[var(--surface-2)] p-4">
+              <p className="text-sm font-semibold">خطوة واحدة مرة واحدة</p>
+              <ol className="flex flex-col gap-1.5 text-sm text-[var(--fg-muted)]">
+                <li>
+                  ١. اعمل حساب على{' '}
+                  <a
+                    href="https://wasenderapi.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 font-medium text-[var(--primary)] hover:underline"
+                  >
+                    wasenderapi.com
+                    <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                  </a>
+                </li>
+                <li>٢. من الإعدادات، انسخ «Personal Access Token».</li>
+                <li>٣. الصقه تحت واحفظ — وبعدها كل حاجة هنا.</li>
+              </ol>
+
+              <div className="flex flex-wrap gap-2">
+                <input
+                  value={accessToken}
+                  onChange={(e) => setAccessToken(e.target.value)}
+                  dir="ltr"
+                  placeholder="Personal Access Token"
+                  aria-label="توكن الحساب"
+                  className="h-11 min-w-0 flex-1 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-start font-mono text-xs focus:border-[var(--primary)] focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={saveToken}
+                  disabled={linking || accessToken.trim().length < 10}
+                  className="flex min-h-11 shrink-0 items-center gap-2 rounded-lg bg-[var(--primary)] px-5 text-sm font-semibold text-[var(--primary-fg)] disabled:opacity-50"
+                >
+                  {linking ? (
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Save className="h-4 w-4" aria-hidden="true" />
+                  )}
+                  احفظ التوكن
+                </button>
+              </div>
+
+              <p className="text-xs text-[var(--fg-subtle)]">
+                الحساب باسمك والاشتراك عليك — إحنا بنشيل خطوات الإعداد بس.
+              </p>
+            </div>
+          )}
+
           {linked ? (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-[#25D366]/10 p-4">
               <span className="flex items-center gap-2 text-sm font-semibold text-[#128C4A]">
@@ -149,7 +220,7 @@ export function WhatsappForm({
                 مستنيين المسح…
               </span>
             </div>
-          ) : (
+          ) : hasToken ? (
             <Row label="رقم واتساب المتجر" hint="الرسايل هتطلع من الرقم ده وباسم متجرك.">
               <div className="flex flex-wrap gap-2">
                 <input
@@ -176,7 +247,7 @@ export function WhatsappForm({
                 </button>
               </div>
             </Row>
-          )}
+          ) : null}
 
           {/*
             المخاطرة مكتوبة هنا كمان.

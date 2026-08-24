@@ -46,6 +46,14 @@ export const messagingSettings = pgTable('messaging_settings', {
   whatsappCredentials: text('whatsapp_credentials'),
   whatsappPhoneId: text('whatsapp_phone_id'),
 
+  /**
+   * نصوص رسايل واتساب اللي التاجر كتبها.
+   *
+   * الفاضي معناه «استعمل الافتراضي» — مش «مفيش رسالة». التاجر
+   * بيعدّل اللي يهمّه وسايب الباقي.
+   */
+  whatsappTemplates: jsonb('whatsapp_templates').$type<Record<string, string>>(),
+
   telegramBotToken: text('telegram_bot_token'),
   telegramChatIds: jsonb('telegram_chat_ids').$type<string[]>().notNull().default([]),
 

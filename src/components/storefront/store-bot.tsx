@@ -153,7 +153,7 @@ export function StoreBot({
   const waLink =
     whatsappHref ??
     (fallbackWa
-      ? `https://wa.me/${fallbackWa.replace(/D/g, '')}?text=${encodeURIComponent(
+      ? `https://wa.me/${fallbackWa.replace(/\D/g, '')}?text=${encodeURIComponent(
           'أهلًا، كنت بسأل المساعد وعايز مساعدة.',
         )}`
       : null)
