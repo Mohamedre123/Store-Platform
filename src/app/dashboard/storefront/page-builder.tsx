@@ -38,7 +38,7 @@ import {
 import { saveSectionsAction } from './actions'
 import { BlockSettings } from './block-settings'
 import type { PickerCategory } from './picker-actions'
-import { BLOCK_LIBRARY, blockMeta, defaultSettings, type BlockType } from '@/lib/blocks'
+import { BLOCK_LIBRARY, blockMeta, defaultSettings, renderType, type BlockType } from '@/lib/blocks'
 import type { Section } from '@/db/schema'
 import { Alert, Button } from '@/components/ui'
 import { cn } from '@/lib/utils'
@@ -149,14 +149,34 @@ export function PageBuilder({
       setSaved(true)
     })
 
+  /**
+   * قايمة الإضافة بتعرض **اللي مش موجود بس**.
+   *
+   * البلوك اللي على الصفحة خلاص — حتى لو مخفي — مالوش لزوم يتعرض
+   * تاني: التاجر بيدوس عليه فيلاقي نسخة تانية ظهرت ومش فاهم منين،
+   * أو يفتكر إن اللي عنده اتبدّل.
+   *
+   * والنسخة التانية من نفس النوع لسه ممكنة، بس من زر **التكرار** على
+   * البلوك نفسه — وهو أحسن أصلًا لأنه بينسخ الإعدادات معاه بدل ما
+   * يبدأ من فاضي.
+   *
+   * والأنواع القديمة بتتحسب بنوعها المعروض: متجر عنده «وصل حديثًا»
+   * القديم عنده بلوك منتجات فعلًا، فما ينفعش نعرضه على إنه ناقص.
+   */
+  const present = useMemo(
+    () => new Set(sections.map((s) => renderType(s.type))),
+    [sections],
+  )
+
   const groups = useMemo(() => {
     const out = new Map<string, typeof BLOCK_LIBRARY>()
     for (const b of BLOCK_LIBRARY) {
       if (b.hidden || b.locked) continue
+      if (present.has(renderType(b.type))) continue
       out.set(b.group, [...(out.get(b.group) ?? []), b])
     }
     return [...out.entries()]
-  }, [])
+  }, [present])
 
   return (
     <div className="flex flex-col gap-4">
@@ -299,7 +319,8 @@ export function PageBuilder({
               <div>
                 <h2 className="font-semibold">زوّد قسم</h2>
                 <p className="text-xs text-[var(--fg-muted)]">
-                  تقدر تحطّ نفس النوع أكتر من مرة بإعدادات مختلفة.
+                  دي الأقسام اللي لسه مش على صفحتك. عايز نسخة تانية من قسم موجود؟ استعمل زر
+                  التكرار جنبه.
                 </p>
               </div>
               <button
@@ -313,6 +334,13 @@ export function PageBuilder({
             </div>
 
             <div className="flex-1 overflow-y-auto p-4">
+              {groups.length === 0 ? (
+                <p className="py-10 text-center text-sm leading-relaxed text-[var(--fg-muted)]">
+                  كل الأقسام موجودة على صفحتك خلاص.
+                  <br />
+                  لو عايز نسخة تانية من قسم — قسم منتجات تاني مثلًا — دوس زر التكرار جنبه.
+                </p>
+              ) : (
               <div className="flex flex-col gap-6">
                 {groups.map(([group, items]) => (
                   <section key={group} className="flex flex-col gap-2">
@@ -346,6 +374,7 @@ export function PageBuilder({
                   </section>
                 ))}
               </div>
+              )}
             </div>
           </div>
         </div>

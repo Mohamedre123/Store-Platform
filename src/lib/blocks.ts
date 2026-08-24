@@ -86,7 +86,7 @@ export type ProductsBlock = {
    * المنتج اللي ليه مقاسات وألوان، الإضافة بضغطة معناها إننا نختار
    * نيابةً عن العميل — وده بيرجّع مرتجعًا مش بيعة.
    */
-  action: 'inherit' | 'add' | 'options' | 'none'
+  action: 'inherit' | 'add' | 'choose' | 'options' | 'none'
   moreEnabled: boolean
   moreLabel: string
   /** فاضي = يروح للقسم المختار، أو لكل المنتجات */

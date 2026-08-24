@@ -8,6 +8,7 @@ import {
   listProducts,
 } from '@/lib/storefront'
 import { loadHomeProducts } from '@/lib/home-blocks'
+import { loadProductOptions } from '@/lib/product-options'
 import { legacySource, readBlock, renderType } from '@/lib/blocks'
 import type { Section } from '@/db/schema'
 import { Hero } from '@/components/storefront/hero'
@@ -71,6 +72,24 @@ export default async function StoreHomePage({ params }: { params: Promise<{ stor
 
   const home = await loadHomeProducts(store.id, blocks, anyProduct.length > 0)
 
+  /*
+    خيارات المنتجات للبلوكات اللي بتعرضها على الكارت.
+
+    بتتجاب للصفحة كلها دفعة واحدة، وللمنتجات المعروضة فعلًا بس. لو
+    مفيش ولا بلوك بيعرض خيارات، مفيش أي استعلام أصلًا — التاجر اللي
+    مش مستخدم الميزة ما بيدفعش تمنها.
+  */
+  const needsOptions = blocks.some(
+    (b) => renderType(b.type) === 'products' && readBlock('products', b.settings).action === 'choose',
+  )
+
+  const optionSets = needsOptions
+    ? await loadProductOptions(
+        store.id,
+        [...home.productsByBlock.values()].flat().map((p) => p.id),
+      )
+    : undefined
+
   /* البانر الرئيسي بيفضل ثابتًا فوق — هو أول حاجة العميل بيشوفها */
   const heroOn = saved.length === 0 || saved.some((s) => s.type === 'hero')
 
@@ -126,6 +145,7 @@ export default async function StoreHomePage({ params }: { params: Promise<{ stor
                   listing={listing}
                   chrome={c}
                   moreHref={moreHrefFor(resolved.categoryId, resolved.moreUrl)}
+                  optionSets={optionSets}
                 />
               )
             }

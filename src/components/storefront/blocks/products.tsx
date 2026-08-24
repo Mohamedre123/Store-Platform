@@ -5,6 +5,7 @@ import { BlockHead, BlockItem, BlockShell, hoverClass, type BlockChrome } from '
 import type { ProductsBlock } from '@/lib/blocks'
 import type { ListingSettings } from '@/lib/customization'
 import type { StorefrontProduct } from '@/lib/storefront'
+import type { ProductOptionSet } from '@/lib/product-options'
 
 /**
  * بلوك المنتجات.
@@ -53,6 +54,7 @@ export function ProductsBlockView({
   listing,
   chrome,
   moreHref,
+  optionSets,
 }: {
   block: ProductsBlock
   products: StorefrontProduct[]
@@ -60,6 +62,8 @@ export function ProductsBlockView({
   listing: ListingSettings
   chrome: BlockChrome
   moreHref: string
+  /** خيارات المنتجات اللي ليها خيارات — بتتجاب للصفحة كلها دفعة واحدة */
+  optionSets?: Map<string, ProductOptionSet>
 }) {
   if (products.length === 0) return null
 
@@ -76,6 +80,10 @@ export function ProductsBlockView({
         : block.action,
   }
 
+  /* الخيارات بتتمرّر في وضع «الخيارات على الكارت» بس */
+  const optionsFor = (id: string) =>
+    cardProps.action === 'choose' ? optionSets?.get(id) : undefined
+
   const hover = hoverClass(chrome.effects)
 
   return (
@@ -91,17 +99,23 @@ export function ProductsBlockView({
         <div className={RAIL}>
           {products.map((p, i) => (
             <BlockItem key={p.id} chrome={chrome} index={i} className={RAIL_ITEM}>
-              <ProductCard product={p} {...cardProps} className={hover} />
+              <ProductCard product={p} {...cardProps} optionSet={optionsFor(p.id)} className={hover} />
             </BlockItem>
           ))}
         </div>
       ) : block.layout === 'tiles' ? (
-        <TileGrid products={products} cardProps={cardProps} chrome={chrome} hover={hover} />
+        <TileGrid
+          products={products}
+          cardProps={cardProps}
+          chrome={chrome}
+          hover={hover}
+          optionsFor={optionsFor}
+        />
       ) : (
         <div className={gridClass(block, listing)}>
           {products.map((p, i) => (
             <BlockItem key={p.id} chrome={chrome} index={i}>
-              <ProductCard product={p} {...cardProps} className={hover} />
+              <ProductCard product={p} {...cardProps} optionSet={optionsFor(p.id)} className={hover} />
             </BlockItem>
           ))}
         </div>
@@ -125,11 +139,13 @@ function TileGrid({
   cardProps,
   chrome,
   hover,
+  optionsFor,
 }: {
   products: StorefrontProduct[]
   cardProps: Omit<React.ComponentProps<typeof ProductCard>, 'product'>
   chrome: BlockChrome
   hover: string
+  optionsFor: (id: string) => ProductOptionSet | undefined
 }) {
   return (
     <div className="grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-4">
@@ -140,7 +156,13 @@ function TileGrid({
           index={i}
           className={i === 0 ? 'md:col-span-2 md:row-span-2' : ''}
         >
-          <ProductCard product={p} {...cardProps} className={hover} fill={i === 0} />
+          <ProductCard
+            product={p}
+            {...cardProps}
+            optionSet={optionsFor(p.id)}
+            className={hover}
+            fill={i === 0}
+          />
         </BlockItem>
       ))}
     </div>

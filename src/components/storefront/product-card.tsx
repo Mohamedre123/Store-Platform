@@ -5,7 +5,8 @@ import type { StorefrontProduct } from '@/lib/storefront'
 import { discountPercent } from '@/lib/storefront'
 import { formatMoney } from '@/lib/utils'
 import type { CardStyle } from '@/lib/themes'
-import { QuickAdd } from './quick-add'
+import { CardAdd } from './card-add'
+import type { ProductOptionSet } from '@/lib/product-options'
 
 /**
  * بطاقة المنتج.
@@ -22,6 +23,7 @@ export function ProductCard({
   showRating = true,
   showQuickAdd = false,
   action,
+  optionSet,
   className = '',
   fill = false,
 }: {
@@ -40,7 +42,14 @@ export function ProductCard({
    * بنختار نيابةً عن العميل — وده بيرجّع مرتجعًا مش بيعة، فالتاجر
    * بيقدر يبدّلها بـ«الخيارات» من محرّر الصفحة.
    */
-  action?: 'add' | 'options' | 'none'
+  action?: 'add' | 'choose' | 'options' | 'none'
+  /**
+   * خيارات المنتج لو ليه خيارات.
+   *
+   * بتتجاب للصفحة كلها دفعة واحدة وبتتوزّع على البطاقات — البطاقة
+   * ما بتجيبش حاجة لوحدها. غيابها معناه إن المنتج ده مالوش خيارات.
+   */
+  optionSet?: ProductOptionSet
   className?: string
   /** بلاطة الفسيفساء — الصورة بتملا المساحة المضاعفة */
   fill?: boolean
@@ -65,8 +74,8 @@ export function ProductCard({
   return (
     <div className={`flex flex-col ${className}`}>
       {body}
-      {mode === 'add' ? (
-        <QuickAdd
+      {mode === 'add' || mode === 'choose' ? (
+        <CardAdd
           product={{
             productId: product.id,
             name: product.name,
@@ -75,6 +84,13 @@ export function ProductCard({
             price: product.price,
             maxStock: product.trackInventory ? product.stock : undefined,
           }}
+          /*
+            «إضافة» بيضيف على طول والعميل يختار من السلة، و«الخيارات
+            على الكارت» بيوريهاله قبل ما يضيف. المنتج اللي مالوش
+            خيارات بياخد زر الإضافة في الحالتين.
+          */
+          optionSet={mode === 'choose' ? optionSet : undefined}
+          currency={currency}
           soldOut={soldOutForAdd}
         />
       ) : (

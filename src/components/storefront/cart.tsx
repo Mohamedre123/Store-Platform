@@ -38,6 +38,14 @@ type CartContext = {
   ready: boolean
   /** درج جانبي ولا صفحة سلة كاملة — إعداد التاجر */
   mode: 'drawer' | 'page'
+  /**
+   * معرّف المتجر زي ما اتفتح بيه.
+   *
+   * أجزاء السلة محتاجاه عشان تسأل الخادم عن خيارات المنتجات — وهي
+   * جوّه الشجرة أصلًا، فتمريره كخاصية لكل واحد فيهم كان هيخلّي كل
+   * صفحة بتعرض سلة تفتكر تمرّره.
+   */
+  storeIdentifier: string
 }
 
 const Ctx = createContext<CartContext | null>(null)
@@ -98,6 +106,7 @@ export function CartProvider({
       setOpen,
       ready,
       mode,
+      storeIdentifier,
 
       add(item, quantity = 1) {
         setItems((prev) => {

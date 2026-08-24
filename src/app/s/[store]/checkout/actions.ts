@@ -249,6 +249,7 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
       unavailable: 'فيه منتجات ما بقتش متاحة',
       out_of_stock: 'فيه منتجات نفدت كميتها',
       below_minimum: 'الطلب أقل من الحد الأدنى',
+      needs_options: 'فيه منتج محتاج تختار مقاسه أو لونه — حدّده من السلة',
     } as const
     return { ok: false, error: messages[issue.kind] }
   }

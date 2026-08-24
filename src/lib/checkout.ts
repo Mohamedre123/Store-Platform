@@ -47,6 +47,8 @@ export type CheckoutIssue =
   | { kind: 'unavailable'; names: string[] }
   | { kind: 'out_of_stock'; names: string[] }
   | { kind: 'below_minimum'; minimum: number }
+  /** منتج ليه مقاسات أو ألوان والعميل ما اختارش */
+  | { kind: 'needs_options'; names: string[] }
 
 /**
  * تسعير السلة من قاعدة البيانات.
@@ -105,9 +107,38 @@ export async function priceCart(storeId: string, lines: CartLine[], visitorId?: 
     : []
   const variantById = new Map(variantRows.map((v) => [v.id, v]))
 
+  /**
+   * المنتجات اللي ليها مقاسات والسطر جاي من غير اختيار.
+   *
+   * العميل بيقدر يضيف من على البطاقة بضغطة واحدة، فالسطر بيوصل هنا
+   * بلا متغيّر. لو عدّى كده، التاجر بيستلم طلبًا مكتوب فيه «تيشيرت»
+   * من غير مقاس — فيتصل بالعميل يسأله، أو يبعت مقاسًا بالتخمين
+   * ويرجع له.
+   *
+   * فبنوقف الطلب هنا ونقول له يختار. والسلة نفسها بتوريه الخيارات
+   * في مكانها عشان ما يضطرش يرجع لصفحة المنتج.
+   */
+  const bareIds = [...new Set(lines.filter((l) => !l.variantId).map((l) => l.productId))]
+  const needsOptions = new Set<string>()
+
+  if (bareIds.length) {
+    const rows = await db
+      .selectDistinct({ productId: productVariants.productId })
+      .from(productVariants)
+      .where(
+        and(
+          eq(productVariants.storeId, storeId),
+          eq(productVariants.isActive, true),
+          inArray(productVariants.productId, bareIds),
+        ),
+      )
+    for (const r of rows) needsOptions.add(r.productId)
+  }
+
   const priced: PricedLine[] = []
   const unavailable: string[] = []
   const outOfStock: string[] = []
+  const missingOptions: string[] = []
 
   for (const line of lines) {
     const p = byId.get(line.productId)
@@ -122,6 +153,11 @@ export async function priceCart(storeId: string, lines: CartLine[], visitorId?: 
 
     if (line.variantId && !useVariant) {
       unavailable.push(p.name)
+      continue
+    }
+
+    if (!line.variantId && needsOptions.has(p.id)) {
+      missingOptions.push(p.name)
       continue
     }
 
@@ -164,6 +200,15 @@ export async function priceCart(storeId: string, lines: CartLine[], visitorId?: 
       total: price * quantity,
       available,
     })
+  }
+
+  /*
+    «اختار المقاس» بيسبق أي رسالة تانية: هي الوحيدة اللي العميل يقدر
+    يصلّحها بضغطة، والباقي بيحتاج يغيّر سلته. وبتتقال حتى لو باقي
+    السطور سليمة — الطلب اللي بينقصه مقاس ما ينفعش يعدّي نُصّه.
+  */
+  if (missingOptions.length) {
+    return { lines: priced, issue: { kind: 'needs_options', names: missingOptions } as CheckoutIssue }
   }
 
   if (priced.length === 0) {
