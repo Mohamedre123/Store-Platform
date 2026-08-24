@@ -117,17 +117,20 @@ export const PLUGINS: PluginDef[] = [
 
   {
     slug: 'claude',
-    name: 'Claude — مصمّم الثيمات وصفحات الهبوط',
+    name: 'مصمّم الثيمات وصفحات الهبوط',
     desc:
       'مش عاجبك ولا ثيم من اللي عندنا؟ اوصف اللي في دماغك — الألوان والشكل والتخطيط — ' +
-      'وكلود يعملهولك، وتقدر تعدّله بعدين من محرّر التخصيص زي أي ثيم. ' +
-      'ونفس الحكاية في صفحات الهبوط.',
+      'وهيعملهولك، وتقدر تعدّله بعدين من محرّر التخصيص زي أي ثيم. ' +
+      'ونفس الحكاية في صفحات الهبوط. ' +
+      '**بيشتغل بـClaude أو Gemini** — حطّ اللي معاك، أو الاتنين واختار الموديل.',
     group: 'ai',
     custom: 'claude',
     secretFields: ['apiKey'],
     fields: [{ key: 'apiKey', label: 'مفتاح Anthropic API', placeholder: 'مفتاحك من console.anthropic.com' }],
     where:
-      'من console.anthropic.com ← API Keys. الحساب محتاج رصيد مشحون — مفيش خطة مجانية زي Gemini.',
+      'Claude من console.anthropic.com ← API Keys، وGemini من aistudio.google.com ← Get API key. ' +
+      'حطّ واحد منهم أو الاتنين. **الاتنين محتاجين رصيد**: أنثروبيك مفيهوش خطة مجانية خالص، ' +
+      'وحصّة Gemini المجانية بتقف بسرعة مع التوليد الطويل.',
   },
 ]
 

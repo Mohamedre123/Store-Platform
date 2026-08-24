@@ -31,7 +31,7 @@ const LOOKS: Record<string, { initials: string; gradient: string; badge?: string
     gradient: 'linear-gradient(135deg,#f59e0b,#ec4899)',
     badge: 'بيغيّر في متجرك',
   },
-  claude: { initials: 'CL', gradient: 'linear-gradient(135deg,#d97757,#8b5cf6)' },
+  claude: { initials: 'تص', gradient: 'linear-gradient(135deg,#d97757,#4285f4)' },
 }
 
 const GROUPS = [

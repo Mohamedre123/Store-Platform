@@ -44,6 +44,15 @@ export type StorefrontStore = {
   vatIncludedInPrice: boolean
   /** الحجوزات مفتوحة؟ منتجات «الخدمة» بتاخد تقويم بدل زرار كمية */
   bookingsEnabled: boolean
+  /**
+   * نطاق التاجر المخصّص لو ربطه واتحقّقنا منه.
+   *
+   * كل رابط بيوصل لعميل التاجر (تتبّع الطلب، السلة المتروكة، رابط
+   * الإحالة) لازم يتبني عليه. الرابط بالنطاق الفرعي بتاعنا بيوري
+   * العميل اسمنا مكان اسم التاجر — وده اللي ربط نطاقه عشان يمنعه.
+   */
+  customDomain: string | null
+  customDomainVerifiedAt: Date | null
 }
 
 /** يحلّ المتجر من النطاق الفرعي أو النطاق المخصّص */
@@ -68,6 +77,8 @@ export const getStore = cache(async (identifier: string): Promise<StorefrontStor
       vatRate: stores.vatRate,
       bookingsEnabled: stores.bookingsEnabled,
       vatIncludedInPrice: stores.vatIncludedInPrice,
+      customDomain: stores.customDomain,
+      customDomainVerifiedAt: stores.customDomainVerifiedAt,
       deletedAt: stores.deletedAt,
     })
     .from(stores)

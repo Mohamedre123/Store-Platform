@@ -108,7 +108,12 @@ export const CLAUDE_SLUG = 'claude'
 
 export type ClaudeConfig = {
   enabled: boolean
+  /** مفتاح أنثروبيك */
   apiKey: string | null
+  /** مفتاح جوجل — نفس الإضافة بتقبل الاتنين */
+  geminiKey: string | null
+  /** مين هيولّد: كلود ولا جيميني */
+  provider: 'claude' | 'gemini'
   model: string | null
 }
 
@@ -123,20 +128,36 @@ export const getClaudeConfig = cache(async (storeId: string): Promise<ClaudeConf
     .where(and(eq(storePlugins.storeId, storeId), eq(storePlugins.pluginSlug, CLAUDE_SLUG)))
     .limit(1)
 
-  if (!row) return { enabled: false, apiKey: null, model: null }
+  if (!row) {
+    return { enabled: false, apiKey: null, geminiKey: null, provider: 'claude', model: null }
+  }
 
-  const secrets = decryptJson<{ apiKey?: string }>(row.secrets)
+  const secrets = decryptJson<{ apiKey?: string; geminiKey?: string }>(row.secrets)
   const cfg = row.config as Record<string, unknown>
+
+  const provider = cfg.provider === 'gemini' ? 'gemini' : 'claude'
 
   return {
     enabled: row.enabled,
     apiKey: secrets?.apiKey ?? null,
+    geminiKey: secrets?.geminiKey ?? null,
+    provider,
     model: typeof cfg.model === 'string' ? cfg.model : null,
   }
 })
 
-export function isClaudeReady(
-  cfg: ClaudeConfig,
-): cfg is ClaudeConfig & { apiKey: string; model: string } {
-  return cfg.enabled && Boolean(cfg.apiKey) && Boolean(cfg.model)
+/** المفتاح اللي هيتنفّذ بيه فعلًا — حسب المزوّد المختار */
+export function designerKey(cfg: ClaudeConfig): string | null {
+  return cfg.provider === 'gemini' ? cfg.geminiKey : cfg.apiKey
+}
+
+/**
+ * المصمّم جاهز؟
+ *
+ * مفعّل + مفتاح للمزوّد المختار + موديل. التاجر اللي حطّ مفتاح
+ * كلود واختار موديل جيميني (أو العكس) مش جاهز — والزرار اللي
+ * بيظهر وبيرد بخطأ أسوأ من زرار مش موجود.
+ */
+export function isClaudeReady(cfg: ClaudeConfig): boolean {
+  return cfg.enabled && Boolean(designerKey(cfg)) && Boolean(cfg.model)
 }

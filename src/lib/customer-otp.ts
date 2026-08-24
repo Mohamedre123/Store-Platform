@@ -4,7 +4,7 @@ import { db } from '@/db'
 import { customers, messagingSettings, verificationTokens } from '@/db/schema'
 import { decrypt, generateOtp, hashToken } from './crypto'
 import { isEmailConfigured, sendEmail } from './email'
-import { verificationEmail } from './email-templates'
+import { customerCodeEmail, type StoreBrand } from './store-emails'
 import { config } from './config'
 import { normalizePhone } from './utils'
 
@@ -118,7 +118,13 @@ async function sendWhatsapp(storeId: string, phone: string, code: string): Promi
  */
 export async function issueCustomerOtp(input: {
   storeId: string
-  storeName: string
+  /**
+   * هوية *المتجر* لا هوية المنصة.
+   *
+   * العميل ده مشترك عند التاجر ومش عارفنا. رسالة بشعار جهة تانية
+   * بتبان تصيّدًا، والعميل ما بيكتبش رمزًا جاي من حد ما يعرفهوش.
+   */
+  brand: StoreBrand
   identity: Identity
   country: string
 }): Promise<IssueResult> {
@@ -181,11 +187,11 @@ export async function issueCustomerOtp(input: {
   }
 
   if (!channel && emailTarget && isEmailConfigured()) {
-    const mail = verificationEmail(code)
+    const mail = customerCodeEmail(input.brand, code, TTL)
     const sent = await sendEmail({
       to: emailTarget,
       ...mail,
-      senderName: input.storeName,
+      senderName: input.brand.name,
       log: { storeId: input.storeId, event: 'customer_login_otp' },
     })
     if (sent.ok) channel = 'email'

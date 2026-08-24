@@ -3,7 +3,7 @@
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { customers } from '@/db/schema'
-import { getStore } from '@/lib/storefront'
+import { getStore, getStoreTheme, type StorefrontStore } from '@/lib/storefront'
 import {
   createCustomerSession,
   customerHasPassword,
@@ -29,6 +29,16 @@ export type LoginState =
   | { ok: true; step: 'password'; masked: string }
   | { ok: false; error: string }
 
+/**
+ * هوية المتجر للرسايل — اسمه وشعاره ولونه.
+ *
+ * اللون بييجي من توكنز الثيم عشان الرمز في الرسالة يطلع بنفس لون
+ * الزراير اللي العميل شافها في المتجر قبل ما يطلب الرمز.
+ */
+async function storeBrand(store: StorefrontStore) {
+  const theme = await getStoreTheme(store.id)
+  return { name: store.name, logo: store.logoLight, primary: theme.custom.identity.primary }
+}
 /**
  * الخطوة الأولى: العميل كتب رقمه أو بريده.
  *
@@ -56,7 +66,7 @@ export async function startLoginAction(input: {
 
   const res = await issueCustomerOtp({
     storeId: store.id,
-    storeName: store.name,
+    brand: await storeBrand(store),
     identity,
     country: store.country,
   })
@@ -85,7 +95,7 @@ export async function sendCodeAction(input: {
 
   const res = await issueCustomerOtp({
     storeId: store.id,
-    storeName: store.name,
+    brand: await storeBrand(store),
     identity,
     country: store.country,
   })

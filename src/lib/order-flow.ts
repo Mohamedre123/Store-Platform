@@ -16,7 +16,7 @@ import { recordAudit } from '@/lib/audit'
 import { getStoreTheme } from '@/lib/storefront'
 import { isEmailConfigured, sendEmail } from '@/lib/email'
 import { isEmailableStatus, orderStatusEmail } from '@/lib/store-emails'
-import { storeUrl } from '@/lib/domain'
+import { publicStoreUrl } from '@/lib/domain'
 import { awardOrderPoints } from '@/lib/loyalty'
 import { rewardReferralForOrder } from '@/lib/referrals'
 import { approveAffiliateCommission, cancelAffiliateCommission } from '@/lib/affiliates'
@@ -66,12 +66,28 @@ type FlowStore = {
   logoLight: string | null
   /** بريد التاجر — بيتحط كـReply-To في رسايل العملاء */
   email?: string | null
+  /**
+   * نطاق التاجر لو ربطه — روابط التتبّع بتتبني عليه.
+   *
+   * الرابط بالنطاق الفرعي بتاعنا بيوصل لعميل التاجر وبيوريه اسمنا
+   * مكان اسمه، وده بالظبط اللي التاجر ربط نطاقه عشان يمنعه.
+   */
+  customDomain?: string | null
+  customDomainVerifiedAt?: Date | null
 }
 
 /** بيانات المتجر اللي التحوّلات محتاجاها — للمسارات اللي مالهاش سياق لوحة */
 export async function loadFlowStore(storeId: string): Promise<FlowStore | null> {
   const [row] = await db
-    .select({ id: stores.id, name: stores.name, slug: stores.slug, logoLight: stores.logoLight, email: stores.email })
+    .select({
+      id: stores.id,
+      name: stores.name,
+      slug: stores.slug,
+      logoLight: stores.logoLight,
+      email: stores.email,
+      customDomain: stores.customDomain,
+      customDomainVerifiedAt: stores.customDomainVerifiedAt,
+    })
     .from(stores)
     .where(eq(stores.id, storeId))
     .limit(1)
@@ -261,6 +277,8 @@ export async function applyOrderStatus(
         storeId: store.id,
         storeName: store.name,
         storeSlug: store.slug,
+        storeDomain: store.customDomain,
+        storeDomainVerifiedAt: store.customDomainVerifiedAt,
         currency: order.currency,
         orderId: order.id,
         orderNumber: order.orderNumber,
@@ -347,7 +365,7 @@ export async function applyOrderStatus(
           currency: order.currency,
           trackingNumber: order.trackingNumber,
           carrier: order.shippingCarrier,
-          trackUrl: `${storeUrl(store.slug)}/order/${order.orderNumber}?t=${encodeURIComponent(order.recoveryToken ?? '')}`,
+          trackUrl: `${publicStoreUrl(store)}/order/${order.orderNumber}?t=${encodeURIComponent(order.recoveryToken ?? '')}`,
         },
       )
       await sendEmail({

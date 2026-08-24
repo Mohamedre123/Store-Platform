@@ -210,6 +210,32 @@ export type ClaudeVerifyState =
  * بنداء حقيقي زي Gemini. مفاتيحهم بتبدأ بـ`sk-ant-` غالبًا، لكن
  * الاعتماد على الشكل بيرفض أي صيغة جديدة والتاجر يفضل يحاول ومش فاهم.
  */
+/**
+ * التحقّق من مفتاح المصمّم — كلود أو جيميني.
+ *
+ * الموديلات بتتجاب من المزوّد نفسه لا من قايمة مكتوبة عندنا: أي
+ * قايمة بتبقى قديمة بعد إصدار، والتاجر يلاقي موديل مذكور ومش شغّال.
+ */
+export async function verifyDesignerKeyAction(input: {
+  provider: 'claude' | 'gemini'
+  apiKey: string
+}): Promise<ClaudeVerifyState> {
+  await getDashboardContext()
+
+  const key = input.apiKey.trim()
+  if (!key) return { ok: false, error: 'الصق المفتاح الأول' }
+
+  if (input.provider === 'gemini') {
+    const res = await verifyKey(key)
+    if (!res.ok) return { ok: false, error: res.error.message }
+    return { ok: true, models: res.data.models, suggested: res.data.suggested }
+  }
+
+  const res = await verifyClaude(key)
+  if (!res.ok) return { ok: false, error: res.error.message }
+  return { ok: true, models: res.data.models, suggested: res.data.suggested }
+}
+
 export async function verifyClaudeKeyAction(apiKey: string): Promise<ClaudeVerifyState> {
   await getDashboardContext()
 
@@ -224,7 +250,11 @@ export async function verifyClaudeKeyAction(apiKey: string): Promise<ClaudeVerif
 
 const claudeSchema = z.object({
   enabled: z.boolean(),
+  /** مفتاح أنثروبيك */
   apiKey: z.string().trim().max(300).optional(),
+  /** مفتاح جوجل — نفس الإضافة بتقبل الاتنين */
+  geminiKey: z.string().trim().max(300).optional(),
+  provider: z.enum(['claude', 'gemini']).optional(),
   model: z.string().trim().max(120).optional(),
 })
 
@@ -236,16 +266,36 @@ export async function saveClaudeAction(raw: unknown): Promise<SaveState> {
   const { store, user } = await getDashboardContext()
   const current = await getClaudeConfig(store.id)
 
+  /*
+    الفاضي معناه «سيب المحفوظ» لا «امسحه».
+    الواجهة بتعرض نجوم بدل المفتاح، فلو الفاضي كان بيمسح، أي حفظ
+    لتغيير الموديل كان هيفقد المفاتيح.
+  */
   const apiKey = input.apiKey || current.apiKey
+  const geminiKey = input.geminiKey || current.geminiKey
+  const provider = input.provider ?? current.provider
   const model = input.model || current.model
 
-  if (input.enabled && !apiKey) return { error: 'محتاج مفتاح Anthropic عشان تفعّلها.' }
+  const activeKey = provider === 'gemini' ? geminiKey : apiKey
+
+  if (input.enabled && !activeKey) {
+    return {
+      error:
+        provider === 'gemini'
+          ? 'محتاج مفتاح Gemini عشان تفعّلها.'
+          : 'محتاج مفتاح Anthropic عشان تفعّلها.',
+    }
+  }
   if (input.enabled && !model) return { error: 'اختار الموديل الأول.' }
+
+  const secrets: Record<string, string> = {}
+  if (apiKey) secrets.apiKey = apiKey
+  if (geminiKey) secrets.geminiKey = geminiKey
 
   const values = {
     enabled: input.enabled,
-    config: { model },
-    secrets: apiKey ? encryptJson({ apiKey }) : null,
+    config: { model, provider },
+    secrets: Object.keys(secrets).length ? encryptJson(secrets) : null,
   }
 
   const [existing] = await db
@@ -266,7 +316,12 @@ export async function saveClaudeAction(raw: unknown): Promise<SaveState> {
     action: 'settings.update',
     resource: 'plugin',
     resourceId: CLAUDE_SLUG,
-    after: { enabled: input.enabled, model, keyChanged: Boolean(input.apiKey) },
+    after: {
+      enabled: input.enabled,
+      provider,
+      model,
+      keyChanged: Boolean(input.apiKey || input.geminiKey),
+    },
   })
 
   revalidatePath('/dashboard/plugins')

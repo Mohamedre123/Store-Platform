@@ -2,7 +2,7 @@ import { desc, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { affiliates } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
-import { storeUrl } from '@/lib/domain'
+import { publicStoreUrl } from '@/lib/domain'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { AffiliatesManager, type AffiliateRow } from './affiliates-manager'
@@ -30,7 +30,7 @@ export default async function AffiliatesPage() {
         <AffiliatesManager
           affiliates={rows as AffiliateRow[]}
           currency={store.currency}
-          storeUrl={storeUrl(store.slug)}
+          storeUrl={publicStoreUrl(store)}
         />
       </Reveal>
     </div>

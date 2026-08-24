@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { funnels, products } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
-import { storeUrl } from '@/lib/domain'
+import { publicStoreUrl } from '@/lib/domain'
 import type { Block } from '@/lib/landing'
 import { LandingEditor } from './editor'
 
@@ -46,7 +46,7 @@ export default async function LandingEditorPage({
         status: funnel.status,
       }}
       previewUrl={`/s/${store.slug}/lp/${funnel.slug}?preview=1`}
-      publicUrl={`${storeUrl(store.slug)}/lp/${funnel.slug}`}
+      publicUrl={`${publicStoreUrl(store)}/lp/${funnel.slug}`}
       products={productRows}
     />
   )

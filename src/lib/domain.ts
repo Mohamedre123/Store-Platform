@@ -92,6 +92,24 @@ export function storeUrl(slug: string, path = '') {
   return `${protocol()}://${slug}.${ROOT_DOMAIN}${path}`
 }
 
+/**
+ * رابط المتجر العام — بنطاق التاجر لو ربطه.
+ *
+ * `storeUrl` بترجّع النطاق الفرعي عندنا دايمًا. التاجر اللي ربط
+ * نطاقه الخاص ودفع فيه، أي رابط بيوصل لعميله بالنطاق الفرعي بتاعنا
+ * بيلغي السبب اللي ربط النطاق عشانه — العميل بيشوف اسمنا مكان اسمه.
+ *
+ * والنطاق غير المتحقَّق منه ما بيتستخدمش: لسه ما بيردّش، والرابط
+ * اللي ما بيفتحش أسوأ من رابط باسم غلط.
+ */
+export function publicStoreUrl(
+  store: { slug: string; customDomain?: string | null; customDomainVerifiedAt?: Date | string | null },
+  path = '',
+): string {
+  const domain = store.customDomain?.trim().toLowerCase()
+  if (domain && store.customDomainVerifiedAt) return `https://${domain}${path}`
+  return storeUrl(store.slug, path)
+}
 export function dashboardUrl(path = '') {
   if (!SUBDOMAINS_ENABLED) return `${protocol()}://${ROOT_DOMAIN}/dashboard${path}`
   return `${protocol()}://dashboard.${ROOT_DOMAIN}${path}`

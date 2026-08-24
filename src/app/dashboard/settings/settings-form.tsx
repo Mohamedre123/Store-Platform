@@ -21,7 +21,10 @@ const field =
 
 export function SettingsForm({
   store,
+  colors,
 }: {
+  /** لونا الهوية الحاليان — من توكنز الثيم، أو من لوحة الثيم لو ما اتغيّروش */
+  colors: { primary: string; accent: string }
   store: {
     name: string
     tagline: string | null
@@ -45,6 +48,8 @@ export function SettingsForm({
   const [whatsapp, setWhatsapp] = useState(store.whatsapp ?? '')
   const [logoLight, setLogoLight] = useState<string | null>(store.logoLight)
   const [favicon, setFavicon] = useState<string | null>(store.favicon)
+  const [primary, setPrimary] = useState(colors.primary)
+  const [accent, setAccent] = useState(colors.accent)
   const [infoMsg, setInfoMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [savingInfo, startInfo] = useTransition()
 
@@ -60,7 +65,17 @@ export function SettingsForm({
   function saveInfo() {
     setInfoMsg(null)
     startInfo(async () => {
-      const res = await saveStoreInfoAction({ name, tagline, email, phone, whatsapp, logoLight, favicon })
+      const res = await saveStoreInfoAction({
+        name,
+        tagline,
+        email,
+        phone,
+        whatsapp,
+        logoLight,
+        favicon,
+        primary,
+        accent,
+      })
       setInfoMsg(res?.error ? { ok: false, text: res.error } : { ok: true, text: 'اتحفظ' })
     })
   }
@@ -172,6 +187,29 @@ export function SettingsForm({
           />
         </div>
 
+        {/*
+          ألوان الهوية.
+
+          محرّر الثيم فيه لوحة ألوان كاملة، بس التاجر بيعدّي على
+          «بيانات المتجر» أول يوم — واللون جزء من هويته زي الشعار.
+          اللونين دول هما اللي بيبانوا فعلًا للعميل: الأساسي على
+          الأزرار والروابط، والمساعد على الشارات والتمييز.
+        */}
+        <div className="flex flex-col gap-4 border-t border-[var(--border)] pt-5">
+          <div>
+            <h3 className="text-sm font-medium">ألوان هويتك</h3>
+            <p className="mt-0.5 text-xs text-[var(--fg-subtle)]">
+              الأساسي بيلوّن الأزرار والروابط، والمساعد بيلوّن الشارات والتمييز. تقدر تظبط
+              باقي الألوان من محرّر الثيم.
+            </p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <ColorField label="اللون الأساسي" value={primary} onChange={setPrimary} />
+            <ColorField label="اللون المساعد" value={accent} onChange={setAccent} />
+          </div>
+        </div>
+
         <button
           type="button"
           onClick={saveInfo}
@@ -266,5 +304,55 @@ export function SettingsForm({
         </button>
       </Card>
     </div>
+  )
+}
+
+/**
+ * خانة لون.
+ *
+ * منتقي اللون لوحده مش كفاية: التاجر اللي معاه كود هويته (من
+ * المصمّم أو من موقعه) محتاج يلزقه، والمنتقي ما بيقبلش لزق. فالاتنين
+ * جنب بعض ومربوطين — أي واحد فيهم بيحدّث التاني.
+ */
+function ColorField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+}) {
+  const valid = /^#[0-9a-fA-F]{6}$/.test(value)
+
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-sm font-medium">{label}</span>
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          value={valid ? value : '#000000'}
+          onChange={(e) => onChange(e.target.value)}
+          aria-label={label}
+          className="h-11 w-12 shrink-0 cursor-pointer rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] p-1"
+        />
+        <input
+          value={value}
+          onChange={(e) => {
+            const v = e.target.value.trim()
+            onChange(v.startsWith('#') || !v ? v : '#' + v)
+          }}
+          dir="ltr"
+          spellCheck={false}
+          placeholder="#000000"
+          className={`${field} min-w-0 text-start font-mono uppercase`}
+        />
+      </div>
+      {!valid && value.length > 0 && (
+        <span className="text-xs text-[var(--color-warning)]">
+          الكود لازم يكون ٦ خانات بعد #، زي 634B9A#
+        </span>
+      )}
+    </label>
   )
 }

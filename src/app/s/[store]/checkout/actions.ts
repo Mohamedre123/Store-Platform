@@ -22,7 +22,7 @@ import {
   orderConfirmationEmail,
   orderInvoiceEmail,
 } from '@/lib/store-emails'
-import { dashboardUrl, storeUrl } from '@/lib/domain'
+import { dashboardUrl, publicStoreUrl } from '@/lib/domain'
 import { validateCoupon, recordCouponUse } from '@/lib/coupons'
 import { issueOrderOtp, isPhoneVerifiedForOrder, verifyOrderOtp } from '@/lib/order-otp'
 import { computeOfferDiscount, getActiveOffers } from '@/lib/offers'
@@ -664,6 +664,8 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
     storeId: store.id,
     storeName: store.name,
     storeSlug: store.slug,
+    storeDomain: store.customDomain,
+    storeDomainVerifiedAt: store.customDomainVerifiedAt,
     currency: store.currency,
     orderId: result.orderId!,
     orderNumber: result.orderNumber,
@@ -823,7 +825,7 @@ async function sendOrderEmails(ctx: {
     tax: totals.tax,
     paymentLabel: paymentLabel(input.paymentGateway),
     placedAt: new Date(),
-    trackUrl: `${storeUrl(store.slug)}/order/${orderNumber}?t=${encodeURIComponent(token)}`,
+    trackUrl: `${publicStoreUrl(store)}/order/${orderNumber}?t=${encodeURIComponent(token)}`,
   }
 
   if (input.email) {

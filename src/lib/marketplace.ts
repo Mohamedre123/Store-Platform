@@ -2,7 +2,7 @@ import 'server-only'
 import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { marketplaceConnections, products, stores } from '@/db/schema'
-import { storeUrl } from './domain'
+import { publicStoreUrl } from './domain'
 import { MARKETPLACES, marketplaceDef, type Connection } from './marketplace-meta'
 
 /*
@@ -125,7 +125,13 @@ export type FeedItem = {
  */
 export async function feedItems(storeId: string): Promise<{ items: FeedItem[]; store: { name: string; slug: string; currency: string } | null }> {
   const [store] = await db
-    .select({ name: stores.name, slug: stores.slug, currency: stores.currency })
+    .select({
+      name: stores.name,
+      slug: stores.slug,
+      currency: stores.currency,
+      customDomain: stores.customDomain,
+      customDomainVerifiedAt: stores.customDomainVerifiedAt,
+    })
     .from(stores)
     .where(eq(stores.id, storeId))
     .limit(1)
@@ -152,7 +158,7 @@ export async function feedItems(storeId: string): Promise<{ items: FeedItem[]; s
     .orderBy(products.name)
     .limit(5000)
 
-  const base = storeUrl(store.slug)
+  const base = publicStoreUrl(store)
 
   const items: FeedItem[] = rows
     .filter((p) => (p.images?.length ?? 0) > 0)

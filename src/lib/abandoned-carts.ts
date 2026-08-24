@@ -5,7 +5,7 @@ import { orderItems, orders, stores } from '@/db/schema'
 import { getStoreTheme } from './storefront'
 import { isEmailConfigured, sendEmail } from './email'
 import { abandonedCartEmail } from './store-emails'
-import { storeUrl } from './domain'
+import { publicStoreUrl } from './domain'
 import { runAutomations } from './automation'
 
 /**
@@ -45,6 +45,8 @@ export async function sendAbandonedCartReminders(limit = 50): Promise<ReminderRe
       storeName: stores.name,
       storeSlug: stores.slug,
       storeLogo: stores.logoLight,
+      storeDomain: stores.customDomain,
+      storeDomainVerifiedAt: stores.customDomainVerifiedAt,
     })
     .from(orders)
     .innerJoin(stores, eq(stores.id, orders.storeId))
@@ -81,7 +83,11 @@ export async function sendAbandonedCartReminders(limit = 50): Promise<ReminderRe
           lines: items,
           total: cart.total,
           currency: cart.currency,
-          resumeUrl: `${storeUrl(cart.storeSlug)}/checkout?resume=${encodeURIComponent(cart.recoveryToken ?? '')}`,
+          resumeUrl: `${publicStoreUrl({
+            slug: cart.storeSlug,
+            customDomain: cart.storeDomain,
+            customDomainVerifiedAt: cart.storeDomainVerifiedAt,
+          })}/checkout?resume=${encodeURIComponent(cart.recoveryToken ?? '')}`,
         },
       )
 

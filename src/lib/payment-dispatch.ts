@@ -4,7 +4,7 @@ import { db } from '@/db'
 import { orderItems, orders, paymentAttempts, stores } from '@/db/schema'
 import { paymentCreds, recordPaymentError } from '@/lib/provider-store'
 import { paymentProvider, webhookPath } from '@/lib/providers'
-import { platformOrigin, storeUrl } from '@/lib/domain'
+import { platformOrigin, publicStoreUrl } from '@/lib/domain'
 import { createPaymentSession, type PaymentOrder } from '@/lib/integrations/payments'
 
 /**
@@ -60,7 +60,12 @@ export async function startPayment(
   if (!creds) return { ok: false, error: `${def.name} مش مربوطة دلوقتي` }
 
   const [store] = await db
-    .select({ name: stores.name, slug: stores.slug })
+    .select({
+      name: stores.name,
+      slug: stores.slug,
+      customDomain: stores.customDomain,
+      customDomainVerifiedAt: stores.customDomainVerifiedAt,
+    })
     .from(stores)
     .where(eq(stores.id, storeId))
     .limit(1)
@@ -98,7 +103,12 @@ export async function startPayment(
     payload.items = [{ name: `طلب رقم ${order.orderNumber}`, quantity: 1, price: order.total }]
   }
 
-  const base = store ? storeUrl(store.slug) : platformOrigin()
+  /*
+    رابط العودة لازم يبقى بنطاق التاجر لو ربطه: العميل بيرجع من
+    البوابة على نطاق تاني غير اللي طلب منه، وجلسته عندنا مربوطة
+    بالنطاق — فبيلاقي نفسه خارج حسابه بعد ما دفع.
+  */
+  const base = store ? publicStoreUrl(store) : platformOrigin()
   const returnUrl = `${base}/order/${order.orderNumber}?t=${encodeURIComponent(order.recoveryToken ?? '')}`
 
   const session = await createPaymentSession(slug, {

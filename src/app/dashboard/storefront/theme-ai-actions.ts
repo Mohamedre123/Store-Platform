@@ -7,7 +7,7 @@ import { db } from '@/db'
 import { aiConversations, aiMessages, storeThemes } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { recordAudit } from '@/lib/audit'
-import { getClaudeConfig, isClaudeReady } from '@/lib/ai/settings'
+import { designerKey, getClaudeConfig, isClaudeReady } from '@/lib/ai/settings'
 import { getStoreBrief } from '@/lib/ai/store-context'
 import { generateTheme } from '@/lib/ai/theme-generator'
 import { themePlanSchema, checkContrast, type ThemePlan } from '@/lib/ai/theme-schema'
@@ -135,8 +135,10 @@ export async function sendThemeRequestAction(raw: unknown): Promise<ThemeChatSta
   const brief = await getStoreBrief(store.id)
 
   const result = await generateTheme({
-    apiKey: cfg.apiKey,
-    model: cfg.model,
+    provider: cfg.provider,
+    // `isClaudeReady` فوق ضمنت وجود المفتاح والموديل
+    apiKey: designerKey(cfg)!,
+    model: cfg.model!,
     brief,
     history,
     request: parsed.data.message,

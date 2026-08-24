@@ -20,7 +20,7 @@ import {
   shippingZones,
 } from "@/db/schema";
 import { getDashboardContext } from "@/lib/store-context";
-import { storeUrl } from "@/lib/domain";
+import { publicStoreUrl } from "@/lib/domain";
 import { formatMoney } from "@/lib/utils";
 import { Card } from "@/components/ui";
 import { Rail } from "@/components/rail";
@@ -151,7 +151,7 @@ export default async function DashboardHome() {
   return (
     <div className="flex flex-col gap-8">
       <Reveal>
-        <PublishBanner initialPublished={store.isPublished} storeUrl={storeUrl(store.slug)} />
+        <PublishBanner initialPublished={store.isPublished} storeUrl={publicStoreUrl(store)} />
       </Reveal>
 
       <Reveal>

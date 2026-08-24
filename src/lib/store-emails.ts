@@ -12,7 +12,7 @@ import { formatMoney } from './utils'
  * لازم تُقرأ كاملة والصور محجوبة.
  */
 
-type StoreBrand = {
+export type StoreBrand = {
   name: string
   logo: string | null
   primary: string
@@ -116,6 +116,37 @@ function totalsTable(o: OrderInfo) {
   `
 }
 
+/**
+ * رمز دخول عميل المتجر.
+ *
+ * بهوية *المتجر* لا هوية المنصة. العميل ده مشترك عند التاجر ومش
+ * عارفنا؛ رسالة بشعار حد تاني بتبان تصيّدًا، والعميل ما بيكتبش رمز
+ * جاي من جهة ما يعرفهاش — فالرسالة بتتجاهل والدخول ما بيتمّش.
+ */
+export function customerCodeEmail(store: StoreBrand, code: string, ttlMinutes: number) {
+  const spaced = code.split('').join(String.fromCharCode(32))
+
+  const inner = `
+    <p style="margin:0 0 8px;font-size:16px;">رمز دخولك على ${escapeHtml(store.name)}</p>
+    <p style="margin:0 0 20px;font-size:15px;line-height:1.8;color:${MUTED};">
+      اكتب الرمز ده في صفحة الدخول عشان تكمّل.
+    </p>
+
+    <div style="background-color:#f8f8fc;border-radius:12px;padding:20px;text-align:center;margin-bottom:20px;">
+      <span style="font-family:'Segoe UI',Tahoma,Arial,sans-serif;font-size:32px;font-weight:bold;letter-spacing:8px;color:${store.primary};">${escapeHtml(spaced)}</span>
+    </div>
+
+    <p style="margin:0;font-size:13px;line-height:1.8;color:${MUTED};">
+      الرمز صالح ${ttlMinutes} دقايق. لو مش إنت اللي طلبته، تجاهل الرسالة ومحدّش هيقدر يدخل بحسابك.
+    </p>`
+
+  return {
+    subject: `${code} هو رمز دخولك على ${store.name}`,
+    html: layout(store, inner, `رمز دخولك: ${code}`),
+    text: `رمز دخولك على ${store.name}: ${code}
+صالح ${ttlMinutes} دقايق. لو مش إنت اللي طلبته، تجاهل الرسالة.`,
+  }
+}
 /** تأكيد الطلب — بيروح لعميل التاجر */
 export function orderConfirmationEmail(store: StoreBrand, o: OrderInfo) {
   const greeting = o.customerName ? `أهلًا ${escapeHtml(o.customerName)}،` : 'أهلًا،'

@@ -1,5 +1,6 @@
 import 'server-only'
-import { extractJson, generate, type ClaudeMessage } from './claude'
+import type { ClaudeMessage } from './claude'
+import { designerGenerate, extractJson, type DesignerProvider } from './designer'
 import { briefLine, type StoreBrief } from './store-context'
 import {
   LANDING_FIELD_GUIDE,
@@ -118,13 +119,16 @@ function toBlocks(plan: LandingPlan): Block[] {
 export async function generateLanding(input: {
   apiKey: string
   model: string
+  /** كلود ولا جيميني — الاتنين بيعرفوا يعملوها */
+  provider: DesignerProvider
   brief: StoreBrief
   product: ProductContext | null
   storeColors: { primary: string; background: string; surface: string; text: string } | null
   history: ClaudeMessage[]
   request: string
 }): Promise<LandingResult> {
-  const res = await generate({
+  const res = await designerGenerate({
+    provider: input.provider,
     apiKey: input.apiKey,
     model: input.model,
     system: buildSystem(input),
@@ -135,11 +139,7 @@ export async function generateLanding(input: {
   })
 
   if (!res.ok) {
-    return {
-      ok: false,
-      error: res.error.message,
-      needsSetup: res.error.kind === 'invalid_key' || res.error.kind === 'credit',
-    }
+    return { ok: false, error: res.error, needsSetup: res.needsSetup }
   }
 
   const json = extractJson(res.data)

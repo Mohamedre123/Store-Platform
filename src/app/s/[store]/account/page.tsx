@@ -15,7 +15,7 @@ import { tierAllows, TIER_LABELS } from '@/lib/rewards-meta'
 import { RewardsCatalog, type CatalogReward } from '@/components/storefront/rewards-catalog'
 import { ReferralCard } from '@/components/storefront/referral-card'
 import { getOrCreateReferralCode, getReferralStats } from '@/lib/referrals'
-import { storeUrl } from '@/lib/domain'
+import { publicStoreUrl } from '@/lib/domain'
 import { CustomerLoginForm } from './login-form'
 import { LogoutButton } from './logout-button'
 
@@ -96,7 +96,7 @@ export default async function AccountPage({ params }: { params: Promise<{ store:
           const code = await getOrCreateReferralCode(store.id, customer.id)
           return {
             code,
-            link: storeUrl(store.slug, `/?rf=${code}`),
+            link: publicStoreUrl(store, `/?rf=${code}`),
             stats: await getReferralStats(store.id, customer.id),
           }
         })()

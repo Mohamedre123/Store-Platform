@@ -1,5 +1,6 @@
 import 'server-only'
-import { extractJson, generate, type ClaudeMessage } from './claude'
+import type { ClaudeMessage } from './claude'
+import { designerGenerate, extractJson, type DesignerProvider } from './designer'
 import { briefLine, type StoreBrief } from './store-context'
 import { THEME_FIELD_GUIDE, checkContrast, themePlanSchema, type ThemePlan } from './theme-schema'
 import type { ContrastIssue } from './theme-schema'
@@ -60,11 +61,14 @@ function buildSystem(brief: StoreBrief): string {
 export async function generateTheme(input: {
   apiKey: string
   model: string
+  /** كلود ولا جيميني — الاتنين بيعرفوا يعملوها */
+  provider: DesignerProvider
   brief: StoreBrief
   history: ClaudeMessage[]
   request: string
 }): Promise<ThemeResult> {
-  const res = await generate({
+  const res = await designerGenerate({
+    provider: input.provider,
     apiKey: input.apiKey,
     model: input.model,
     system: buildSystem(input.brief),
@@ -76,11 +80,7 @@ export async function generateTheme(input: {
   })
 
   if (!res.ok) {
-    return {
-      ok: false,
-      error: res.error.message,
-      needsSetup: res.error.kind === 'invalid_key' || res.error.kind === 'credit',
-    }
+    return { ok: false, error: res.error, needsSetup: res.needsSetup }
   }
 
   const json = extractJson(res.data)

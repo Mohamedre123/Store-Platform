@@ -8,7 +8,7 @@ import { aiConversations, aiMessages, categories, funnels, products } from '@/db
 import type { AiToolCall } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { recordAudit } from '@/lib/audit'
-import { getClaudeConfig, isClaudeReady } from '@/lib/ai/settings'
+import { designerKey, getClaudeConfig, isClaudeReady } from '@/lib/ai/settings'
 import { getStoreBrief } from '@/lib/ai/store-context'
 import { generateLanding, type ProductContext } from '@/lib/ai/landing-generator'
 import { landingPlanSchema, type LandingPlan } from '@/lib/ai/landing-schema'
@@ -192,8 +192,10 @@ export async function sendLandingRequestAction(raw: unknown): Promise<LandingCha
   ])
 
   const result = await generateLanding({
-    apiKey: cfg.apiKey,
-    model: cfg.model,
+    provider: cfg.provider,
+    // `isClaudeReady` فوق ضمنت وجود المفتاح والموديل
+    apiKey: designerKey(cfg)!,
+    model: cfg.model!,
     brief,
     product,
     storeColors: {

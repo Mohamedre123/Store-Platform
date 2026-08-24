@@ -1,5 +1,9 @@
 import Link from 'next/link'
 import { FileText, Globe, LinkIcon } from 'lucide-react'
+import { eq } from 'drizzle-orm'
+import { db } from '@/db'
+import { storeThemes } from '@/db/schema'
+import { getTheme } from '@/lib/themes'
 import { getDashboardContext } from '@/lib/store-context'
 import { storeUrl } from '@/lib/domain'
 import { PageHeader } from '@/components/dashboard/page-shell'
@@ -12,12 +16,30 @@ export const metadata = { title: 'الإعدادات' }
 export default async function SettingsPage() {
   const { store } = await getDashboardContext()
 
+  /*
+    ألوان الهوية بتتقرا من توكنز الثيم مباشرةً — نفس المصدر اللي
+    بيقرا منه المتجر. ولو التاجر لسه ما غيّرش حاجة، بنعرض ألوان
+    الثيم اللي مختاره بدل خانة فاضية تخلّيه يفتكر إن مفيش لون.
+  */
+  const [themeRow] = await db
+    .select({ slug: storeThemes.themeSlug, tokens: storeThemes.tokens })
+    .from(storeThemes)
+    .where(eq(storeThemes.storeId, store.id))
+    .limit(1)
+
+  const palette = getTheme(themeRow?.slug ?? '').palette
+  const tokens = (themeRow?.tokens ?? {}) as { primary?: string; accent?: string }
+  const colors = {
+    primary: tokens.primary ?? palette.primary,
+    accent: tokens.accent ?? palette.accent,
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="الإعدادات" description="بيانات متجرك وتفضيلاته." />
 
       <Reveal>
-        <SettingsForm store={store} />
+        <SettingsForm store={store} colors={colors} />
       </Reveal>
 
       {/* صفحات السياسات */}

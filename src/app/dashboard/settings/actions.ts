@@ -3,8 +3,9 @@
 import { revalidatePath } from 'next/cache'
 import { eq } from 'drizzle-orm'
 import { db } from '@/db'
-import { stores } from '@/db/schema'
+import { storeThemes, stores } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import type { ThemeTokens } from '@/db/schema'
 import { normalizePhone } from '@/lib/utils'
 
 export type SettingsState = { ok?: boolean; error?: string } | null
@@ -24,6 +25,16 @@ export async function saveStoreInfoAction(input: {
   whatsapp: string
   logoLight: string | null
   favicon: string | null
+  /**
+   * ألوان الهوية.
+   *
+   * هنا لا في محرّر الثيم وحده: التاجر بيفتح «بيانات المتجر» أول
+   * يوم عشان يحطّ اسمه وشعاره، ولونه جزء من نفس الحاجة. إجباره
+   * يروح لمحرّر التخصيص عشان لونين كان بيخلّي أغلب المتاجر تفضل
+   * باللون الافتراضي.
+   */
+  primary?: string
+  accent?: string
 }): Promise<SettingsState> {
   const { store } = await getDashboardContext()
 
@@ -51,9 +62,67 @@ export async function saveStoreInfoAction(input: {
     })
     .where(eq(stores.id, store.id))
 
+  /*
+    الألوان بتتحفظ في تخصيص الثيم — هو مصدر الحقيقة للعرض.
+    لو خزّنّاها على المتجر كمان، بيبقى فيه رقمان للون الواحد
+    وواحد فيهم هيقدم من غير ما حد ياخد باله.
+  */
+  const hex = /^#[0-9a-fA-F]{6}$/
+  if ((input.primary && hex.test(input.primary)) || (input.accent && hex.test(input.accent))) {
+    await saveIdentityColors(store.id, {
+      primary: input.primary && hex.test(input.primary) ? input.primary : undefined,
+      accent: input.accent && hex.test(input.accent) ? input.accent : undefined,
+    })
+  }
+
   revalidatePath('/dashboard/settings')
   revalidatePath('/dashboard')
+  revalidatePath('/dashboard/storefront')
   return { ok: true }
+}
+
+/**
+ * يكتب لونَي الهوية في «توكنز» الثيم — هي مصدر ألوان المتجر المنشور.
+ *
+ * والمسوّدة بتتحدّث معاها لو كانت كاملة: التاجر اللي فتح محرّر
+ * التخصيص وسابه من غير نشر، لو غيّر لونه من هنا كان هيلاقي المحرّر
+ * لسه على اللون القديم ويفتكر إن الحفظ ضاع.
+ */
+async function saveIdentityColors(
+  storeId: string,
+  colors: { primary?: string; accent?: string },
+): Promise<void> {
+  const patch = {
+    ...(colors.primary ? { primary: colors.primary } : {}),
+    ...(colors.accent ? { accent: colors.accent } : {}),
+  }
+  if (!Object.keys(patch).length) return
+
+  const [row] = await db
+    .select({ tokens: storeThemes.tokens, draft: storeThemes.draft })
+    .from(storeThemes)
+    .where(eq(storeThemes.storeId, storeId))
+    .limit(1)
+
+  if (!row) return
+
+  const draft = (row.draft ?? {}) as Record<string, unknown>
+  const draftIdentity = draft.identity as Record<string, unknown> | undefined
+
+  await db
+    .update(storeThemes)
+    .set({
+      /*
+        دمج جزئي: بنكتب اللونين وسايبين باقي التوكنز زي ما هي.
+        الكتابة الكاملة كانت هتمسح الخط والحواف اللي التاجر ظبّطهم
+        من محرّر الثيم.
+      */
+      tokens: { ...((row.tokens ?? {}) as ThemeTokens), ...patch } as ThemeTokens,
+      ...(draftIdentity
+        ? { draft: { ...draft, identity: { ...draftIdentity, ...patch } } }
+        : {}),
+    })
+    .where(eq(storeThemes.storeId, storeId))
 }
 
 /**

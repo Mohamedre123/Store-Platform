@@ -7,7 +7,7 @@ import { isEmailConfigured, sendEmail } from './email'
 import { recordPoints } from './loyalty'
 import { generateToken } from './crypto'
 import { formatMoney } from './utils'
-import { storeUrl } from './domain'
+import { publicStoreUrl } from './domain'
 import type { TriggerKey } from './automation-defs'
 
 /**
@@ -50,6 +50,9 @@ export type AutomationContext = {
   stock?: number
   currency: string
   storeSlug: string
+  /** نطاق التاجر لو ربطه — الروابط في رسايل عملائه بتتبني عليه */
+  storeDomain?: string | null
+  storeDomainVerifiedAt?: Date | null
   recoveryToken?: string | null
 }
 
@@ -278,6 +281,12 @@ async function runAction(action: Action, ctx: AutomationContext) {
  * بيتشال بدل ما يظهر للعميل كـ{{xyz}}.
  */
 function fill(text: string, ctx: AutomationContext): string {
+  const base = publicStoreUrl({
+    slug: ctx.storeSlug,
+    customDomain: ctx.storeDomain,
+    customDomainVerifiedAt: ctx.storeDomainVerifiedAt,
+  })
+
   const map: Record<string, string> = {
     name: ctx.customerName ?? '',
     store: ctx.storeName,
@@ -286,8 +295,8 @@ function fill(text: string, ctx: AutomationContext): string {
     product: ctx.productName ?? '',
     link:
       ctx.orderNumber && ctx.recoveryToken
-        ? `${storeUrl(ctx.storeSlug)}/order/${ctx.orderNumber}?t=${encodeURIComponent(ctx.recoveryToken)}`
-        : storeUrl(ctx.storeSlug),
+        ? `${base}/order/${ctx.orderNumber}?t=${encodeURIComponent(ctx.recoveryToken)}`
+        : base,
   }
 
   return text.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, key: string) => map[key] ?? '')

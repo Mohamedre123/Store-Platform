@@ -5,7 +5,7 @@ import { db } from '@/db'
 import { storeThemes, type Section } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { getTheme } from '@/lib/themes'
-import { storeUrl } from '@/lib/domain'
+import { publicStoreUrl } from '@/lib/domain'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { ThemeGallery } from './theme-gallery'
@@ -44,7 +44,7 @@ export default async function StorefrontPage() {
             تخصيص المتجر
           </Link>
           <a
-            href={storeUrl(store.slug)}
+            href={publicStoreUrl(store)}
             target="_blank"
             rel="noopener noreferrer"
             className="zw-lift inline-flex min-h-11 items-center gap-2 rounded-lg border border-[var(--border-strong)] px-4 text-sm font-medium text-[var(--fg-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--fg)]"

@@ -60,6 +60,8 @@ export default async function PluginsPage() {
           claude={{
             enabled: claude.enabled,
             hasKey: Boolean(claude.apiKey),
+            hasGeminiKey: Boolean(claude.geminiKey),
+            provider: claude.provider,
             model: claude.model,
           }}
         />

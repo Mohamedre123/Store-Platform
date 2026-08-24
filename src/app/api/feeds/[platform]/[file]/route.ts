@@ -9,7 +9,7 @@ import {
   metaFeed,
   touchCatalogFeed,
 } from '@/lib/marketplace'
-import { storeUrl } from '@/lib/domain'
+import { publicStoreUrl } from '@/lib/domain'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -68,7 +68,7 @@ export async function GET(
   }
 
   if (def.format === 'google') {
-    return new NextResponse(googleFeed(items, store.name, storeUrl(store.slug)), {
+    return new NextResponse(googleFeed(items, store.name, publicStoreUrl(store)), {
       headers: { ...headers, 'Content-Type': 'application/xml; charset=utf-8' },
     })
   }

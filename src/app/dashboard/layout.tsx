@@ -8,7 +8,7 @@ import { AssistantPanel } from '@/components/dashboard/assistant-panel'
 import { AssistBubble } from '@/components/dashboard/assist-bubble'
 import { Toaster } from '@/components/dashboard/toast'
 import { getAiConfig, isAssistantReady, GEMINI_PRO_SLUG, GEMINI_SLUG } from '@/lib/ai/settings'
-import { storeUrl } from '@/lib/domain'
+import { publicStoreUrl } from '@/lib/domain'
 import { logoutAction } from '@/app/(auth)/actions'
 import { ExternalLink, LogOut } from 'lucide-react'
 
@@ -41,7 +41,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         storeName={store.name}
         storeSlug={store.slug}
         storeLogo={store.logoLight}
-        storeUrl={storeUrl(store.slug)}
+        storeUrl={publicStoreUrl(store)}
         userName={user.name}
         userEmail={user.email}
         onLogout={logoutAction}
@@ -51,7 +51,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         {/* الشريط العلوي */}
         <header className="sticky top-0 z-30 hidden h-16 items-center justify-between gap-4 border-b border-[var(--border)] bg-[var(--surface)]/85 px-6 backdrop-blur-md lg:flex">
           <a
-            href={storeUrl(store.slug)}
+            href={publicStoreUrl(store)}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 rounded-lg border border-[var(--border-strong)] px-3 py-2 text-sm font-medium text-[var(--fg-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--fg)]"

@@ -2,7 +2,7 @@ import { and, desc, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { funnels, products } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
-import { storeUrl } from '@/lib/domain'
+import { publicStoreUrl } from '@/lib/domain'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { LandingList, type FunnelRow } from './landing-list'
@@ -58,7 +58,7 @@ export default async function LandingPage() {
         <LandingList
           funnels={rows as FunnelRow[]}
           products={productRows}
-          storeUrl={storeUrl(store.slug)}
+          storeUrl={publicStoreUrl(store)}
         />
       </Reveal>
     </div>
