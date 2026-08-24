@@ -2,14 +2,14 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { and, eq, ne } from 'drizzle-orm'
+import { and, eq, like, ne } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/db'
 import { categories, products, inventoryMovements } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { recordAudit } from '@/lib/audit'
 import { deleteImage } from '@/lib/storage'
-import { suggestStoreSlug, toMinorUnits } from '@/lib/utils'
+import { slugify, toMinorUnits } from '@/lib/utils'
 import { renderSeoSlug } from '@/lib/seo-template'
 
 export type FormState = { error?: string; fieldErrors?: Record<string, string> } | null
@@ -24,25 +24,42 @@ function fieldErrors(error: z.ZodError): Record<string, string> {
 }
 
 /** رابط فريد داخل المتجر — يزوّد رقمًا لو الاسم مكرر */
+/**
+ * رابط فريد داخل المتجر.
+ *
+ * **استعلام واحد لا تسعة وتسعين.**
+ *
+ * النسخة القديمة كانت بتجرّب `اسم`، `اسم-2`، `اسم-3`… وكل تجربة
+ * رحلة كاملة لقاعدة البيانات. وده كان بيتفجّر مع الأسماء العربية:
+ * `suggestStoreSlug` بتشيل كل حرف مش لاتيني، فكل منتج عربي كان
+ * بيطلّع نفس الجذر (`item`) — والمنتج الخمسين كان بيحتاج خمسين
+ * استعلامًا متتاليًا قبل ما يتحفظ. ده سبب إن الإضافة كانت «مرة
+ * تظبط ومرة لأ».
+ *
+ * دلوقتي بنجيب كل الروابط اللي بتبدأ بالجذر مرة واحدة وبنحسب أول
+ * رقم فاضي في الذاكرة.
+ */
 async function uniqueSlug(storeId: string, base: string, table: 'products' | 'categories', excludeId?: string) {
   const root = base || 'item'
-  let candidate = root
+  const t = table === 'products' ? products : categories
 
-  for (let i = 2; i < 100; i++) {
-    const t = table === 'products' ? products : categories
-    const rows = await db
-      .select({ id: t.id })
-      .from(t)
-      .where(
-        excludeId
-          ? and(eq(t.storeId, storeId), eq(t.slug, candidate), ne(t.id, excludeId))
-          : and(eq(t.storeId, storeId), eq(t.slug, candidate)),
-      )
-      .limit(1)
+  const rows = await db
+    .select({ slug: t.slug })
+    .from(t)
+    .where(
+      excludeId
+        ? and(eq(t.storeId, storeId), like(t.slug, `${root}%`), ne(t.id, excludeId))
+        : and(eq(t.storeId, storeId), like(t.slug, `${root}%`)),
+    )
 
-    if (rows.length === 0) return candidate
-    candidate = `${root}-${i}`
+  const taken = new Set(rows.map((r) => r.slug))
+  if (!taken.has(root)) return root
+
+  for (let i = 2; i < 500; i++) {
+    const candidate = `${root}-${i}`
+    if (!taken.has(candidate)) return candidate
   }
+
   return `${root}-${Date.now()}`
 }
 
@@ -97,7 +114,7 @@ export async function saveCategoryAction(_prev: FormState, formData: FormData): 
     await db.insert(categories).values({
       storeId: store.id,
       name: data.name,
-      slug: await uniqueSlug(store.id, suggestStoreSlug(data.name), 'categories'),
+      slug: await uniqueSlug(store.id, slugify(data.name), 'categories'),
       description: data.description,
       image: data.image,
       isActive: data.isActive,
@@ -269,7 +286,7 @@ export async function saveProductAction(_prev: FormState, formData: FormData): P
         storeId: store.id,
         slug: await uniqueSlug(
           store.id,
-          d.seoSlug ? renderSeoSlug(d.seoSlug, seoCtx) : suggestStoreSlug(d.name),
+          d.seoSlug ? renderSeoSlug(d.seoSlug, seoCtx) : slugify(d.name),
           'products',
         ),
       })

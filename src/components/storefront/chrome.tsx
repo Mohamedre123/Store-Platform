@@ -2,7 +2,7 @@
 
 import { SLink as Link } from './store-link'
 import Image from 'next/image'
-import { Heart, Menu, Search, ShoppingBag, User, X } from 'lucide-react'
+import { Heart, Menu, Search, ShoppingBag, User, X, ChevronDown } from 'lucide-react'
 import { useState } from 'react'
 import { useCart } from './cart'
 import { CartDrawer } from './cart-drawer'
@@ -51,7 +51,7 @@ export function StoreHeader({
   showAccount?: boolean
   showCategoriesBar?: boolean
   sticky?: boolean
-  categories?: Array<{ name: string; slug: string }>
+  categories?: Array<{ name: string; slug: string; parentId?: string | null; id?: string }>
   cartEmptyMessage?: string
   cartFreeShippingBar?: boolean
   cartFreeOver?: number
@@ -214,18 +214,58 @@ export function StoreHeader({
       </header>
 
       {/* شريط الأقسام — بيظهر لو التاجر فعّله */}
+{/*
+        شريط الأقسام — والأقسام الفرعية بتظهر جوّه أبوها.
+
+        القسم اللي ليه أولاد بياخد قايمة منسدلة بتفتح بالمرور على
+        الكمبيوتر وبالضغط على الموبايل (`focus-within` بيغطّي
+        الاتنين من غير أي جافاسكربت). عرض الكل في صف واحد كان
+        بيخلّي الشريط عشرين قسمًا والعميل يتوه.
+      */}
       {showCategoriesBar && categories.length > 0 && (
         <div className="border-b border-[var(--sf-text)]/10 bg-[var(--sf-surface)]/60">
           <div className="scroll-x mx-auto flex max-w-6xl items-center gap-1 px-4 py-2 sm:px-6">
-            {categories.map((c) => (
-              <Link
-                key={c.slug}
-                href={`/category/${c.slug}`}
-                className="shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm opacity-75 transition-all hover:bg-[var(--sf-text)]/6 hover:opacity-100"
-              >
-                {c.name}
-              </Link>
-            ))}
+            {categories
+              .filter((c) => !c.parentId)
+              .map((parent) => {
+                const children = categories.filter((c) => c.parentId && c.parentId === parent.id)
+
+                if (children.length === 0) {
+                  return (
+                    <Link
+                      key={parent.slug}
+                      href={`/category/${parent.slug}`}
+                      className="shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm opacity-75 transition-all hover:bg-[var(--sf-text)]/6 hover:opacity-100"
+                    >
+                      {parent.name}
+                    </Link>
+                  )
+                }
+
+                return (
+                  <div key={parent.slug} className="group relative shrink-0">
+                    <Link
+                      href={`/category/${parent.slug}`}
+                      className="flex items-center gap-1 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm opacity-75 transition-all hover:bg-[var(--sf-text)]/6 hover:opacity-100"
+                    >
+                      {parent.name}
+                      <ChevronDown className="h-3 w-3" aria-hidden="true" />
+                    </Link>
+
+                    <div className="invisible absolute start-0 top-full z-40 min-w-[11rem] rounded-[var(--sf-radius)] border border-[var(--sf-text)]/12 bg-[var(--sf-surface)] py-1 opacity-0 shadow-xl transition-all group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
+                      {children.map((child) => (
+                        <Link
+                          key={child.slug}
+                          href={`/category/${child.slug}`}
+                          className="block whitespace-nowrap px-3 py-2 text-sm opacity-75 transition-colors hover:bg-[var(--sf-text)]/6 hover:opacity-100"
+                        >
+                          {child.name}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
           </div>
         </div>
       )}

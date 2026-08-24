@@ -46,7 +46,12 @@ export default async function CategoryPage({
   const sort = parseSort((await searchParams).sort)
 
   const [items, cats] = await Promise.all([
-    listProducts(store.id, { categoryId: category.id, limit: listing.perPage || 60, sort }),
+    listProducts(store.id, {
+      categoryId: category.id,
+      includeChildren: true,
+      limit: listing.perPage || 60,
+      sort,
+    }),
     listing.showCategoryFilter ? listCategories(store.id) : Promise.resolve([]),
   ])
 

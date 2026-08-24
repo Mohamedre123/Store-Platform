@@ -1,6 +1,6 @@
 import 'server-only'
 import { cache } from 'react'
-import { and, desc, eq, gt, ilike, isNotNull, isNull, or, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, ilike, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { banners, categories, pages, products, productVariants, reviews, stores, storePlugins, storeThemes } from '@/db/schema'
 import { getTheme, type ThemeDefinition } from './themes'
@@ -220,16 +220,36 @@ export const listProducts = cache(
     storeId: string,
     options: {
       limit?: number
+      /** قسم واحد، أو قسم وكل أولاده لو `includeChildren` */
       categoryId?: string
+      includeChildren?: boolean
       onSale?: boolean
       featured?: boolean
       sort?: SortKey
     } = {},
   ): Promise<StorefrontProduct[]> => {
-    const { limit = 12, categoryId, onSale, featured, sort = 'newest' } = options
+    const { limit = 12, categoryId, includeChildren, onSale, featured, sort = 'newest' } = options
 
     const conditions = [visible(storeId)]
-    if (categoryId) conditions.push(eq(products.categoryId, categoryId))
+    if (categoryId) {
+      /*
+        القسم الأب بيعرض منتجاته **ومنتجات أولاده**.
+
+        من غير كده التاجر اللي نقل منتجاته لأقسام فرعية بيلاقي القسم
+        الرئيسي فاضي في متجره — وهو أكتر قسم بيتضغط عليه.
+      */
+      if (includeChildren) {
+        const children = await db
+          .select({ id: categories.id })
+          .from(categories)
+          .where(and(eq(categories.storeId, storeId), eq(categories.parentId, categoryId)))
+
+        const ids = [categoryId, ...children.map((c) => c.id)]
+        conditions.push(inArray(products.categoryId, ids))
+      } else {
+        conditions.push(eq(products.categoryId, categoryId))
+      }
+    }
     if (onSale) conditions.push(and(isNotNull(products.compareAtPrice), gt(products.compareAtPrice, products.price))!)
     if (featured) conditions.push(eq(products.isFeatured, true))
 
@@ -323,6 +343,8 @@ export const listCategories = cache(async (storeId: string) => {
       name: categories.name,
       slug: categories.slug,
       image: categories.image,
+      parentId: categories.parentId,
+      showInMenu: categories.showInMenu,
       productCount: sql<number>`count(${products.id})::int`,
     })
     .from(categories)
