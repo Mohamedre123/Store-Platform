@@ -1,8 +1,15 @@
 'use client'
 
-import { useState, useTransition } from 'react'
-import { Check, ExternalLink, Loader2, Save, Send, ShieldAlert } from 'lucide-react'
-import { saveWhatsappAction, testWhatsappAction, type WaState } from './actions'
+import { useEffect, useState, useTransition } from 'react'
+import { Check, ExternalLink, Loader2, QrCode, Save, Send, ShieldAlert } from 'lucide-react'
+import {
+  linkWhatsappAction,
+  saveWhatsappAction,
+  testWhatsappAction,
+  unlinkWhatsappAction,
+  whatsappStatusAction,
+  type WaState,
+} from './actions'
 import { Alert, Card } from '@/components/ui'
 import { Choice, Row, TextField } from '@/components/dashboard/controls'
 import type { WhatsappProvider, WhatsappSettings } from '@/lib/whatsapp'
@@ -14,14 +21,73 @@ import type { WhatsappProvider, WhatsappSettings } from '@/lib/whatsapp'
  * الطريق الرسمي من ميتا. الفرق بينهم مش تقني بس — فيه مخاطرة
  * حقيقية في الأول، ومكتوبة له بالنص هنا عشان يقرّر وهو عارف.
  */
-export function WhatsappForm({ initial }: { initial: WhatsappSettings }) {
+export function WhatsappForm({
+  initial,
+  easyLink,
+  storePhone,
+}: {
+  initial: WhatsappSettings
+  /** الربط السهل مفعّل على المنصة؟ */
+  easyLink: boolean
+  storePhone: string | null
+}) {
   const [provider, setProvider] = useState<WhatsappProvider>(initial.provider)
   const [apiKey, setApiKey] = useState('')
   const [phoneId, setPhoneId] = useState(initial.phoneId ?? '')
   const [testPhone, setTestPhone] = useState('')
   const [msg, setMsg] = useState<WaState>(null)
+  const [linkPhone, setLinkPhone] = useState(storePhone ?? '')
+  const [qr, setQr] = useState<string | null>(null)
+  const [linked, setLinked] = useState(initial.provider === 'wasender' && initial.hasKey)
+  const [linking, startLink] = useTransition()
+  const [advanced, setAdvanced] = useState(false)
   const [saving, startSave] = useTransition()
   const [testing, startTest] = useTransition()
+
+  /*
+    بنسأل كل تلات ثواني بعد ما الكود يظهر.
+
+    التاجر بيمسح بموبايله، ومفيش حاجة بتقول للصفحة إنه خلص غير
+    السؤال. وبيقف أول ما يتوصّل عشان ما نفضلش نسأل على الفاضي.
+  */
+  useEffect(() => {
+    if (!qr || linked) return
+
+    const id = setInterval(async () => {
+      const status = await whatsappStatusAction()
+      if (status === 'connected') {
+        setLinked(true)
+        setQr(null)
+        setMsg({ ok: true, note: 'اتربط ✅ رقمك دلوقتي بيبعت لعملاءك.' })
+      }
+    }, 3000)
+
+    return () => clearInterval(id)
+  }, [qr, linked])
+
+  const link = () =>
+    startLink(async () => {
+      setMsg(null)
+      const res = await linkWhatsappAction(linkPhone)
+      if (!res.ok) {
+        setMsg({ error: res.error })
+        return
+      }
+      if (res.status === 'connected') {
+        setLinked(true)
+        setQr(null)
+        setMsg({ ok: true, note: 'اتربط خلاص ✅' })
+      } else {
+        setQr(res.qrImage)
+      }
+    })
+
+  const unlink = () =>
+    startLink(async () => {
+      setMsg(await unlinkWhatsappAction())
+      setLinked(false)
+      setQr(null)
+    })
 
   const save = () =>
     startSave(async () => {
@@ -39,7 +105,105 @@ export function WhatsappForm({ initial }: { initial: WhatsappSettings }) {
       {msg?.ok && <Alert tone="success">{msg.note ?? 'اتحفظ'}</Alert>}
       {msg?.error && <Alert tone="danger">{msg.error}</Alert>}
 
-      <Card className="flex flex-col gap-5 p-5">
+      {easyLink && (
+        <Card className="flex flex-col gap-5 p-5">
+          <div>
+            <h2 className="font-semibold">اربط رقمك</h2>
+            <p className="mt-0.5 text-sm text-[var(--fg-muted)]">
+              امسح كود بموبايلك زي واتساب ويب بالظبط — من غير ما تفتح حساب عند حد.
+            </p>
+          </div>
+
+          {linked ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-[#25D366]/10 p-4">
+              <span className="flex items-center gap-2 text-sm font-semibold text-[#128C4A]">
+                <Check className="h-4 w-4" aria-hidden="true" />
+                رقمك مربوط وشغّال
+              </span>
+              <button
+                type="button"
+                onClick={unlink}
+                disabled={linking}
+                className="min-h-10 rounded-lg border border-[var(--border-strong)] px-4 text-sm font-medium transition-colors hover:bg-[var(--surface-2)] disabled:opacity-50"
+              >
+                افصل الرقم
+              </button>
+            </div>
+          ) : qr ? (
+            <div className="flex flex-col items-center gap-4 rounded-lg bg-[var(--surface-2)] p-5">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={qr}
+                alt="كود ربط واتساب"
+                width={260}
+                height={260}
+                className="rounded-lg bg-white p-2"
+              />
+              <ol className="flex flex-col gap-1 text-sm text-[var(--fg-muted)]">
+                <li>١. افتح واتساب على الموبايل اللي فيه رقم المتجر.</li>
+                <li>٢. الإعدادات ← الأجهزة المرتبطة ← ربط جهاز.</li>
+                <li>٣. صوّر الكود ده.</li>
+              </ol>
+              <span className="flex items-center gap-2 text-xs text-[var(--fg-subtle)]">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                مستنيين المسح…
+              </span>
+            </div>
+          ) : (
+            <Row label="رقم واتساب المتجر" hint="الرسايل هتطلع من الرقم ده وباسم متجرك.">
+              <div className="flex flex-wrap gap-2">
+                <input
+                  value={linkPhone}
+                  onChange={(e) => setLinkPhone(e.target.value)}
+                  dir="ltr"
+                  placeholder="01012345678"
+                  aria-label="رقم واتساب المتجر"
+                  className="h-11 min-w-0 flex-1 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-start text-sm focus:border-[var(--primary)] focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={link}
+                  disabled={linking || linkPhone.trim().length < 8}
+                  className="flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-5 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+                  style={{ background: '#25D366' }}
+                >
+                  {linking ? (
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <QrCode className="h-4 w-4" aria-hidden="true" />
+                  )}
+                  اربط
+                </button>
+              </div>
+            </Row>
+          )}
+
+          {/*
+            المخاطرة مكتوبة هنا كمان.
+            الربط السهل بيمرّ على نفس البوابة غير الرسمية — سهولته
+            ما بتغيّرش إن الرقم ممكن يتقفل، والتاجر لازم يعرف.
+          */}
+          <div className="flex items-start gap-2 text-xs leading-relaxed text-[var(--fg-subtle)]">
+            <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <span>
+              الربط بيمرّ ببوابة مش معتمدة رسميًا من واتساب. استعمل رقمًا مخصّصًا للمتجر مش رقمك
+              الشخصي، وابعت للعملاء اللي طلبوا منك بس.
+            </span>
+          </div>
+        </Card>
+      )}
+
+      {easyLink && (
+        <button
+          type="button"
+          onClick={() => setAdvanced((v) => !v)}
+          className="w-fit text-sm font-medium text-[var(--fg-muted)] hover:text-[var(--fg)]"
+        >
+          {advanced ? 'إخفاء الربط اليدوي' : 'عندي حساب بمفاتيحي — ربط يدوي'}
+        </button>
+      )}
+
+      <Card className={`flex flex-col gap-5 p-5 ${easyLink && !advanced ? 'hidden' : ''}`}>
         <div>
           <h2 className="font-semibold">طريقة الربط</h2>
           <p className="mt-0.5 text-sm text-[var(--fg-muted)]">

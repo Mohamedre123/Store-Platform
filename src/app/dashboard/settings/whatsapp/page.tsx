@@ -1,5 +1,6 @@
 import { getDashboardContext } from '@/lib/store-context'
 import { readWhatsapp } from '@/lib/whatsapp'
+import { platformWhatsappEnabled } from '@/lib/whatsapp-onboard'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { WhatsappForm } from './whatsapp-form'
@@ -18,7 +19,11 @@ export default async function WhatsappPage() {
       />
 
       <Reveal>
-        <WhatsappForm initial={settings} />
+        <WhatsappForm
+          initial={settings}
+          easyLink={platformWhatsappEnabled()}
+          storePhone={store.whatsapp ?? store.phone ?? null}
+        />
       </Reveal>
     </div>
   )
