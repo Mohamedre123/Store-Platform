@@ -121,8 +121,15 @@ export async function sendEmail(options: {
         text: text ?? toPlainText(html),
         ...(replyTo ? { reply_to: replyTo } : {}),
         headers: {
+          /*
+            `List-Unsubscribe-Post` اتشال.
+
+            «إلغاء بضغطة واحدة» بيوعد المستقبِل إن فيه عنوان https
+            بيستقبل POST — وإحنا مالناش. الوعد اللي مش وراه تنفيذ
+            بيتحسب عيبًا في الرسالة عند فلاتر جيميل، فبيضرّ أكتر
+            ما ينفع. الرابط البريدي وحده صالح وكفاية.
+          */
           'List-Unsubscribe': `<mailto:${unsubscribeAddress()}?subject=unsubscribe>`,
-          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
         },
       }),
     })

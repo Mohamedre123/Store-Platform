@@ -1,6 +1,7 @@
 'use server'
 
 import { cookies } from 'next/headers'
+import { after } from 'next/server'
 import { and, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/db'
@@ -529,7 +530,8 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
    * بيكلّمه ويتفقوا على معاد تاني.
    */
   if (input.slots && Object.keys(input.slots).length > 0) {
-    void (async () => {
+    after(
+      (async () => {
       for (const [productId, startsAt] of Object.entries(input.slots ?? {})) {
         // الخدمة لازم تكون في الطلب فعلًا — مش أي معرّف بيتبعت
         if (!lines.some((l) => l.productId === productId)) continue
@@ -555,7 +557,8 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
           })
         }
       }
-    })().catch((e) => console.error('فشل تسجيل الحجز:', e))
+      })().catch((e) => console.error('فشل تسجيل الحجز:', e)),
+    )
   }
 
   /*
@@ -566,14 +569,16 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
     طلب بيقع عشان صف مفقود في جدول توزيع خسارة حقيقية مقابل رقم
     تقريبي.
   */
-  void consumeFromDefaultBranch(
+  after(
+    consumeFromDefaultBranch(
     store.id,
     lines.map((l) => ({
       productId: l.productId,
       variantId: l.variantId ?? null,
       quantity: l.quantity,
     })),
-  ).catch((e) => console.error('فشل خصم مخزون الفرع:', e))
+    ).catch((e) => console.error('فشل خصم مخزون الفرع:', e)),
+  )
 
   /**
    * تقييد البيعة للمسوّق لو العميل جه من رابطه.
@@ -584,7 +589,8 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
    */
   const refCode = (await cookies()).get('zw_ref')?.value
   if (refCode) {
-    void findAffiliateByCode(store.id, refCode)
+    after(
+      findAffiliateByCode(store.id, refCode)
       .then((affiliate) =>
         affiliate
           ? recordAffiliateConversion({
@@ -596,7 +602,8 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
             })
           : undefined,
       )
-      .catch((e) => console.error('فشل تسجيل عمولة المسوّق:', e))
+        .catch((e) => console.error('فشل تسجيل عمولة المسوّق:', e)),
+    )
   }
 
   /*
@@ -620,13 +627,15 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
    */
   const rfCode = (await cookies()).get('zw_rf')?.value
   if (rfCode) {
-    void recordReferral({
+    after(
+      recordReferral({
       storeId: store.id,
       code: rfCode,
       referredCustomerId: result.customerId,
       previousOrders: customerOrdersBefore,
       orderId: result.orderId!,
-    }).catch((e) => console.error('فشل تسجيل الإحالة:', e))
+      }).catch((e) => console.error('فشل تسجيل الإحالة:', e)),
+    )
   }
 
   /*
@@ -634,11 +643,13 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
     بتقيس البيعات اللي تمّت فعلًا.
   */
   const visitor = await visitorId()
-  void trackExperimentConversions(
+  after(
+    trackExperimentConversions(
     store.id,
     visitor,
     lines.map((l) => ({ productId: l.productId, total: l.total })),
-  ).catch((e) => console.error('فشل تسجيل تحويل التجربة:', e))
+    ).catch((e) => console.error('فشل تسجيل تحويل التجربة:', e)),
+  )
 
   /**
    * رسائل التأكيد — بعد ما المعاملة نجحت لا جوّاها.
@@ -646,8 +657,16 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
    * لو البريد فشل (مفتاح ناقص، مزوّد واقع)، الطلب لازم يفضل موجود:
    * تاجر معاه طلب من غير إيميل أحسن بكتير من عميل دفع وطلبه اتلغى
    * عشان رسالة ما اتبعتش. عشان كده مفيش await على النتيجة ومفيش throw.
+   *
+   * **و`after` مش `void`.** الوعد السايب على منصة بلا خوادم بيتقطع:
+   * أول ما الاستجابة تخرج، التنفيذ بيتجمّد وأي شغل لسه شغّال بيموت
+   * في نُصّه. الرسالة كانت بتوصل صدفة لما الطلب يفضل مشغول بحاجات
+   * تانية بعدها — ولما اتشالت الحاجات دي، وقفت تمامًا.
+   *
+   * `after` بيقول للمنصة: متجمّديش لحد ما ده يخلص.
    */
-  void sendOrderEmails({
+  after(
+    sendOrderEmails({
     store,
     orderId: result.orderId!,
     orderNumber: result.orderNumber,
@@ -656,7 +675,8 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
     totals,
     input,
     phone,
-  }).catch((e) => console.error('فشل إرسال بريد الطلب:', e))
+    }).catch((e) => console.error('فشل إرسال بريد الطلب:', e)),
+  )
 
   /**
    * محفّزات الأتمتة — بعد ما الطلب اتسجّل بالكامل.

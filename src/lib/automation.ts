@@ -1,4 +1,5 @@
 import 'server-only'
+import { after } from 'next/server'
 import { and, eq, gt, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { automationRules, coupons, orderEvents, orders } from '@/db/schema'
@@ -57,10 +58,27 @@ export type AutomationContext = {
 }
 
 /** نقطة الدخول الوحيدة — بترجع فورًا والتنفيذ بيكمّل في الخلفية */
+/**
+ * شغل خلفي بيكمّل بعد ما الاستجابة تخرج.
+ *
+ * `void` وحدها مش كفاية على منصة بلا خوادم: أول ما الاستجابة تخرج
+ * التنفيذ بيتجمّد، وأي وعد سايب بيموت في نُصّه. الرسايل كانت
+ * بتوصل صدفة لما الطلب يفضل مشغول بحاجة تانية بعدها.
+ *
+ * `after` بيقول للمنصة متجمّديش لحد ما ده يخلص. وبرّه سياق الطلب
+ * (مهمة مجدولة مثلًا) بيرمي، فبنرجع للسلوك القديم.
+ */
+function background(work: Promise<unknown>, label: string) {
+  const guarded = work.catch((e) => console.error(label, e))
+  try {
+    after(guarded)
+  } catch {
+    void guarded
+  }
+}
+
 export function runAutomations(trigger: TriggerKey, ctx: AutomationContext) {
-  void execute(trigger, ctx).catch((e) =>
-    console.error('فشل تشغيل الأتمتة:', trigger, e),
-  )
+  background(execute(trigger, ctx), `فشل تشغيل الأتمتة: ${trigger}`)
 }
 
 /**

@@ -1,4 +1,5 @@
 import 'server-only'
+import { after } from 'next/server'
 import { createHmac } from 'node:crypto'
 import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/db'
@@ -32,10 +33,27 @@ export function signPayload(secret: string, body: string): string {
  * بترجع فورًا — الإرسال بيكمّل في الخلفية. أي فشل بيتسجّل ومش بيأثر
  * على العملية اللي سبّبت الحدث.
  */
+/**
+ * شغل خلفي بيكمّل بعد ما الاستجابة تخرج.
+ *
+ * `void` وحدها مش كفاية على منصة بلا خوادم: أول ما الاستجابة تخرج
+ * التنفيذ بيتجمّد، وأي وعد سايب بيموت في نُصّه. الرسايل كانت
+ * بتوصل صدفة لما الطلب يفضل مشغول بحاجة تانية بعدها.
+ *
+ * `after` بيقول للمنصة متجمّديش لحد ما ده يخلص. وبرّه سياق الطلب
+ * (مهمة مجدولة مثلًا) بيرمي، فبنرجع للسلوك القديم.
+ */
+function background(work: Promise<unknown>, label: string) {
+  const guarded = work.catch((e) => console.error(label, e))
+  try {
+    after(guarded)
+  } catch {
+    void guarded
+  }
+}
+
 export function dispatchWebhook(storeId: string, event: WebhookEvent, data: unknown) {
-  void deliver(storeId, event, data).catch((e) =>
-    console.error('فشل إرسال الويب هوك:', event, e),
-  )
+  background(deliver(storeId, event, data), `فشل إرسال الويب هوك: ${event}`)
 }
 
 async function deliver(storeId: string, event: WebhookEvent, data: unknown) {

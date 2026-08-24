@@ -1,4 +1,5 @@
 import 'server-only'
+import { after } from 'next/server'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { messagingSettings, notificationRecipients, stores } from '@/db/schema'
@@ -88,8 +89,27 @@ async function sendTelegram(botToken: string, chatId: string, text: string): Pro
  * بيتنادى بغير `await` من مسارات الطلب — الإشعار مهم، بس مش أهم
  * من إن الطلب يخلص.
  */
+/**
+ * شغل خلفي بيكمّل بعد ما الاستجابة تخرج.
+ *
+ * `void` وحدها مش كفاية على منصة بلا خوادم: أول ما الاستجابة تخرج
+ * التنفيذ بيتجمّد، وأي وعد سايب بيموت في نُصّه. الرسايل كانت
+ * بتوصل صدفة لما الطلب يفضل مشغول بحاجة تانية بعدها.
+ *
+ * `after` بيقول للمنصة متجمّديش لحد ما ده يخلص. وبرّه سياق الطلب
+ * (مهمة مجدولة مثلًا) بيرمي، فبنرجع للسلوك القديم.
+ */
+function background(work: Promise<unknown>, label: string) {
+  const guarded = work.catch((e) => console.error(label, e))
+  try {
+    after(guarded)
+  } catch {
+    void guarded
+  }
+}
+
 export function notifyTeam(event: TeamEvent, ctx: TeamContext): void {
-  void deliver(event, ctx).catch((e) => console.error('فشل إشعار الفريق:', e))
+  background(deliver(event, ctx), 'فشل إشعار الفريق:')
 }
 
 async function deliver(event: TeamEvent, ctx: TeamContext): Promise<void> {
