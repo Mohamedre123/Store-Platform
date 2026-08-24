@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { ArrowRight, Check, Monitor, RotateCcw, Save, Smartphone, Tablet } from 'lucide-react'
 import { saveCustomizationAction, saveDraftAction } from './actions'
-import { Panel } from './panels'
+import { Panel, type StoreHints } from './panels'
 import { PANELS, type Customization, type PanelKey } from '@/lib/customization'
 import { Button } from '@/components/ui'
 import { cn } from '@/lib/utils'
@@ -19,10 +19,12 @@ export function Customizer({
   initial,
   previewUrl,
   themeName,
+  store,
 }: {
   initial: Customization
   previewUrl: string
   themeName: string
+  store: StoreHints
 }) {
   const [draft, setDraft] = useState<Customization>(initial)
   const [panel, setPanel] = useState<PanelKey>('identity')
@@ -201,7 +203,7 @@ export function Customizer({
               <p className="mt-0.5 text-xs text-[var(--fg-subtle)]">{current.hint}</p>
             </div>
             <div className="flex flex-col gap-6 pb-10">
-              <Panel panel={panel} value={draft} patch={patch} />
+              <Panel panel={panel} value={draft} patch={patch} store={store} />
             </div>
           </div>
         </aside>

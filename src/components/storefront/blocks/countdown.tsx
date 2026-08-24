@@ -98,7 +98,7 @@ export function CountdownBlockView({ block }: { block: CountdownBlock }) {
           <div
             className="relative flex flex-col items-center gap-5 rounded-[var(--sf-radius)]"
             style={
-              block.blur > 0
+              block.blurEnabled && block.blur > 0
                 ? {
                     backdropFilter: `blur(${block.blur}px)`,
                     WebkitBackdropFilter: `blur(${block.blur}px)`,

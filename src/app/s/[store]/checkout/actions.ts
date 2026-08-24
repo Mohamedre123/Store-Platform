@@ -582,23 +582,34 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
    * للتاجر، والعمولة عليه بتاكل من هامشه. وبتفضل «قيد الانتظار» لحد
    * ما الطلب يتسلّم — الطلب ممكن يتلغي والعمولة على بيعة اتلغت خسارة.
    */
-  try {
-    const refCode = (await cookies()).get('zw_ref')?.value
-    if (refCode) {
-      const affiliate = await findAffiliateByCode(store.id, refCode)
-      if (affiliate) {
-        await recordAffiliateConversion({
-          storeId: store.id,
-          affiliateId: affiliate.id,
-          orderId: result.orderId!,
-          eligibleAmount: Math.max(0, totals.subtotal - totals.discount),
-          orderTotal: totals.total,
-        })
-      }
-    }
-  } catch (e) {
-    console.error('فشل تسجيل عمولة المسوّق:', e)
+  const refCode = (await cookies()).get('zw_ref')?.value
+  if (refCode) {
+    void findAffiliateByCode(store.id, refCode)
+      .then((affiliate) =>
+        affiliate
+          ? recordAffiliateConversion({
+              storeId: store.id,
+              affiliateId: affiliate.id,
+              orderId: result.orderId!,
+              eligibleAmount: Math.max(0, totals.subtotal - totals.discount),
+              orderTotal: totals.total,
+            })
+          : undefined,
+      )
+      .catch((e) => console.error('فشل تسجيل عمولة المسوّق:', e))
   }
+
+  /*
+    اللي تحت ده **قياسات**، والعميل مش لازم يستنّاها.
+
+    كانت متنتظرة واحدة ورا التانية بعد ما الطلب اتسجّل خلاص: عمولة
+    مسوّق، وإحالة صاحب، وتحويل تجربة سعر — كل واحدة رحلة أو أكتر
+    لقاعدة البيانات. المجموع كان بيقرّب مسار التأكيد من سقف المضيف،
+    والعميل بيشوف صفحة خطأ بعد ما طلبه اتسجّل فعلًا.
+
+    الطلب موجود، والقياس بيلحق نفسه. ولو وقع، بيتسجّل في السجل
+    وبس — ما يصحّش قياس يمنع تأكيد بيعة.
+  */
 
   /**
    * إحالة صاحب.
@@ -607,34 +618,27 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
    * صاحبه في كل طلب والاتنين ياخدوا نقاط بلا نهاية. والنقاط نفسها
    * بتتصرف وقت التسليم زي نقاط الشراء.
    */
-  try {
-    const rfCode = (await cookies()).get('zw_rf')?.value
-    if (rfCode) {
-      await recordReferral({
-        storeId: store.id,
-        code: rfCode,
-        referredCustomerId: result.customerId,
-        previousOrders: customerOrdersBefore,
-        orderId: result.orderId!,
-      })
-    }
-  } catch (e) {
-    console.error('فشل تسجيل الإحالة:', e)
+  const rfCode = (await cookies()).get('zw_rf')?.value
+  if (rfCode) {
+    void recordReferral({
+      storeId: store.id,
+      code: rfCode,
+      referredCustomerId: result.customerId,
+      previousOrders: customerOrdersBefore,
+      orderId: result.orderId!,
+    }).catch((e) => console.error('فشل تسجيل الإحالة:', e))
   }
 
   /*
     تقييد تحويلات تجارب السعر. بعد نجاح الطلب لا قبله — التجربة
     بتقيس البيعات اللي تمّت فعلًا.
   */
-  try {
-    await trackExperimentConversions(
-      store.id,
-      await visitorId(),
-      lines.map((l) => ({ productId: l.productId, total: l.total })),
-    )
-  } catch (e) {
-    console.error('فشل تسجيل تحويل التجربة:', e)
-  }
+  const visitor = await visitorId()
+  void trackExperimentConversions(
+    store.id,
+    visitor,
+    lines.map((l) => ({ productId: l.productId, total: l.total })),
+  ).catch((e) => console.error('فشل تسجيل تحويل التجربة:', e))
 
   /**
    * رسائل التأكيد — بعد ما المعاملة نجحت لا جوّاها.

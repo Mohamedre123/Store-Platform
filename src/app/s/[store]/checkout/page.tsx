@@ -9,6 +9,21 @@ import { CheckoutForm } from './checkout-form'
 import { EmptyCart } from './empty-cart'
 
 export const dynamic = 'force-dynamic'
+
+/**
+ * مهلة تأكيد الطلب.
+ *
+ * أفعال الخادم بتاخد إعدادات الصفحة اللي بتتنادى منها، والافتراضي
+ * على المضيف **عشر ثواني**. تأكيد الطلب بيعمل معاملة كاملة (طلب،
+ * سطور، مخزون، حركات، إحصاءات العميل) وبعدها بيفتح جلسة دفع عند
+ * البوابة — والبوابة طرف خارجي مالوش سقف نضمنه.
+ *
+ * أول ما المجموع يعدّي العشرة، المضيف بيقطع الاستدعاء ويرجّع صفحة
+ * خطأ عامة. والعميل بيشوف «This page couldn't load» بعد ما دفع
+ * وملأ بياناته — وما بيعرفش إذا كان طلبه اتسجّل ولا لأ.
+ */
+export const maxDuration = 60
+
 export const metadata = { title: 'إتمام الطلب' }
 
 export default async function CheckoutPage({ params }: { params: Promise<{ store: string }> }) {

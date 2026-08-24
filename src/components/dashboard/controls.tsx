@@ -1,6 +1,7 @@
 'use client'
 
 import { useId, type ReactNode } from 'react'
+import { Wand2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 /**
@@ -150,29 +151,44 @@ export function ColorField({
   const id = useId()
   return (
     <Row label={label} hint={hint}>
-      <div className="flex items-center gap-2">
-        <label
-          htmlFor={id}
-          className="h-10 w-10 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-[var(--border-strong)]"
-          style={{ background: value }}
-        >
+      {/*
+        عمودان لا صف واحد.
+
+        الصف الواحد كان بيشتغل في لوحة عريضة بس: المنتقي (٤٠px) وخانة
+        الكود (١١٢px ثابتة) وعشر عيّنات — قرب ٤٠٠px. أول ما اتحطّ
+        خانتين لون جنب بعض، العمود بقى نصّ العرض، فالعيّنات اتكوّمت
+        فوق بعض والخانات اتراكبت وبقى الشكل ملغبط.
+
+        دلوقتي الكود بياخد المساحة الفاضلة (`flex-1 min-w-0`) بدل عرض
+        ثابت، والعيّنات على سطر لوحدها بتلفّ عادي. الشكل واحد في أي عرض.
+      */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <label
+            htmlFor={id}
+            className="h-10 w-10 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-[var(--border-strong)]"
+            style={{ background: value }}
+          >
+            <input
+              id={id}
+              type="color"
+              value={/^#[0-9a-fA-F]{6}$/.test(value) ? value : '#000000'}
+              onChange={(e) => onChange(e.target.value)}
+              className="h-full w-full cursor-pointer opacity-0"
+              aria-label={label}
+            />
+          </label>
           <input
-            id={id}
-            type="color"
+            type="text"
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="h-full w-full cursor-pointer opacity-0"
-            aria-label={label}
+            dir="ltr"
+            spellCheck={false}
+            aria-label={`${label} — الكود`}
+            className="h-10 min-w-0 flex-1 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-2.5 text-start font-mono text-xs uppercase focus:border-[var(--primary)] focus:outline-none"
           />
-        </label>
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          dir="ltr"
-          spellCheck={false}
-          className="h-10 w-28 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-2.5 text-start font-mono text-xs focus:border-[var(--primary)] focus:outline-none"
-        />
+        </div>
+
         <div className="flex flex-wrap gap-1">
           {SWATCHES.map((c) => (
             <button
@@ -181,8 +197,10 @@ export function ColorField({
               onClick={() => onChange(c)}
               aria-label={`اللون ${c}`}
               className={cn(
-                'h-6 w-6 rounded-md border transition-transform hover:scale-110',
-                value.toLowerCase() === c ? 'border-[var(--primary)] ring-1 ring-[var(--primary)]' : 'border-[var(--border)]',
+                'h-6 w-6 shrink-0 rounded-md border transition-transform hover:scale-110',
+                value.toLowerCase() === c
+                  ? 'border-[var(--primary)] ring-1 ring-[var(--primary)]'
+                  : 'border-[var(--border)]',
               )}
               style={{ background: c }}
             />
@@ -203,6 +221,7 @@ export function TextField({
   placeholder,
   ltr = false,
   multiline = false,
+  suggestion,
 }: {
   label: string
   hint?: string
@@ -211,6 +230,14 @@ export function TextField({
   placeholder?: string
   ltr?: boolean
   multiline?: boolean
+  /**
+   * كلام جاهز التاجر يقدر ياخده بضغطة.
+   *
+   * بديل الملء التلقائي: الملء التلقائي كان بيحطّ كلام في المتجر
+   * التاجر ما كتبهوش ولا موافق عليه، ويفضل يدوّر على مكان يمسحه
+   * منه وما فيش. الاقتراح بيفضل اقتراحًا لحد ما يضغط عليه.
+   */
+  suggestion?: string
 }) {
   const shared =
     'w-full rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-sm transition-colors focus:border-[var(--primary)] focus:outline-none'
@@ -235,6 +262,18 @@ export function TextField({
           dir={ltr ? 'ltr' : undefined}
           className={cn(shared, 'h-10', ltr && 'text-start')}
         />
+      )}
+
+      {/* الاقتراح بيبان للخانة الفاضية بس — بعد ما يكتب مالوش لزوم */}
+      {suggestion && !value.trim() && (
+        <button
+          type="button"
+          onClick={() => onChange(suggestion)}
+          className="flex w-fit max-w-full items-center gap-1.5 rounded-lg border border-dashed border-[var(--border-strong)] px-2.5 py-1.5 text-start text-xs text-[var(--fg-muted)] transition-colors hover:border-[var(--primary)] hover:text-[var(--primary)]"
+        >
+          <Wand2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span className="truncate">اقتراح: {suggestion}</span>
+        </button>
       )}
     </Row>
   )

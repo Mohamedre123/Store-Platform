@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ArrowUp, MessageCircle } from 'lucide-react'
+import { ArrowUp } from 'lucide-react'
+import { WhatsappIcon } from './whatsapp-icon'
 import type { ToolbarSettings } from '@/lib/customization'
 import { StoreBot } from './store-bot'
 import { normalizePhone } from '@/lib/utils'
@@ -74,6 +75,12 @@ export function StoreToolbar({
           greeting={bot.greeting}
           accent={bot.accent}
           whatsappHref={waHref}
+          /*
+            لوحة المحادثة بتقف فوق الأزرار العائمة، والأزرار نفسها
+            بتترفع فوق شريط التنقّل السفلي. من غير ما تعرف الحالة دي،
+            اللوحة كانت بتنزل على الأزرار فتبان مقصوصة من تحت.
+          */
+          liftedOnMobile={toolbar.mobileNavEnabled}
         />
       )}
 
@@ -94,7 +101,7 @@ export function StoreToolbar({
           } ${toolbar.showOnDesktop ? 'md:flex' : 'md:hidden'}`}
           style={{ background: '#25D366' }}
         >
-          <MessageCircle className="h-7 w-7" aria-hidden="true" />
+          <WhatsappIcon className="h-7 w-7" />
         </a>
       )}
     </div>

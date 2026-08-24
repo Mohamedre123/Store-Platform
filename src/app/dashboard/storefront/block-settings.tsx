@@ -576,14 +576,14 @@ function CountdownSettings({ settings, onChange }: { settings: Record<string, un
         <LinkPicker value={b.ctaUrl} onChange={(v) => set({ ctaUrl: v })} />
 
         {b.ctaLabel.trim() && (
-          <div className="grid gap-4 sm:grid-cols-2">
+          <>
             <ColorField label="لون الزر" value={b.ctaBg || '#ffffff'} onChange={(v) => set({ ctaBg: v })} />
             <ColorField
-              label="لون نص الزر"
+              label="لون الكلام جوّه الزر"
               value={b.ctaColor || '#111111'}
               onChange={(v) => set({ ctaColor: v })}
             />
-          </div>
+          </>
         )}
       </Group>
 
@@ -606,14 +606,23 @@ function CountdownSettings({ settings, onChange }: { settings: Record<string, un
           max={90}
           suffix="%"
         />
-        <NumberField
-          label="ضبابية خلف النص"
-          value={b.blur}
-          onChange={(v) => set({ blur: Math.min(24, Math.max(0, v)) })}
-          min={0}
-          max={24}
-          suffix="px"
+        <Toggle
+          label="خلفية ضبابية ورا الكلام"
+          hint="لوح مضبّب ورا الكلام والزر بس — الصورة تفضل واضحة."
+          checked={b.blurEnabled}
+          onChange={(v) => set({ blurEnabled: v, blur: v ? b.blur || 18 : b.blur })}
         />
+
+        {b.blurEnabled && (
+          <NumberField
+            label="شدّة الضبابية"
+            value={b.blur}
+            onChange={(v) => set({ blur: Math.min(40, Math.max(2, v)) })}
+            min={2}
+            max={40}
+            suffix="px"
+          />
+        )}
       </Group>
     </>
   )
@@ -640,18 +649,18 @@ function RichTextSettings({ settings, onChange }: { settings: Record<string, unk
         <LinkPicker value={b.ctaUrl} onChange={(v) => set({ ctaUrl: v })} />
 
         {b.ctaLabel.trim() && (
-          <div className="grid gap-4 sm:grid-cols-2">
+          <>
             <ColorField
               label="لون الزر"
               value={b.ctaBg || '#000000'}
               onChange={(v) => set({ ctaBg: v })}
             />
             <ColorField
-              label="لون نص الزر"
+              label="لون الكلام جوّه الزر"
               value={b.ctaColor || '#ffffff'}
               onChange={(v) => set({ ctaColor: v })}
             />
-          </div>
+          </>
         )}
       </Group>
 

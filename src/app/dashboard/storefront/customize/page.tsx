@@ -52,6 +52,7 @@ export default async function CustomizePage() {
       initial={customization}
       previewUrl={`/s/${store.slug}?preview=1`}
       themeName={theme.name}
+      store={{ name: store.name, tagline: store.tagline }}
     />
   )
 }

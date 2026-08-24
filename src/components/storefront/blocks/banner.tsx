@@ -112,7 +112,7 @@ export function BannerCard({
           <span
             className="flex max-w-lg flex-col gap-2 rounded-[var(--sf-radius)]"
             style={
-              item.blur > 0
+              item.blurEnabled && item.blur > 0
                 ? {
                     /*
                       الضبابية خلف النص بس، مش على الصورة كلها: كده
@@ -121,7 +121,7 @@ export function BannerCard({
                     */
                     backdropFilter: `blur(${item.blur}px)`,
                     WebkitBackdropFilter: `blur(${item.blur}px)`,
-                    background: 'rgba(0,0,0,0.16)',
+                    background: 'rgba(0,0,0,0.28)',
                     padding: '1rem 1.25rem',
                   }
                 : undefined

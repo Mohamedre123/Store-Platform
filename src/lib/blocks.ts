@@ -58,6 +58,8 @@ export type SlideItem = {
   overlay: number
   /** ضبابية خلف النص — بتفصله عن الصورة من غير ما تغطّيها */
   blur: number
+  /** مفتاحها — منفصل عن الشدّة عشان التاجر يقفلها ويرجّعها بنفس الرقم */
+  blurEnabled: boolean
   textPosition: 'start' | 'center' | 'end'
   textColor: string
   /**
@@ -147,6 +149,7 @@ export type CountdownBlock = {
   ctaColor: string
   overlay: number
   blur: number
+  blurEnabled: boolean
 }
 
 export type RichTextBlock = {
@@ -251,7 +254,8 @@ export function newSlide(id: string): SlideItem {
     ctaLabel: '',
     ctaUrl: '',
     overlay: 25,
-    blur: 0,
+    blur: 18,
+    blurEnabled: false,
     textPosition: 'center',
     textColor: '#ffffff',
     ctaBg: '#ffffff',
@@ -331,7 +335,8 @@ const DEFAULTS: DefaultsMap = {
     ctaBg: '#ffffff',
     ctaColor: '#111111',
     overlay: 40,
-    blur: 0,
+    blur: 18,
+    blurEnabled: false,
   },
   rich_text: {
     heading: '',

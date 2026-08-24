@@ -163,11 +163,11 @@ function Slide({ item, index, total }: { item: SlideItem; index: number; total: 
         <span
           className="flex max-w-xl flex-col gap-3 rounded-[var(--sf-radius)]"
           style={
-            item.blur > 0
+            item.blurEnabled && item.blur > 0
               ? {
                   backdropFilter: `blur(${item.blur}px)`,
                   WebkitBackdropFilter: `blur(${item.blur}px)`,
-                  background: 'rgba(0,0,0,0.16)',
+                  background: 'rgba(0,0,0,0.28)',
                   padding: '1.25rem 1.5rem',
                 }
               : undefined

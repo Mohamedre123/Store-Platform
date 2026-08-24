@@ -31,14 +31,19 @@ const FONT_OPTIONS = (Object.keys(FONT_LABELS) as Array<keyof typeof FONT_LABELS
   label: FONT_LABELS[k],
 }))
 
+/** بيانات المتجر — مصدر الاقتراحات الجاهزة في المحرّر */
+export type StoreHints = { name: string; tagline: string | null }
+
 export function Panel({
   panel,
   value,
   patch,
+  store,
 }: {
   panel: PanelKey
   value: Customization
   patch: Patch
+  store: StoreHints
 }) {
   /* ══════════════════ الهوية ══════════════════ */
   if (panel === 'identity') {
@@ -331,11 +336,23 @@ export function Panel({
                     folder="banners"
                   />
 
-                  <TextField label="العنوان" value={slide.title} onChange={(v) => setSlide(slide.id, { title: v })} />
+                  {/*
+                    الاقتراح بيتحطّ بضغطة، ما بينزلش لوحده.
+                    الملء التلقائي كان بيكتب في بانر التاجر كلامًا هو
+                    ما كتبهوش، ويفضل يدوّر على مكان يمسحه منه وما فيش.
+                  */}
+                  <TextField
+                    label="العنوان"
+                    value={slide.title}
+                    onChange={(v) => setSlide(slide.id, { title: v })}
+                    suggestion={store.name}
+                    hint="سيبه فاضي لو الصورة نفسها فيها العنوان."
+                  />
                   <TextField
                     label="الوصف"
                     value={slide.subtitle}
                     onChange={(v) => setSlide(slide.id, { subtitle: v })}
+                    suggestion={store.tagline || 'اطلب دلوقتي والتوصيل لباب البيت'}
                   />
                   <TextField
                     label="نص الزر"
@@ -350,18 +367,20 @@ export function Panel({
                     onChange={(v) => setSlide(slide.id, { ctaUrl: v })}
                   />
 
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <ColorField
-                      label="لون الزر"
-                      value={slide.ctaBg ?? '#ffffff'}
-                      onChange={(v) => setSlide(slide.id, { ctaBg: v })}
-                    />
-                    <ColorField
-                      label="لون نص الزر"
-                      value={slide.ctaColor ?? value.identity.primary}
-                      onChange={(v) => setSlide(slide.id, { ctaColor: v })}
-                    />
-                  </div>
+                  {slide.ctaLabel.trim() && (
+                    <>
+                      <ColorField
+                        label="لون الزر"
+                        value={slide.ctaBg ?? '#ffffff'}
+                        onChange={(v) => setSlide(slide.id, { ctaBg: v })}
+                      />
+                      <ColorField
+                        label="لون الكلام جوّه الزر"
+                        value={slide.ctaColor ?? value.identity.primary}
+                        onChange={(v) => setSlide(slide.id, { ctaColor: v })}
+                      />
+                    </>
+                  )}
                   <Choice
                     label="مكان النص"
                     value={slide.textPosition}
@@ -382,15 +401,36 @@ export function Panel({
                     suffix="%"
                   />
 
-                  <NumberField
-                    label="ضبابية خلف النص"
-                    hint="بتضبّب الخلفية ورا النص والزر بس — الصورة تفضل واضحة والزر يبان."
-                    value={slide.blur ?? 0}
-                    onChange={(v) => setSlide(slide.id, { blur: Math.min(24, Math.max(0, v)) })}
-                    min={0}
-                    max={24}
-                    suffix="px"
+                  <ColorField
+                    label="لون العنوان والوصف"
+                    hint="بيتطبّق على الكلام اللي إنت كاتبه فوق الصورة."
+                    value={slide.textColor ?? '#ffffff'}
+                    onChange={(v) => setSlide(slide.id, { textColor: v })}
                   />
+
+                  <Toggle
+                    label="خلفية ضبابية ورا الكلام"
+                    hint="لوح مضبّب ورا العنوان والزر بس — الصورة تفضل واضحة. شغّلها لو الكلام بيتوه في الصورة."
+                    checked={slide.blurEnabled ?? (slide.blur ?? 0) > 0}
+                    onChange={(v) =>
+                      setSlide(slide.id, {
+                        blurEnabled: v,
+                        /* أول تشغيل بيبدأ بشدّة تبان فعلًا مش بصفر */
+                        blur: v ? slide.blur || 18 : (slide.blur ?? 0),
+                      })
+                    }
+                  />
+
+                  {(slide.blurEnabled ?? (slide.blur ?? 0) > 0) && (
+                    <NumberField
+                      label="شدّة الضبابية"
+                      value={slide.blur ?? 18}
+                      onChange={(v) => setSlide(slide.id, { blur: Math.min(40, Math.max(2, v)) })}
+                      min={2}
+                      max={40}
+                      suffix="px"
+                    />
+                  )}
                 </div>
               ))}
 
@@ -411,6 +451,8 @@ export function Panel({
                         textPosition: 'start' as const,
                         overlay: 30,
                         blur: 0,
+                        blurEnabled: false,
+                        textColor: '#ffffff',
                         ctaBg: '#ffffff',
                         ctaColor: value.identity.primary,
                       },

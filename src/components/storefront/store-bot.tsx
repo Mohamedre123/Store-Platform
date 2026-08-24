@@ -31,12 +31,15 @@ export function StoreBot({
   greeting,
   whatsappHref,
   accent,
+  liftedOnMobile = true,
 }: {
   storeIdentifier: string
   greeting: string
   whatsappHref: string | null
   /** لون المتجر — البوت جزء من المتجر مش أداة غريبة عليه */
   accent: string
+  /** الأزرار العائمة مرفوعة فوق شريط التنقّل السفلي؟ */
+  liftedOnMobile?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<Msg[]>([])
@@ -182,7 +185,28 @@ export function StoreBot({
             الديسكتوب لوحة جنبية. اللوحة الثابتة بعرض ٢٤rem بتخرج برّه
             الشاشة على ٣٢٠px وبتعمل تمرير أفقي في المتجر كله.
           */
-          className="fixed inset-x-3 bottom-24 z-50 flex max-h-[70vh] flex-col overflow-hidden rounded-2xl border border-[var(--sf-text)]/12 bg-[var(--sf-surface)] shadow-2xl sm:inset-x-auto sm:bottom-24 sm:end-4 sm:w-[24rem]"
+          /*
+            الارتفاع بـ`svh` لا `vh`.
+
+            `vh` على موبايل بيتحسب على الشاشة **من غير** شريط عنوان
+            المتصفح، فاللوحة بتطلع أطول من المساحة الظاهرة وآخرها
+            بيتقص — والعميل بيلاقي خانة الكتابة نُصّها مخفي.
+
+            والقاع بيتحسب من فوق الأزرار العائمة نفسها: هي مرفوعة
+            `5.5rem` فوق شريط التنقّل وطولها `3.5rem`، فاللوحة
+            بتبدأ من `9.5rem` وفوق. من غير الحساب ده كانت بتنزل
+            عليها فتبان مقصوصة.
+          */
+          /*
+            الإزاحة متغيّر CSS لا كلاس مبني وقت التشغيل.
+
+            Tailwind بيولّد كلاساته من قراءة الملفات، فأي كلاس متركّب
+            من قيمة بتتحسب أثناء التشغيل ما بيتولّدش أصلًا — الكلاس
+            بيوصل للمتصفح بلا تعريف والعنصر بيقع في مكانه الافتراضي.
+            المتغيّر بيتحطّ inline، والكلاسات نفسها ثابتة.
+          */
+          style={{ '--bot-lift': liftedOnMobile ? '9.5rem' : '5rem' } as React.CSSProperties}
+          className="fixed inset-x-3 bottom-[var(--bot-lift)] z-50 flex h-[min(72svh,34rem)] max-h-[calc(100svh-var(--bot-lift)-1.5rem)] flex-col overflow-hidden rounded-2xl border border-[var(--sf-text)]/12 bg-[var(--sf-surface)] shadow-2xl sm:inset-x-auto sm:bottom-24 sm:end-4 sm:h-[min(78vh,40rem)] sm:max-h-[calc(100svh-8rem)] sm:w-[26rem]"
         >
           <div
             className="flex shrink-0 items-center gap-2 px-4 py-3 text-white"

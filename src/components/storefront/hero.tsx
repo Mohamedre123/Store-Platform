@@ -53,33 +53,44 @@ export function Hero({
   const hasImage = Boolean(active?.imageDesktop || active?.imageMobile)
 
   /**
-   * لو الشريحة صورة بلا عنوان مكتوب، ما نكتبش عليها حاجة.
+   * **بنعرض اللي التاجر كتبه بالظبط — ولا كلمة زيادة.**
    *
-   * أغلب التجار بيرفعوا بانر النص فيه مرسوم جوّه الصورة أصلًا. لو
-   * كتبنا اسم المتجر فوقه، النصّين بيتراكبوا والبانر يبقى غير مقروء.
-   * الصمت هنا أصحّ من ملء الفراغ.
+   * كان فيه احتياطي على كل خانة: العنوان الفاضي بياخد اسم المتجر،
+   * والوصف الفاضي بياخد «اطلب دلوقتي والتوصيل لباب البيت». فالتاجر
+   * يكتب عنوانه، ويفتح متجره، ويلاقي تحته جملة مكتوبة مش من عنده —
+   * ويفضل يدوّر على مكان يمسحها منه وما فيش.
+   *
+   * الاحتياطي ده كان معمول لحالة واحدة: متجر لسه ما ظبّطش بانره
+   * خالص، عشان أول الصفحة ما يبقاش مربّعًا ملوّنًا فاضي. فبيتحصر
+   * فيها: شريحة فيها أي محتوى بتتعرض زي ما هي.
    */
-  const showText = hasImage ? Boolean(active?.title || active?.subtitle) : true
+  const typed = {
+    title: active?.title?.trim() ?? '',
+    subtitle: active?.subtitle?.trim() ?? '',
+    cta: active?.ctaLabel?.trim() ?? '',
+  }
+
+  /* شريحة «فاضية» = لا صورة ولا كلام ولا زر — يبقى مافيش بانر أصلًا */
+  const blank = !hasImage && !typed.title && !typed.subtitle && !typed.cta
+
+  const title = blank ? storeName : typed.title
+  const subtitle = blank ? tagline || 'اطلب دلوقتي والتوصيل لباب البيت' : typed.subtitle
+  const ctaLabel = blank ? 'تسوّق دلوقتي' : typed.cta
+  const ctaUrl = active?.ctaUrl || '/products'
+
+  const showText = Boolean(title || subtitle)
+  const showCta = Boolean(ctaLabel)
 
   /**
-   * الزر قراره منفصل عن العنوان.
+   * الضبابية اختيار صريح.
    *
-   * كان مربوطًا بيه، فالتاجر اللي رفع بانر جاهز (النص مرسوم جوّه
-   * الصورة) وكتب «تسوّق الان» في خانة الزر، كان بيحفظ ويفتح متجره
-   * فما يلاقيش زر — والخانة اللي ملاها ما عملتش حاجة.
-   *
-   * فبنعرضه لما يكون **هو كتبه بنفسه**. والافتراضي بيظهر في حالة
-   * واحدة بس: مافيش صورة أصلًا، يعني إحنا اللي بنرسم البانر
-   * وبيحتاج مخرجًا.
+   * كانت رقمًا، والتاجر اللي عايز يجرّبها ويرجع لازم يفتكر إنها كانت
+   * صفر. المفتاح بيقول «شغّالة ولا لأ» من نظرة، والشدّة بتبان لما
+   * يشغّلها بس.
    */
-  const typedCta = Boolean(active?.ctaLabel?.trim())
-  const showCta = typedCta || !hasImage
+  const blur = active?.blurEnabled === false ? 0 : (active?.blur ?? 0)
+  const textColor = active?.textColor || '#ffffff'
 
-  const title = active?.title || storeName
-  const subtitle = active?.subtitle || tagline || 'اطلب دلوقتي والتوصيل لباب البيت'
-  const ctaLabel = active?.ctaLabel?.trim() || 'تسوّق دلوقتي'
-  const ctaUrl = active?.ctaUrl || '/products'
-  const blur = active?.blur ?? 0
   const align =
     active?.textPosition === 'center'
       ? 'items-center text-center'
@@ -106,8 +117,9 @@ export function Hero({
     return (
       <section data-sf="hero" className="mx-auto grid max-w-6xl items-center gap-8 px-4 py-12 sm:px-6 md:grid-cols-2">
         <div className="flex flex-col gap-4">
-          <h1 className="text-balance text-3xl font-bold tracking-tight sm:text-5xl">{title}</h1>
-          <p className="text-lg opacity-70">{subtitle}</p>
+          {title && <h1 className="text-balance text-3xl font-bold tracking-tight sm:text-5xl">{title}</h1>}
+          {subtitle && <p className="text-lg opacity-70">{subtitle}</p>}
+          {showCta && (
           <Link
             href={ctaUrl}
             className="mt-2 inline-flex min-h-12 w-fit items-center gap-2 rounded-[var(--sf-radius)] px-6 font-semibold shadow-sm transition-opacity hover:opacity-90"
@@ -119,6 +131,7 @@ export function Hero({
             {ctaLabel}
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           </Link>
+          )}
         </div>
         <div className="relative aspect-[4/3] overflow-hidden rounded-[var(--sf-radius)] bg-[var(--sf-primary)]">
           {active?.imageDesktop && (
@@ -180,19 +193,29 @@ export function Hero({
                     */
                     backdropFilter: `blur(${blur}px)`,
                     WebkitBackdropFilter: `blur(${blur}px)`,
-                    background: 'rgba(0,0,0,0.16)',
+                    /*
+                      طبقة خفيفة مع الضبابية.
+                      الضبابية وحدها بتبان باهتة فوق صورة هادية —
+                      الطبقة بتدّي النص أرضية يقف عليها.
+                    */
+                    background: 'rgba(0,0,0,0.28)',
                     padding: '1.25rem 1.5rem',
                   }
                 : undefined
             }
           >
-            {showText && (
-              <>
-                <h1 className="text-balance text-3xl font-bold tracking-tight text-white sm:text-5xl">
-                  {title}
-                </h1>
-                <p className="max-w-lg text-white/85">{subtitle}</p>
-              </>
+            {title && (
+              <h1
+                className="text-balance text-3xl font-bold tracking-tight sm:text-5xl"
+                style={{ color: textColor }}
+              >
+                {title}
+              </h1>
+            )}
+            {subtitle && (
+              <p className="max-w-lg" style={{ color: textColor, opacity: 0.85 }}>
+                {subtitle}
+              </p>
             )}
             {showCta && cta}
           </div>

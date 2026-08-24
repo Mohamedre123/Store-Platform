@@ -189,18 +189,18 @@ export function SlideFields({
       <LinkPicker value={slide.ctaUrl} onChange={(v) => patch({ ctaUrl: v })} />
 
       {slide.ctaLabel.trim() && (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <>
           <ColorField
             label="لون الزر"
             value={slide.ctaBg || '#ffffff'}
             onChange={(v) => patch({ ctaBg: v })}
           />
           <ColorField
-            label="لون نص الزر"
+            label="لون الكلام جوّه الزر"
             value={slide.ctaColor || '#111111'}
             onChange={(v) => patch({ ctaColor: v })}
           />
-        </div>
+        </>
       )}
 
       <Choice
@@ -214,7 +214,11 @@ export function SlideFields({
         ]}
       />
 
-      <ColorField label="لون النص" value={slide.textColor} onChange={(v) => patch({ textColor: v })} />
+      <ColorField
+        label="لون العنوان والوصف"
+        value={slide.textColor}
+        onChange={(v) => patch({ textColor: v })}
+      />
 
       <NumberField
         label="تعتيم الصورة"
@@ -226,15 +230,23 @@ export function SlideFields({
         hint="النص الأبيض على صورة فاتحة ما بيتقراش من غير تعتيم"
       />
 
-      <NumberField
-        label="ضبابية خلف النص"
-        value={slide.blur}
-        onChange={(v) => patch({ blur: Math.min(24, Math.max(0, v)) })}
-        min={0}
-        max={24}
-        suffix="px"
-        hint="بتفصل النص عن الصورة من غير ما تغطّيها"
+      <Toggle
+        label="خلفية ضبابية ورا الكلام"
+        hint="لوح مضبّب ورا الكلام والزر بس — الصورة تفضل واضحة. شغّلها لو الكلام بيتوه في الصورة."
+        checked={slide.blurEnabled}
+        onChange={(v) => patch({ blurEnabled: v, blur: v ? slide.blur || 18 : slide.blur })}
       />
+
+      {slide.blurEnabled && (
+        <NumberField
+          label="شدّة الضبابية"
+          value={slide.blur}
+          onChange={(v) => patch({ blur: Math.min(40, Math.max(2, v)) })}
+          min={2}
+          max={40}
+          suffix="px"
+        />
+      )}
     </>
   )
 }
