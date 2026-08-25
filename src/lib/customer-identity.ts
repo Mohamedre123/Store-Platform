@@ -192,24 +192,29 @@ export async function rememberContact(input: {
 
   if (!current) return
 
-  const patch = {
-    ...(phone && !current.phone ? { phone } : {}),
-    ...(email && !current.email ? { email } : {}),
-  }
+  /**
+   * كل وسيلة لوحدها — مش الاتنين في تحديث واحد.
+   *
+   * الرقم ممكن يكون فاضي والبريد مسجّل على حساب تاني. لو كتبناهم
+   * مع بعض، تعارض البريد بيلغي كتابة الرقم كمان — والعميل بيفضل
+   * بلا رقم على حسابه بلا سبب.
+   *
+   * والتعارض نفسه مش خطأ: الوسيلة مسجّلة على حساب تاني في نفس
+   * المتجر، والدمج مكانه لحظة التحقق لا لحظة الطلب — لأن كتابة
+   * حاجة في خانة مش إثبات ملكية.
+   */
+  const writes: Array<Record<string, string>> = []
+  if (phone && !current.phone) writes.push({ phone })
+  if (email && !current.email) writes.push({ email })
 
-  if (Object.keys(patch).length === 0) return
-
-  /*
-    الوسيلة ممكن تكون على حساب تاني في نفس المتجر — والفهرس فريد.
-    بنسكت في الحالة دي: الدمج بيحصل لما العميل يتحقّق منها فعلًا،
-    وقبلها ما نلمسش حسابًا تاني.
-  */
-  try {
-    await db
-      .update(customers)
-      .set(patch)
-      .where(and(eq(customers.id, input.customerId), eq(customers.storeId, input.storeId)))
-  } catch {
-    /* تعارض فهرس — الوسيلة مسجّلة على حساب تاني، والدمج مكانه التحقق */
+  for (const patch of writes) {
+    try {
+      await db
+        .update(customers)
+        .set(patch)
+        .where(and(eq(customers.id, input.customerId), eq(customers.storeId, input.storeId)))
+    } catch {
+      /* الوسيلة على حساب تاني — بنسيبها، والدمج بيحصل وقت التحقق */
+    }
   }
 }
