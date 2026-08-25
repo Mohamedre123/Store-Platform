@@ -101,7 +101,7 @@ export async function sendAbandonedCartReminders(limit = 50): Promise<ReminderRe
 
       const theme = await getStoreTheme(cart.storeId)
       const mail = abandonedCartEmail(
-        { name: cart.storeName, logo: cart.storeLogo, primary: theme.custom.identity.primary, email: cart.storeEmail },
+        { name: cart.storeName, logo: cart.storeLogo, primary: theme.custom.identity.primary, email: cart.storeEmail, slug: cart.storeSlug },
         {
           customerName: cart.customerName,
           lines: items,
@@ -153,6 +153,7 @@ export async function sendAbandonedCartReminders(limit = 50): Promise<ReminderRe
 
       const sent = await sendEmail({
         senderName: cart.storeName,
+        senderSlug: cart.storeSlug,
         /* تسويقية — العميل ما طلبهاش، فليها إلغاء اشتراك */
         bulk: true,
         unsubscribeUrl,

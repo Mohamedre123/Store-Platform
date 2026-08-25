@@ -387,7 +387,7 @@ export async function applyOrderStatus(
       const theme = await getStoreTheme(store.id)
       const storeEmail = store.email
       const mail = orderStatusEmail(
-        { name: store.name, logo: store.logoLight, primary: theme.custom.identity.primary, email: store.email },
+        { name: store.name, logo: store.logoLight, primary: theme.custom.identity.primary, email: store.email, slug: store.slug },
         status,
         {
           orderNumber: order.orderNumber,
@@ -406,6 +406,7 @@ export async function applyOrderStatus(
         replyTo: safeReplyTo(storeEmail),
         // الرسالة بتيجي باسم متجره لا باسمنا
         senderName: store.name,
+        senderSlug: store.slug,
         log: {
           storeId: store.id,
           event: `order_${status}`,

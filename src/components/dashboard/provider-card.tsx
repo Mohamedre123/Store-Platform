@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useTransition } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Check,
   Copy,
@@ -85,6 +86,13 @@ export function ProviderCard({
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [pending, start] = useTransition()
   const panelRef = useRef<HTMLDivElement>(null)
+
+  /*
+    الـportal محتاج `document` — وهو مش موجود وقت العرض على الخادم.
+    العلم ده بيأجّل النافذة للعرض في المتصفح بس.
+  */
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
 
   useEffect(() => {
     if (!open) return
@@ -245,9 +253,22 @@ export function ProviderCard({
         </div>
       </div>
 
-      {/* لوحة التفاصيل */}
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+      {/**
+       * لوحة التفاصيل — في `body` مباشرةً لا مكانها في الشجرة.
+       *
+       * **`z-50` مكانش بيكفي، وده السبب.** البطاقة جوّه `Reveal` اللي
+       * بيتحرّك بـ`transform`، و`transform` بيعمل **سياق تكديس جديد**.
+       * يعني `z-50` بتاع النافذة بيتحسب جوّه البطاقة بس — مش على
+       * الصفحة كلها. فأي كارت بعدها في الصفحة (الدفع عند الاستلام
+       * مثلًا) بيرسم فوق النافذة، وزرار «احفظ وفعّل» بيختفي وراه.
+       *
+       * الـ`portal` بيطلّع النافذة برّه أي سياق تكديس — فبتفضل فوق
+       * كل حاجة مهما اتحرّكت البطاقة اللي جواها.
+       */}
+      {open &&
+        mounted &&
+        createPortal(
+        <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center">
           <button
             type="button"
             aria-label="إغلاق"
@@ -508,8 +529,9 @@ export function ProviderCard({
               </button>
             </footer>
           </div>
-        </div>
-      )}
+        </div>,
+          document.body,
+        )}
     </>
   )
 }

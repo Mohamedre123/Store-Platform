@@ -16,6 +16,8 @@ export type StoreBrand = {
   name: string
   logo: string | null
   primary: string
+  /** سلَج المتجر — بيبقى الجزء الأول من عنوان المرسِل */
+  slug?: string | null
   /**
    * بريد التاجر — بيتكتب في تذييل الرسالة.
    *

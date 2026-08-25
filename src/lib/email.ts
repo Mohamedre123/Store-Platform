@@ -53,12 +53,45 @@ function encodeDisplayName(name: string): string {
  * والحل النهائي إن التاجر يوثّق نطاقه ويبعت من عليه — ساعتها الاسم
  * والنطاق بتوعه هو.
  */
-function fromHeader(senderName?: string | null): string {
+function fromHeader(senderName?: string | null, senderSlug?: string | null): string {
   const configured = process.env.EMAIL_FROM ?? ''
   const name = senderName?.trim()
   if (!name) return configured
 
-  const address = configured.match(/<([^>]+)>/)?.[1] ?? configured.trim()
+  const base = configured.match(/<([^>]+)>/)?.[1] ?? configured.trim()
+
+  /**
+   * العنوان يطابق الاسم — دي كانت المشكلة كلها.
+   *
+   * ## الدليل
+   * رسايل زاوية نفسها (تسجيل التاجر، استعادة كلمة السر) بتوصل
+   * الوارد عادي. ورسايل المتاجر بتروح السبام. **نفس النطاق، نفس
+   * المفتاح، نفس المزوّد، نفس اللحظة.** الفرق الوحيد في الكود إن
+   * رسايل المتجر بتغيّر الاسم الظاهر:
+   *
+   * ```
+   * زاوية    <no-reply@zawyaeg.site>   ← وارد
+   * atlosa   <no-reply@zawyaeg.site>   ← سبام
+   * ```
+   *
+   * الاسم بيدّعي علامة، والعنوان مالوش أي علاقة بيها. ودي بصمة
+   * انتحال هوية — نفس شكل الرسالة اللي بتدّعي إنها من بنك وعنوانها
+   * على نطاق تاني.
+   *
+   * ## الحل
+   * سلَج المتجر بيبقى الجزء الأول من العنوان: `atlosa@zawyaeg.site`.
+   * دلوقتي الاسم والعنوان متسقين، والنطاق بتاعنا وموقّع منه فعلًا.
+   *
+   * ده اللي بتعمله المنصات الكبيرة بالظبط — وما بيحتاجش من التاجر
+   * يوثّق نطاقًا ولا يضيف كلمة «عبر» على علامته.
+   */
+  const local = (senderSlug ?? '').trim().toLowerCase()
+  const domain = base.split('@')[1] ?? ''
+
+  const address =
+    /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/.test(local) && domain
+      ? `${local}@${domain}`
+      : base
 
   /*
     الاقتباس المزدوج والأقواس بيكسروا الترويسة — اسم متجر فيه
@@ -183,6 +216,14 @@ export async function sendEmail(options: {
    */
   senderName?: string | null
   /**
+   * سلَج المتجر — بيبقى الجزء الأول من عنوان المرسِل.
+   *
+   * من غيره الرسالة بتخرج «اسم المتجر <no-reply@نطاقنا>» — اسم
+   * علامة على عنوان مالوش علاقة بيها، ودي بصمة انتحال هوية عند
+   * الفلاتر. سيبه فاضي لرسايل المنصة نفسها.
+   */
+  senderSlug?: string | null
+  /**
    * مرفقات — الفاتورة PDF مثلًا.
    *
    * **بايتات لا رابط.** Resend بيقبل الاتنين، بس الرابط معناه إنه
@@ -194,8 +235,19 @@ export async function sendEmail(options: {
   /** رابط إلغاء الاشتراك بضغطة — للرسايل التسويقية بس */
   unsubscribeUrl?: string | null
 }): Promise<SendResult> {
-  const { to, subject, html, text, log, replyTo, senderName, bulk, attachments, unsubscribeUrl } =
-    options
+  const {
+    to,
+    subject,
+    html,
+    text,
+    log,
+    replyTo,
+    senderName,
+    senderSlug,
+    bulk,
+    attachments,
+    unsubscribeUrl,
+  } = options
 
   if (!isEmailConfigured()) {
     console.warn(
@@ -234,7 +286,7 @@ export async function sendEmail(options: {
        * مهما عملنا في الكود.
        */
       body: JSON.stringify({
-        from: fromHeader(senderName),
+        from: fromHeader(senderName, senderSlug),
         to: [to],
         subject,
         html,

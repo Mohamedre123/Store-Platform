@@ -27,6 +27,8 @@ export type IssueOtpResult =
 export async function issueOrderOtp(input: {
   storeId: string
   storeName: string
+  /** سلَج المتجر — عنوان المرسِل بيتبنى منه */
+  storeSlug?: string | null
   phone: string
   email?: string | null
 }): Promise<IssueOtpResult> {
@@ -56,6 +58,7 @@ export async function issueOrderOtp(input: {
   const spaced = code.split('').join(' ')
   await sendEmail({
     senderName: input.storeName,
+    senderSlug: input.storeSlug,
     log: { storeId: input.storeId, event: 'order_otp' },
     to: input.email,
     subject: `رمز تأكيد طلبك: ${code}`,

@@ -119,7 +119,7 @@ export async function sendRecoveryMessageAction(input: {
   if (wantsEmail(channel) && order.email) {
     const theme = await getStoreTheme(store.id)
     const mail = merchantMessageEmail(
-      { name: store.name, logo: store.logoLight, primary: theme.custom.identity.primary, email: store.email },
+      { name: store.name, logo: store.logoLight, primary: theme.custom.identity.primary, email: store.email, slug: store.slug },
       {
         subject: `بخصوص طلبك من ${store.name}`,
         body: text,
@@ -131,6 +131,7 @@ export async function sendRecoveryMessageAction(input: {
       ...mail,
       replyTo: safeReplyTo(store.email),
       senderName: store.name,
+      senderSlug: store.slug,
       log: {
         storeId: store.id,
         event: 'cart_recovery',

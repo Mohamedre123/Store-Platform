@@ -1100,6 +1100,7 @@ async function sendOrderEmails(ctx: {
     logo: store.logoLight,
     primary: theme.custom.identity.primary,
     email: store.email,
+    slug: store.slug,
   }
 
   const address = [input.street, input.building, input.area, input.city].filter(Boolean).join('، ') || null
@@ -1157,6 +1158,7 @@ async function sendOrderEmails(ctx: {
       ...orderInvoiceEmail(brandInfo, { ...order, trackUrl: invoiceUrl }),
       replyTo: safeReplyTo(store.email),
       senderName: store.name,
+      senderSlug: store.slug,
       ...(invoicePdf
         ? { attachments: [{ filename: `فاتورة-${orderNumber}.pdf`, content: invoicePdf }] }
         : {}),
@@ -1174,6 +1176,7 @@ async function sendOrderEmails(ctx: {
       */
       replyTo: safeReplyTo(store.email),
       senderName: store.name,
+      senderSlug: store.slug,
       log: { storeId: store.id, event: 'order_confirmation', orderId },
     })
   }
@@ -1185,6 +1188,7 @@ async function sendOrderEmails(ctx: {
       to: store.email,
       ...mail,
       senderName: store.name,
+      senderSlug: store.slug,
       log: { storeId: store.id, event: 'merchant_new_order', orderId },
     })
   }
@@ -1230,6 +1234,7 @@ export async function requestOrderOtpAction(input: {
   const res = await issueOrderOtp({
     storeId: store.id,
     storeName: store.name,
+    storeSlug: store.slug,
     phone,
     email: input.email,
   })

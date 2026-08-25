@@ -43,6 +43,7 @@ async function storeBrand(store: StorefrontStore) {
     logo: store.logoLight,
     primary: theme.custom.identity.primary,
     email: store.email,
+    slug: store.slug,
   }
 }
 /**
