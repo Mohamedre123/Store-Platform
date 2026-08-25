@@ -1,5 +1,4 @@
 import 'server-only'
-import { storeSenderAddress } from '@/lib/store-email-domain'
 import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { customers, verificationTokens } from '@/db/schema'
@@ -206,7 +205,7 @@ export async function issueCustomerOtp(input: {
     const sent = await sendEmail({
       to: emailTarget,
       ...mail,
-      senderAddress: await storeSenderAddress(input.storeId),
+      sender: { name: input.brand.name, slug: input.brand.slug },
       log: { storeId: input.storeId, event: 'customer_login_otp' },
     })
     if (sent.ok) channel = 'email'

@@ -1,5 +1,4 @@
 import { Suspense } from 'react'
-import { after } from 'next/server'
 import { getDashboardContext } from '@/lib/store-context'
 import { Sidebar } from '@/components/dashboard/sidebar'
 import { SectionTabs } from '@/components/dashboard/section-tabs'
@@ -11,19 +10,10 @@ import { Toaster } from '@/components/dashboard/toast'
 import { getAiConfig, isAssistantReady, GEMINI_PRO_SLUG, GEMINI_SLUG } from '@/lib/ai/settings'
 import { publicStoreUrl } from '@/lib/domain'
 import { logoutAction } from '@/app/(auth)/actions'
-import { autoVerifyEmailDomain } from '@/lib/store-email-domain'
 import { ExternalLink, LogOut } from 'lucide-react'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, store } = await getDashboardContext()
-
-  /*
-    نطاق بريد المتجر بيتجهّز في الخلفية أول ما التاجر يدخل لوحته —
-    مش في صفحة الإعدادات. اللي بيفتح صفحة بريد أصلًا هو اللي عنده
-    مشكلة خلاص، والمفروض ما توصلش لحد هناك: أول رسالة بتخرج للعميل
-    تكون طالعة من نطاق المتجر من غير ما حد يعمل حاجة.
-  */
-  after(autoVerifyEmailDomain(store.id))
 
 /*
     المساعد بيتحمّل بس لما يبقى شغّال فعلًا: اللوحة العائمة ملف عميل

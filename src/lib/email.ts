@@ -28,37 +28,65 @@ function unsubscribeAddress(): string {
 }
 
 /**
- * عنوان المرسِل — `info@` على نطاق المتجر، **بلا اسم ظاهر**.
+ * ترميز الاسم الظاهر لو فيه حروف مش لاتينية.
  *
- * ## ليه بلا اسم ظاهر
- * الاسم الظاهر جنب عنوان على نطاق تاني بصمة انتحال هوية. وبدل ما
- * نلفّ حواليها، بنشيلها: عميل البريد بيعرض العنوان نفسه، والعميل
- * بيقرا `info@atlosa.zawyaeg.site` فيعرف المتجر من العنوان.
- *
- * واسم المتجر ما ضاعش — موجود في موضوع كل رسالة وفي أول سطر فيها.
- *
- * ## ليه `info@` مش `no-reply@`
- * `no-reply` بيقول للفلتر وللعميل «دي رسالة آلية مش بترد»، والرسالة
- * اللي مالهاش رد بتاخد نقطة سلبية. و`info` عنوان طبيعي لأي جهة،
- * وبيبان أقرب لمراسلة حقيقية.
- *
- * ## النطاق بيترقّى لوحده
- * - نطاق المتجر ما اتوثّقش  →  `info@<نطاق المنصة>`
- * - نطاقه أو نطاقه الفرعي اتوثّق  →  `info@<نطاقه>`
- *
- * والفحص على «اتوثّق» لا على «موجود»: الإرسال من نطاق لسه ما اتوثّقش
- * بيترفض من المزوّد والرسالة بتضيع — والضياع أسوأ من السبام.
+ * ترويسات البريد ASCII بالأصل. اسم متجر بالعربي بيتبعت خام بيوصل
+ * محارف مكسّرة عند بعض المستقبِلين، وبيتحسب ترويسة غير سليمة عند
+ * الفلاتر. `RFC 2047` هو الشكل اللي كل عميل بريد بيفهمه.
  */
-function fromHeader(ownAddress?: string | null): string {
-  const configured = process.env.EMAIL_FROM ?? ''
-  const own = ownAddress?.trim()
-  if (own) return own
+function encodeDisplayName(name: string): string {
+  /*
+    الترتيب هنا مقصود: الشرطة المايلة آخر حاجة في المجموعة.
+    كتابتها في النص كانت بتخلّي القارئ يدمج الهروب مع اللي بعده
+    ويشيل حرف الـr من كل اسم — «Nour Shop» بقت «Nou Shop».
+  */
+  const clean = name.replace(/[\r\n"\\]/g, ' ').trim()
+  if (!/[^ -~]/.test(clean)) return `"${clean}"`
+  return `=?UTF-8?B?${Buffer.from(clean, 'utf8').toString('base64')}?=`
+}
 
-  /* نطاق المنصة: بناخد نطاقه من الإعداد ونحطّ `info` قبله */
+/** الجزء اللي قبل @ — من سلَج المتجر، ولاتيني بالإجبار */
+function localPart(slug?: string | null): string | null {
+  const s = slug?.trim().toLowerCase() ?? ''
+  return /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/.test(s) ? s : null
+}
+
+/**
+ * عنوان المرسِل — **دايمًا على نطاق المنصة**.
+ *
+ * ## ليه رجعنا لنطاق المنصة
+ * جرّبنا نبعت من نطاق كل متجر (`info@atlosa.zawyaeg.site`). المصادقة
+ * ظبطت، السجلات اتكتبت، والرسايل فضلت في السبام — لأن نطاقًا عمره
+ * ساعة سمعته صفر عند جيميل مهما كانت إعداداته سليمة. وكل متجر جديد
+ * كان بيبدأ من الصفر ده تاني.
+ *
+ * نطاق المنصة عمره أكبر وبيراكم سمعة من كل التجّار مع بعض. السمعة
+ * المشتركة ليها عيبها — تاجر وحش بيأذي الباقي — بس تاجر جديد بيركب
+ * على سمعة موجودة بدل ما يبني واحدة من الصفر وهو محتاج يبيع دلوقتي.
+ *
+ * ## بس مش عنوانًا واحدًا للكل
+ * كل متجر بياخد الجزء الأول بتاعه: `atlosa@zawyaeg.site`. ده بيخلّي
+ * سمعة كل متجر تتحسب على عنوانه هو جوّه النطاق، وبيمنع إن رسايل
+ * التجّار كلها تتجمّع في خيط واحد عند العميل.
+ *
+ * ## والاسم الظاهر اسم المتجر
+ * العميل بيستقبل رمز دخول؛ لازم يعرف من مين قبل ما يفتح. والاسم هنا
+ * **مش بينقض العنوان**: «atlosa» جنب `atlosa@…` متطابقين، على عكس
+ * اسم متجر جنب `no-reply@` — وده الشكل اللي كان بيتقرا انتحال هوية.
+ */
+function fromHeader(store?: { name?: string | null; slug?: string | null } | null): string {
+  const configured = process.env.EMAIL_FROM ?? ''
   const base = configured.match(/<([^>]+)>/)?.[1] ?? configured.trim()
   const domain = base.split('@')[1]
-  return domain ? `info@${domain}` : base
+  if (!domain) return base
+
+  const local = localPart(store?.slug) ?? 'info'
+  const address = `${local}@${domain}`
+
+  const name = store?.name?.trim()
+  return name ? `${encodeDisplayName(name)} <${address}>` : address
 }
+
 
 /**
  * مزوّدو البريد المجاني.
@@ -153,12 +181,14 @@ export async function sendEmail(options: {
    */
   bulk?: boolean
   /**
-   * عنوان المتجر على نطاقه الموثّق.
+   * المتجر اللي الرسالة بتخرج باسمه.
    *
-   * لما يبقى موجود، الرسالة بتخرج من نطاق التاجر بالكامل — وسمعته
-   * بتبقى بتاعته لوحده، مالهاش دعوة بباقي التجّار على المنصة.
+   * بيحدّد الاسم الظاهر والجزء الأول من العنوان — «atlosa
+   * <atlosa@zawyaeg.site>». سيبه فاضي لرسايل المنصة نفسها (تأكيد
+   * حساب التاجر، استعادة كلمة سرّه): دي جاية مننا فعلًا، وبتخرج
+   * من `info@` باسم المنصة.
    */
-  senderAddress?: string | null
+  sender?: { name?: string | null; slug?: string | null } | null
   /**
    * مرفقات — الفاتورة PDF مثلًا.
    *
@@ -178,7 +208,7 @@ export async function sendEmail(options: {
     text,
     log,
     replyTo,
-    senderAddress,
+    sender,
     bulk,
     attachments,
     unsubscribeUrl,
@@ -221,7 +251,7 @@ export async function sendEmail(options: {
        * مهما عملنا في الكود.
        */
       body: JSON.stringify({
-        from: fromHeader(senderAddress),
+        from: fromHeader(sender),
         to: [to],
         subject,
         html,

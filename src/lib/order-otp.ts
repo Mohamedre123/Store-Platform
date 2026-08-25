@@ -1,5 +1,4 @@
 import 'server-only'
-import { storeSenderAddress } from '@/lib/store-email-domain'
 import { and, desc, eq, gt } from 'drizzle-orm'
 import { db } from '@/db'
 import { otpCodes } from '@/db/schema'
@@ -57,7 +56,7 @@ export async function issueOrderOtp(input: {
   })
 
   await sendEmail({
-    senderAddress: await storeSenderAddress(input.storeId),
+    sender: { name: input.storeName, slug: input.storeSlug },
     log: { storeId: input.storeId, event: 'order_otp' },
     to: input.email,
     subject: `رمز تأكيد طلبك من ${input.storeName}`,
