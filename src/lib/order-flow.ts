@@ -28,7 +28,13 @@ import { notifyTeam } from '@/lib/notify-team'
 import { whatsappOrderStatus } from '@/lib/order-whatsapp'
 import { after } from 'next/server'
 import type { OrderStatus } from '@/db/schema'
-import { normalizeChannel, wantsEmail, wantsWhatsapp, type NotifyChannel } from '@/lib/notify-channel'
+import {
+  normalizeChannel,
+  resolveChannel,
+  wantsEmail,
+  wantsWhatsapp,
+  type NotifyChannel,
+} from '@/lib/notify-channel'
 
 /**
  * تحوّلات حالة الطلب والشحنة — بمعزل عن جلسة التاجر.
@@ -116,9 +122,9 @@ export async function applyOrderStatus(
    * الشحن بينادي نفس الدالة ومالوش تاجر يختار — والعميل ساعتها لازم
    * يتبلّغ بكل طريق متاح.
    */
-  channel: NotifyChannel = 'both',
+  channel: NotifyChannel = 'auto',
 ): Promise<void> {
-  const notify = normalizeChannel(channel)
+  const requested = normalizeChannel(channel)
   const [order] = await db
     .select({
       id: orders.id,
@@ -364,6 +370,18 @@ export async function applyOrderStatus(
    * برّه المعاملة وبغير await: العميل لازم يتبلّغ، بس لو البريد وقع
    * الحالة تفضل متغيّرة — الحالة اتغيّرت فعلًا والمخزون اتعدّل.
    */
+  /**
+   * «تلقائي» بيتحوّل لقناة حقيقية حسب اللي على الطلب.
+   *
+   * العميل سجّل دخوله برقمه أو ببريده، والطلب حافظ الاتنين. الإرسال
+   * على الاتنين دايمًا معناه رسالة على بريد فاضي — أو إزعاج مضاعف
+   * لواحد الاتنين بيوصلوه.
+   */
+  const notify = resolveChannel(requested, {
+    phone: Boolean(order.customerPhone),
+    email: Boolean(order.customerEmail),
+  })
+
   if (wantsEmail(notify) && order.customerEmail && isEmailableStatus(status) && isEmailConfigured()) {
     void (async () => {
       const theme = await getStoreTheme(store.id)

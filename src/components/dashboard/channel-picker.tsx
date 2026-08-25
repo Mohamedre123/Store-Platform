@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { BellOff, Mail, MessageCircle } from 'lucide-react'
+import { BellOff, Mail, MessageCircle, Wand2 } from 'lucide-react'
 import {
   CHANNEL_KEY,
   NOTIFY_CHANNELS,
@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils'
  * عشرين حالة ورا بعض ما ينفعش يختار كل مرة.
  */
 export function useNotifyChannel(): [NotifyChannel, (c: NotifyChannel) => void] {
-  const [channel, setChannel] = useState<NotifyChannel>('both')
+  const [channel, setChannel] = useState<NotifyChannel>('auto')
 
   useEffect(() => {
     try {
@@ -41,6 +41,7 @@ export function useNotifyChannel(): [NotifyChannel, (c: NotifyChannel) => void] 
 }
 
 const ICONS: Record<NotifyChannel, React.ComponentType<{ className?: string }>> = {
+  auto: Wand2,
   both: MessageCircle,
   whatsapp: MessageCircle,
   email: Mail,
@@ -67,7 +68,7 @@ export function ChannelPicker({
         شبكة عمودين على الفون وصف واحد على الشاشة الواسعة: أربع
         خيارات بأسمائها العربية ما بتدخلش في ٣٤٣ بكسل.
       */}
-      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
         {NOTIFY_CHANNELS.map((c) => {
           const Icon = ICONS[c.key]
           const on = c.key === value

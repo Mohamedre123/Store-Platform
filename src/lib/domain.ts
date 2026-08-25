@@ -87,6 +87,17 @@ export const SUBDOMAINS_ENABLED = (() => {
 
 const protocol = () => (ROOT_DOMAIN.startsWith('localhost') ? 'http' : 'https')
 
+/**
+ * أصل المنصة نفسها — لا نطاق تاجر بعينه.
+ *
+ * لروابط بتخصّ المنصة زي إلغاء الاشتراك: العميل بيلغي اشتراكه من
+ * رسايل متجر واحد، بس العنوان اللي بيستقبل الإلغاء بتاعنا لأنه هو
+ * اللي بيبعت.
+ */
+export function appUrl(path = '') {
+  return `${protocol()}://${ROOT_DOMAIN}${path}`
+}
+
 export function storeUrl(slug: string, path = '') {
   if (!SUBDOMAINS_ENABLED) return `${protocol()}://${ROOT_DOMAIN}/s/${slug}${path}`
   return `${protocol()}://${slug}.${ROOT_DOMAIN}${path}`

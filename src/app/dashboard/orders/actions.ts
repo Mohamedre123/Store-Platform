@@ -7,7 +7,7 @@ import { orderEvents, orders } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { applyOrderStatus } from '@/lib/order-flow'
 import type { OrderStatus } from '@/db/schema'
-import { normalizeChannel, wantsEmail, wantsWhatsapp } from '@/lib/notify-channel'
+import { normalizeChannel, resolveChannel, wantsEmail, wantsWhatsapp } from '@/lib/notify-channel'
 import { sendWhatsapp } from '@/lib/whatsapp'
 import { sendEmail } from '@/lib/email'
 import { merchantMessageEmail } from '@/lib/store-emails'
@@ -79,7 +79,6 @@ export async function sendRecoveryMessageAction(input: {
   channel?: unknown
 }): Promise<{ ok: boolean; sent: string[]; failed: string[]; waHref?: string }> {
   const { store, user } = await getDashboardContext()
-  const channel = normalizeChannel(input.channel)
   const text = input.text.trim().slice(0, 2000)
 
   const [order] = await db
@@ -95,6 +94,12 @@ export async function sendRecoveryMessageAction(input: {
     .limit(1)
 
   if (!order || !text) return { ok: false, sent: [], failed: [] }
+
+  /* «تلقائي» بيتحوّل لقناة حقيقية حسب اللي معانا من العميل */
+  const channel = resolveChannel(normalizeChannel(input.channel), {
+    phone: Boolean(order.phone),
+    email: Boolean(order.email),
+  })
 
   const sent: string[] = []
   const failed: string[] = []

@@ -34,17 +34,71 @@ const BASE = 'https://generativelanguage.googleapis.com/v1beta'
  * ٢٠ ثانية بتخلّي لفّتين يعدّوا جوّه السقف، وبتدّي مجالًا لإعادة
  * محاولة لو جوجل اتقطّعت.
  */
-const CALL_TIMEOUT_MS = 20_000
+const CALL_TIMEOUT_MS = 15_000
 
 /** خطأ المهلة — بيتلفّ في نوع نعرفه بدل ما يطلع بنصّه الإنجليزي */
 export class GeminiTimeout extends Error {
-  constructor() {
-    super('جوجل ما ردّتش في الوقت. جرّب تاني، ولو تكرر قلّل حجم الطلب.')
+  constructor(model?: string) {
+    super(
+      model
+        ? `موديل «${model}» ما بيردّش خالص. غيّره من القايمة فوق أو من صفحة الإضافات.`
+        : 'جوجل ما ردّتش في الوقت. جرّب تاني، ولو تكرر قلّل حجم الطلب.',
+    )
     this.name = 'GeminiTimeout'
   }
 }
 
-async function callWithRetry(url: string, init: RequestInit, attempts = 3): Promise<Response> {
+/**
+ * قايمة جوجل نفسها **مش موثوقة** — والفرق ده أوقف المساعد.
+ *
+ * جوجل بتدرج موديلات وبتقول إنها بتدعم `generateContent`، وبعضها:
+ * - **بيعلّق ولا بيرد أبدًا** (`gemini-3.7-flash` قعد ٣٠ ثانية ساكت)
+ * - **بيرجّع ٤٠٤** لما تناديه فعلًا (`gemini-2.5-flash` على نفس
+ *   المفتاح اللي مدرِج الاسم ده في قايمته)
+ *
+ * والتاجر بيختار من القايمة دي — فاختيار واحد منهم كان بيوقّف
+ * المساعد كله وهو فاكر إن المنصة باظت.
+ *
+ * وعشان كده مفيش قايمة بدايل مكتوبة عندنا: أي قايمة نكتبها هتبقى
+ * غلط على مفتاح تاني أو بعد تحديث. البديل بيتجاب من نفس المفتاح
+ * وبيتجرّب على الحقيقي.
+ */
+const MAX_FALLBACKS = 2
+
+/**
+ * الموديلات اللي ثبت إنها ميتة — في ذاكرة الاستدعاء.
+ *
+ * من غيرها، كل رسالة بتدفع تمن اكتشاف نفس العطل من الأول: ١٥ ثانية
+ * انتظار على موديل معروف إنه مش بيرد، قبل ما البديل يشتغل. العميل
+ * قاعد قدام شاشة واقفة في كل سؤال.
+ *
+ * في الذاكرة لا في قاعدة البيانات عن قصد: الموديل ممكن يرجع يشتغل
+ * بعد ساعة، والاستدعاء بيموت خلال دقايق فالنسيان بيحصل لوحده.
+ * وإعداد التاجر ما بيتغيّرش من ورا ظهره.
+ */
+const deadModels = new Set<string>()
+
+/** خطأ الموديل الميت بشكل جاهز — من غير ما نستنّى المهلة تاني */
+const GeminiTimeoutError = (model: string): GeminiError => ({
+  kind: 'network',
+  message: new GeminiTimeout(model).message,
+})
+
+/** الموديل ده مش شغّال — مش مشكلة في المفتاح ولا في الطلب */
+function isDeadModel(e: GeminiError): boolean {
+  return (
+    (e.kind === 'network' && e.message.includes('ما بيردّش')) ||
+    (e.kind === 'unknown' && /\(404\)/.test(e.message))
+  )
+}
+
+async function callWithRetry(
+  url: string,
+  init: RequestInit,
+  attempts = 3,
+  /** اسم الموديل — عشان رسالة التعليق تسمّيه للتاجر */
+  model?: string,
+): Promise<Response> {
   let last: Response | null = null
   let timedOut = false
 
@@ -67,17 +121,24 @@ async function callWithRetry(url: string, init: RequestInit, attempts = 3): Prom
         الانقطاع المؤقت بيستاهل محاولة تانية زي الـ٥xx بالظبط.
       */
       if (e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError')) {
+        /*
+          **مفيش إعادة محاولة على التعليق.**
+
+          الموديل اللي بيعلّق بيعلّق تاني وتالت — تلات محاولات معناها
+          ٤٥ ثانية انتظار على حاجة مش هتيجي، والعميل قاعد قدام شاشة
+          واقفة. الخروج فورًا بيسيب وقتًا للبديل يرد.
+        */
         timedOut = true
-      } else {
-        throw e
+        break
       }
+      throw e
     }
 
     if (i < attempts - 1) await new Promise((r) => setTimeout(r, 400 * (i + 1)))
   }
 
   if (last) return last
-  if (timedOut) throw new GeminiTimeout()
+  if (timedOut) throw new GeminiTimeout(model)
   throw new Error('فشل الاتصال بجوجل')
 }
 
@@ -88,6 +149,67 @@ async function callWithRetry(url: string, init: RequestInit, attempts = 3): Prom
  * («TimeoutError: The operation was aborted…») في نص محادثة عربية —
  * وما بيعرفش ده عطل عنده ولا عندنا ولا عند جوجل.
  */
+/**
+ * بينفّذ نداءً، ولو الموديل علّق بيجرّب بديلًا مضمونًا.
+ *
+ * ## المشكلة اللي بيحلّها
+ * التاجر بيختار الموديل من قايمة جاية من جوجل نفسها. وبعض اللي في
+ * القايمة **بيعلّق ولا بيرد**: جرّبنا موديلين بنفس المفتاح ونفس
+ * السؤال في نفس الثانية — واحد ردّ في ١.٨ ثانية، والتاني قعد ٣٠
+ * ثانية وما ردّش. فالتاجر بيختار الغلط ويلاقي المساعد كله واقف
+ * وهو فاكر إن المنصة باظت.
+ *
+ * ## بيرجع لبديل بدل ما يفشل
+ * المساعد اللي بيرد بموديل تاني أحسن من مساعد واقف. والرسالة
+ * بتقوله إن الموديل اللي مختاره مش بيرد عشان يغيّره — مش بنخبّي
+ * السبب.
+ *
+ * ## على المهلة بس
+ * المفتاح الباطل والكوته الخالصة مش هيتصلّحوا بموديل تاني — إعادتهم
+ * بتضيّع وقت وبتستهلك حصّة. البديل للتعليق وحده.
+ */
+async function withModelFallback<T>(
+  apiKey: string,
+  model: string,
+  run: (model: string) => Promise<GeminiResult<T>>,
+): Promise<GeminiResult<T>> {
+  /* موديل ثبت موته في الاستدعاء ده — ما نضيّعش عليه ١٥ ثانية تانية */
+  const skipFirst = deadModels.has(model)
+
+  const first = skipFirst
+    ? ({ ok: false, error: GeminiTimeoutError(model) } as GeminiResult<T>)
+    : await run(model)
+
+  if (first.ok || !isDeadModel(first.error)) return first
+
+  deadModels.add(model)
+  if (!skipFirst) {
+    console.error(`موديل «${model}» مش شغّال (${first.error.message}) — بنجرّب بديلًا`)
+  }
+
+  const list = await listModels(apiKey)
+  if (!list.ok) return first
+
+  /*
+    الترتيب بتاع `listModels` بيحطّ الأحدث فوق. بنجرّب اتنين بحد
+    أقصى: تلاتة بتخلّي التاجر مستنّي دقيقة قبل ما يشوف أي رد،
+    والانتظار الطويل أسوأ من رسالة خطأ واضحة.
+  */
+  let tried = 0
+  for (const candidate of list.data) {
+    if (candidate.id === model) continue
+    if (tried >= MAX_FALLBACKS) break
+    tried++
+
+    const res = await run(candidate.id)
+    if (res.ok) return res
+    if (!isDeadModel(res.error)) return res
+    deadModels.add(candidate.id)
+  }
+
+  return first
+}
+
 function networkError(e: unknown): GeminiError {
   if (e instanceof GeminiTimeout) return { kind: 'network', message: e.message }
   if (e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError')) {
@@ -240,14 +362,20 @@ export type ChatMessage = { role: 'user' | 'model'; text: string }
  * بيفرّق بين تعليماتنا وكلام العميل، وأصعب على العميل إنه يقنعه
  * يتجاهلها.
  */
-export async function generate(input: {
+type GenerateInput = {
   apiKey: string
   model: string
   system?: string
   messages: ChatMessage[]
   maxTokens?: number
   temperature?: number
-}): Promise<GeminiResult<string>> {
+}
+
+export function generate(input: GenerateInput): Promise<GeminiResult<string>> {
+  return withModelFallback(input.apiKey, input.model, (model) => generateWith({ ...input, model }))
+}
+
+async function generateWith(input: GenerateInput): Promise<GeminiResult<string>> {
   try {
     const res = await callWithRetry(
       `${BASE}/models/${encodeURIComponent(input.model)}:generateContent?key=${encodeURIComponent(input.apiKey)}`,
@@ -268,6 +396,8 @@ export async function generate(input: {
           },
         }),
       },
+      3,
+      input.model,
     )
 
     if (!res.ok) return { ok: false, error: classify(res.status, await res.text()) }
@@ -474,14 +604,20 @@ function cleanHistory(messages: AgentMessage[]): Array<{ role: 'user' | 'model';
  * حاجة. التنفيذ قرار الطبقة اللي فوق، وده الحاجز اللي بيمنع الموديل
  * إنه يغيّر أسعار من غير ما التاجر يشوف.
  */
-export async function agentTurn(input: {
+type AgentTurnInput = {
   apiKey: string
   model: string
   system: string
   messages: AgentMessage[]
   tools: ToolDef[]
   maxTokens?: number
-}): Promise<GeminiResult<AgentTurn>> {
+}
+
+export function agentTurn(input: AgentTurnInput): Promise<GeminiResult<AgentTurn>> {
+  return withModelFallback(input.apiKey, input.model, (model) => agentTurnWith({ ...input, model }))
+}
+
+async function agentTurnWith(input: AgentTurnInput): Promise<GeminiResult<AgentTurn>> {
   try {
     const res = await callWithRetry(
       `${BASE}/models/${encodeURIComponent(input.model)}:generateContent?key=${encodeURIComponent(input.apiKey)}`,
@@ -501,6 +637,8 @@ export async function agentTurn(input: {
           },
         }),
       },
+      3,
+      input.model,
     )
 
     if (!res.ok) return { ok: false, error: classify(res.status, await res.text()) }

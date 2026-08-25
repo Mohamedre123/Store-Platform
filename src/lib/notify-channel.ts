@@ -22,20 +22,52 @@
  * حاجة عدّت.
  */
 
-export type NotifyChannel = 'email' | 'whatsapp' | 'both' | 'none'
+export type NotifyChannel = 'auto' | 'email' | 'whatsapp' | 'both' | 'none'
 
 export const NOTIFY_CHANNELS: Array<{ key: NotifyChannel; label: string; hint: string }> = [
+  { key: 'auto', label: 'تلقائي', hint: 'يروح على اللي العميل مسجّل بيه' },
   { key: 'both', label: 'بريد + واتساب', hint: 'يوصل على الاتنين' },
   { key: 'whatsapp', label: 'واتساب بس', hint: 'أسرع طريق للعميل المصري' },
   { key: 'email', label: 'بريد بس', hint: 'للعميل اللي بيتابع بريده' },
   { key: 'none', label: 'من غير إشعار', hint: 'غيّر الحالة في الهدوء' },
 ]
 
-/** القيمة الآمنة لو الجاي من المتصفح مش معروف */
+/**
+ * القيمة الآمنة لو الجاي من المتصفح مش معروف.
+ *
+ * الافتراضي «تلقائي»: العميل سجّل دخوله برقمه أو ببريده، فإحنا
+ * عارفين الوسيلة اللي بيستقبل عليها فعلًا. الإرسال على الاتنين
+ * دايمًا معناه رسالة على بريد مالوش صاحب — أو إزعاج مضاعف.
+ */
 export function normalizeChannel(value: unknown): NotifyChannel {
-  return value === 'email' || value === 'whatsapp' || value === 'none' || value === 'both'
+  return value === 'email' ||
+    value === 'whatsapp' ||
+    value === 'none' ||
+    value === 'both' ||
+    value === 'auto'
     ? value
-    : 'both'
+    : 'auto'
+}
+
+/**
+ * «تلقائي» بيتحوّل لقناة حقيقية حسب اللي العميل معاه.
+ *
+ * **الترتيب مقصود:** الرقم قبل البريد. في السوق المصري أغلب اللي
+ * بيشتري من الموبايل بيسيب خانة البريد فاضية، والواتساب بيتفتح في
+ * ثانية — والرسالة اللي بتتقري هي اللي ليها قيمة.
+ *
+ * ولو معاه الاتنين، بيروح على الاتنين: العميل اللي كتب بريده كتبه
+ * عشان يستقبل عليه.
+ */
+export function resolveChannel(
+  channel: NotifyChannel,
+  has: { phone: boolean; email: boolean },
+): NotifyChannel {
+  if (channel !== 'auto') return channel
+  if (has.phone && has.email) return 'both'
+  if (has.phone) return 'whatsapp'
+  if (has.email) return 'email'
+  return 'none'
 }
 
 export const wantsEmail = (c: NotifyChannel) => c === 'email' || c === 'both'

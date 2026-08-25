@@ -41,6 +41,14 @@ export const customers = pgTable(
     lastOrderAt: timestamp('last_order_at', { withTimezone: true }),
 
     acceptsMarketing: boolean('accepts_marketing').notNull().default(true),
+    /**
+     * رمز إلغاء الاشتراك — مخزَّن كهاش زي أي رمز.
+     *
+     * جيميل بيشترط «إلغاء بضغطة واحدة» على المرسلين، والترويسة لازم
+     * تشاور على عنوان بيشتغل فعلًا. والرمز مش معرّف العميل: من غير
+     * كده أي حد يعدّ المعرّفات ويلغي اشتراك عملاء متجر مش بتاعه.
+     */
+    unsubscribeToken: text('unsubscribe_token'),
     tags: jsonb('tags').$type<string[]>().notNull().default([]),
     note: text('note'),
     isBlocked: boolean('is_blocked').notNull().default(false),
@@ -52,6 +60,7 @@ export const customers = pgTable(
     uniqueIndex('customers_store_phone_unique').on(t.storeId, t.phone),
     uniqueIndex('customers_store_email_unique').on(t.storeId, t.email),
     index('customers_store_idx').on(t.storeId),
+    index('customers_unsubscribe_idx').on(t.unsubscribeToken),
     index('customers_tier_idx').on(t.storeId, t.tier),
   ],
 )

@@ -6,7 +6,7 @@ import { buildBotSystem, checkLimits, logBotMessage, splitWhatsappMarker } from 
 import { generate, type ChatMessage } from '@/lib/ai/gemini'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 30
+export const maxDuration = 45
 
 /**
  * رابط واتساب برسالة جاهزة عن اللي العميل سأل عنه بالظبط.

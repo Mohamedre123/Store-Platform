@@ -1,12 +1,13 @@
 import 'server-only'
-import { and, eq, isNotNull, lt, sql } from 'drizzle-orm'
+import { and, eq, isNotNull, isNull, lt, sql } from 'drizzle-orm'
 import { db } from '@/db'
-import { orderItems, orders, stores } from '@/db/schema'
+import { customers, orderItems, orders, stores } from '@/db/schema'
 import type { CheckoutStage } from '@/db/schema'
 import { getStoreTheme } from './storefront'
 import { isEmailConfigured, sendEmail } from './email'
 import { abandonedCartEmail } from './store-emails'
-import { publicStoreUrl } from './domain'
+import { appUrl, publicStoreUrl } from './domain'
+import { generateToken, hashToken } from './crypto'
 import { runAutomations } from './automation'
 
 /**
@@ -58,6 +59,7 @@ export async function sendAbandonedCartReminders(limit = 50): Promise<ReminderRe
       currency: orders.currency,
       recoveryToken: orders.recoveryToken,
       checkoutStage: orders.checkoutStage,
+      customerId: orders.customerId,
       storeName: stores.name,
       storeSlug: stores.slug,
       storeLogo: stores.logoLight,
@@ -128,10 +130,31 @@ export async function sendAbandonedCartReminders(limit = 50): Promise<ReminderRe
         recoveryToken: cart.recoveryToken,
       })
 
+      /**
+       * رمز إلغاء الاشتراك — بيتولّد أول مرة بس.
+       *
+       * جيميل بيشترط «إلغاء بضغطة» على المرسلين، والترويسة لازم
+       * تشاور على عنوان بيشتغل. بنولّده هنا لا وقت التسجيل: أغلب
+       * العملاء ما بيوصلهمش أي رسالة تسويقية أصلًا، فما نملاش الجدول
+       * أرقامًا عشوائية ما اتشافتش.
+       */
+      let unsubscribeUrl: string | null = null
+      if (cart.customerId) {
+        const token = generateToken(24)
+        const [row] = await db
+          .update(customers)
+          .set({ unsubscribeToken: hashToken(token) })
+          .where(and(eq(customers.id, cart.customerId), isNull(customers.unsubscribeToken)))
+          .returning({ id: customers.id })
+
+        if (row) unsubscribeUrl = `${appUrl()}/api/unsubscribe?t=${token}`
+      }
+
       const sent = await sendEmail({
         senderName: cart.storeName,
         /* تسويقية — العميل ما طلبهاش، فليها إلغاء اشتراك */
         bulk: true,
+        unsubscribeUrl,
         to: cart.customerEmail!,
         ...mail,
         log: { storeId: cart.storeId, event: 'abandoned_cart', orderId: cart.id },

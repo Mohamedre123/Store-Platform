@@ -45,6 +45,7 @@ import { notifyTeam } from '@/lib/notify-team'
 import { createBooking } from '@/lib/bookings'
 import { paymentProvider } from '@/lib/providers'
 import { loadInvoice } from '@/lib/invoice'
+import { rememberContact } from '@/lib/customer-identity'
 import { renderInvoicePdf } from '@/lib/invoice-pdf'
 
 /**
@@ -917,6 +918,22 @@ async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
    * السياق بيتجمّع مرة واحدة وبيتبعت للمحرّك، اللي بيقرّر أي قواعد
    * تنطبق. لو مفيش قواعد، مفيش أي تكلفة تقريبًا.
    */
+  /*
+    الوسيلة التانية بتتسجّل على حساب العميل.
+
+    داخل برقمه وكاتب بريده في الطلب؟ الطلب ده إثبات إنه بيستخدم
+    البريد ده. لما يدخل بيه بعدين، بيلاقي نفس الحساب وطلباته كلها
+    بدل ما يبقى عنده حسابان نصّهم فاضي.
+  */
+  after(
+    rememberContact({
+      storeId: store.id,
+      customerId: result.customerId,
+      phone,
+      email: input.email || null,
+    }).catch((e) => console.error('فشل ربط وسيلة العميل:', e)),
+  )
+
   const isNewCustomer = customerOrdersBefore === 0
   const autoCtx = {
     storeId: store.id,

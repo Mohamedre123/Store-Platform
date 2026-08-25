@@ -13,6 +13,7 @@ import {
   verifyCustomerPassword,
 } from '@/lib/customer-auth'
 import { issueCustomerOtp, readIdentity, verifyCustomerOtp, type Channel } from '@/lib/customer-otp'
+import { linkCustomerIdentity } from '@/lib/customer-identity'
 
 /**
  * دخول العميل — برقمه أو ببريده، برمز أو بكلمة سر.
@@ -127,26 +128,25 @@ export async function verifyCodeAction(input: {
   const res = await verifyCustomerOtp(store.id, identity, input.code)
   if (!res.ok) return { ok: false, error: res.error }
 
-  const customerId =
-    identity.kind === 'phone'
-      ? await findOrCreateCustomer(store.id, identity.value, input.name)
-      : await findOrCreateByEmail(store.id, identity.value, input.name)
+  /**
+   * حساب واحد للعميل مهما دخل برقمه ولا ببريده.
+   *
+   * **كان بيبقى عنده حسابان.** يطلب برقمه النهارده، وببريده بعد
+   * شهر، فيفتح «طلباتي» ويلاقي نصّها ضايع ويكلّم التاجر يشتكي.
+   *
+   * والربط بيتم لأنه **أثبت** إنه بيستقبل على الوسيلة دي (أكّد
+   * الرمز عليها) — مش لأن حد كتبها في خانة. والدمج جوّه المتجر
+   * الواحد بس: بيانات عملاء تاجر ما تصحّش تعدّي لتاجر تاني.
+   */
+  const linked = await linkCustomerIdentity({
+    storeId: store.id,
+    phone: identity.kind === 'phone' ? identity.value : null,
+    email: identity.kind === 'email' ? identity.value : null,
+    name: input.name,
+    verified: identity.kind,
+  })
 
-  /*
-    الوسيلة اللي اتحقّق بيها بتتعلّم «مؤكّدة».
-    ده اللي بيخلّي رسايل الطلبات تروح على حاجة مثبتة إنها بتوصله،
-    مش على أي حاجة اتكتبت في خانة.
-  */
-  await db
-    .update(customers)
-    .set(
-      identity.kind === 'phone'
-        ? { phoneVerifiedAt: new Date(), ...(input.name ? { name: input.name } : {}) }
-        : { emailVerifiedAt: new Date(), ...(input.name ? { name: input.name } : {}) },
-    )
-    .where(and(eq(customers.id, customerId), eq(customers.storeId, store.id)))
-
-  await createCustomerSession(store.id, customerId)
+  await createCustomerSession(store.id, linked.customerId)
   return { ok: true, step: 'done' }
 }
 

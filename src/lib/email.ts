@@ -67,26 +67,20 @@ function fromHeader(senderName?: string | null): string {
   const clean = name.replace(/["<>]/g, '').trim().slice(0, 50)
 
   /**
-   * «اسم المتجر عبر زاوية» لا «اسم المتجر» لوحده.
+   * اسم المتجر لوحده — من غير أي إضافة من عندنا.
    *
-   * **ده اللي رجّع الرسايل من السبام.** لما بدأنا نبعت باسم المتجر،
-   * الترويسة بقت `atlosa <no-reply@zawyaeg.site>` — اسم علامة
-   * وعنوان على نطاق تاني خالص. ودي بالظبط بصمة انتحال الهوية اللي
-   * فلاتر جيميل بتدوّر عليها: الاسم بيدّعي جهة، والنطاق بتاع جهة
-   * تانية، ومفيش أي حاجة بتربطهم.
+   * جرّبنا نكتب «عبر زاوية» جنب الاسم على أمل إنه يهدّي فلاتر
+   * انتحال الهوية. مافرقش في التسليم (الرسايل فضلت زي ما هي)، ومعناه
+   * إن كل تاجر بينسب نفسه لمنصة عملاؤه ما يعرفوهاش — ودي مشكلة
+   * علامة تجارية حقيقية مقابل مكسب وهمي.
    *
-   * جيميل نفسه بيحل المشكلة دي بكلمة «via» وبيعرضها للمستخدم. لما
-   * إحنا نكتبها في الاسم من الأول، الترويسة بتبقى صادقة: العميل
-   * بيشوف اسم متجره، والفلتر بيشوف اسمًا متسقًا مع النطاق اللي
-   * الرسالة موقّعة منه فعلًا.
+   * وجيميل بيعرض «via» بنفسه لما يشوف الفرق بين الاسم والنطاق،
+   * فالإضافة اليدوية كانت بتتكرر مرتين قدام العميل.
    *
-   * الحل النهائي إن التاجر يوثّق نطاقه ويبعت من عليه — ساعتها الاسم
-   * والنطاق بتوعه هو ومفيش «عبر».
+   * الحل الحقيقي للاسم والنطاق مع بعض إن التاجر يوثّق نطاقه ويبعت
+   * من عليه.
    */
-  const platform = (process.env.NEXT_PUBLIC_APP_NAME ?? 'زاوية').replace(/["<>]/g, '').trim()
-  const display = platform && clean !== platform ? `${clean} عبر ${platform}` : clean
-
-  return `${encodeDisplayName(display)} <${address}>`
+  return `${encodeDisplayName(clean)} <${address}>`
 }
 
 export type MessageContext = {
@@ -135,8 +129,11 @@ export async function sendEmail(options: {
    * اتبعت هو اللي إحنا ولّدناه.
    */
   attachments?: Array<{ filename: string; content: Buffer }>
+  /** رابط إلغاء الاشتراك بضغطة — للرسايل التسويقية بس */
+  unsubscribeUrl?: string | null
 }): Promise<SendResult> {
-  const { to, subject, html, text, log, replyTo, senderName, bulk, attachments } = options
+  const { to, subject, html, text, log, replyTo, senderName, bulk, attachments, unsubscribeUrl } =
+    options
 
   if (!isEmailConfigured()) {
     console.warn(
@@ -197,10 +194,27 @@ export async function sendEmail(options: {
           والترويسة نفسها بتتشال من الرسايل المعاملاتية: رمز الدخول
           مش نشرة، والعميل هو اللي طلبه دلوقتي.
         */
+        /**
+         * إلغاء بضغطة — على الرسايل التسويقية بس.
+         *
+         * **جيميل بيشترط `List-Unsubscribe-Post` على المرسلين.**
+         * وكنا شايلينها لأننا كنا بنوعد بعنوان بيستقبل POST وإحنا
+         * مالناش — والوعد اللي مش وراه تنفيذ بيتحسب عيبًا. دلوقتي
+         * `/api/unsubscribe` بيشتغل فعلًا، فالوعد بقى صادق.
+         *
+         * وبتفضل مشالة تمامًا من الرسايل المعاملاتية: رمز الدخول
+         * وتأكيد الطلب مش نشرة، والعميل هو اللي طلبهم دلوقتي —
+         * وترويسة إلغاء اشتراك عليهم بتقول للفلتر «دي رسالة جماعية».
+         */
         ...(bulk
           ? {
               headers: {
-                'List-Unsubscribe': `<mailto:${unsubscribeAddress()}?subject=unsubscribe>`,
+                'List-Unsubscribe': unsubscribeUrl
+                  ? `<${unsubscribeUrl}>, <mailto:${unsubscribeAddress()}?subject=unsubscribe>`
+                  : `<mailto:${unsubscribeAddress()}?subject=unsubscribe>`,
+                ...(unsubscribeUrl
+                  ? { 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' }
+                  : {}),
               },
             }
           : {}),

@@ -292,6 +292,7 @@ CREATE TABLE "customers" (
 	"total_spent" integer DEFAULT 0 NOT NULL,
 	"last_order_at" timestamp with time zone,
 	"accepts_marketing" boolean DEFAULT true NOT NULL,
+	"unsubscribe_token" text,
 	"tags" jsonb DEFAULT '[]'::jsonb NOT NULL,
 	"note" text,
 	"is_blocked" boolean DEFAULT false NOT NULL,
