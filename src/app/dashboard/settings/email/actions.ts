@@ -292,25 +292,21 @@ export async function sendFullSuiteAction(
 }
 
 /**
- * نفس الرسالة بالظبط من نطاقين — عشان نبطّل تخمين.
+ * نفس الرسالة بتلات صيغ مرسِل — عشان نبطّل تخمين.
  *
- * ## السؤال اللي بتجاوبه
- * الرسايل بتروح السبام. السبب **القالب** ولا **النطاق**؟ الاتنين
- * بيدّوا نفس العَرَض، وعلاجهم مختلف تمامًا: القالب بيتصلّح في ساعة،
- * والسمعة بتاخد أسابيع أو نطاقًا تاني. كل جولة تغيير في القالب من
- * غير ما نعرف الإجابة دي كانت تخمينًا.
+ * ## ليه الاختبار ده موجود
+ * جرّبنا صيغة ورا صيغة على مدار يوم كامل، وكل مرة نستنتج من رسالة
+ * واحدة على الباقي. النسخة اللي قبل دي كانت بتقارن بنطاق المزوّد،
+ * و**ما اشتغلتش**: `resend.dev` بيرفض يبعت لغير صاحب الحساب، فالخانة
+ * التانية رجعت فاضية والمقارنة ما تمّتش.
  *
- * ## إزاي بتجاوبه
- * بتبعت **نفس الـHTML ونفس الموضوع** مرتين: مرة من نطاق المنصة،
- * ومرة من `onboarding@resend.dev` — نطاق المزوّد نفسه وسمعته ممتازة
- * ومالوش أي علاقة بينا.
+ * الصيغ التلاتة دي كلها بتخرج من **نطاقنا الموثّق**، فكلها بتتبعت
+ * فعلًا. والمتغيّر بينهم واحد بس في كل خطوة، فالنتيجة بتقول أي
+ * جزء بالظبط هو اللي بيفرق.
  *
- * - وصلت من resend.dev والتانية سبام  →  **النطاق**، والقالب بريء
- * - الاتنين سبام                       →  **القالب**، والنطاق بريء
- * - الاتنين وصلوا                      →  المشكلة في صندوق بعينه
- *
- * ملحوظة: `resend.dev` بيبعت لعنوان صاحب حساب المزوّد بس. لو الرسالة
- * التانية اترفضت، ابعت للعنوان المسجّل في ريسيند.
+ * ١. اسم المتجر لوحده + عنوان باسم المتجر
+ * ٢. اسم المتجر لوحده + عنوان المنصة
+ * ٣. «اسم المتجر عبر المنصة» + عنوان المنصة   ← اللي كان شغّال
  */
 export async function sendDomainComparisonAction(
   to: string,
@@ -334,10 +330,21 @@ export async function sendDomainComparisonAction(
     address,
   )
 
-  const diag = await emailDiagnosticsAction()
+  const configured = process.env.EMAIL_FROM ?? ''
+  const base = configured.match(/<([^>]+)>/)?.[1] ?? configured.trim()
+  const domain = base.split('@')[1] ?? ''
+  const platform = process.env.NEXT_PUBLIC_APP_NAME?.trim() || 'زاوية'
+  const slug = store.slug.trim().toLowerCase()
+  const storeLocal = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/.test(slug) ? slug : 'info'
+
+  /** الاسم العربي لازم يتشفّر — الترويسة ASCII بالأصل */
+  const enc = (n: string) =>
+    /[^ -~]/.test(n) ? `=?UTF-8?B?${Buffer.from(n, 'utf8').toString('base64')}?=` : `"${n}"`
+
   const variants = [
-    { label: 'من نطاق المنصة', from: null as string | null, shown: diag.from },
-    { label: 'من نطاق المزوّد', from: 'Zawya <onboarding@resend.dev>', shown: 'onboarding@resend.dev' },
+    { label: 'اسم المتجر + عنوان المتجر', from: `${enc(store.name)} <${storeLocal}@${domain}>` },
+    { label: 'اسم المتجر + عنوان المنصة', from: `${enc(store.name)} <${base}>` },
+    { label: 'اسم المتجر عبر المنصة + عنوان المنصة', from: `${enc(`${store.name} عبر ${platform}`)} <${base}>` },
   ]
 
   const results = []
@@ -349,20 +356,19 @@ export async function sendDomainComparisonAction(
       to: address,
       ...mail,
       /*
-        الموضوع بيتعلّم عشان تفرّقهم في الصندوق — ده الجزء الوحيد
-        اللي بيختلف بين النسختين، وكل حاجة تانية متطابقة حرفيًا.
+        الموضوع بيتعلّم برقم عشان تفرّقهم في الصندوق — ده الجزء
+        الوحيد اللي بيختلف، وكل حاجة تانية متطابقة حرفيًا.
       */
       subject: `${mail.subject} [${i + 1}]`,
-      sender: { name: store.name, slug: store.slug },
       fromOverride: v.from,
       log: { storeId: store.id, event: 'delivery_test' },
     })
 
     results.push({
-      label: v.label,
-      from: v.shown,
+      label: `[${i + 1}] ${v.label}`,
+      from: v.from.replace(/=?UTF-8?B?[^?]+?=/, store.name),
       ok: res.ok,
-      note: res.ok ? `اتبعتت — دوّر على «[${i + 1}]»` : `المزوّد رفض: ${res.error}`,
+      note: res.ok ? `اتبعتت — دوّر على «[${i + 1}]» في الوارد والسبام` : `المزوّد رفض: ${res.error}`,
     })
   }
 

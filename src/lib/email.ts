@@ -45,46 +45,47 @@ function encodeDisplayName(name: string): string {
   return `=?UTF-8?B?${Buffer.from(clean, 'utf8').toString('base64')}?=`
 }
 
-/** الجزء اللي قبل @ — من سلَج المتجر، ولاتيني بالإجبار */
-function localPart(slug?: string | null): string | null {
-  const s = slug?.trim().toLowerCase() ?? ''
-  return /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/.test(s) ? s : null
+/** اسم المنصة زي ما هو مكتوب في الإعدادات */
+function platformName(): string {
+  return process.env.NEXT_PUBLIC_APP_NAME?.trim() || 'زاوية'
 }
 
 /**
- * عنوان المرسِل — **دايمًا على نطاق المنصة**.
+ * عنوان المرسِل.
  *
- * ## ليه رجعنا لنطاق المنصة
- * جرّبنا نبعت من نطاق كل متجر (`info@atlosa.zawyaeg.site`). المصادقة
- * ظبطت، السجلات اتكتبت، والرسايل فضلت في السبام — لأن نطاقًا عمره
- * ساعة سمعته صفر عند جيميل مهما كانت إعداداته سليمة. وكل متجر جديد
- * كان بيبدأ من الصفر ده تاني.
+ * ## اللي اتعلمناه بالتجربة
+ * جرّبنا أربع صيغ على نفس النطاق، ودي نتيجتها الحقيقية:
  *
- * نطاق المنصة عمره أكبر وبيراكم سمعة من كل التجّار مع بعض. السمعة
- * المشتركة ليها عيبها — تاجر وحش بيأذي الباقي — بس تاجر جديد بيركب
- * على سمعة موجودة بدل ما يبني واحدة من الصفر وهو محتاج يبيع دلوقتي.
+ * | الاسم الظاهر        | العنوان                    | النتيجة |
+ * |---------------------|----------------------------|---------|
+ * | `زاوية`             | `onboarding@zawyaeg.site`  | وارد    |
+ * | `atlosa`            | `onboarding@zawyaeg.site`  | سبام    |
+ * | `atlosa عبر زاوية`  | `onboarding@zawyaeg.site`  | وارد    |
+ * | `atlosa`            | `atlosa@zawyaeg.site`      | سبام    |
  *
- * ## بس مش عنوانًا واحدًا للكل
- * كل متجر بياخد الجزء الأول بتاعه: `atlosa@zawyaeg.site`. ده بيخلّي
- * سمعة كل متجر تتحسب على عنوانه هو جوّه النطاق، وبيمنع إن رسايل
- * التجّار كلها تتجمّع في خيط واحد عند العميل.
+ * السطر الأخير هو اللي بيحسم التفسير: ظنّينا إن توحيد الجزء الأول
+ * مع الاسم هيصلّح التناقض، وما صلّحش. **الفلتر بيقارن الاسم الظاهر
+ * بالنطاق لا بالجزء اللي قبل @** — والنطاق لسه بيقول `zawyaeg`.
  *
- * ## والاسم الظاهر اسم المتجر
- * العميل بيستقبل رمز دخول؛ لازم يعرف من مين قبل ما يفتح. والاسم هنا
- * **مش بينقض العنوان**: «atlosa» جنب `atlosa@…` متطابقين، على عكس
- * اسم متجر جنب `no-reply@` — وده الشكل اللي كان بيتقرا انتحال هوية.
+ * فاسم متجر لوحده على نطاق المنصة بيتقرا: «جهة بتقول إنها atlosa
+ * وهي بتبعت من مكان تاني» — وهي بالظبط بصمة انتحال الهوية.
+ *
+ * ## و«عبر» هي الحل المعياري
+ * جيميل نفسه بيكتب «via» تحت أي رسالة اسمها الظاهر ونطاقها مش
+ * متطابقين. كتابتها إحنا في الاسم من الأول بتخلّي الترويسة صادقة
+ * بدل ما تبان متناقضة: المتجر معروف، والناقل معروف، ومحدّش بيدّعي.
+ *
+ * وسمعة العنوان الواحد بتتراكم من كل التجّار مع بعض بدل ما كل متجر
+ * جديد يبدأ من الصفر.
  */
 function fromHeader(store?: { name?: string | null; slug?: string | null } | null): string {
   const configured = process.env.EMAIL_FROM ?? ''
-  const base = configured.match(/<([^>]+)>/)?.[1] ?? configured.trim()
-  const domain = base.split('@')[1]
-  if (!domain) return base
-
-  const local = localPart(store?.slug) ?? 'info'
-  const address = `${local}@${domain}`
+  const address = configured.match(/<([^>]+)>/)?.[1] ?? configured.trim()
+  if (!address.includes('@')) return configured
 
   const name = store?.name?.trim()
-  return name ? `${encodeDisplayName(name)} <${address}>` : address
+  const display = name ? `${name} عبر ${platformName()}` : platformName()
+  return `${encodeDisplayName(display)} <${address}>`
 }
 
 

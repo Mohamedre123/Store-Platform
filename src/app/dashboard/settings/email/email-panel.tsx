@@ -183,13 +183,13 @@ export function EmailPanel({ initial }: { initial: EmailDiagnostics }) {
               setSuite(res.results.map((r) => ({ label: `${r.label} — ${r.from}`, ok: r.ok, note: r.note })))
               setTestMsg({
                 ok: res.results.every((r) => r.ok),
-                text: 'رسالتين بنفس المحتوى بالظبط: [1] من نطاقنا، [2] من نطاق المزوّد. لو [2] وصلت الوارد و[1] راحت السبام، يبقى المشكلة في النطاق مش في القالب.',
+                text: 'تلات رسايل بنفس المحتوى بالحرف، والفرق بينهم اسم المرسِل بس. شوف [1] و[2] و[3] راحوا فين — اللي يوصل الوارد هو الصيغة اللي هنمشي بيها.',
               })
             })
           }
         >
           <Send className="h-4 w-4" aria-hidden="true" />
-          اختبار المقارنة: نفس الرسالة من نطاقين
+          اختبار المقارنة: نفس الرسالة بتلات صيغ مرسِل
         </Button>
 
         {suite.length > 0 && (
