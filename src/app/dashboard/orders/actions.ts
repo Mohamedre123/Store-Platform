@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { storeSenderAddress } from '@/lib/store-email-domain'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { orderEvents, orders } from '@/db/schema'
@@ -132,6 +133,7 @@ export async function sendRecoveryMessageAction(input: {
       replyTo: safeReplyTo(store.email),
       senderName: store.name,
       senderSlug: store.slug,
+      senderAddress: await storeSenderAddress(store.id),
       log: {
         storeId: store.id,
         event: 'cart_recovery',

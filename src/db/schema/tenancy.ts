@@ -43,6 +43,35 @@ export const stores = pgTable(
     slug: text('slug').notNull(), // النطاق الفرعي: <slug>.zawya.app
     customDomain: text('custom_domain'),
     customDomainVerifiedAt: timestamp('custom_domain_verified_at', { withTimezone: true }),
+
+    /**
+     * نطاق بريد المتجر — عشان رسايله تخرج باسمه هو.
+     *
+     * ## ليه ده لازم يكون لكل تاجر
+     * كل رسايل المتاجر كانت بتخرج من نطاق المنصة. جيميل بيقيّم
+     * **النطاق**، فكل التجّار بيتشاركوا سمعة واحدة: تاجر واحد
+     * عملاؤه بيبلّغوا سبام بيأذي كل اللي على المنصة. وفوق كده، رسالة
+     * باسم «متجر س» جاية من نطاق «زاوية» بتبان انتحال هوية.
+     *
+     * لما التاجر يوثّق نطاقه، بيبقى:
+     * - بيبني سمعته هو، مالوش دعوة بغيره
+     * - الاسم والنطاق والعلامة كلهم بتوعه
+     * - ومحدّش يقدر يقول إن الرسالة مش منه
+     *
+     * ## نطاق فرعي لا الجذر
+     * `mail.<نطاقه>` مش `<نطاقه>` — عشان ما نلمسش الـMX بتاع بريده
+     * الشخصي على نطاقه لو عنده واحد.
+     */
+    emailDomain: text('email_domain'),
+    /** معرّف النطاق عند مزوّد البريد — بيه بنسأل عن حالة التحقق */
+    emailDomainId: text('email_domain_id'),
+    emailDomainStatus: text('email_domain_status')
+      .$type<'pending' | 'verified' | 'failed'>(),
+    /** السجلات اللي التاجر لازم يضيفها في DNS — بتتعرض له زي ما هي */
+    emailDnsRecords: jsonb('email_dns_records').$type<
+      Array<{ type: string; name: string; value: string; priority?: number; status?: string }>
+    >(),
+    emailDomainVerifiedAt: timestamp('email_domain_verified_at', { withTimezone: true }),
     name: text('name').notNull(),
     nameEn: text('name_en'),
     tagline: text('tagline'),

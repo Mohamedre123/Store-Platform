@@ -1,4 +1,5 @@
 import 'server-only'
+import { storeSenderAddress } from '@/lib/store-email-domain'
 import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import {
@@ -407,6 +408,7 @@ export async function applyOrderStatus(
         // الرسالة بتيجي باسم متجره لا باسمنا
         senderName: store.name,
         senderSlug: store.slug,
+        senderAddress: await storeSenderAddress(store.id),
         log: {
           storeId: store.id,
           event: `order_${status}`,

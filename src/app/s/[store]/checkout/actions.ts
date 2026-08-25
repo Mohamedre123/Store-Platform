@@ -1,6 +1,7 @@
 'use server'
 
 import { cookies } from 'next/headers'
+import { storeSenderAddress } from '@/lib/store-email-domain'
 import { after } from 'next/server'
 import { whatsappOrderPlaced } from '@/lib/order-whatsapp'
 import { and, eq, sql } from 'drizzle-orm'
@@ -1095,6 +1096,8 @@ async function sendOrderEmails(ctx: {
   const customerEmail = input.email || ctx.fallbackEmail || null
 
   const theme = await getStoreTheme(store.id)
+  /* عنوان التاجر لو نطاقه موثّق — بيتجاب مرة للرسايل التلاتة */
+  const ownAddress = await storeSenderAddress(store.id)
   const brandInfo = {
     name: store.name,
     logo: store.logoLight,
@@ -1159,6 +1162,7 @@ async function sendOrderEmails(ctx: {
       replyTo: safeReplyTo(store.email),
       senderName: store.name,
       senderSlug: store.slug,
+      senderAddress: ownAddress,
       ...(invoicePdf
         ? { attachments: [{ filename: `فاتورة-${orderNumber}.pdf`, content: invoicePdf }] }
         : {}),
@@ -1177,6 +1181,7 @@ async function sendOrderEmails(ctx: {
       replyTo: safeReplyTo(store.email),
       senderName: store.name,
       senderSlug: store.slug,
+      senderAddress: ownAddress,
       log: { storeId: store.id, event: 'order_confirmation', orderId },
     })
   }
@@ -1189,6 +1194,7 @@ async function sendOrderEmails(ctx: {
       ...mail,
       senderName: store.name,
       senderSlug: store.slug,
+      senderAddress: ownAddress,
       log: { storeId: store.id, event: 'merchant_new_order', orderId },
     })
   }

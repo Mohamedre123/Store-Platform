@@ -53,12 +53,29 @@ function encodeDisplayName(name: string): string {
  * والحل النهائي إن التاجر يوثّق نطاقه ويبعت من عليه — ساعتها الاسم
  * والنطاق بتوعه هو.
  */
-function fromHeader(senderName?: string | null, senderSlug?: string | null): string {
+function fromHeader(
+  senderName?: string | null,
+  senderSlug?: string | null,
+  /**
+   * عنوان على نطاق التاجر الموثّق.
+   *
+   * لما يكون موجود، الرسالة بتخرج من نطاقه بالكامل — الاسم والعنوان
+   * والتوقيع كلهم بتوعه، وسمعته بتبقى بتاعته لوحده مش مشتركة مع
+   * باقي التجّار على المنصة.
+   */
+  ownAddress?: string | null,
+): string {
   const configured = process.env.EMAIL_FROM ?? ''
   const name = senderName?.trim()
   if (!name) return configured
 
-  const base = configured.match(/<([^>]+)>/)?.[1] ?? configured.trim()
+  const base = ownAddress?.trim() || configured.match(/<([^>]+)>/)?.[1] || configured.trim()
+
+  /* نطاق التاجر الموثّق بيتستخدم زي ما هو — مفيش سلَج ولا تعديل */
+  if (ownAddress?.trim()) {
+    const cleanName = name.replace(/["<>]/g, '').trim().slice(0, 50)
+    return `${encodeDisplayName(cleanName)} <${ownAddress.trim()}>`
+  }
 
   /**
    * العنوان يطابق الاسم — دي كانت المشكلة كلها.
@@ -224,6 +241,13 @@ export async function sendEmail(options: {
    */
   senderSlug?: string | null
   /**
+   * عنوان المتجر على نطاقه الموثّق.
+   *
+   * لما يبقى موجود، الرسالة بتخرج من نطاق التاجر بالكامل — وسمعته
+   * بتبقى بتاعته لوحده، مالهاش دعوة بباقي التجّار على المنصة.
+   */
+  senderAddress?: string | null
+  /**
    * مرفقات — الفاتورة PDF مثلًا.
    *
    * **بايتات لا رابط.** Resend بيقبل الاتنين، بس الرابط معناه إنه
@@ -244,6 +268,7 @@ export async function sendEmail(options: {
     replyTo,
     senderName,
     senderSlug,
+    senderAddress,
     bulk,
     attachments,
     unsubscribeUrl,
@@ -286,7 +311,7 @@ export async function sendEmail(options: {
        * مهما عملنا في الكود.
        */
       body: JSON.stringify({
-        from: fromHeader(senderName, senderSlug),
+        from: fromHeader(senderName, senderSlug, senderAddress),
         to: [to],
         subject,
         html,
