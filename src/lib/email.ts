@@ -53,6 +53,31 @@ function encodeDisplayName(name: string): string {
  * والحل النهائي إن التاجر يوثّق نطاقه ويبعت من عليه — ساعتها الاسم
  * والنطاق بتوعه هو.
  */
+/**
+ * أسلوب هوية المرسِل — مفتاح بيئة، مش نشر جديد.
+ *
+ * ## ليه إعداد
+ * التسليم مش بيتحدّد بمنطق نقدر نستنتجه: SPF وDKIM وDMARC كلهم
+ * بينجحوا والرسالة بتروح السبام برضو. الباقي سلوك فلتر ما بيتشافش
+ * من برّه، وطريقة معرفته الوحيدة إننا نجرّب ونشوف.
+ *
+ * فالأسلوب بيتغيّر بمفتاح: التاجر يجرّب التلاتة من صفحة البريد،
+ * ويتحطّ اللي وصل — من غير انتظار نشر ولا تعديل كود.
+ *
+ * - `platform` — كل حاجة باسم المنصة وعنوانها. أضمن هوية لأنها
+ *   الوحيدة اللي بتراكم سمعة، بس التاجر بيخسر اسمه على الرسالة.
+ * - `store-name` — اسم المتجر على عنوان المنصة. برانده ظاهر، والعنوان
+ *   محتفظ بسمعة موحّدة.
+ * - `store-address` — اسم المتجر على عنوانه هو. أوضح هوية، بس كل
+ *   متجر بيبدأ سمعته من الصفر.
+ */
+type SenderStyle = 'platform' | 'store-name' | 'store-address'
+
+function senderStyle(): SenderStyle {
+  const v = process.env.EMAIL_SENDER_STYLE
+  return v === 'platform' || v === 'store-name' || v === 'store-address' ? v : 'store-name'
+}
+
 function fromHeader(
   senderName?: string | null,
   senderSlug?: string | null,
@@ -69,10 +94,20 @@ function fromHeader(
   const name = senderName?.trim()
   if (!name) return configured
 
-  const base = ownAddress?.trim() || configured.match(/<([^>]+)>/)?.[1] || configured.trim()
+  const style = senderStyle()
+
+  /*
+    هوية المنصة بالكامل: الرسالة بتخرج زي رسايل زاوية نفسها — نفس
+    الاسم ونفس العنوان. اسم المتجر بيفضل في الموضوع وفي الرسالة
+    وفي الشعار، اللي بيتغيّر هو الترويسة بس.
+  */
+  if (style === 'platform') return configured
+
+  const useOwn = style === 'store-address'
+  const base = (useOwn ? ownAddress?.trim() : '') || configured.match(/<([^>]+)>/)?.[1] || configured.trim()
 
   /* نطاق التاجر الموثّق بيتستخدم زي ما هو — مفيش سلَج ولا تعديل */
-  if (ownAddress?.trim()) {
+  if (useOwn && ownAddress?.trim()) {
     const cleanName = name.replace(/["<>]/g, '').trim().slice(0, 50)
     return `${encodeDisplayName(cleanName)} <${ownAddress.trim()}>`
   }
@@ -102,7 +137,8 @@ function fromHeader(
    * ده اللي بتعمله المنصات الكبيرة بالظبط — وما بيحتاجش من التاجر
    * يوثّق نطاقًا ولا يضيف كلمة «عبر» على علامته.
    */
-  const local = (senderSlug ?? '').trim().toLowerCase()
+  /* السلَج بيتحوّل لعنوان في وضع «عنوان المتجر» بس */
+  const local = useOwn ? (senderSlug ?? '').trim().toLowerCase() : ''
   const domain = base.split('@')[1] ?? ''
 
   const address =

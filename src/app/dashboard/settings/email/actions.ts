@@ -146,53 +146,112 @@ export async function emailDiagnosticsAction(): Promise<EmailDiagnostics> {
 }
 
 /**
- * رسالة تجريبية بنفس مسار رسايل العملاء بالظبط.
+ * اختبار مقارنة — تلات رسايل بتلات هويات مرسِل.
  *
- * **نفس القالب ونفس الترويسات** — رسالة اختبار بمسار مختلف بتوصل
- * الوارد وتخلّي التاجر يفتكر إن المشكلة اتحلّت، وهي لسه مكانها.
+ * ## ليه مقارنة مش رسالة واحدة
+ * الترويسة أثبتت إن SPF وDKIM وDMARC كلهم بينجحوا، والرسالة بتروح
+ * السبام برضو. يعني السبب مش في المصادقة — والباقي احتمالات إحنا
+ * بنخمّنها. والتخمين في التسليم بيضيّع أسابيع.
+ *
+ * التلات رسايل بتخرج **في نفس اللحظة، لنفس العنوان، بنفس المحتوى**،
+ * والفرق الوحيد بينهم هوية المرسِل. اللي هيوصل الوارد بيقول لنا
+ * الجواب من غير أي اجتهاد:
+ *
+ * - **أ** — هوية المنصة: `زاوية <no-reply@نطاقنا>`
+ *   دي اللي كانت شغّالة قبل ٢٤ أغسطس، لما اسم المتجر اتحطّ على الرسايل.
+ * - **ب** — اسم المتجر على عنوان المنصة: `atlosa <no-reply@نطاقنا>`
+ *   ده اللي اتعمل يوم ٢٤ وبدأت السبام بعده.
+ * - **ج** — اسم المتجر على عنوانه: `atlosa <atlosa@نطاقنا>`
+ *   ده الوضع الحالي.
+ *
+ * وكل رسالة بتقول رقمها في الموضوع عشان التاجر يعرف مين وصل فين.
  */
-export async function sendTestEmailAction(
+export type TestVariant = { key: 'a' | 'b' | 'c'; label: string; from: string; sent: boolean; error?: string }
+
+export async function sendDeliveryTestAction(
   to: string,
-): Promise<{ ok: boolean; message: string; from: string }> {
+): Promise<{ ok: boolean; message: string; variants: TestVariant[] }> {
   const { store } = await getDashboardContext()
 
   const address = to.trim().toLowerCase()
-  if (!address.includes('@')) return { ok: false, message: 'اكتب بريدًا صحيحًا', from: '' }
+  if (!address.includes('@')) {
+    return { ok: false, message: 'اكتب بريدًا صحيحًا', variants: [] }
+  }
 
   const theme = await getStoreTheme(store.id)
   const own = await storeSenderAddress(store.id)
 
-  const mail = customerCodeEmail(
+  const brand = {
+    name: store.name,
+    logo: store.logoLight,
+    primary: theme.custom.identity.primary,
+    slug: store.slug,
+    email: store.email,
+  }
+
+  const configured = process.env.EMAIL_FROM ?? ''
+  const base = configured.match(/<([^>]+)>/)?.[1] ?? configured.trim()
+  const platformName = process.env.NEXT_PUBLIC_APP_NAME ?? 'زاوية'
+
+  const setups: Array<{
+    key: TestVariant['key']
+    label: string
+    from: string
+    opts: { senderName?: string | null; senderSlug?: string | null; senderAddress?: string | null }
+  }> = [
     {
-      name: store.name,
-      logo: store.logoLight,
-      primary: theme.custom.identity.primary,
-      slug: store.slug,
-      email: store.email,
+      key: 'a',
+      label: 'هوية المنصة (اللي كانت شغّالة قبل ٢٤ أغسطس)',
+      from: configured,
+      opts: {},
     },
-    '123456',
-    10,
-  )
+    {
+      key: 'b',
+      label: 'اسم المتجر على عنوان المنصة',
+      from: `${store.name} <${base}>`,
+      opts: { senderName: store.name },
+    },
+    {
+      key: 'c',
+      label: 'اسم المتجر على عنوانه (الوضع الحالي)',
+      from: `${store.name} <${own ?? `${store.slug}@${base.split('@')[1] ?? ''}`}>`,
+      opts: { senderName: store.name, senderSlug: store.slug, senderAddress: own },
+    },
+  ]
 
-  const res = await sendEmail({
-    to: address,
-    ...mail,
-    senderName: store.name,
-    senderSlug: store.slug,
-    senderAddress: own,
-    replyTo: safeReplyTo(store.email),
-    log: { storeId: store.id, event: 'delivery_test' },
-  })
+  const variants: TestVariant[] = []
 
-  const diag = await emailDiagnosticsAction()
+  for (const s of setups) {
+    const mail = customerCodeEmail(brand, '123456', 10)
+    const res = await sendEmail({
+      to: address,
+      ...mail,
+      /* رقم التجربة في الموضوع — عشان يعرف مين وصل فين */
+      subject: `[تجربة ${s.key.toUpperCase()}] ${mail.subject}`,
+      ...s.opts,
+      replyTo: safeReplyTo(store.email),
+      log: { storeId: store.id, event: `delivery_test_${s.key}` },
+    })
 
-  return res.ok
-    ? {
-        ok: true,
-        message: 'اتبعتت. شوف الوارد والسبام، ولو لقيتها في السبام افتح «Show original» وابعتلنا أول ١٠ سطور.',
-        from: diag.from,
-      }
-    : { ok: false, message: `المزوّد رفض: ${res.error}`, from: diag.from }
+    variants.push({
+      key: s.key,
+      label: s.label,
+      from: s.from,
+      sent: res.ok,
+      ...(res.ok ? {} : { error: res.error }),
+    })
+  }
+
+  const okCount = variants.filter((v) => v.sent).length
+
+  return {
+    ok: okCount > 0,
+    message:
+      okCount === 0
+        ? 'مفيش ولا رسالة اتبعتت — شوف الأخطاء تحت.'
+        : 'اتبعتت تلات رسايل. افتح بريدك وشوف كل واحدة راحت الوارد ولا السبام، وقولّنا الحرف اللي وصل — هنخلّي الإعداد بتاعه هو الافتراضي.',
+    variants,
+  }
 }
 
 /* ────────────────────── نطاق المتجر ────────────────────── */
