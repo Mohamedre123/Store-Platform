@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { and, count, desc, eq, ne } from 'drizzle-orm'
-import { MessageCircle, Package, Phone, ShoppingBag } from 'lucide-react'
+import { Mail, MessageCircle, Package, Phone, ShoppingBag } from 'lucide-react'
 import { db } from '@/db'
 import { orders } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
@@ -37,6 +37,7 @@ export default async function OrdersPage({
         isIncomplete: orders.isIncomplete,
         customerName: orders.customerName,
         customerPhone: orders.customerPhone,
+        customerEmail: orders.customerEmail,
         total: orders.total,
         createdAt: orders.createdAt,
         shippingAddress: orders.shippingAddress,
@@ -166,6 +167,25 @@ export default async function OrdersPage({
                         {o.customerName || 'بدون اسم'}
                         {city && ` · ${city}`}
                       </span>
+                      {/*
+                        وسيلة التواصل في السطر نفسه — مش جوّه الطلب.
+
+                        السلة المتروكة بالذات بتتراجع من القايمة دي على
+                        طول: التاجر بيمرّ على العشرين سطر ويقرّر يكلّم
+                        مين. لو البريد مخفي جوّه، هو عمليًا مش موجود،
+                        وبيفضل يبعت واتساب لواحد ما بيردّش.
+                      */}
+                      {(o.customerPhone || o.customerEmail) && (
+                        <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-[var(--fg-subtle)]">
+                          {o.customerPhone && <bdi dir="ltr">{o.customerPhone}</bdi>}
+                          {o.customerPhone && o.customerEmail && <span aria-hidden="true">·</span>}
+                          {o.customerEmail && (
+                            <bdi dir="ltr" className="min-w-0 truncate">
+                              {o.customerEmail}
+                            </bdi>
+                          )}
+                        </span>
+                      )}
                       <span className="mt-0.5 block text-xs text-[var(--fg-subtle)]">
                         {formatDateTime(o.createdAt)}
                       </span>
@@ -175,8 +195,19 @@ export default async function OrdersPage({
                       {formatMoney(o.total, store.currency)}
                     </span>
 
-                    {o.customerPhone && (
+                    {(o.customerPhone || o.customerEmail) && (
                       <div className="flex gap-1">
+                        {o.customerEmail && (
+                          <a
+                            href={`mailto:${o.customerEmail}`}
+                            aria-label="بريد"
+                            className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--border-strong)] text-[var(--fg-muted)] transition-colors hover:bg-[var(--surface-2)]"
+                          >
+                            <Mail className="h-4 w-4" aria-hidden="true" />
+                          </a>
+                        )}
+                        {o.customerPhone && (
+                          <>
                         <a
                           href={`tel:${o.customerPhone}`}
                           aria-label="اتصال"
@@ -197,6 +228,8 @@ export default async function OrdersPage({
                         >
                           <MessageCircle className="h-4 w-4" aria-hidden="true" />
                         </a>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>

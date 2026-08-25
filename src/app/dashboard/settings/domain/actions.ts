@@ -79,7 +79,7 @@ export async function verifyDomainAction(): Promise<DomainState> {
      * المنصة — عطل في البريد ما يصحّش يمنع متجره من الاشتغال.
      */
     after(
-      startEmailDomain(store.id, store.customDomain).catch((e) =>
+      startEmailDomain(store.id).catch((e) =>
         console.error('فشل تجهيز بريد النطاق:', e),
       ),
     )

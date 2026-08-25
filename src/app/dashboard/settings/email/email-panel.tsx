@@ -8,7 +8,6 @@ import {
   startEmailDomainAction,
   verifyEmailDomainAction,
   type EmailDiagnostics,
-  type TestVariant,
 } from './actions'
 import { Button, Card, Input } from '@/components/ui'
 import type { DnsRecord } from '@/lib/store-email-domain'
@@ -27,7 +26,6 @@ export function EmailPanel({ initial }: { initial: EmailDiagnostics }) {
 
   const [testTo, setTestTo] = useState('')
   const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null)
-  const [variants, setVariants] = useState<TestVariant[]>([])
 
   const [domainMsg, setDomainMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [records, setRecords] = useState<DnsRecord[]>(initial.ownDomain.records)
@@ -131,10 +129,8 @@ export function EmailPanel({ initial }: { initial: EmailDiagnostics }) {
             onClick={() =>
               start(async () => {
                 setTestMsg(null)
-                setVariants([])
                 const res = await sendDeliveryTestAction(testTo)
                 setTestMsg({ ok: res.ok, text: res.message })
-                setVariants(res.variants)
               })
             }
           >
@@ -155,35 +151,6 @@ export function EmailPanel({ initial }: { initial: EmailDiagnostics }) {
           </p>
         )}
 
-        {/*
-          التلات هويات قدام بعض.
-
-          الرسايل التلاتة بتخرج في نفس اللحظة لنفس العنوان بنفس
-          المحتوى — الفرق الوحيد بينهم الترويسة. اللي هيوصل الوارد
-          بيقول الجواب من غير أي اجتهاد.
-        */}
-        {variants.length > 0 && (
-          <ul className="flex flex-col gap-2 border-t border-[var(--border)] pt-3">
-            {variants.map((v) => (
-              <li key={v.key} className="flex items-start gap-2 text-xs">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[var(--primary-soft)] text-[11px] font-bold text-[var(--primary)]">
-                  {v.key.toUpperCase()}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block font-medium">{v.label}</span>
-                  <span className="block break-all text-[var(--fg-subtle)]" dir="ltr">
-                    {v.from}
-                  </span>
-                  {!v.sent && (
-                    <span className="block text-[var(--color-danger)]">
-                      ما اتبعتتش — {v.error}
-                    </span>
-                  )}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
       </Card>
 
       {/* ٣ — نطاق المتجر */}

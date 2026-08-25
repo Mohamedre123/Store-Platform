@@ -75,12 +75,29 @@ const MUTED = '#5c6890'
 const BORDER = '#e2e4ec'
 const PAGE = '#f4f3f9'
 
+/**
+ * قالب خفيف — والخفّة هنا مقصودة مش تبسيط.
+ *
+ * ## ليه اتغيّر
+ * القالب القديم كان بطاقة مصمّمة: جداول جوّه جداول، وخلفية ملوّنة،
+ * وشعار المتجر كصورة بعيدة، وحدود وزوايا ونصّ مخفي للمعاينة. الشكل
+ * ده بيتقرا حلو، **بس بصمته عند الفلاتر بصمة رسالة تسويقية** — لا
+ * رسالة معاملة.
+ *
+ * وأخطر جزء كان **الصورة البعيدة**: أول رسالة من مرسِل جديد فيها
+ * صورة بتتجاب من نطاق تخزين تاني بتتقرا كتتبّع فتح. الفلتر بيشوف
+ * «مرسِل ما يعرفوش + صورة تتبّع + تصميم تسويقي» فبيوديها السبام
+ * حتى والمصادقة ناجحة.
+ *
+ * ## اللي بقى
+ * - **جدول واحد** بعرض ثابت، مفيش تداخل
+ * - **مفيش صور خالص** — اسم المتجر نص، وبيتقرا حتى والصور محجوبة
+ * - **رابط واحد بحد أقصى** في الرسالة كلها
+ * - مفيش خلفيات ولا حدود ولا زوايا — أبيض على أبيض زي رسالة من بني آدم
+ *
+ * الرسالة المعاملاتية المفروض تبان زي رسالة شخص كتبها، مش زي إعلان.
+ */
 function layout(store: StoreBrand, inner: string, preheader: string) {
-  const header = store.logo
-    ? `<img src="${store.logo}" height="44" alt="${escapeHtml(store.name)}"
-           style="display:block;height:44px;width:auto;border:0;outline:none;margin:0 auto;">`
-    : `<div style="font-family:'Segoe UI',Tahoma,Arial,sans-serif;font-size:20px;font-weight:bold;color:${INK};">${escapeHtml(store.name)}</div>`
-
   return `<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
@@ -90,22 +107,15 @@ function layout(store: StoreBrand, inner: string, preheader: string) {
 <meta name="color-scheme" content="light">
 <title>${escapeHtml(store.name)}</title>
 </head>
-<body style="margin:0;padding:0;background-color:${PAGE};">
+<body style="margin:0;padding:0;background:#ffffff;">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(preheader)}</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${PAGE};">
-  <tr><td align="center" style="padding:32px 16px;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;">
-      <tr><td align="center" style="padding-bottom:24px;">${header}</td></tr>
-      <tr><td style="background-color:#ffffff;border:1px solid ${BORDER};border-radius:16px;padding:32px 28px;font-family:'Segoe UI',Tahoma,Arial,sans-serif;color:${INK};">
-        ${inner}
-      </td></tr>
-      <tr><td align="center" style="padding-top:20px;font-family:'Segoe UI',Tahoma,Arial,sans-serif;font-size:12px;line-height:1.8;color:${MUTED};">
-        ${escapeHtml(store.name)}
-        ${
-          store.email
-            ? `<br>للتواصل: <a href="mailto:${escapeHtml(store.email)}" style="color:${MUTED};">${escapeHtml(store.email)}</a>`
-            : ''
-        }
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr><td align="center" style="padding:24px 16px;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="520" style="width:520px;max-width:100%;font-family:-apple-system,'Segoe UI',Tahoma,Arial,sans-serif;color:${INK};font-size:15px;line-height:1.9;">
+      <tr><td style="padding-bottom:16px;font-size:17px;font-weight:bold;">${escapeHtml(store.name)}</td></tr>
+      <tr><td>${inner}</td></tr>
+      <tr><td style="padding-top:24px;border-top:1px solid ${BORDER};font-size:13px;line-height:1.8;color:${MUTED};">
+        ${escapeHtml(store.name)}${store.email ? ` — ${escapeHtml(store.email)}` : ''}
       </td></tr>
     </table>
   </td></tr>

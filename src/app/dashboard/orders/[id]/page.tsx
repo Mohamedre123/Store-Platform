@@ -2,7 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { notFound } from 'next/navigation'
 import { and, asc, eq, inArray } from 'drizzle-orm'
-import { AlertTriangle, ArrowRight, MapPin, MessageCircle, Phone, StickyNote, User } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Mail, MapPin, MessageCircle, Phone, StickyNote, User } from 'lucide-react'
 import { db } from '@/db'
 import { categories, orderEvents, orderItems, orders, productOptions, products, productVariants } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
@@ -350,6 +350,22 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                     <Phone className="h-4 w-4 shrink-0 text-[var(--fg-subtle)]" aria-hidden="true" />
                     <bdi dir="ltr">{order.customerPhone}</bdi>
                   </span>
+                )}
+
+                {/*
+                  البريد جنب الرقم مش مخفي: كل الرسايل الرسمية —
+                  الفاتورة، تأكيد الطلب، تتبّع الشحنة — بتخرج عليه،
+                  والتاجر لازم يشوف العنوان اللي وصلت عليه فعلًا لما
+                  العميل يقول «ما وصلنيش حاجة».
+                */}
+                {order.customerEmail && (
+                  <a
+                    href={`mailto:${order.customerEmail}`}
+                    className="flex items-center gap-2 hover:underline"
+                  >
+                    <Mail className="h-4 w-4 shrink-0 text-[var(--fg-subtle)]" aria-hidden="true" />
+                    <bdi dir="ltr" className="break-all">{order.customerEmail}</bdi>
+                  </a>
                 )}
 
                 {address && (

@@ -131,8 +131,6 @@ export async function sendRecoveryMessageAction(input: {
       to: order.email,
       ...mail,
       replyTo: safeReplyTo(store.email),
-      senderName: store.name,
-      senderSlug: store.slug,
       senderAddress: await storeSenderAddress(store.id),
       log: {
         storeId: store.id,

@@ -89,7 +89,12 @@ const orderSchema = z.object({
   storeIdentifier: z.string().min(1),
   name: z.string().trim().max(120).optional(),
   phone: z.string().trim().min(6, 'اكتب رقم تليفون صحيح'),
-  email: z.string().trim().email('البريد غير صحيح').optional().or(z.literal('')),
+  /*
+    البريد إجباري على الخادم كمان مش في النموذج بس — الطلب ممكن
+    ييجي من أي مكان. من غيره الفاتورة وتأكيد الطلب ما لهمش طريق
+    توصل بيها لو العميل مش راد على تليفونه.
+  */
+  email: z.string().trim().email('اكتب بريدًا إلكترونيًا صحيح'),
   country: z.string().trim().default('EG'),
   city: z.string().trim().optional(),
   area: z.string().trim().optional(),
@@ -1160,8 +1165,6 @@ async function sendOrderEmails(ctx: {
       to: customerEmail,
       ...orderInvoiceEmail(brandInfo, { ...order, trackUrl: invoiceUrl }),
       replyTo: safeReplyTo(store.email),
-      senderName: store.name,
-      senderSlug: store.slug,
       senderAddress: ownAddress,
       ...(invoicePdf
         ? { attachments: [{ filename: `فاتورة-${orderNumber}.pdf`, content: invoicePdf }] }
@@ -1179,8 +1182,6 @@ async function sendOrderEmails(ctx: {
         اللي مالهاش رد بتبان لفلاتر السبام كإشعار آلي مجهول.
       */
       replyTo: safeReplyTo(store.email),
-      senderName: store.name,
-      senderSlug: store.slug,
       senderAddress: ownAddress,
       log: { storeId: store.id, event: 'order_confirmation', orderId },
     })
@@ -1192,8 +1193,6 @@ async function sendOrderEmails(ctx: {
     await sendEmail({
       to: store.email,
       ...mail,
-      senderName: store.name,
-      senderSlug: store.slug,
       senderAddress: ownAddress,
       log: { storeId: store.id, event: 'merchant_new_order', orderId },
     })

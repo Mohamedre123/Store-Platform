@@ -88,17 +88,11 @@ export async function emailDiagnosticsAction(): Promise<EmailDiagnostics> {
   */
   const configured = process.env.EMAIL_FROM ?? ''
   const base = configured.match(/<([^>]+)>/)?.[1] ?? configured.trim()
-  const domain = base.split('@')[1] ?? ''
-  const slug = (row?.slug ?? '').toLowerCase()
-  const address = own
-    ? own
-    : /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/.test(slug) && domain
-      ? `${slug}@${domain}`
-      : base
+  const rootDomain = base.split('@')[1] ?? ''
 
-  const from = `${row?.name ?? store.name} <${address}>`
-
-  const sendingDomain = own ? (row?.emailDomain ?? domain) : domain
+  /* نفس منطق `fromHeader` بالظبط — عنوان مجرّد بلا اسم ظاهر */
+  const from = own || (rootDomain ? `info@${rootDomain}` : base)
+  const sendingDomain = own ? (row?.emailDomain ?? rootDomain) : rootDomain
 
   const dns = await Promise.all([
     lookup(sendingDomain, 'TXT').then((found) => ({
@@ -146,112 +140,51 @@ export async function emailDiagnosticsAction(): Promise<EmailDiagnostics> {
 }
 
 /**
- * اختبار مقارنة — تلات رسايل بتلات هويات مرسِل.
+ * رسالة تجريبية بنفس مسار رسايل العملاء بالظبط.
  *
- * ## ليه مقارنة مش رسالة واحدة
- * الترويسة أثبتت إن SPF وDKIM وDMARC كلهم بينجحوا، والرسالة بتروح
- * السبام برضو. يعني السبب مش في المصادقة — والباقي احتمالات إحنا
- * بنخمّنها. والتخمين في التسليم بيضيّع أسابيع.
- *
- * التلات رسايل بتخرج **في نفس اللحظة، لنفس العنوان، بنفس المحتوى**،
- * والفرق الوحيد بينهم هوية المرسِل. اللي هيوصل الوارد بيقول لنا
- * الجواب من غير أي اجتهاد:
- *
- * - **أ** — هوية المنصة: `زاوية <no-reply@نطاقنا>`
- *   دي اللي كانت شغّالة قبل ٢٤ أغسطس، لما اسم المتجر اتحطّ على الرسايل.
- * - **ب** — اسم المتجر على عنوان المنصة: `atlosa <no-reply@نطاقنا>`
- *   ده اللي اتعمل يوم ٢٤ وبدأت السبام بعده.
- * - **ج** — اسم المتجر على عنوانه: `atlosa <atlosa@نطاقنا>`
- *   ده الوضع الحالي.
- *
- * وكل رسالة بتقول رقمها في الموضوع عشان التاجر يعرف مين وصل فين.
+ * **نفس القالب ونفس الترويسات** — رسالة اختبار بمسار مختلف بتوصل
+ * الوارد وتخلّي التاجر يفتكر إن المشكلة اتحلّت، وهي لسه مكانها.
  */
-export type TestVariant = { key: 'a' | 'b' | 'c'; label: string; from: string; sent: boolean; error?: string }
-
 export async function sendDeliveryTestAction(
   to: string,
-): Promise<{ ok: boolean; message: string; variants: TestVariant[] }> {
+): Promise<{ ok: boolean; message: string; from: string }> {
   const { store } = await getDashboardContext()
 
   const address = to.trim().toLowerCase()
-  if (!address.includes('@')) {
-    return { ok: false, message: 'اكتب بريدًا صحيحًا', variants: [] }
-  }
+  if (!address.includes('@')) return { ok: false, message: 'اكتب بريدًا صحيحًا', from: '' }
 
   const theme = await getStoreTheme(store.id)
   const own = await storeSenderAddress(store.id)
 
-  const brand = {
-    name: store.name,
-    logo: store.logoLight,
-    primary: theme.custom.identity.primary,
-    slug: store.slug,
-    email: store.email,
-  }
-
-  const configured = process.env.EMAIL_FROM ?? ''
-  const base = configured.match(/<([^>]+)>/)?.[1] ?? configured.trim()
-  const platformName = process.env.NEXT_PUBLIC_APP_NAME ?? 'زاوية'
-
-  const setups: Array<{
-    key: TestVariant['key']
-    label: string
-    from: string
-    opts: { senderName?: string | null; senderSlug?: string | null; senderAddress?: string | null }
-  }> = [
+  const mail = customerCodeEmail(
     {
-      key: 'a',
-      label: 'هوية المنصة (اللي كانت شغّالة قبل ٢٤ أغسطس)',
-      from: configured,
-      opts: {},
+      name: store.name,
+      logo: store.logoLight,
+      primary: theme.custom.identity.primary,
+      slug: store.slug,
+      email: store.email,
     },
-    {
-      key: 'b',
-      label: 'اسم المتجر على عنوان المنصة',
-      from: `${store.name} <${base}>`,
-      opts: { senderName: store.name },
-    },
-    {
-      key: 'c',
-      label: 'اسم المتجر على عنوانه (الوضع الحالي)',
-      from: `${store.name} <${own ?? `${store.slug}@${base.split('@')[1] ?? ''}`}>`,
-      opts: { senderName: store.name, senderSlug: store.slug, senderAddress: own },
-    },
-  ]
+    '123456',
+    10,
+  )
 
-  const variants: TestVariant[] = []
+  const res = await sendEmail({
+    to: address,
+    ...mail,
+    senderAddress: own,
+    replyTo: safeReplyTo(store.email),
+    log: { storeId: store.id, event: 'delivery_test' },
+  })
 
-  for (const s of setups) {
-    const mail = customerCodeEmail(brand, '123456', 10)
-    const res = await sendEmail({
-      to: address,
-      ...mail,
-      /* رقم التجربة في الموضوع — عشان يعرف مين وصل فين */
-      subject: `[تجربة ${s.key.toUpperCase()}] ${mail.subject}`,
-      ...s.opts,
-      replyTo: safeReplyTo(store.email),
-      log: { storeId: store.id, event: `delivery_test_${s.key}` },
-    })
+  const diag = await emailDiagnosticsAction()
 
-    variants.push({
-      key: s.key,
-      label: s.label,
-      from: s.from,
-      sent: res.ok,
-      ...(res.ok ? {} : { error: res.error }),
-    })
-  }
-
-  const okCount = variants.filter((v) => v.sent).length
-
-  return {
-    ok: okCount > 0,
-    message:
-      okCount === 0
-        ? 'مفيش ولا رسالة اتبعتت — شوف الأخطاء تحت.'
-        : 'اتبعتت تلات رسايل. افتح بريدك وشوف كل واحدة راحت الوارد ولا السبام، وقولّنا الحرف اللي وصل — هنخلّي الإعداد بتاعه هو الافتراضي.',
-    variants,
-  }
+  return res.ok
+    ? {
+        ok: true,
+        message: 'اتبعتت. شوف الوارد والسبام — ولو لقيتها في السبام دوس «ليست غير مرغوب فيها».',
+        from: diag.from,
+      }
+    : { ok: false, message: `المزوّد رفض: ${res.error}`, from: diag.from }
 }
 
 /* ────────────────────── نطاق المتجر ────────────────────── */
@@ -261,14 +194,7 @@ export async function startEmailDomainAction(): Promise<
 > {
   const { store } = await getDashboardContext()
 
-  if (!store.customDomain) {
-    return {
-      ok: false,
-      error: 'اربط نطاقك للمتجر الأول من صفحة النطاق، وبعدين فعّل البريد عليه.',
-    }
-  }
-
-  const res = await startEmailDomain(store.id, store.customDomain)
+  const res = await startEmailDomain(store.id)
   if (!res.ok) return { ok: false, error: res.error }
 
   revalidatePath('/dashboard/settings/email')

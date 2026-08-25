@@ -206,8 +206,6 @@ export async function issueCustomerOtp(input: {
     const sent = await sendEmail({
       to: emailTarget,
       ...mail,
-      senderName: input.brand.name,
-      senderSlug: input.brand.slug,
       senderAddress: await storeSenderAddress(input.storeId),
       log: { storeId: input.storeId, event: 'customer_login_otp' },
     })

@@ -14,7 +14,7 @@ import {
   requestOrderOtpAction,
   verifyOrderOtpAction,
 } from './actions'
-import { formatMoney, isValidPhone } from '@/lib/utils'
+import { formatMoney, isValidEmail, isValidPhone } from '@/lib/utils'
 import type { Region } from '@/lib/regions'
 
 type FieldMode = 'required' | 'optional' | 'hidden'
@@ -299,6 +299,10 @@ export function CheckoutForm({
       setError('اكتب رقم تليفون صحيح')
       return
     }
+    if (!isValidEmail(email)) {
+      setError('اكتب بريدًا إلكترونيًا صحيح — الفاتورة هتوصلك عليه')
+      return
+    }
     if (config.addressMode === 'structured' && req(config.fieldCity) && !city) {
       setError('اختار المحافظة')
       return
@@ -313,7 +317,7 @@ export function CheckoutForm({
         storeIdentifier,
         name: name || undefined,
         phone,
-        email: email || undefined,
+        email: email.trim(),
         country,
         city: city || undefined,
         area: area || undefined,
@@ -415,21 +419,28 @@ export function CheckoutForm({
             <span className="text-xs opacity-60">هنكلّمك عليه لتأكيد الطلب</span>
           </label>
 
-          {show(config.fieldEmail) && (
-            <label className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium">
-                البريد الإلكتروني {req(config.fieldEmail) && <span className="text-red-500">*</span>}
-              </span>
-              <input
-                value={email}
-                onChange={(e) => { setEmail(e.target.value); setTouchedContact(true) }}
-                type="email"
-                dir="ltr"
-                className={`${input} text-start`}
-                placeholder="you@example.com"
-              />
-            </label>
-          )}
+          {/*
+            البريد إجباري دايمًا — مش تبع إعداد التاجر.
+
+            الفاتورة وتأكيد الطلب وتتبّع الشحنة كلها بتتبعت عليه، وتاجر
+            قافل الحقل «عشان ما يطوّلش النموذج» بيخسر الوسيلة الوحيدة
+            اللي بتوصل لعميل مش راد على تليفونه. والعنوان ده كمان هو
+            اللي بيربط حساب العميل لو سجّل برقمه مرة وبميله مرة.
+          */}
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium">
+              البريد الإلكتروني <span className="text-red-500">*</span>
+            </span>
+            <input
+              value={email}
+              onChange={(e) => { setEmail(e.target.value); setTouchedContact(true) }}
+              type="email"
+              dir="ltr"
+              className={`${input} text-start`}
+              placeholder="you@example.com"
+            />
+            <span className="text-xs opacity-60">هنبعتلك عليه الفاتورة وتأكيد الطلب</span>
+          </label>
         </section>
 
         {config.addressMode !== 'hidden' && (

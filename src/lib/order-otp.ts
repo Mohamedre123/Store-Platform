@@ -58,8 +58,6 @@ export async function issueOrderOtp(input: {
 
   const spaced = code.split('').join(' ')
   await sendEmail({
-    senderName: input.storeName,
-    senderSlug: input.storeSlug,
     senderAddress: await storeSenderAddress(input.storeId),
     log: { storeId: input.storeId, event: 'order_otp' },
     to: input.email,

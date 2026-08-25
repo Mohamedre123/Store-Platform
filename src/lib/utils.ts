@@ -137,6 +137,19 @@ export function isValidPhone(input: string): boolean {
   return /^\+\d{10,15}$/.test(normalized)
 }
 
+/**
+ * فحص بريد بسيط عن قصد.
+ *
+ * الفحوص الصارمة بترفض عناوين شرعية (نقط، علامات زائد، نطاقات
+ * جديدة)، والعميل بيقف قدام رسالة «بريد غلط» وهو كاتبه صح. اللي
+ * محتاجينه هنا نمنع الغلط الواضح بس — التسليم الحقيقي هو اللي
+ * بيحكم في الآخر.
+ */
+export function isValidEmail(input: string): boolean {
+  const v = input.trim()
+  return /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(v) && v.length <= 254
+}
+
 export function formatDate(date: Date | string, locale = 'ar-EG') {
   const d = typeof date === 'string' ? new Date(date) : date
   try {

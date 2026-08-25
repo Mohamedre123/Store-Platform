@@ -406,8 +406,6 @@ export async function applyOrderStatus(
         // الرد على التاجر — العميل بيرد على رسالة الحالة كتير
         replyTo: safeReplyTo(storeEmail),
         // الرسالة بتيجي باسم متجره لا باسمنا
-        senderName: store.name,
-        senderSlug: store.slug,
         senderAddress: await storeSenderAddress(store.id),
         log: {
           storeId: store.id,

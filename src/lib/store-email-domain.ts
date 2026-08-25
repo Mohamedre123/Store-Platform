@@ -2,6 +2,7 @@ import 'server-only'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { stores } from '@/db/schema'
+import { ensurePlatformDns, platformDnsReady } from '@/lib/platform-dns'
 
 /**
  * نطاق بريد المتجر — التاجر بيبعت من نطاقه هو.
@@ -50,15 +51,48 @@ function key(): string | null {
   return process.env.RESEND_API_KEY || null
 }
 
-/** «mail.example.com» من «example.com» أو من «www.example.com» */
-export function mailSubdomain(customDomain: string): string {
-  const clean = customDomain
+/** «example.com» من «https://www.example.com/» */
+function bareDomain(input: string): string {
+  return input
     .trim()
     .toLowerCase()
     .replace(/^https?:\/\//, '')
     .replace(/\/.*$/, '')
     .replace(/^www\./, '')
-  return `mail.${clean}`
+}
+
+/**
+ * نطاق الإرسال بتاع المتجر.
+ *
+ * ## التاجر عنده نطاقه
+ * `mail.<نطاقه>` — نطاق فرعي عشان ما نلمسش الـMX بتاع بريده لو
+ * عنده واحد على الجذر.
+ *
+ * ## التاجر لسه على نطاق المنصة
+ * `<سلَجه>.<نطاق المنصة>` — يعني `atlosa.zawyaeg.site`، والعنوان
+ * بيبقى `info@atlosa.zawyaeg.site`.
+ *
+ * **وده مش تجميل.** كل متجر بيبقى له نطاق فرعي مستقل، فسمعته
+ * بتتحسب لوحده: تاجر عملاؤه بيبلّغوا سبام ما بيأذيش باقي التجّار،
+ * والتاجر اللي رسايله بتتفتح بيبني سمعته هو.
+ *
+ * ولما التاجر يجيب نطاقه الحقيقي، العنوان بيتحوّل عليه تلقائيًا
+ * بنفس الشكل — `info@` برضو.
+ */
+export function sendingDomainFor(input: {
+  slug: string
+  customDomain?: string | null
+  customDomainVerifiedAt?: Date | string | null
+}): string | null {
+  if (input.customDomain && input.customDomainVerifiedAt) {
+    return `mail.${bareDomain(input.customDomain)}`
+  }
+
+  const root = process.env.NEXT_PUBLIC_ROOT_DOMAIN?.trim().toLowerCase()
+  if (!root || root.startsWith('localhost')) return null
+
+  const slug = input.slug.trim().toLowerCase()
+  return /^[a-z0-9](?:[a-z0-9-]{0,40}[a-z0-9])?$/.test(slug) ? `${slug}.${root}` : null
 }
 
 type ResendDomain = {
@@ -139,17 +173,24 @@ async function call(
  */
 export async function startEmailDomain(
   storeId: string,
-  customDomain: string,
 ): Promise<{ ok: true; state: DomainState } | { ok: false; error: string }> {
-  const domain = mailSubdomain(customDomain)
-
   const [store] = await db
-    .select({ id: stores.id, emailDomainId: stores.emailDomainId, emailDomain: stores.emailDomain })
+    .select({
+      id: stores.id,
+      slug: stores.slug,
+      customDomain: stores.customDomain,
+      customDomainVerifiedAt: stores.customDomainVerifiedAt,
+      emailDomainId: stores.emailDomainId,
+      emailDomain: stores.emailDomain,
+    })
     .from(stores)
     .where(eq(stores.id, storeId))
     .limit(1)
 
   if (!store) return { ok: false, error: 'المتجر مش موجود' }
+
+  const domain = sendingDomainFor(store)
+  if (!domain) return { ok: false, error: 'مقدرناش نحدّد نطاق الإرسال للمتجر ده' }
 
   /* نفس النطاق ومسجّل خلاص — بنقرا حالته بس */
   if (store.emailDomainId && store.emailDomain === domain) {
@@ -179,6 +220,16 @@ export async function startEmailDomain(
       emailDomainVerifiedAt: null,
     })
     .where(eq(stores.id, storeId))
+
+  /*
+    السجلات بتتكتب في منطقتنا فورًا لو النطاق تحتنا — والتوثيق
+    بيتطلب في نفس النَفَس. Vercel DNS بينشر في ثواني، فالمتجر بيبقى
+    جاهز للإرسال قبل ما التاجر يخلّص تسجيله أصلًا.
+  */
+  if (await ensurePlatformDns(domain, records)) {
+    const done = await refreshEmailDomain(storeId)
+    if (done.ok) return done
+  }
 
   return {
     ok: true,
@@ -258,14 +309,15 @@ export async function removeEmailDomain(storeId: string): Promise<void> {
 }
 
 /**
- * بيحاول يوثّق النطاق لوحده لو لسه معلّق.
+ * بتجهّز نطاق بريد المتجر لوحدها — تسجيل وكتابة سجلات وتوثيق.
  *
- * **التاجر ما يصحّش يدوس زرار «تحقّق».** هو ضاف السجلات خلاص؛
- * الانتشار بياخد وقت، وإحنا اللي المفروض نشوف امتى خلص. الدالة دي
- * بتتنادى في الخلفية لما يفتح لوحته، وبتسكت لو مفيش حاجة تتعمل.
+ * **التاجر ما يصحّش يعمل أي خطوة من دول.** هو جه يفتح متجر، مش
+ * يضبط DNS. الدالة دي بتتنادى في الخلفية لما يفتح لوحته وبتمشي
+ * المشوار كله: تسجّل النطاق عند المزوّد، تكتب السجلات في منطقة
+ * المنصة، وتطلب التوثيق.
  *
- * بتتخطّى نفسها لو النطاق موثّق خلاص أو لسه ما اتسجّلش — عشان ما
- * نستهلكش حصّة المزوّد على حاجة ما اتغيّرتش.
+ * بتسكت تمامًا لو النطاق موثّق خلاص — عشان ما نستهلكش حصّة المزوّد
+ * على حاجة ما اتغيّرتش.
  */
 export async function autoVerifyEmailDomain(storeId: string): Promise<void> {
   const [store] = await db
@@ -274,10 +326,25 @@ export async function autoVerifyEmailDomain(storeId: string): Promise<void> {
     .where(eq(stores.id, storeId))
     .limit(1)
 
-  if (!store?.id || store.status === 'verified') return
+  if (store?.status === 'verified') return
 
   try {
-    await refreshEmailDomain(storeId)
+    /*
+      لسه ما اتسجّلش خالص: بنسجّله إحنا. ده اللي بيخلّي التاجر
+      يلاقي بريده شغّال من نطاقه من غير ما يعمل أي خطوة.
+    */
+    if (!store?.id) {
+      if (platformDnsReady()) await startEmailDomain(storeId)
+      return
+    }
+
+    const state = await refreshEmailDomain(storeId)
+    /* معلّق ومنطقتنا — يبقى فيه سجل ناقص، نكتبه ونعيد السؤال */
+    if (state.ok && state.state.status !== 'verified' && state.state.domain) {
+      if (await ensurePlatformDns(state.state.domain, state.state.records)) {
+        await refreshEmailDomain(storeId)
+      }
+    }
   } catch (e) {
     console.error('فشل التحقق التلقائي من نطاق البريد:', e)
   }
@@ -302,5 +369,6 @@ export async function storeSenderAddress(storeId: string): Promise<string | null
     .limit(1)
 
   if (!store?.domain || store.status !== 'verified') return null
-  return `no-reply@${store.domain}`
+  /*  لكل المتاجر — عنوان طبيعي، مش «مش بترد» */
+  return `info@${store.domain}`
 }
