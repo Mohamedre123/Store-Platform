@@ -1,5 +1,6 @@
 import 'server-only'
 import { formatMoney } from './utils'
+import { publicStoreUrl } from './domain'
 
 /**
  * رسائل بريد متجر التاجر.
@@ -27,6 +28,19 @@ export type StoreBrand = {
    * ساعتها، والعميل بيلاقي البريد مكتوبًا هنا فيقدر يكلّم التاجر.
    */
   email?: string | null
+  /**
+   * رابط المتجر — بيتحطّ في تذييل كل رسالة.
+   *
+   * **الفرق ده اتقاس مش اتخمّن.** الفاتورة هي الرسالة الوحيدة اللي
+   * كانت بتوصل الوارد، وهي الوحيدة اللي فيها زرار «تابع طلبك» —
+   * رابط على نطاق المرسِل نفسه. رمز الدخول ما كانش فيه ولا رابط:
+   * رسالة قصيرة فيها رقم كبير وبس، وده بالظبط شكل رسالة التصيّد
+   * اللي الفلاتر متدرّبة على إمساكه.
+   *
+   * رابط على نفس نطاق المرسِل بيقلب الإشارة: بيربط الرسالة بجهة
+   * ليها موقع حقيقي، بدل رقم جاي من مجهول.
+   */
+  url?: string | null
 }
 
 type OrderLine = {
@@ -75,6 +89,12 @@ const MUTED = '#5c6890'
 const BORDER = '#e2e4ec'
 const PAGE = '#f4f3f9'
 
+/** رابط واجهة المتجر — من `url` لو اتبعت، وإلا متبني من سلَجه */
+function storeHome(store: StoreBrand): string | null {
+  if (store.url) return store.url
+  return store.slug ? publicStoreUrl({ slug: store.slug }) : null
+}
+
 /**
  * قالب خفيف — والخفّة هنا مقصودة مش تبسيط.
  *
@@ -96,8 +116,14 @@ const PAGE = '#f4f3f9'
  * - مفيش خلفيات ولا حدود ولا زوايا — أبيض على أبيض زي رسالة من بني آدم
  *
  * الرسالة المعاملاتية المفروض تبان زي رسالة شخص كتبها، مش زي إعلان.
+ *
+ * ## والرابط في التذييل
+ * الفاتورة كانت الرسالة الوحيدة اللي بتوصل الوارد، والفرق الوحيد
+ * في جسمها كان رابط على نطاق المرسِل. بقى في تذييل كل رسالة.
  */
 function layout(store: StoreBrand, inner: string, preheader: string) {
+  const home = storeHome(store)
+
   return `<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
@@ -115,7 +141,11 @@ function layout(store: StoreBrand, inner: string, preheader: string) {
       <tr><td style="padding-bottom:16px;font-size:17px;font-weight:bold;">${escapeHtml(store.name)}</td></tr>
       <tr><td>${inner}</td></tr>
       <tr><td style="padding-top:24px;border-top:1px solid ${BORDER};font-size:13px;line-height:1.8;color:${MUTED};">
-        ${escapeHtml(store.name)}${store.email ? ` — ${escapeHtml(store.email)}` : ''}
+        ${escapeHtml(store.name)}${store.email ? ` — ${escapeHtml(store.email)}` : ''}${
+          home
+            ? `<br><a href="${home}" style="color:${MUTED};">${escapeHtml(home.replace(/^https?:\/\//, ''))}</a>`
+            : ''
+        }
       </td></tr>
     </table>
   </td></tr>
@@ -169,8 +199,18 @@ function totalsTable(o: OrderInfo) {
  * جاي من جهة ما يعرفهاش — فالرسالة بتتجاهل والدخول ما بيتمّش.
  */
 export function customerCodeEmail(store: StoreBrand, code: string, ttlMinutes: number) {
-  const spaced = code.split('').join(String.fromCharCode(32))
+  /*
+    الرمز مش في الموضوع، والأرقام مش متفرّقة بمسافات.
 
+    الاتنين كانوا موجودين وهما بالظبط شكل الرسالة اللي الفلاتر
+    بتصنّفها سبام: رقم في الموضوع بيخلّي كل رسالة موضوعها فريد
+    فمفيش سمعة بتتراكم على موضوع ثابت، وحروف متفرّقة بمسافات
+    (`6 7 6 5 1 9`) هي الحيلة اللي الإعلانات المزعجة بتستخدمها
+    عشان تعدّي من فحص الكلمات — والفلتر بيسجّل عليها مباشرةً.
+
+    التفرقة البصرية موجودة أصلًا في `letter-spacing` — المسافات
+    الحقيقية كانت زيادة ما لهاش لازمة أضرّت أكتر ما نفعت.
+  */
   const inner = `
     <p style="margin:0 0 8px;font-size:16px;">رمز دخولك على ${escapeHtml(store.name)}</p>
     <p style="margin:0 0 20px;font-size:15px;line-height:1.8;color:${MUTED};">
@@ -178,7 +218,7 @@ export function customerCodeEmail(store: StoreBrand, code: string, ttlMinutes: n
     </p>
 
     <div style="background-color:#f8f8fc;border-radius:12px;padding:20px;text-align:center;margin-bottom:20px;">
-      <span style="font-family:'Segoe UI',Tahoma,Arial,sans-serif;font-size:32px;font-weight:bold;letter-spacing:8px;color:${store.primary};">${escapeHtml(spaced)}</span>
+      <span style="font-family:'Segoe UI',Tahoma,Arial,sans-serif;font-size:32px;font-weight:bold;letter-spacing:8px;color:${store.primary};">${escapeHtml(code)}</span>
     </div>
 
     <p style="margin:0;font-size:13px;line-height:1.8;color:${MUTED};">
@@ -186,75 +226,15 @@ export function customerCodeEmail(store: StoreBrand, code: string, ttlMinutes: n
     </p>`
 
   return {
-    subject: `${code} هو رمز دخولك على ${store.name}`,
-    html: layout(store, inner, `رمز دخولك: ${code}`),
+    subject: `رمز الدخول على ${store.name}`,
+    html: layout(store, inner, `الرمز جوّه الرسالة وصالح ${ttlMinutes} دقايق`),
     text: `رمز دخولك على ${store.name}: ${code}
-صالح ${ttlMinutes} دقايق. لو مش إنت اللي طلبته، تجاهل الرسالة.`,
+
+اكتب الرمز ده في صفحة الدخول عشان تكمّل. صالح ${ttlMinutes} دقايق.
+لو مش إنت اللي طلبته، تجاهل الرسالة ومحدّش هيقدر يدخل بحسابك.
+${storeHome(store) ?? ''}`.trim(),
   }
 }
-/** تأكيد الطلب — بيروح لعميل التاجر */
-export function orderConfirmationEmail(store: StoreBrand, o: OrderInfo) {
-  const greeting = o.customerName ? `أهلًا ${escapeHtml(o.customerName)}،` : 'أهلًا،'
-
-  const inner = `
-    <p style="margin:0 0 8px;font-size:16px;">${greeting}</p>
-    <p style="margin:0 0 20px;font-size:15px;line-height:1.8;color:${MUTED};">
-      استلمنا طلبك وهنبدأ نجهّزه. ده ملخّصه:
-    </p>
-
-    <div style="background-color:#f8f8fc;border-radius:10px;padding:12px 16px;margin-bottom:20px;">
-      <span style="font-size:13px;color:${MUTED};">رقم الطلب</span><br>
-      <span style="font-size:20px;font-weight:bold;letter-spacing:1px;">#${o.orderNumber}</span>
-    </div>
-
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:16px;">
-      ${linesTable(o.lines, o.currency)}
-    </table>
-
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:24px;">
-      ${totalsTable(o)}
-    </table>
-
-    ${
-      o.address
-        ? `<div style="border-top:1px solid ${BORDER};padding-top:16px;margin-bottom:20px;">
-             <span style="font-size:13px;color:${MUTED};">عنوان التوصيل</span><br>
-             <span style="font-size:14px;line-height:1.7;">${escapeHtml(o.address)}</span>
-           </div>`
-        : ''
-    }
-
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;">
-      <tr><td align="center" style="border-radius:10px;background-color:${store.primary};">
-        <a href="${o.trackUrl}" style="display:inline-block;padding:13px 28px;font-family:'Segoe UI',Tahoma,Arial,sans-serif;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;">
-          تابع طلبك
-        </a>
-      </td></tr>
-    </table>
-
-    <p style="margin:20px 0 0;font-size:13px;line-height:1.8;color:${MUTED};text-align:center;">
-      لو عندك أي استفسار، رد على الرسالة دي.
-    </p>
-  `
-
-  const text = [
-    `${o.customerName ? `أهلًا ${o.customerName}،` : 'أهلًا،'}`,
-    `استلمنا طلبك رقم #${o.orderNumber}.`,
-    '',
-    ...o.lines.map((l) => `- ${l.name} × ${l.quantity} — ${formatMoney(l.total, o.currency)}`),
-    '',
-    `الإجمالي: ${formatMoney(o.total, o.currency)}`,
-    `تابع طلبك: ${o.trackUrl}`,
-  ].join('\n')
-
-  return {
-    subject: `تأكيد طلبك #${o.orderNumber} من ${store.name}`,
-    html: layout(store, inner, `طلبك #${o.orderNumber} — إجماليه ${formatMoney(o.total, o.currency)}`),
-    text,
-  }
-}
-
-/** إشعار التاجر بطلب جديد */
 /**
  * فاتورة الطلب.
  *

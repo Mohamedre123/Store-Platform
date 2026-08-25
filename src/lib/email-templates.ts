@@ -87,8 +87,6 @@ function layout(inner: string, preheader: string) {
 
 export function verificationEmail(code: string, name?: string) {
   const greeting = name ? `أهلًا ${name}،` : 'أهلًا،'
-  // مسافات بين الأرقام تخلي القراءة والنسخ أسهل
-  const spaced = code.split('').join(' ')
 
   const inner = `
     <p style="margin:0 0 14px;font-size:16px;line-height:1.9;font-weight:600;">${greeting}</p>
@@ -101,7 +99,7 @@ export function verificationEmail(code: string, name?: string) {
       <tr>
         <td align="center" style="background-color:${COLORS.primarySoft};border:1px solid #d8cfec;border-radius:12px;padding:22px 12px;">
           <div style="font-size:12px;letter-spacing:1px;color:${COLORS.muted};margin-bottom:10px;">رمز التأكيد</div>
-          <div dir="ltr" style="font-family:'Courier New',Consolas,monospace;font-size:34px;font-weight:700;letter-spacing:6px;color:${COLORS.primary};line-height:1;">${spaced}</div>
+          <div dir="ltr" style="font-family:'Courier New',Consolas,monospace;font-size:34px;font-weight:700;letter-spacing:6px;color:${COLORS.primary};line-height:1;">${code}</div>
         </td>
       </tr>
     </table>
@@ -119,7 +117,7 @@ export function verificationEmail(code: string, name?: string) {
   `
 
   return {
-    subject: `${code} هو رمز تأكيد حسابك في ${brand.name}`,
+    subject: `رمز تأكيد حسابك في ${brand.name}`,
     html: layout(inner, `رمز التأكيد: ${code} — صالح ١٠ دقايق`),
     text: [
       greeting,
@@ -145,7 +143,6 @@ export function verificationEmail(code: string, name?: string) {
  */
 export function passwordResetEmail(code: string, name?: string) {
   const greeting = name ? `أهلًا ${name}،` : 'أهلًا،'
-  const spaced = code.split('').join(' ')
 
   const inner = `
     <p style="margin:0 0 14px;font-size:16px;line-height:1.9;font-weight:600;">${greeting}</p>
@@ -159,7 +156,7 @@ export function passwordResetEmail(code: string, name?: string) {
       <tr>
         <td align="center" style="background-color:${COLORS.primarySoft};border:1px solid #d8cfec;border-radius:12px;padding:22px 12px;">
           <div style="font-size:12px;letter-spacing:1px;color:${COLORS.muted};margin-bottom:10px;">رمز الاستعادة</div>
-          <div dir="ltr" style="font-family:'Courier New',Consolas,monospace;font-size:34px;font-weight:700;letter-spacing:6px;color:${COLORS.primary};line-height:1;">${spaced}</div>
+          <div dir="ltr" style="font-family:'Courier New',Consolas,monospace;font-size:34px;font-weight:700;letter-spacing:6px;color:${COLORS.primary};line-height:1;">${code}</div>
         </td>
       </tr>
     </table>
@@ -177,7 +174,7 @@ export function passwordResetEmail(code: string, name?: string) {
   `
 
   return {
-    subject: `${code} هو رمز استعادة كلمة السر في ${brand.name}`,
+    subject: `استعادة كلمة السر في ${brand.name}`,
     html: layout(inner, `رمز الاستعادة: ${code} — صالح ١٠ دقايق`),
     text: [
       greeting,

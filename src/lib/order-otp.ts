@@ -56,15 +56,14 @@ export async function issueOrderOtp(input: {
     expiresAt,
   })
 
-  const spaced = code.split('').join(' ')
   await sendEmail({
     senderAddress: await storeSenderAddress(input.storeId),
     log: { storeId: input.storeId, event: 'order_otp' },
     to: input.email,
-    subject: `رمز تأكيد طلبك: ${code}`,
+    subject: `رمز تأكيد طلبك من ${input.storeName}`,
     html: `<div style="font-family:'Segoe UI',Tahoma,Arial,sans-serif;direction:rtl;text-align:right;max-width:420px;margin:0 auto;padding:24px;">
       <p style="font-size:15px;color:#222540;">رمز تأكيد طلبك من <strong>${input.storeName}</strong>:</p>
-      <p style="font-size:30px;font-weight:bold;letter-spacing:6px;text-align:center;color:#222540;margin:24px 0;">${spaced}</p>
+      <p style="font-size:30px;font-weight:bold;letter-spacing:6px;text-align:center;color:#222540;margin:24px 0;">${code}</p>
       <p style="font-size:13px;color:#5c6890;">الرمز صالح لمدة ${TTL_MINUTES} دقايق. لو مش إنت اللي طلبت، تجاهل الرسالة.</p>
     </div>`,
     text: `رمز تأكيد طلبك من ${input.storeName}: ${code}\nصالح ${TTL_MINUTES} دقايق.`,

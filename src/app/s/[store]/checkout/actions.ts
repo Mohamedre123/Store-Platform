@@ -25,7 +25,6 @@ import type { CheckoutStage } from '@/db/schema'
 import { isEmailConfigured, safeReplyTo, sendEmail } from '@/lib/email'
 import {
   newOrderNotificationEmail,
-  orderConfirmationEmail,
   orderInvoiceEmail,
 } from '@/lib/store-emails'
 import { dashboardUrl, publicStoreUrl } from '@/lib/domain'
@@ -1161,21 +1160,23 @@ async function sendOrderEmails(ctx: {
       console.error('فشل توليد مرفق الفاتورة:', e)
     }
 
-    void sendEmail({
-      to: customerEmail,
-      ...orderInvoiceEmail(brandInfo, { ...order, trackUrl: invoiceUrl }),
-      replyTo: safeReplyTo(store.email),
-      senderAddress: ownAddress,
-      ...(invoicePdf
-        ? { attachments: [{ filename: `فاتورة-${orderNumber}.pdf`, content: invoicePdf }] }
-        : {}),
-      log: { storeId: store.id, event: 'order_invoice', orderId },
-    }).catch((e) => console.error('فشل إرسال الفاتورة:', e))
+    /*
+      رسالة واحدة لا اتنين.
 
-    const mail = orderConfirmationEmail(brandInfo, order)
+      كنا بنبعت الفاتورة والتأكيد ورا بعض في نفس الثانية، لنفس
+      العنوان، بنفس الأصناف والإجماليات، من نفس المرسِل. رسالتين
+      شبه متطابقتين في نفس اللحظة دي بصمة إرسال جماعي عند الفلاتر
+      قبل ما تبقى خدمة كويسة للعميل.
+
+      واللي فضل هو **الفاتورة** تحديدًا لأنها هي اللي كانت بتوصل
+      الوارد فعلًا والتأكيد كان بيروح السبام: موضوعها معاملاتي
+      واضح، وفيها رابط على نطاق المرسِل، ومعاها مرفق PDF حقيقي.
+      وهي أصلًا تأكيد كامل — فيها الأصناف والإجماليات والعنوان
+      وزرار المتابعة.
+    */
     await sendEmail({
       to: customerEmail,
-      ...mail,
+      ...orderInvoiceEmail(brandInfo, { ...order, trackUrl: invoiceUrl }),
       /*
         الرد على بريد التاجر لا على عنوان لا يُرد عليه.
         العميل اللي عايز يغيّر عنوانه بيرد على الرسالة — والرسالة
@@ -1183,7 +1184,10 @@ async function sendOrderEmails(ctx: {
       */
       replyTo: safeReplyTo(store.email),
       senderAddress: ownAddress,
-      log: { storeId: store.id, event: 'order_confirmation', orderId },
+      ...(invoicePdf
+        ? { attachments: [{ filename: `فاتورة-${orderNumber}.pdf`, content: invoicePdf }] }
+        : {}),
+      log: { storeId: store.id, event: 'order_invoice', orderId },
     })
   }
 
