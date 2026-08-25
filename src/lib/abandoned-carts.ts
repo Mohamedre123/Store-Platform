@@ -108,6 +108,8 @@ export async function sendAbandonedCartReminders(limit = 50): Promise<ReminderRe
 
       const sent = await sendEmail({
         senderName: cart.storeName,
+        /* تسويقية — العميل ما طلبهاش، فليها إلغاء اشتراك */
+        bulk: true,
         to: cart.customerEmail!,
         ...mail,
         log: { storeId: cart.storeId, event: 'abandoned_cart', orderId: cart.id },

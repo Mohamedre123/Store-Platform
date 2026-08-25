@@ -177,6 +177,8 @@ async function runAction(action: Action, ctx: AutomationContext) {
       if (!body.trim()) return
 
       await sendEmail({
+        /* رسالة حملة كتبها التاجر — تسويقية */
+        bulk: true,
         log: { storeId: ctx.storeId, event: 'automation', orderId: ctx.orderId },
         to: ctx.customerEmail,
         subject,
@@ -225,6 +227,7 @@ async function runAction(action: Action, ctx: AutomationContext) {
       if (ctx.customerEmail && isEmailConfigured() && cfg.email !== false) {
         const theme = await getStoreTheme(ctx.storeId)
         await sendEmail({
+          bulk: true,
           log: { storeId: ctx.storeId, event: 'automation', orderId: ctx.orderId },
           to: ctx.customerEmail,
           subject: `كود خصم ${percent / 100}٪ من ${ctx.storeName}`,

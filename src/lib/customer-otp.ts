@@ -163,7 +163,6 @@ export async function issueCustomerOtp(input: {
       to: emailTarget,
       ...mail,
       senderName: input.brand.name,
-      transactional: true,
       log: { storeId: input.storeId, event: 'customer_login_otp' },
     })
     if (sent.ok) channel = 'email'
