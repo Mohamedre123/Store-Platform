@@ -21,7 +21,7 @@ import { getStore, getStoreTheme } from '@/lib/storefront'
 import { computeTotals, getCheckoutSettings, priceCart } from '@/lib/checkout'
 import { furthestStage, STAGE_EVENT } from '@/lib/checkout-stage'
 import type { CheckoutStage } from '@/db/schema'
-import { isEmailConfigured, sendEmail } from '@/lib/email'
+import { isEmailConfigured, safeReplyTo, sendEmail } from '@/lib/email'
 import {
   newOrderNotificationEmail,
   orderConfirmationEmail,
@@ -1091,6 +1091,7 @@ async function sendOrderEmails(ctx: {
     name: store.name,
     logo: store.logoLight,
     primary: theme.custom.identity.primary,
+    email: store.email,
   }
 
   const address = [input.street, input.building, input.area, input.city].filter(Boolean).join('، ') || null
@@ -1146,7 +1147,7 @@ async function sendOrderEmails(ctx: {
     void sendEmail({
       to: customerEmail,
       ...orderInvoiceEmail(brandInfo, { ...order, trackUrl: invoiceUrl }),
-      replyTo: store.email ?? undefined,
+      replyTo: safeReplyTo(store.email),
       senderName: store.name,
       ...(invoicePdf
         ? { attachments: [{ filename: `فاتورة-${orderNumber}.pdf`, content: invoicePdf }] }
@@ -1163,7 +1164,7 @@ async function sendOrderEmails(ctx: {
         العميل اللي عايز يغيّر عنوانه بيرد على الرسالة — والرسالة
         اللي مالهاش رد بتبان لفلاتر السبام كإشعار آلي مجهول.
       */
-      replyTo: store.email ?? undefined,
+      replyTo: safeReplyTo(store.email),
       senderName: store.name,
       log: { storeId: store.id, event: 'order_confirmation', orderId },
     })

@@ -38,7 +38,12 @@ export type LoginState =
  */
 async function storeBrand(store: StorefrontStore) {
   const theme = await getStoreTheme(store.id)
-  return { name: store.name, logo: store.logoLight, primary: theme.custom.identity.primary }
+  return {
+    name: store.name,
+    logo: store.logoLight,
+    primary: theme.custom.identity.primary,
+    email: store.email,
+  }
 }
 /**
  * الخطوة الأولى: العميل كتب رقمه أو بريده.

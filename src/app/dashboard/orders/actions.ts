@@ -9,7 +9,7 @@ import { applyOrderStatus } from '@/lib/order-flow'
 import type { OrderStatus } from '@/db/schema'
 import { normalizeChannel, resolveChannel, wantsEmail, wantsWhatsapp } from '@/lib/notify-channel'
 import { sendWhatsapp } from '@/lib/whatsapp'
-import { sendEmail } from '@/lib/email'
+import { safeReplyTo, sendEmail } from '@/lib/email'
 import { merchantMessageEmail } from '@/lib/store-emails'
 import { getStoreTheme } from '@/lib/storefront'
 
@@ -119,7 +119,7 @@ export async function sendRecoveryMessageAction(input: {
   if (wantsEmail(channel) && order.email) {
     const theme = await getStoreTheme(store.id)
     const mail = merchantMessageEmail(
-      { name: store.name, logo: store.logoLight, primary: theme.custom.identity.primary },
+      { name: store.name, logo: store.logoLight, primary: theme.custom.identity.primary, email: store.email },
       {
         subject: `بخصوص طلبك من ${store.name}`,
         body: text,
@@ -129,7 +129,7 @@ export async function sendRecoveryMessageAction(input: {
     const res = await sendEmail({
       to: order.email,
       ...mail,
-      replyTo: store.email ?? undefined,
+      replyTo: safeReplyTo(store.email),
       senderName: store.name,
       log: {
         storeId: store.id,

@@ -14,7 +14,7 @@ import {
 } from '@/db/schema'
 import { recordAudit } from '@/lib/audit'
 import { getStoreTheme } from '@/lib/storefront'
-import { isEmailConfigured, sendEmail } from '@/lib/email'
+import { isEmailConfigured, safeReplyTo, sendEmail } from '@/lib/email'
 import { isEmailableStatus, orderStatusEmail } from '@/lib/store-emails'
 import { publicStoreUrl } from '@/lib/domain'
 import { awardOrderPoints } from '@/lib/loyalty'
@@ -387,7 +387,7 @@ export async function applyOrderStatus(
       const theme = await getStoreTheme(store.id)
       const storeEmail = store.email
       const mail = orderStatusEmail(
-        { name: store.name, logo: store.logoLight, primary: theme.custom.identity.primary },
+        { name: store.name, logo: store.logoLight, primary: theme.custom.identity.primary, email: store.email },
         status,
         {
           orderNumber: order.orderNumber,
@@ -403,7 +403,7 @@ export async function applyOrderStatus(
         to: order.customerEmail!,
         ...mail,
         // الرد على التاجر — العميل بيرد على رسالة الحالة كتير
-        replyTo: storeEmail ?? undefined,
+        replyTo: safeReplyTo(storeEmail),
         // الرسالة بتيجي باسم متجره لا باسمنا
         senderName: store.name,
         log: {

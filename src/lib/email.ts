@@ -83,6 +83,68 @@ function fromHeader(senderName?: string | null): string {
   return `${encodeDisplayName(clean)} <${address}>`
 }
 
+/**
+ * مزوّدو البريد المجاني.
+ *
+ * القايمة دي مش للحجب — هي للتفرقة بين «بريد على نطاق التاجر»
+ * و«بريد شخصي على خدمة مجانية». الاتنين شرعيين، بس ترويستهم بتتقرا
+ * بشكل مختلف تمامًا عند الفلاتر.
+ */
+const FREE_MAIL = new Set([
+  'gmail.com',
+  'googlemail.com',
+  'yahoo.com',
+  'hotmail.com',
+  'outlook.com',
+  'live.com',
+  'icloud.com',
+  'aol.com',
+  'proton.me',
+  'protonmail.com',
+  'yandex.com',
+  'mail.ru',
+])
+
+/**
+ * `Reply-To` — بس لما ما يبقاش بيناقض المرسِل.
+ *
+ * ## المشكلة اللي اكتشفناها
+ * الرسالة كانت بتخرج كده:
+ *
+ * ```
+ * From:     atlosa <no-reply@zawyaeg.site>
+ * Reply-To: something@gmail.com
+ * ```
+ *
+ * علامة تجارية على نطاق، والرد بيروح لبريد مجاني على نطاق تاني
+ * خالص. **دي بصمة تصيّد كلاسيكية** — نفس الشكل اللي بيستخدمه اللي
+ * بينتحل شخصية شركة عشان الرد يوصله هو. وفلاتر جيميل بتعاقب عليها
+ * بالذات، وده بيفسّر إن الرسايل بدأت تروح السبام من غير ما الكود
+ * يتغيّر: أول ما التاجر حطّ بريده الشخصي في إعدادات المتجر.
+ *
+ * ## الحل من غير ما نخسر الرد
+ * بريد التاجر لو على **نطاقه هو** بيتحط عادي — مفيش تناقض ساعتها.
+ * ولو على خدمة مجانية بنشيل الترويسة، والعميل بيلاقي بريد التاجر
+ * مكتوبًا في نص الرسالة نفسها فيقدر يكلّمه.
+ *
+ * الحل النهائي إن التاجر يوثّق نطاقه — ساعتها المرسِل والرد
+ * والعلامة كلهم على نطاق واحد.
+ */
+export function safeReplyTo(email?: string | null): string | undefined {
+  const value = email?.trim().toLowerCase()
+  if (!value || !value.includes('@')) return undefined
+
+  const domain = value.split('@')[1] ?? ''
+  if (FREE_MAIL.has(domain)) return undefined
+
+  /*
+    النطاق لازم يبقى بتاع التاجر لا بتاع حد تالت. أي نطاق غير مجاني
+    بنقبله: النطاق المدفوع بيتقرا كجهة ليها كيان، والفلتر مش بيشوف
+    فيه التناقض اللي بيشوفه في البريد المجاني.
+  */
+  return value
+}
+
 export type MessageContext = {
   storeId: string
   /** نوع الرسالة: order_confirmation | abandoned_cart | otp … */

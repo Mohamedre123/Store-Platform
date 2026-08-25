@@ -16,6 +16,15 @@ export type StoreBrand = {
   name: string
   logo: string | null
   primary: string
+  /**
+   * بريد التاجر — بيتكتب في تذييل الرسالة.
+   *
+   * **لأن `Reply-To` مش دايمًا بيتحط.** لما بريد التاجر يكون على
+   * خدمة مجانية (جيميل مثلًا)، الترويسة بتبقى «مرسِل على نطاق وردّ
+   * على نطاق تاني» — وهي بصمة تصيّد بتودّي الرسالة السبام. بنشيلها
+   * ساعتها، والعميل بيلاقي البريد مكتوبًا هنا فيقدر يكلّم التاجر.
+   */
+  email?: string | null
 }
 
 type OrderLine = {
@@ -90,6 +99,11 @@ function layout(store: StoreBrand, inner: string, preheader: string) {
       </td></tr>
       <tr><td align="center" style="padding-top:20px;font-family:'Segoe UI',Tahoma,Arial,sans-serif;font-size:12px;line-height:1.8;color:${MUTED};">
         ${escapeHtml(store.name)}
+        ${
+          store.email
+            ? `<br>للتواصل: <a href="mailto:${escapeHtml(store.email)}" style="color:${MUTED};">${escapeHtml(store.email)}</a>`
+            : ''
+        }
       </td></tr>
     </table>
   </td></tr>
