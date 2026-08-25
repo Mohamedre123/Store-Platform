@@ -3,7 +3,7 @@ import { decodeSlug } from '@/lib/utils'
 import { headers } from 'next/headers'
 import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/db'
-import { funnels, products } from '@/db/schema'
+import { funnels, productVariants, products } from '@/db/schema'
 import { getStore } from '@/lib/storefront'
 import { mergeTokens, WIDTH_PX, type Block } from '@/lib/landing'
 import { FONT_STACKS, RADIUS_PX } from '@/lib/customization'
@@ -85,7 +85,26 @@ export default async function LandingPage({
       .from(products)
       .where(and(eq(products.id, funnel.productId), eq(products.storeId, store.id)))
       .limit(1)
-    product = row ?? null
+
+    if (row) {
+      /*
+        وجود متغيّر واحد شغّال بيغيّر سلوك الزرار كله: الإضافة
+        المباشرة بترفض في الشيك أوت، فبنودّي العميل يختار الأول.
+      */
+      const [variant] = await db
+        .select({ id: productVariants.id })
+        .from(productVariants)
+        .where(
+          and(
+            eq(productVariants.productId, row.id),
+            eq(productVariants.storeId, store.id),
+            eq(productVariants.isActive, true),
+          ),
+        )
+        .limit(1)
+
+      product = { ...row, hasVariants: Boolean(variant) }
+    }
   }
 
   const tokens = mergeTokens(funnel.tokens)

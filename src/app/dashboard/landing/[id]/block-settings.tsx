@@ -8,6 +8,52 @@ const field =
   'w-full rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm focus:border-[var(--primary)] focus:outline-none'
 
 /**
+ * حقل نصّي لإعداد واحد.
+ *
+ * **معرَّف برّه `BlockSettings` عن قصد.** كان جوّها، فكل ضغطة حرف
+ * كانت بتعمل دالة جديدة بهوية جديدة — ورياكت بيقرا الهوية الجديدة
+ * على إنها نوع عنصر مختلف، فبيهدّ الـ`input` القديم ويبني واحدًا
+ * جديدًا. والتركيز بيضيع مع العنصر المهدود، فالتاجر كان بيكتب حرفًا
+ * ويقف ويدوس على الخانة تاني.
+ *
+ * المكوّن اللي بيتعرّف جوّه مكوّن تاني بيتهدّ ويتبني كل رندر دايمًا —
+ * القاعدة دي مالهاش استثناء.
+ */
+function Text({
+  s,
+  set,
+  k,
+  label,
+  multiline,
+}: {
+  s: Record<string, unknown>
+  set: (patch: Record<string, unknown>) => void
+  k: string
+  label: string
+  multiline?: boolean
+}) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-sm font-medium">{label}</span>
+      {multiline ? (
+        <textarea
+          value={String(s[k] ?? '')}
+          onChange={(e) => set({ [k]: e.target.value })}
+          rows={4}
+          className={field}
+        />
+      ) : (
+        <input
+          value={String(s[k] ?? '')}
+          onChange={(e) => set({ [k]: e.target.value })}
+          className={field}
+        />
+      )}
+    </label>
+  )
+}
+
+/**
  * إعدادات البلوك المختار.
  *
  * كل نوع بلوك ليه حقوله. الحقول بتكتب في نسخة من الإعدادات وبترجّعها
@@ -24,29 +70,13 @@ export function BlockSettings({
   const s = block.settings
   const set = (patch: Record<string, unknown>) => onChange({ ...s, ...patch })
 
-  const Text = ({ k, label, multiline }: { k: string; label: string; multiline?: boolean }) => (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium">{label}</span>
-      {multiline ? (
-        <textarea
-          value={String(s[k] ?? '')}
-          onChange={(e) => set({ [k]: e.target.value })}
-          rows={4}
-          className={field}
-        />
-      ) : (
-        <input value={String(s[k] ?? '')} onChange={(e) => set({ [k]: e.target.value })} className={field} />
-      )}
-    </label>
-  )
-
   switch (block.type) {
     case 'hero':
       return (
         <>
-          <Text k="title" label="العنوان" />
-          <Text k="subtitle" label="السطر التوضيحي" />
-          <Text k="ctaLabel" label="نص الزرار" />
+          <Text s={s} set={set} k="title" label="العنوان" />
+          <Text s={s} set={set} k="subtitle" label="السطر التوضيحي" />
+          <Text s={s} set={set} k="ctaLabel" label="نص الزرار" />
           <ImageUpload
             label="صورة الخلفية"
             value={s.image ? [String(s.image)] : []}
@@ -73,7 +103,7 @@ export function BlockSettings({
     case 'features':
       return (
         <>
-          <Text k="title" label="عنوان القسم" />
+          <Text s={s} set={set} k="title" label="عنوان القسم" />
           <ListEditor
             items={(s.items as Array<{ icon?: string; title: string; text: string }>) ?? []}
             onChange={(items) => set({ items })}
@@ -102,7 +132,7 @@ export function BlockSettings({
     case 'product':
       return (
         <>
-          <Text k="ctaLabel" label="نص زرار الشراء" />
+          <Text s={s} set={set} k="ctaLabel" label="نص زرار الشراء" />
           <Check2 label="اعرض السعر قبل الخصم" k="showCompareAt" s={s} set={set} />
           <Check2 label="اعرض عدّاد المخزون" k="showStock" s={s} set={set} />
         </>
@@ -111,7 +141,7 @@ export function BlockSettings({
     case 'gallery':
       return (
         <>
-          <Text k="title" label="عنوان القسم" />
+          <Text s={s} set={set} k="title" label="عنوان القسم" />
           <ImageUpload
             label="الصور"
             value={(s.images as string[]) ?? []}
@@ -125,7 +155,7 @@ export function BlockSettings({
     case 'testimonials':
       return (
         <>
-          <Text k="title" label="عنوان القسم" />
+          <Text s={s} set={set} k="title" label="عنوان القسم" />
           <ListEditor
             items={(s.items as Array<{ name: string; text: string; rating?: number }>) ?? []}
             onChange={(items) => set({ items })}
@@ -155,7 +185,7 @@ export function BlockSettings({
     case 'faq':
       return (
         <>
-          <Text k="title" label="عنوان القسم" />
+          <Text s={s} set={set} k="title" label="عنوان القسم" />
           <ListEditor
             items={(s.items as Array<{ q: string; a: string }>) ?? []}
             onChange={(items) => set({ items })}
@@ -185,7 +215,7 @@ export function BlockSettings({
     case 'countdown':
       return (
         <>
-          <Text k="title" label="العنوان" />
+          <Text s={s} set={set} k="title" label="العنوان" />
           <label className="flex flex-col gap-1.5">
             <span className="text-sm font-medium">المدة (دقيقة)</span>
             <input
@@ -205,24 +235,24 @@ export function BlockSettings({
     case 'cta':
       return (
         <>
-          <Text k="title" label="العنوان" />
-          <Text k="subtitle" label="السطر التوضيحي" />
-          <Text k="ctaLabel" label="نص الزرار" />
+          <Text s={s} set={set} k="title" label="العنوان" />
+          <Text s={s} set={set} k="subtitle" label="السطر التوضيحي" />
+          <Text s={s} set={set} k="ctaLabel" label="نص الزرار" />
         </>
       )
 
     case 'text':
       return (
         <>
-          <Text k="title" label="العنوان" />
-          <Text k="body" label="النص" multiline />
+          <Text s={s} set={set} k="title" label="العنوان" />
+          <Text s={s} set={set} k="body" label="النص" multiline />
         </>
       )
 
     case 'video':
       return (
         <>
-          <Text k="title" label="العنوان" />
+          <Text s={s} set={set} k="title" label="العنوان" />
           <label className="flex flex-col gap-1.5">
             <span className="text-sm font-medium">رابط يوتيوب</span>
             <input

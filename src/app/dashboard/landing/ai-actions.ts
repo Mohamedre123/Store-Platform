@@ -239,6 +239,18 @@ export async function sendLandingRequestAction(raw: unknown): Promise<LandingCha
  */
 export async function createLandingFromPlanAction(
   messageId: string,
+  /**
+   * صفحة موجودة تتطبّق عليها الخطة بدل ما نعمل واحدة جديدة.
+   *
+   * **من غيرها الذكاء بيعرف يعمل بس مش يعدّل.** التاجر اللي صفحته
+   * منشورة وطالب تعديل كان بيلاقي **صفحة تانية جديدة كمسوّدة**،
+   * وصفحته المنشورة زي ما هي — يعني اللي عدّله ما وصلش لحد.
+   *
+   * لما تتبعت، بنكتب البلوكات والهوية على الصفحة نفسها ونسيب
+   * `slug` و`status` زي ما هما: الرابط اللي التاجر معلّن بيه ما
+   * يتغيّرش، والمنشور يفضل منشورًا فالتعديل يبان للزوار فورًا.
+   */
+  targetId?: string,
 ): Promise<LandingChatState & { landingId?: string }> {
   const { store, user } = await getDashboardContext()
 
@@ -277,21 +289,42 @@ export async function createLandingFromPlanAction(
     return { id: `ai${Date.now()}${i}`, type, settings: { ...(def?.defaults ?? {}), ...settings } }
   })
 
-  const slug = await uniqueSlug(store.id, slugify(plan.name) || 'offer')
+  let created: { id: string } | undefined
 
-  const [created] = await db
-    .insert(funnels)
-    .values({
-      storeId: store.id,
-      slug,
-      name: plan.name,
-      productId: conv?.targetId ?? null,
-      template: 'ai',
-      blocks,
-      tokens: plan.tokens ?? {},
-      status: 'draft',
-    })
-    .returning({ id: funnels.id })
+  if (targetId) {
+    /* التحقق من المتجر شرط: المعرّف جاي من المتصفح */
+    const [existing] = await db
+      .select({ id: funnels.id })
+      .from(funnels)
+      .where(and(eq(funnels.id, targetId), eq(funnels.storeId, store.id)))
+      .limit(1)
+
+    if (!existing) return { ok: false, error: 'الصفحة مش موجودة' }
+
+    await db
+      .update(funnels)
+      .set({ name: plan.name, blocks, tokens: plan.tokens ?? {} })
+      .where(eq(funnels.id, existing.id))
+
+    created = existing
+  } else {
+    const slug = await uniqueSlug(store.id, slugify(plan.name) || 'offer')
+    ;[created] = await db
+      .insert(funnels)
+      .values({
+        storeId: store.id,
+        slug,
+        name: plan.name,
+        productId: conv?.targetId ?? null,
+        template: 'ai',
+        blocks,
+        tokens: plan.tokens ?? {},
+        status: 'draft',
+      })
+      .returning({ id: funnels.id })
+  }
+
+  if (!created) return { ok: false, error: 'مقدرناش نحفظ الصفحة' }
 
   const calls: AiToolCall[] = [{ ...call, status: 'done', result: created.id }]
   await db.update(aiMessages).set({ toolCalls: calls }).where(eq(aiMessages.id, msg.id))
@@ -306,6 +339,7 @@ export async function createLandingFromPlanAction(
   })
 
   revalidatePath('/dashboard/landing')
+  revalidatePath(`/dashboard/landing/${created.id}`)
 
   return {
     ok: true,

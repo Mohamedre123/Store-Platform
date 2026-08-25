@@ -14,6 +14,7 @@ export type LandingProduct = {
   images: string[]
   stock: number
   trackInventory: boolean
+  hasVariants: boolean
 } | null
 
 const ICONS: Record<string, typeof Check> = {

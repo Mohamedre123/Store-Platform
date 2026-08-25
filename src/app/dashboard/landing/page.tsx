@@ -51,7 +51,10 @@ export default async function LandingPage() {
         اللي بيشوفه، واللي جاي يعدّل القديم بيعدّي عليه لتحت.
       */}
       <Reveal>
-        <LandingAi enabled={isClaudeReady(claude)} />
+        <LandingAi
+          enabled={isClaudeReady(claude)}
+          pages={rows.map((r) => ({ id: r.id, name: r.name, published: r.status === 'published' }))}
+        />
       </Reveal>
 
       <Reveal delay={60}>

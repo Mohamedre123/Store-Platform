@@ -10,12 +10,28 @@ import { useStoreHref } from './store-link'
  *
  * بيضيف المنتج للسلة ويودّي الشيك أوت على طول — صفحة الهبوط هدفها
  * بيعة واحدة، فمفيش داعي يفتح درج السلة ويستنى العميل يقرّر تاني.
+ *
+ * ## إلا لما المنتج يكون له مقاسات
+ * ساعتها الإضافة المباشرة بتحطّ سطرًا بلا متغيّر، والشيك أوت بيرفضه
+ * («فيه منتج محتاج تحدّد مقاسه») — فالعميل بيتحطّ في طريق مسدود
+ * جوّه صفحة كل هدفها إنه يشتري بضغطة. بنودّيه صفحة المنتج يختار،
+ * وهي أقصر طريق فعليًا للشرا بدل رسالة خطأ.
  */
 export function LandingBuyButton({
   product,
   label,
 }: {
-  product: { id: string; name: string; slug: string; price: number; images: string[]; stock: number; trackInventory: boolean }
+  product: {
+    id: string
+    name: string
+    slug: string
+    price: number
+    images: string[]
+    stock: number
+    trackInventory: boolean
+    /** المنتج له مقاسات أو ألوان لازم العميل يختارها */
+    hasVariants: boolean
+  }
   storeIdentifier: string
   label: string
 }) {
@@ -30,6 +46,11 @@ export function LandingBuyButton({
       disabled={pending}
       onClick={() =>
         start(() => {
+          if (product.hasVariants) {
+            router.push(href(`/products/${product.slug}`))
+            return
+          }
+
           add(
             {
               productId: product.id,

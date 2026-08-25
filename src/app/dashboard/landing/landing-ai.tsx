@@ -35,7 +35,19 @@ type ProductOption = { id: string; name: string; price: string; image: string | 
  * والنتيجة بتتعمل **مسوّدة** — التاجر بيفتح المحرّر ويعدّل. آراء
  * العملاء المولّدة لازم يستبدلها بحقيقية قبل ما ينشر.
  */
-export function LandingAi({ enabled }: { enabled: boolean }) {
+export function LandingAi({
+  enabled,
+  pages,
+}: {
+  enabled: boolean
+  /**
+   * الصفحات الموجودة — عشان الخطة تتطبّق على وحدة منهم.
+   *
+   * المنشورة بتتعلّم، لأن التطبيق عليها بيغيّر اللي الزوار شايفينه
+   * **دلوقتي** — والتاجر لازم يعرف ده قبل ما يدوس مش بعدها.
+   */
+  pages: Array<{ id: string; name: string; published: boolean }>
+}) {
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [messages, setMessages] = useState<LandingChatMsg[]>([])
   const [chats, setChats] = useState<Chat[]>([])
@@ -105,9 +117,9 @@ export function LandingAi({ enabled }: { enabled: boolean }) {
     })
   }
 
-  const create = (messageId: string) =>
+  const create = (messageId: string, targetId?: string) =>
     start(async () => {
-      const res = await createLandingFromPlanAction(messageId)
+      const res = await createLandingFromPlanAction(messageId, targetId)
       if (res.ok) setMessages(res.messages)
       else setError({ text: res.error })
     })
@@ -246,7 +258,7 @@ export function LandingAi({ enabled }: { enabled: boolean }) {
         )}
 
         {messages.map((m) => (
-          <Bubble key={m.id} msg={m} onCreate={create} busy={pending} />
+          <Bubble key={m.id} msg={m} onCreate={create} busy={pending} pages={pages} />
         ))}
 
         {pending && (
@@ -318,10 +330,12 @@ const BLOCK_NAMES: Record<string, string> = {
 function Bubble({
   msg,
   onCreate,
+  pages,
   busy,
 }: {
   msg: LandingChatMsg
-  onCreate: (id: string) => void
+  onCreate: (id: string, targetId?: string) => void
+  pages: Array<{ id: string; name: string; published: boolean }>
   busy: boolean
 }) {
   const mine = msg.role === 'user'
@@ -389,17 +403,58 @@ function Bubble({
             ))}
           </ol>
 
-          <div className="mt-3 flex flex-wrap gap-1.5">
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
             {!msg.createdId ? (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => onCreate(msg.id)}
-                className="flex min-h-9 items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3 text-xs font-medium text-[var(--primary-fg)] disabled:opacity-60"
-              >
-                <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                اعملها مسوّدة
-              </button>
+              <>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => onCreate(msg.id)}
+                  className="flex min-h-9 items-center gap-1.5 rounded-lg bg-[var(--primary)] px-3 text-xs font-medium text-[var(--primary-fg)] disabled:opacity-60"
+                >
+                  <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                  اعملها صفحة جديدة
+                </button>
+
+                {/*
+                  التطبيق على صفحة موجودة.
+
+                  من غيره الذكاء بيعرف يعمل بس مش يعدّل: التاجر اللي
+                  صفحته منشورة وطالب تعديل كان بياخد صفحة تانية
+                  كمسوّدة، وصفحته المنشورة زي ما هي — يعني تعديله ما
+                  وصلش لحد. التطبيق هنا بيسيب الرابط والنشر زي ما هما،
+                  فالتعديل يبان للزوار على طول.
+                */}
+                {pages.length > 0 && (
+                  <select
+                    disabled={busy}
+                    defaultValue=""
+                    onChange={(e) => {
+                      const id = e.target.value
+                      if (!id) return
+                      const page = pages.find((x) => x.id === id)
+                      if (
+                        page?.published &&
+                        !confirm(`«${page.name}» منشورة — التعديل هيبان للزوار فورًا. تمام؟`)
+                      ) {
+                        e.target.value = ''
+                        return
+                      }
+                      onCreate(msg.id, id)
+                    }}
+                    aria-label="طبّق الخطة على صفحة موجودة"
+                    className="min-h-9 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-2 text-xs disabled:opacity-60"
+                  >
+                    <option value="">أو طبّقها على صفحة موجودة…</option>
+                    {pages.map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.name}
+                        {x.published ? ' (منشورة)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </>
             ) : (
               <Link
                 href={`/dashboard/landing/${msg.createdId}`}
