@@ -201,7 +201,7 @@ export async function issueCustomerOtp(input: {
     البريد احتياطي: لما الواتساب مش مربوط، أو مفيش رقم على الحساب.
   */
   if (!channel && emailTarget && isEmailConfigured()) {
-    const mail = customerCodeEmail(input.brand, code, TTL)
+    const mail = customerCodeEmail(input.brand, code, TTL, emailTarget)
     const sent = await sendEmail({
       to: emailTarget,
       ...mail,

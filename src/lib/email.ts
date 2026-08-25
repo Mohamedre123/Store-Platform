@@ -190,6 +190,17 @@ export async function sendEmail(options: {
    */
   sender?: { name?: string | null; slug?: string | null } | null
   /**
+   * ترويسة مرسِل جاهزة — **للتشخيص وحده**.
+   *
+   * بتخلّي إحنا نبعت نفس الرسالة بالظبط من نطاقين مختلفين ونقارن
+   * راحت فين. من غير المقارنة دي، «القالب ولا النطاق؟» بيفضل سؤالًا
+   * بنجاوبه بالتخمين ونغيّر على أساسه.
+   *
+   * ما تستخدمهاش في أي مسار حقيقي: العنوان هنا بيتخطّى منطق
+   * `fromHeader` كله.
+   */
+  fromOverride?: string | null
+  /**
    * مرفقات — الفاتورة PDF مثلًا.
    *
    * **بايتات لا رابط.** Resend بيقبل الاتنين، بس الرابط معناه إنه
@@ -209,6 +220,7 @@ export async function sendEmail(options: {
     log,
     replyTo,
     sender,
+    fromOverride,
     bulk,
     attachments,
     unsubscribeUrl,
@@ -251,7 +263,7 @@ export async function sendEmail(options: {
        * مهما عملنا في الكود.
        */
       body: JSON.stringify({
-        from: fromHeader(sender),
+        from: fromOverride || fromHeader(sender),
         to: [to],
         subject,
         html,

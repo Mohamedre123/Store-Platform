@@ -198,7 +198,21 @@ function totalsTable(o: OrderInfo) {
  * عارفنا؛ رسالة بشعار حد تاني بتبان تصيّدًا، والعميل ما بيكتبش رمز
  * جاي من جهة ما يعرفهاش — فالرسالة بتتجاهل والدخول ما بيتمّش.
  */
-export function customerCodeEmail(store: StoreBrand, code: string, ttlMinutes: number) {
+export function customerCodeEmail(
+  store: StoreBrand,
+  code: string,
+  ttlMinutes: number,
+  /**
+   * العنوان اللي الرمز اتطلب له.
+   *
+   * **ده مش تجميل.** «دي رسالة رمز» مع «مش عارف لمين» هي بالظبط
+   * قالب التصيّد الأكتر انتشارًا في الدنيا، وفلاتر جيميل متدرّبة
+   * عليه أكتر من أي شكل تاني. لما الرسالة تقول العنوان اللي اتطلب
+   * له، بتتحوّل من نداء مجهول لردّ على فعل محدّد — وده الفرق اللي
+   * بيعمله كل مرسِل كبير (جوجل نفسه بيكتبه).
+   */
+  requestedFor?: string | null,
+) {
   /*
     الرمز مش في الموضوع، والأرقام مش متفرّقة بمسافات.
 
@@ -211,28 +225,49 @@ export function customerCodeEmail(store: StoreBrand, code: string, ttlMinutes: n
     التفرقة البصرية موجودة أصلًا في `letter-spacing` — المسافات
     الحقيقية كانت زيادة ما لهاش لازمة أضرّت أكتر ما نفعت.
   */
+  const home = storeHome(store)
+  const forLine = requestedFor
+    ? `<p style="margin:0 0 20px;font-size:14px;line-height:1.8;color:${MUTED};">
+         الطلب ده اتعمل من صفحة الدخول على <strong style="color:${INK};">${escapeHtml(store.name)}</strong>
+         للحساب <span dir="ltr" style="color:${INK};">${escapeHtml(requestedFor)}</span>.
+       </p>`
+    : ''
+
   const inner = `
-    <p style="margin:0 0 8px;font-size:16px;">رمز دخولك على ${escapeHtml(store.name)}</p>
-    <p style="margin:0 0 20px;font-size:15px;line-height:1.8;color:${MUTED};">
-      اكتب الرمز ده في صفحة الدخول عشان تكمّل.
+    <p style="margin:0 0 8px;font-size:16px;">أهلًا،</p>
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.8;">
+      وصلنا طلب دخول لحسابك على <strong>${escapeHtml(store.name)}</strong>. اكتب الرمز ده في
+      صفحة الدخول عشان تكمّل:
     </p>
 
-    <div style="background-color:#f8f8fc;border-radius:12px;padding:20px;text-align:center;margin-bottom:20px;">
+    <div style="background-color:#f8f8fc;border-radius:12px;padding:20px;text-align:center;margin-bottom:16px;">
       <span style="font-family:'Segoe UI',Tahoma,Arial,sans-serif;font-size:32px;font-weight:bold;letter-spacing:8px;color:${store.primary};">${escapeHtml(code)}</span>
     </div>
 
-    <p style="margin:0;font-size:13px;line-height:1.8;color:${MUTED};">
-      الرمز صالح ${ttlMinutes} دقايق. لو مش إنت اللي طلبته، تجاهل الرسالة ومحدّش هيقدر يدخل بحسابك.
+    ${forLine}
+
+    <p style="margin:0 0 8px;font-size:14px;line-height:1.8;color:${MUTED};">
+      الرمز صالح ${ttlMinutes} دقايق من وقت ما اتبعت، وبيتلغي أول ما تستخدمه.
+    </p>
+    <p style="margin:0;font-size:14px;line-height:1.8;color:${MUTED};">
+      لو مش إنت اللي طلبته، تجاهل الرسالة — محدّش يقدر يدخل بحسابك من غير الرمز ده،
+      ومش محتاج تعمل أي حاجة.
     </p>`
 
   return {
     subject: `رمز الدخول على ${store.name}`,
     html: layout(store, inner, `الرمز جوّه الرسالة وصالح ${ttlMinutes} دقايق`),
-    text: `رمز دخولك على ${store.name}: ${code}
+    text: `أهلًا،
 
-اكتب الرمز ده في صفحة الدخول عشان تكمّل. صالح ${ttlMinutes} دقايق.
-لو مش إنت اللي طلبته، تجاهل الرسالة ومحدّش هيقدر يدخل بحسابك.
-${storeHome(store) ?? ''}`.trim(),
+وصلنا طلب دخول لحسابك على ${store.name}. اكتب الرمز ده في صفحة الدخول عشان تكمّل:
+
+${code}
+${requestedFor ? `\nالطلب اتعمل للحساب ${requestedFor}.\n` : ''}
+الرمز صالح ${ttlMinutes} دقايق من وقت ما اتبعت، وبيتلغي أول ما تستخدمه.
+لو مش إنت اللي طلبته، تجاهل الرسالة — محدّش يقدر يدخل بحسابك من غير الرمز ده.
+
+${store.name}${store.email ? ` — ${store.email}` : ''}
+${home ?? ''}`.trim(),
   }
 }
 /**

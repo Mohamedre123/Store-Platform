@@ -152,6 +152,7 @@ export async function sendDeliveryTestAction(
     },
     '123456',
     10,
+    address,
   )
 
   const res = await sendEmail({
@@ -226,7 +227,7 @@ export async function sendFullSuiteAction(
   }
 
   const jobs: Array<{ label: string; mail: { subject: string; html: string; text?: string }; attach?: boolean }> = [
-    { label: 'رمز الدخول', mail: customerCodeEmail(brand, '123456', 10) },
+    { label: 'رمز الدخول', mail: customerCodeEmail(brand, '123456', 10, address) },
     { label: 'الفاتورة (تأكيد الطلب)', mail: orderInvoiceEmail(brand, order) },
     { label: 'إشعار التاجر بطلب جديد', mail: newOrderNotificationEmail(brand, order, `${home}`) },
     {
@@ -288,4 +289,82 @@ export async function sendFullSuiteAction(
   }
 
   return { ok: results.every((r) => r.ok), from: diag.from, results }
+}
+
+/**
+ * نفس الرسالة بالظبط من نطاقين — عشان نبطّل تخمين.
+ *
+ * ## السؤال اللي بتجاوبه
+ * الرسايل بتروح السبام. السبب **القالب** ولا **النطاق**؟ الاتنين
+ * بيدّوا نفس العَرَض، وعلاجهم مختلف تمامًا: القالب بيتصلّح في ساعة،
+ * والسمعة بتاخد أسابيع أو نطاقًا تاني. كل جولة تغيير في القالب من
+ * غير ما نعرف الإجابة دي كانت تخمينًا.
+ *
+ * ## إزاي بتجاوبه
+ * بتبعت **نفس الـHTML ونفس الموضوع** مرتين: مرة من نطاق المنصة،
+ * ومرة من `onboarding@resend.dev` — نطاق المزوّد نفسه وسمعته ممتازة
+ * ومالوش أي علاقة بينا.
+ *
+ * - وصلت من resend.dev والتانية سبام  →  **النطاق**، والقالب بريء
+ * - الاتنين سبام                       →  **القالب**، والنطاق بريء
+ * - الاتنين وصلوا                      →  المشكلة في صندوق بعينه
+ *
+ * ملحوظة: `resend.dev` بيبعت لعنوان صاحب حساب المزوّد بس. لو الرسالة
+ * التانية اترفضت، ابعت للعنوان المسجّل في ريسيند.
+ */
+export async function sendDomainComparisonAction(
+  to: string,
+): Promise<{ results: Array<{ label: string; from: string; ok: boolean; note: string }> }> {
+  const { store } = await getDashboardContext()
+
+  const address = to.trim().toLowerCase()
+  if (!address.includes('@')) return { results: [] }
+
+  const theme = await getStoreTheme(store.id)
+  const mail = customerCodeEmail(
+    {
+      name: store.name,
+      logo: store.logoLight,
+      primary: theme.custom.identity.primary,
+      slug: store.slug,
+      email: store.email,
+    },
+    '123456',
+    10,
+    address,
+  )
+
+  const diag = await emailDiagnosticsAction()
+  const variants = [
+    { label: 'من نطاق المنصة', from: null as string | null, shown: diag.from },
+    { label: 'من نطاق المزوّد', from: 'Zawya <onboarding@resend.dev>', shown: 'onboarding@resend.dev' },
+  ]
+
+  const results = []
+  for (const [i, v] of variants.entries()) {
+    /* رسالتين في الثانية عند المزوّد */
+    if (i > 0) await new Promise((r) => setTimeout(r, 700))
+
+    const res = await sendEmail({
+      to: address,
+      ...mail,
+      /*
+        الموضوع بيتعلّم عشان تفرّقهم في الصندوق — ده الجزء الوحيد
+        اللي بيختلف بين النسختين، وكل حاجة تانية متطابقة حرفيًا.
+      */
+      subject: `${mail.subject} [${i + 1}]`,
+      sender: { name: store.name, slug: store.slug },
+      fromOverride: v.from,
+      log: { storeId: store.id, event: 'delivery_test' },
+    })
+
+    results.push({
+      label: v.label,
+      from: v.shown,
+      ok: res.ok,
+      note: res.ok ? `اتبعتت — دوّر على «[${i + 1}]»` : `المزوّد رفض: ${res.error}`,
+    })
+  }
+
+  return { results }
 }

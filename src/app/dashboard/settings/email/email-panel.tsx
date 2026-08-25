@@ -2,7 +2,12 @@
 
 import { useState, useTransition } from 'react'
 import { Check, Send, TriangleAlert, X } from 'lucide-react'
-import { sendDeliveryTestAction, sendFullSuiteAction, type EmailDiagnostics } from './actions'
+import {
+  sendDeliveryTestAction,
+  sendDomainComparisonAction,
+  sendFullSuiteAction,
+  type EmailDiagnostics,
+} from './actions'
 import { Button, Card, Input } from '@/components/ui'
 
 /**
@@ -156,6 +161,35 @@ export function EmailPanel({ initial }: { initial: EmailDiagnostics }) {
         >
           <Send className="h-4 w-4" aria-hidden="true" />
           ابعت كل الرسايل (رمز الدخول، الفاتورة، كل حالات الطلب، السلة المتروكة)
+        </Button>
+
+        {/*
+          الاختبار اللي بيقطع الشك.
+
+          «القالب ولا النطاق؟» الاتنين بيدّوا نفس العَرَض وعلاجهم
+          مختلف تمامًا — القالب بيتصلّح في ساعة، والسمعة بتاخد
+          أسابيع. من غير الإجابة دي كل تغيير بنعمله تخمين.
+        */}
+        <Button
+          variant="ghost"
+          loading={pending}
+          disabled={!testTo.includes('@')}
+          className="self-start"
+          onClick={() =>
+            start(async () => {
+              setTestMsg(null)
+              setSuite([])
+              const res = await sendDomainComparisonAction(testTo)
+              setSuite(res.results.map((r) => ({ label: `${r.label} — ${r.from}`, ok: r.ok, note: r.note })))
+              setTestMsg({
+                ok: res.results.every((r) => r.ok),
+                text: 'رسالتين بنفس المحتوى بالظبط: [1] من نطاقنا، [2] من نطاق المزوّد. لو [2] وصلت الوارد و[1] راحت السبام، يبقى المشكلة في النطاق مش في القالب.',
+              })
+            })
+          }
+        >
+          <Send className="h-4 w-4" aria-hidden="true" />
+          اختبار المقارنة: نفس الرسالة من نطاقين
         </Button>
 
         {suite.length > 0 && (
