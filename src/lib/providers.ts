@@ -302,6 +302,13 @@ export const CARRIER_PROVIDERS: ProviderDef[] = [
       },
       { key: 'businessReference', label: 'Business Reference', kind: 'text', required: false },
       {
+        key: 'pickupCity',
+        label: 'محافظة الاستلام',
+        kind: 'text',
+        required: false,
+        hint: 'بنجيب بيها تعريفة الأسعار — سعر الشحن بيتغيّر حسب المحافظة اللي بتشحن منها. سيبها فاضية للقاهرة.',
+      },
+      {
         key: 'webhookSecret',
         label: 'Webhook Secret',
         kind: 'secret',

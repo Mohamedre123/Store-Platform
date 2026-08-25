@@ -1,9 +1,16 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Banknote, Check, Lock, Save, Wand2 } from 'lucide-react'
-import { saveCodAction, saveRatesAction, saveZoneAction } from './actions'
+import { Banknote, Check, Download, Save, Wand2 } from 'lucide-react'
+import {
+  applyZonePricesAction,
+  fetchCarrierRatesAction,
+  saveCodAction,
+  saveRatesAction,
+  saveZoneAction,
+} from './actions'
 import type { Region } from '@/lib/regions'
+import type { ShippingZoneDef } from '@/lib/shipping-zones'
 import { Alert, Button, Card, Field, Input } from '@/components/ui'
 import { Toggle } from '@/components/dashboard/controls'
 import { fromMinorUnits } from '@/lib/utils'
@@ -26,21 +33,26 @@ export function ShippingForm({
   regions,
   zone,
   rates,
-  lockedByCarrier = false,
+  zones,
+  carrier,
 }: {
   country: string
   currency: string
   regions: Region[]
   zone: Zone
   rates: Record<string, { price: number; enabled: boolean }>
+  /** مناطق التسعير — التاجر بيكتب سعر المنطقة وإحنا بنفرده */
+  zones: ShippingZoneDef[]
   /**
-   * فيه شركة شحن مربوطة؟
+   * شركة الشحن المربوطة، لو فيه.
    *
-   * ساعتها أسعارها هي اللي بتحكم، والتسعير اليدوي بيتقفل. القيم
-   * بتفضل محفوظة زي ما هي — التاجر اللي يوقف الشركة بيلاقي أسعاره
-   * مستنياه، مش بيبدأ من الأول.
+   * **الجدول ما بيتقفلش لما تبقى موجودة.** كان بيتقفل، والفكرة كانت
+   * إن أسعارها هي اللي بتحكم — بس هي ما كانتش بتملا حاجة، فالتاجر
+   * كان بيبص على ٢٧ خانة فاضية مقفولة ومش عارف هيتحاسب بكام. دلوقتي
+   * بنجيب تعريفتها ونكتبها في نفس الخانات، فهو شايف الأرقام وقادر
+   * يعدّلها.
    */
-  lockedByCarrier?: boolean
+  carrier: { name: string; canFetch: boolean } | null
 }) {
   const [enabled, setEnabled] = useState(zone.enabled)
   const [defaultPrice, setDefaultPrice] = useState(asAmount(zone.defaultPrice))
@@ -112,6 +124,46 @@ export function ShippingForm({
 
   const filledCount = Object.values(cityRates).filter((v) => v.trim() !== '').length
 
+  /* أسعار المناطق — خمس خانات بتتفرد على الـ٢٧ */
+  const [zonePrices, setZonePrices] = useState<Record<string, string>>({})
+  const [fillMsg, setFillMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [filling, startFill] = useTransition()
+
+  /** بياخد اللي الخادم كتبه ويحطّه في الخانات — من غير إعادة تحميل */
+  function applyReturned(applied: Record<string, string> | undefined) {
+    if (!applied) return
+    setCityRates((prev) => ({ ...prev, ...applied }))
+  }
+
+  function fillFromCarrier() {
+    setFillMsg(null)
+    startFill(async () => {
+      const res = await fetchCarrierRatesAction(country)
+      if (res?.error) {
+        setFillMsg({ ok: false, text: res.error })
+        return
+      }
+      applyReturned(res?.applied)
+      setFillMsg({
+        ok: true,
+        text: `جبنا تعريفة ${res?.carrier ?? 'الشركة'} وملينا ${res?.filled ?? 0} محافظة. راجعها واحفظ.`,
+      })
+    })
+  }
+
+  function fillFromZones() {
+    setFillMsg(null)
+    startFill(async () => {
+      const res = await applyZonePricesAction(country, zonePrices)
+      if (res?.error) {
+        setFillMsg({ ok: false, text: res.error })
+        return
+      }
+      applyReturned(res?.applied)
+      setFillMsg({ ok: true, text: `اتملت ${res?.filled ?? 0} محافظة. راجعها واحفظ.` })
+    })
+  }
+
   return (
     <div className="flex flex-col gap-6">
       {message && <Alert tone={message.ok ? 'success' : 'danger'}>{message.text}</Alert>}
@@ -159,21 +211,7 @@ export function ShippingForm({
         )}
       </Card>
 
-      {lockedByCarrier && (
-        <div className="flex items-start gap-2 rounded-[var(--radius-card)] border border-[var(--color-info)]/35 bg-[var(--color-info-soft)] px-4 py-3 text-sm text-[var(--color-info)]">
-          <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>
-            <strong>التسعير اليدوي متوقّف</strong> — فيه شركة شحن مربوطة، وأسعارها هي
-            اللي بتظهر للعميل. أسعارك محفوظة زي ما هي، وهترجع تشتغل أول ما توقف
-            الشركات كلها.
-          </span>
-        </div>
-      )}
-
-      <fieldset
-        disabled={lockedByCarrier}
-        className={`flex flex-col gap-6 border-0 p-0 ${lockedByCarrier ? 'pointer-events-none opacity-55' : ''}`}
-      >
+      <div className="flex flex-col gap-6">
 
       {/* الإعدادات العامة */}
       <Card className="flex flex-col gap-5 p-5">
@@ -252,6 +290,68 @@ export function ShippingForm({
         </div>
       </Card>
 
+      {/*
+        الملء السريع.
+
+        التاجر مالوش ٢٧ سعر — شركة الشحن بتدّيه كارت بالمناطق:
+        القاهرة الكبرى بكذا، الدلتا بكذا، الصعيد بكذا. فكان بيقعد
+        يترجم الكارت لـ٢٧ خانة بإيده، وبينسى محافظة فتتسعّر غلط
+        والفرق بيطلع من ربحه على كل طلب.
+      */}
+      <Card className="flex flex-col gap-4 p-5">
+        <div className="flex flex-col gap-1">
+          <h2 className="font-semibold">املا الأسعار مرة واحدة</h2>
+          <p className="text-sm leading-relaxed text-[var(--fg-muted)]">
+            {carrier
+              ? `${carrier.name} مربوطة. اسحب تعريفتها، أو اكتب أسعار المناطق بنفسك.`
+              : 'اكتب سعر كل منطقة، وإحنا نفرده على محافظاتها.'}
+          </p>
+        </div>
+
+        {carrier?.canFetch && (
+          <Button variant="secondary" className="self-start" loading={filling} onClick={fillFromCarrier}>
+            <Download className="h-4 w-4" aria-hidden="true" />
+            هات أسعار {carrier.name}
+          </Button>
+        )}
+
+        <div className="grid gap-2 sm:grid-cols-2">
+          {zones.map((z) => (
+            <label
+              key={z.key}
+              className="flex items-center gap-3 rounded-lg border border-[var(--border)] px-3 py-2"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium">{z.label}</span>
+                <span className="block truncate text-xs text-[var(--fg-subtle)]">{z.hint}</span>
+              </span>
+              <input
+                value={zonePrices[z.key] ?? ''}
+                onChange={(e) => setZonePrices((prev) => ({ ...prev, [z.key]: e.target.value }))}
+                inputMode="decimal"
+                dir="ltr"
+                placeholder="—"
+                aria-label={`سعر الشحن لمنطقة ${z.label}`}
+                className="h-9 w-20 shrink-0 rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-2 text-start text-sm tabular-nums focus:border-[var(--primary)] focus:outline-none"
+              />
+            </label>
+          ))}
+        </div>
+
+        <Button
+          variant="secondary"
+          className="self-start"
+          loading={filling}
+          disabled={Object.values(zonePrices).every((v) => !v.trim())}
+          onClick={fillFromZones}
+        >
+          <Wand2 className="h-4 w-4" aria-hidden="true" />
+          افرد على المحافظات
+        </Button>
+
+        {fillMsg && <Alert tone={fillMsg.ok ? 'success' : 'danger'}>{fillMsg.text}</Alert>}
+      </Card>
+
       {/* أسعار المحافظات */}
       <Card className="flex flex-col gap-4 p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -304,7 +404,7 @@ export function ShippingForm({
           حفظ إعدادات الشحن
         </Button>
       </div>
-      </fieldset>
+      </div>
     </div>
   )
 }

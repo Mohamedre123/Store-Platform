@@ -7,7 +7,9 @@ import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { ShippingForm } from './shipping-form'
 import { CarriersManager } from './carriers-manager'
-import { readCarrierProviders, hasActiveCarrier } from '@/lib/provider-store'
+import { readCarrierProviders, activeCarrier } from '@/lib/provider-store'
+import { zonesFor } from '@/lib/shipping-zones'
+import { supportsTariff } from '@/lib/integrations/shipping-tariff'
 import { CARRIER_PROVIDERS } from '@/lib/providers'
 import { platformOrigin } from '@/lib/domain'
 
@@ -31,22 +33,22 @@ export default async function ShippingPage() {
 
   const rates = Object.fromEntries(rateRows.map((r) => [r.city, { price: r.price, enabled: r.enabled }]))
 
-  const [carriers, carrierActive] = await Promise.all([
+  const [carriers, linked] = await Promise.all([
     readCarrierProviders(store.id, CARRIER_PROVIDERS),
-    hasActiveCarrier(store.id),
+    activeCarrier(store.id),
   ])
 
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
         title="الشحن"
-        description="اربط شركة شحن، أو حدّد أسعارك بنفسك لكل محافظة."
+        description="اربط شركة شحن وهات تعريفتها، أو حدّد أسعارك بنفسك لكل منطقة."
       />
 
       {/*
-        الشركات فوق التسعير اليدوي: التاجر اللي عنده شركة بيربطها
-        وخلاص، واللي مالوش بينزل يحطّ أسعاره. الترتيب العكسي كان
-        بيخلّي اللي عنده شركة يملا ٢٧ محافظة على الفاضي.
+        الشركات فوق التسعير: التاجر بيربط الأول، وبعدين ينزل يسحب
+        تعريفتها بضغطة. الترتيب العكسي كان بيخلّيه يملا ٢٧ محافظة
+        بإيده وبعدين يكتشف إن الربط كان هيجيبها.
       */}
       <Reveal>
         <CarriersManager
@@ -59,7 +61,6 @@ export default async function ShippingPage() {
 
       <Reveal delay={60}>
         <ShippingForm
-          lockedByCarrier={carrierActive}
           country={store.country}
           currency={store.currency}
           regions={regionsFor(store.country)}
@@ -73,6 +74,15 @@ export default async function ShippingPage() {
             codEnabled: zone?.codEnabled ?? true,
           }}
           rates={rates}
+          zones={zonesFor(store.country)}
+          carrier={
+            linked
+              ? {
+                  name: linked.displayName ?? linked.slug,
+                  canFetch: supportsTariff(linked.slug),
+                }
+              : null
+          }
         />
       </Reveal>
     </div>

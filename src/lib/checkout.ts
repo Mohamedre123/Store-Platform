@@ -350,7 +350,18 @@ export async function shippingFor(storeId: string, country: string, city: string
     }
   }
 
-  let price = zone.defaultPrice
+  /*
+    الأولوية: الأخصّ بيغلب الأعمّ.
+
+    سعر الشركة الموحّد كان بيتحطّ **بعد** سعر المحافظة فبيلغيه —
+    يعني التاجر اللي ربط شركة ما كانش يقدر يسعّر بالمحافظة أصلًا،
+    والصعيد كان بياخد سعر القاهرة. وده عكس اللي شركات الشحن نفسها
+    بتعمله: كلها بتسعّر بالمنطقة.
+
+    السعر الموحّد مكانه الصح هو بديل السعر الافتراضي — «اللي الشركة
+    بتاخده مني عمومًا» — والمحافظة اللي ليها سعر محدّد بتغلبه.
+  */
+  let price = carrier && carrier.flatRate > 0 ? carrier.flatRate : zone.defaultPrice
   let minDays = zone.minDays
   let maxDays = zone.maxDays
 
@@ -366,10 +377,6 @@ export async function shippingFor(storeId: string, country: string, city: string
       minDays = rate.minDays ?? minDays
       maxDays = rate.maxDays ?? maxDays
     }
-  }
-
-  if (carrier && carrier.flatRate && carrier.flatRate > 0) {
-    price = carrier.flatRate
   }
 
   /*
@@ -465,9 +472,10 @@ export async function computeTotals(options: {
  * ولو الأرقام اللي بيحسب بيها جت من مكان تاني غير `shippingFor`،
  * العميل بيشوف ٥٠ ويتحاسب ٧٥، والفرق بيطلع من جيب التاجر في كل طلب.
  *
- * فلما تبقى فيه شركة مربوطة بسعر، سعرها بيغطّي كل المحافظات: هي
- * بتحاسب التاجر بسعر واحد، وجدول المحافظات بتاعه بيبقى بلا معنى
- * لحد ما يوقفها.
+ * وبيتبع نفس أولوية `shippingFor` بالحرف: سعر المحافظة بيغلب سعر
+ * الشركة الموحّد، والموحّد بيغلب الافتراضي. كان بيرمي أسعار المحافظات
+ * كلها لما يبقى فيه سعر موحّد — فالتاجر اللي جاب تعريفة شركته
+ * بالمحافظات كان بيلاقيها متسجّلة وما بتظهرش.
  */
 export async function getDisplayShipping(storeId: string, country: string) {
   const [carrier] = await db
@@ -500,10 +508,10 @@ export async function getDisplayShipping(storeId: string, country: string) {
   const freeOver = carrier && carrier.freeOver > 0 ? carrier.freeOver : zoneFree
 
   return {
-    byCity: carrierFlat ? {} : Object.fromEntries(rates.map((r) => [r.city, r.price])),
+    byCity: Object.fromEntries(rates.map((r) => [r.city, r.price])),
     defaultPrice: carrierFlat || zone?.defaultPrice || 0,
     freeOver: freeOver || null,
-    carrierName: carrierFlat ? (carrier?.name ?? null) : null,
+    carrierName: carrier?.name ?? null,
     codEnabled: zone?.codEnabled ?? true,
   }
 }
