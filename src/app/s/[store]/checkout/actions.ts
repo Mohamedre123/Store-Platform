@@ -44,6 +44,8 @@ import { consumeFromDefaultBranch } from '@/lib/branches'
 import { notifyTeam } from '@/lib/notify-team'
 import { createBooking } from '@/lib/bookings'
 import { paymentProvider } from '@/lib/providers'
+import { loadInvoice } from '@/lib/invoice'
+import { renderInvoicePdf } from '@/lib/invoice-pdf'
 
 /**
  * معرّف الزائر من الكوكي.
@@ -856,6 +858,14 @@ async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
   */
   const orderUrl = `${publicStoreUrl(store!)}/order/${result.orderNumber}?t=${encodeURIComponent(token)}`
   const invoiceUrl = `${publicStoreUrl(store!)}/order/${result.orderNumber}/invoice?t=${encodeURIComponent(token)}`
+  /*
+    ملف الفاتورة نفسه — مسار مفتوح برمز الطلب.
+
+    لازم يكون مفتوحًا: مزوّد الواتساب بيجيب الملف بنفسه عشان يبعته
+    كمستند، ومالوش جلسة ولا كوكي. الرمز عشوائي ١٦ بايت لكل طلب،
+    ومحتواه بيانات صاحبه لا أكتر.
+  */
+  const invoicePdfUrl = `${publicStoreUrl(store!)}/api/invoice/${encodeURIComponent(store!.slug)}/${result.orderNumber}?t=${encodeURIComponent(token)}`
 
   /*
     رسالة واحدة فيها التتبّع والفاتورة.
@@ -866,6 +876,7 @@ async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
   after(
     whatsappOrderPlaced(store!, {
       orderNumber: result.orderNumber,
+      orderId: result.orderId!,
       phone,
       total: totals.total,
       currency: store!.currency,
@@ -873,6 +884,7 @@ async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
       customerName: input.name ?? null,
       trackUrl: orderUrl,
       invoiceUrl,
+      invoicePdfUrl,
     }).catch((e) => console.error('فشل إرسال واتساب الطلب:', e)),
   )
 
@@ -1095,11 +1107,33 @@ async function sendOrderEmails(ctx: {
      * والفاتورة بتتبعت بغير انتظار: الطلب اتسجّل خلاص، ورسالة
      * فشلت ما يصحّش تأخّر رد الشيك أوت.
      */
+    /*
+      الفاتورة مرفق PDF، مش رسالة HTML وبس.
+
+      العميل بيحتاج ورقة يحتفظ بيها ويرجعلها — والرسالة اللي جوّه
+      البريد بتضيع وسط الوارد. والملف بيتولّد هنا لا بيتجاب من
+      رابطنا: أي تقطّع لحظة الإرسال كان هيبعت الرسالة بلا مرفق من
+      غير ما حد يعرف.
+
+      ولو التوليد فشل (الخط ما اتجابش مثلًا)، الرسالة بتتبعت من
+      غير مرفق: فاتورة في البريد أحسن من مفيش حاجة.
+    */
+    let invoicePdf: Buffer | null = null
+    try {
+      const data = await loadInvoice(store.id, orderId)
+      if (data) invoicePdf = await renderInvoicePdf(data)
+    } catch (e) {
+      console.error('فشل توليد مرفق الفاتورة:', e)
+    }
+
     void sendEmail({
       to: customerEmail,
       ...orderInvoiceEmail(brandInfo, { ...order, trackUrl: invoiceUrl }),
       replyTo: store.email ?? undefined,
       senderName: store.name,
+      ...(invoicePdf
+        ? { attachments: [{ filename: `فاتورة-${orderNumber}.pdf`, content: invoicePdf }] }
+        : {}),
       log: { storeId: store.id, event: 'order_invoice', orderId },
     }).catch((e) => console.error('فشل إرسال الفاتورة:', e))
 

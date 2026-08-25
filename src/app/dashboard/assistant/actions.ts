@@ -145,6 +145,14 @@ const sendSchema = z.object({
   conversationId: z.string().uuid().optional(),
   message: z.string().trim().min(1, 'اكتب رسالتك').max(3000),
   images: z.array(z.string().url()).max(6).optional(),
+  /**
+   * موديل يغلب المحفوظ في الإعدادات — للمحادثة دي بس.
+   *
+   * التاجر بيقارن: سؤال على موديل سريع ورخيص، ونفس السؤال على موديل
+   * أقوى. إجباره يفتح الإعدادات ويغيّر ويرجع بيخلّيه ما يقارنش أصلًا.
+   * والمفتاح بتاعه، فالتكلفة والاختيار بتوعه هو.
+   */
+  model: z.string().trim().max(80).optional(),
 })
 
 /**
@@ -163,6 +171,9 @@ export async function sendToAssistantAction(raw: unknown): Promise<AgentState> {
   if (!key.ok) return { ok: false, error: key.error, needsSetup: key.needsSetup }
 
   const pro = await getAiConfig(store.id, GEMINI_PRO_SLUG)
+
+  /* اختيار التاجر للمحادثة دي يغلب المحفوظ */
+  const model = parsed.data.model || key.model
 
   // محادثة جديدة لو مفيش — عنوانها أول ٤٠ حرف من رسالته
   let conversationId = parsed.data.conversationId
@@ -209,7 +220,7 @@ export async function sendToAssistantAction(raw: unknown): Promise<AgentState> {
   for (let round = 0; round < 4; round++) {
     const res = await agentTurn({
       apiKey: key.apiKey,
-      model: key.model,
+      model,
       system,
       messages,
       tools: AGENT_TOOLS,

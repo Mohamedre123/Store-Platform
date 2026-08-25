@@ -17,9 +17,10 @@ import {
   deleteConversationAction,
   listConversationsAction,
   loadConversationAction,
-  sendToAssistantAction,
   type AgentMsg,
+  type AgentState,
 } from '@/app/dashboard/assistant/actions'
+import { assistImageAction, listChatModelsAction } from '@/app/dashboard/assist-actions'
 import { TOOL_LABELS } from '@/lib/ai/tool-labels'
 
 type Conversation = { id: string; title: string; updatedAt: Date }
@@ -50,6 +51,12 @@ export function AssistantPanel() {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<{ text: string; setup?: boolean } | null>(null)
   const [pending, start] = useTransition()
+
+  /** الموديل المختار للمحادثة دي — فاضي يعني المحفوظ في الإعدادات */
+  const [model, setModel] = useState('')
+  const [models, setModels] = useState<Array<{ id: string; label: string }>>([])
+  /** وضع الصور: نفس الخانة بتوصف صورة بدل ما تسأل */
+  const [imageMode, setImageMode] = useState(false)
 
   const listRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -97,11 +104,56 @@ export function AssistantPanel() {
     ])
 
     start(async () => {
-      const res = await sendToAssistantAction({
-        conversationId: conversationId ?? undefined,
-        message: text,
-        images: sent,
+      /*
+        وضع الصور بيروح لمسار تاني خالص.
+
+        موديلات النص ما بترجّعش صور — النداء بيها بيرجّع فقرة بتوصف
+        الصورة بدل ما تعملها. فالوضع ده بيستخدم موديل صور من نفس
+        المفتاح، والناتج بيترفع للتخزين ويرجع كرابط جاهز للمنتج.
+      */
+      if (imageMode) {
+        const res = await assistImageAction({ instruction: text })
+        if (!res.ok) {
+          setError({ text: res.error, setup: res.needsSetup })
+          setFailed(true)
+          return
+        }
+        setFailed(false)
+        setMessages((m) => [
+          ...m,
+          {
+            id: `img-${Date.now()}`,
+            role: 'model',
+            text: 'اتفضل الصورة — تقدر تحفظها وتحطها في المنتج.',
+            images: [res.url],
+            toolCalls: [],
+          },
+        ])
+        return
+      }
+
+      /*
+        نداء المسار مش الفعل مباشرةً: الفعل بياخد مهلة الصفحة اللي
+        بتناديه، واللوحة بتتعرض في كل صفحات اللوحة — فأي سؤال محتاج
+        أداة كان بيتقطع. المسار ليه مهلته هو.
+      */
+      const res = await fetch('/api/ai/agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversationId: conversationId ?? undefined,
+          message: text,
+          images: sent,
+          model: model || undefined,
+        }),
       })
+        .then((r) => r.json() as Promise<AgentState>)
+        .catch(
+          (): AgentState => ({
+            ok: false,
+            error: 'النت اتقطع قبل ما الرد يوصل. جرّب تاني.',
+          }),
+        )
 
       if (!res.ok) {
         setError({ text: res.error, setup: res.needsSetup })
@@ -115,6 +167,21 @@ export function AssistantPanel() {
       void refreshList()
     })
   }
+
+  /* قايمة الموديلات بتتجاب مرة واحدة أول ما اللوحة تتفتح */
+  useEffect(() => {
+    listChatModelsAction()
+      .then((res) => {
+        setModels(res.models)
+        try {
+          const saved = localStorage.getItem('zw_assist_model')
+          if (saved && res.models.some((m) => m.id === saved)) setModel(saved)
+        } catch {}
+      })
+      .catch(() => {
+        /* فشل القايمة ما يقفلش المساعد — بيشتغل بالموديل المحفوظ */
+      })
+  }, [])
 
   const decide = (messageId: string, index: number, approve: boolean) =>
     start(async () => {
@@ -363,6 +430,49 @@ export function AssistantPanel() {
             </div>
           )}
 
+          {/*
+            شريط الموديل ووضع الصور.
+
+            **المفتاح بتاع التاجر، فالاختيار بتاعه.** كان لازم يفتح
+            صفحة الإضافات ويغيّر الموديل ويرجع عشان يقارن رد بموديل
+            تاني — فما كانش بيقارن أصلًا. والقايمة بتتجاب من جوجل
+            بمفتاحه هو، مش قايمة مكتوبة عندنا بتبقى قديمة بعد شهرين.
+          */}
+          <div className="flex shrink-0 flex-wrap items-center gap-2 border-t border-[var(--border)] px-3 pt-2.5">
+            <select
+              value={model}
+              onChange={(e) => {
+                setModel(e.target.value)
+                try {
+                  localStorage.setItem('zw_assist_model', e.target.value)
+                } catch {}
+              }}
+              aria-label="موديل الذكاء الاصطناعي"
+              className="h-9 min-w-0 max-w-[60%] flex-1 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-2 text-xs text-[var(--fg-muted)] outline-none focus:border-[var(--primary)]"
+            >
+              <option value="">الموديل الافتراضي</option>
+              {models.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+
+            <button
+              type="button"
+              onClick={() => setImageMode((v) => !v)}
+              aria-pressed={imageMode}
+              className={`flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors ${
+                imageMode
+                  ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]'
+                  : 'border-[var(--border-strong)] text-[var(--fg-muted)]'
+              }`}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              اعملّي صورة
+            </button>
+          </div>
+
           <div className="flex shrink-0 items-end gap-2 border-t border-[var(--border)] p-3">
             <input
               ref={fileRef}
@@ -393,7 +503,7 @@ export function AssistantPanel() {
               }}
               rows={1}
               maxLength={3000}
-              placeholder="اكتب اللي محتاجه…"
+              placeholder={imageMode ? 'وصفلي الصورة اللي عايزها…' : 'اكتب اللي محتاجه…'}
               className="max-h-28 min-h-11 flex-1 resize-none rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-3 text-sm focus:border-[var(--primary)] focus:outline-none"
             />
 

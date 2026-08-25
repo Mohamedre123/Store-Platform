@@ -1,4 +1,5 @@
 import type { CheckoutStage } from '@/db/schema'
+import { KIND_COPY, type StoreKind } from './store-kind'
 
 /**
  * مراحل الشيك أوت — وإيه اللي التاجر يقوله في كل واحدة.
@@ -101,6 +102,13 @@ export type MessageContext = {
   resumeUrl: string
   /** فيه منتج لسه محتاج مقاس أو لون؟ */
   missingOptions: boolean
+  /**
+   * أسماء الخيارات الناقصة زي ما التاجر سمّاها — «المقاس»، «الوزن»،
+   * «النكهة». الرسالة بتستخدمها بدل ما تفترض إن كل متجر بيبيع هدوم.
+   */
+  optionNames?: string[]
+  /** نشاط المتجر المستنتج من كتالوجه — بيغيّر نبرة الرسالة */
+  kind?: StoreKind
 }
 
 const hi = (name: string | null) => (name ? `أهلًا ${name}` : 'أهلًا بيك')
@@ -117,6 +125,18 @@ export function readyMessages(
   ctx: MessageContext,
 ): ReadyMessage[] {
   const link = `\n\n${ctx.resumeUrl}`
+  const copy = KIND_COPY[ctx.kind ?? 'generic']
+
+  /*
+    اسم الخيار زي ما التاجر كتبه — «المقاس» أو «الوزن» أو «النكهة».
+    كتابة «المقاس/اللون» على طول كانت بتخلّي متجر عسل يبعت رسالة
+    بيسأل فيها العميل عن مقاسه.
+  */
+  const optionLabel =
+    ctx.optionNames && ctx.optionNames.length
+      ? ctx.optionNames.slice(0, 2).join(' و')
+      : 'الخيارات'
+
   const what = ctx.productName
     ? ctx.itemCount > 1
       ? `${ctx.productName} و${ctx.itemCount - 1} منتج تاني`
@@ -131,10 +151,10 @@ export function readyMessages(
     ? [
         {
           id: 'options',
-          label: 'اسأله عن المقاس',
-          why: 'وقف عند اختيار المقاس أو اللون — ده سبب معروف وله حل بضغطة',
+          label: `اسأله عن ${optionLabel}`,
+          why: `وقف عند اختيار ${optionLabel} — ده سبب معروف وله حل بضغطة`,
           primary: true,
-          text: `${hi(ctx.customerName)} 👋 معاك ${ctx.storeName}\n\nشُفت إنك كنت بتطلب ${what} وفضل تحدّد المقاس/اللون بس.\nقولّي المقاس اللي بتلبسه وأنا أظبّطهولك وأبعتلك الطلب جاهز.${link}`,
+          text: `${hi(ctx.customerName)} 👋 معاك ${ctx.storeName}\n\nشُفت إنك كنت بتطلب ${what} وفضل تحدّد ${optionLabel} بس.\nقولّي اللي يناسبك وأنا أظبّطهولك وأبعتلك الطلب جاهز.${link}`,
         },
       ]
     : []
@@ -158,7 +178,7 @@ export function readyMessages(
         id: 'cart-help',
         label: 'ساعده يختار',
         why: 'اللي لسه بيقارن محتاج نصيحة مش عرض',
-        text: `${hi(ctx.customerName)}، معاك ${ctx.storeName}.\nلو مش متأكد من الاختيار ابعتلي مقاسك أو اللي بتدوّر عليه وأنا أرشّحلك الأنسب.${link}`,
+        text: `${hi(ctx.customerName)}، معاك ${ctx.storeName}.\n${copy.nudge}${link}`,
       },
     ],
 
@@ -180,7 +200,7 @@ export function readyMessages(
         id: 'contact-cod',
         label: 'طمّنه على الدفع',
         why: 'أكتر سبب للوقوف بعد البيانات هو الخوف من الدفع مقدّمًا',
-        text: `${hi(ctx.customerName)}، حبّيت أطمّنك إن الدفع عندنا عند الاستلام — تشوف الطلب الأول وتدفع للمندوب.\nطلبك لسه محفوظ.${link}`,
+        text: `${hi(ctx.customerName)}، حبّيت أطمّنك إن الدفع عندنا عند الاستلام — تشوف ${copy.item} الأول وتدفع للمندوب.\n${copy.reassure}\nطلبك لسه محفوظ.${link}`,
       },
     ],
 

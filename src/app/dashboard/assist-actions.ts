@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { getDashboardContext } from '@/lib/store-context'
 import { getAiConfig, GEMINI_PRO_SLUG, GEMINI_SLUG } from '@/lib/ai/settings'
 import { getStoreBrief, briefLine } from '@/lib/ai/store-context'
-import { editImage, generate, listImageModels } from '@/lib/ai/gemini'
+import { editImage, generate, listImageModels, listModels } from '@/lib/ai/gemini'
 import { uploadImage } from '@/lib/storage'
 
 /**
@@ -107,6 +107,28 @@ export async function assistAskAction(raw: unknown): Promise<AssistState> {
   }
 
   return { ok: true, text: res.data }
+}
+
+/**
+ * موديلات المفتاح — للتبديل من جوّه المساعد.
+ *
+ * **مش قايمة مكتوبة عندنا.** أي قايمة نكتبها بتبقى قديمة بعد شهرين،
+ * والمفاتيح مش كلها ليها نفس الصلاحيات أصلًا — فالمتاح بيتسأل عنه
+ * جوجل بمفتاح التاجر نفسه.
+ */
+export async function listChatModelsAction(): Promise<{
+  models: Array<{ id: string; label: string }>
+  current: string | null
+}> {
+  const { store } = await getDashboardContext()
+  const key = await anyKey(store.id)
+  if (!key.ok) return { models: [], current: null }
+
+  const res = await listModels(key.apiKey)
+  return {
+    models: res.ok ? res.data.map((m) => ({ id: m.id, label: m.label })) : [],
+    current: key.model,
+  }
 }
 
 /* ────────────────────────── الصور ────────────────────────── */

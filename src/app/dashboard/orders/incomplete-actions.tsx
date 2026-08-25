@@ -2,11 +2,12 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, Copy, MessageCircle, Phone, Trash2 } from 'lucide-react'
-import { dismissIncompleteAction, logRecoveryMessageAction } from './actions'
+import { Check, Copy, MessageCircle, Phone, Send, Trash2 } from 'lucide-react'
+import { dismissIncompleteAction, sendRecoveryMessageAction } from './actions'
 import { CHECKOUT_STAGES, readyMessages, stageMeta, type MessageContext } from '@/lib/checkout-stage'
 import type { CheckoutStage } from '@/db/schema'
 import { Button, Card } from '@/components/ui'
+import { ChannelPicker, useNotifyChannel } from '@/components/dashboard/channel-picker'
 import { cn } from '@/lib/utils'
 
 /**
@@ -50,17 +51,32 @@ export function IncompleteActions({
     setCopied(false)
   }
 
-  const digits = (phone ?? '').replace(/\D/g, '')
-  const waHref = digits
-    ? `https://wa.me/${digits}?text=${encodeURIComponent(draft)}`
-    : undefined
-
   const currentRank = stageMeta(stage).rank
 
-  /* الإرسال بيتسجّل على الطلب — عشان التاجر يعرف إنه كلّمه ومتى */
-  function markSent() {
+  const [channel, setChannel] = useNotifyChannel()
+  const [result, setResult] = useState<{
+    sent: string[]
+    failed: string[]
+    waHref?: string
+  } | null>(null)
+
+  /**
+   * الإرسال من الخادم بحساب المتجر المربوط.
+   *
+   * كان زرار بيفتح `wa.me` — يعني التاجر لازم يكون على نفس الجهاز
+   * اللي عليه واتساب، ولازم يدوس «إرسال» تاني بإيده، ومفيش أي أثر
+   * إن الرسالة اتبعتت أصلًا.
+   */
+  function send() {
+    setResult(null)
     start(async () => {
-      await logRecoveryMessageAction(orderId, picked?.label ?? 'رسالة')
+      const res = await sendRecoveryMessageAction({
+        orderId,
+        label: picked?.label ?? 'رسالة',
+        text: draft,
+        channel,
+      })
+      setResult({ sent: res.sent, failed: res.failed, waHref: res.waHref })
       router.refresh()
     })
   }
@@ -142,23 +158,18 @@ export function IncompleteActions({
           className="w-full resize-y rounded-lg border border-[var(--border-strong)] bg-[var(--surface-2)] p-3 text-sm leading-relaxed outline-none focus:border-[var(--primary)]"
         />
 
+        <ChannelPicker value={channel} onChange={setChannel} label="ابعتها على" />
+
         <div className="flex flex-col gap-2 sm:flex-row">
-          {waHref ? (
-            <a
-              href={waHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={markSent}
-              className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-[var(--color-success)] px-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-            >
-              <MessageCircle className="h-4 w-4" aria-hidden="true" />
-              ابعتها واتساب
-            </a>
-          ) : (
-            <span className="flex min-h-11 flex-1 items-center justify-center rounded-lg bg-[var(--surface-2)] px-3 text-sm text-[var(--fg-subtle)]">
-              مفيش رقم تليفون
-            </span>
-          )}
+          <Button
+            loading={pending}
+            disabled={!draft.trim() || channel === 'none'}
+            className="flex-1"
+            onClick={send}
+          >
+            <Send className="h-4 w-4" aria-hidden="true" />
+            {channel === 'none' ? 'اختار قناة الأول' : 'ابعتها دلوقتي'}
+          </Button>
 
           <button
             type="button"
@@ -183,6 +194,40 @@ export function IncompleteActions({
             )}
           </button>
         </div>
+
+        {/*
+          نتيجة الإرسال بالنص الحقيقي للمزوّد.
+
+          «فشل الإرسال» لوحدها بتخلّي التاجر يقعد يجرّب. نص المزوّد
+          هو اللي بيفرّق بين «الجلسة اتفصلت امسح الكود» و«خلص رصيدك»
+          و«حد الرسايل في الدقيقة» — وكل واحدة ليها تصرّف مختلف.
+        */}
+        {result && (result.sent.length > 0 || result.failed.length > 0) && (
+          <div className="flex flex-col gap-1.5 text-xs">
+            {result.sent.length > 0 && (
+              <p className="flex items-center gap-1.5 font-medium text-[var(--color-success)]">
+                <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                اتبعتت على {result.sent.join(' و')}
+              </p>
+            )}
+            {result.failed.map((f) => (
+              <p key={f} className="text-[var(--color-danger)]">
+                {f}
+              </p>
+            ))}
+            {result.waHref && (
+              <a
+                href={result.waHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex min-h-10 items-center justify-center gap-2 rounded-lg border border-[var(--color-success)] text-sm font-medium text-[var(--color-success)]"
+              >
+                <MessageCircle className="h-4 w-4" aria-hidden="true" />
+                ابعتها بإيدك من واتساب
+              </a>
+            )}
+          </div>
+        )}
 
         {phone && (
           <a

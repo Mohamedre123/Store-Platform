@@ -518,6 +518,48 @@ export function orderStatusEmail(
   }
 }
 
+/**
+ * رسالة التاجر بإيده للعميل.
+ *
+ * **نصّها هو اللي التاجر كتبه، بلا تجميل ولا إضافات.** الرسالة اللي
+ * التاجر صاغها بنفسه بتقرا كأنها من بني آدم — ولو لفّيناها في قالب
+ * تسويقي بعناوين وأزرار، بترجع تبان آليّة زي أي رسالة مؤتمتة، ودي
+ * بالظبط اللي العميل بيتجاهلها.
+ *
+ * فالقالب هنا حدّه الأدنى: هوية المتجر فوق، النص زي ما هو، وزرار
+ * واحد للرابط.
+ */
+export function merchantMessageEmail(
+  store: StoreBrand,
+  o: { subject: string; body: string; actionUrl?: string | null; actionLabel?: string },
+) {
+  /* أسطر النص بتتحوّل لفقرات — الرسالة بسطر واحد طويل بتبقى كتلة */
+  const paragraphs = o.body
+    .split(/\n{2,}/)
+    .map((block) => escapeHtml(block).replace(/\n/g, '<br>'))
+    .map(
+      (block) =>
+        `<p style="margin:0 0 14px;font-size:15px;line-height:1.9;">${block}</p>`,
+    )
+    .join('')
+
+  const button = o.actionUrl
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:22px auto 0;">
+         <tr><td align="center" style="border-radius:10px;background-color:${store.primary};">
+           <a href="${o.actionUrl}" style="display:inline-block;padding:13px 30px;font-family:'Segoe UI',Tahoma,Arial,sans-serif;font-size:15px;font-weight:bold;color:#ffffff;text-decoration:none;">
+             ${escapeHtml(o.actionLabel ?? 'كمّل طلبك')}
+           </a>
+         </td></tr>
+       </table>`
+    : ''
+
+  return {
+    subject: o.subject,
+    html: layout(store, paragraphs + button, o.body.slice(0, 120)),
+    text: o.actionUrl ? `${o.body}\n\n${o.actionUrl}` : o.body,
+  }
+}
+
 /** تذكير السلة المتروكة */
 export function abandonedCartEmail(
   store: StoreBrand,

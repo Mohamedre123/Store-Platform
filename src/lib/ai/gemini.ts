@@ -23,18 +23,77 @@ const BASE = 'https://generativelanguage.googleapis.com/v1beta'
  * **بنعيد على ٥xx بس.** المفتاح الباطل والكوته الخالصة مش هيتصلّحوا
  * بإعادة المحاولة — إعادتهم بتضيّع وقت العميل وبتستهلك حصّة التاجر.
  */
+/**
+ * مهلة النداء الواحد.
+ *
+ * **كانت ٤٥ ثانية، وده أطول من عمر الاستدعاء نفسه.** المساعد المنفّذ
+ * بيلفّ لحد ٤ لفّات على الموديل، ودالة على المضيف عمرها ٦٠ ثانية —
+ * فأول نداء بطيء كان بياكل المهلة كلها، والاستدعاء بيموت قبل ما
+ * المهلة نفسها تفوق.
+ *
+ * ٢٠ ثانية بتخلّي لفّتين يعدّوا جوّه السقف، وبتدّي مجالًا لإعادة
+ * محاولة لو جوجل اتقطّعت.
+ */
+const CALL_TIMEOUT_MS = 20_000
+
+/** خطأ المهلة — بيتلفّ في نوع نعرفه بدل ما يطلع بنصّه الإنجليزي */
+export class GeminiTimeout extends Error {
+  constructor() {
+    super('جوجل ما ردّتش في الوقت. جرّب تاني، ولو تكرر قلّل حجم الطلب.')
+    this.name = 'GeminiTimeout'
+  }
+}
+
 async function callWithRetry(url: string, init: RequestInit, attempts = 3): Promise<Response> {
   let last: Response | null = null
+  let timedOut = false
 
   for (let i = 0; i < attempts; i++) {
-    const res = await fetch(url, { ...init, cache: 'no-store', signal: AbortSignal.timeout(45_000) })
-    if (res.status < 500) return res
+    try {
+      const res = await fetch(url, {
+        ...init,
+        cache: 'no-store',
+        signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+      })
+      if (res.status < 500) return res
+      last = res
+    } catch (e) {
+      /*
+        `AbortSignal.timeout` بترمي `TimeoutError` — وهي كانت بتعدّي
+        من غير ما حد يمسكها، فالتاجر كان بيشوف
+        «TimeoutError: The operation was aborted due to timeout»
+        بالإنجليزي في وش المحادثة العربية.
 
-    last = res
+        الانقطاع المؤقت بيستاهل محاولة تانية زي الـ٥xx بالظبط.
+      */
+      if (e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError')) {
+        timedOut = true
+      } else {
+        throw e
+      }
+    }
+
     if (i < attempts - 1) await new Promise((r) => setTimeout(r, 400 * (i + 1)))
   }
 
-  return last!
+  if (last) return last
+  if (timedOut) throw new GeminiTimeout()
+  throw new Error('فشل الاتصال بجوجل')
+}
+
+/**
+ * ترجمة الاستثناء لرسالة التاجر.
+ *
+ * كان بيترمي نصّ الاستثناء زي ما هو، فالتاجر بيشوف إنجليزي تقني
+ * («TimeoutError: The operation was aborted…») في نص محادثة عربية —
+ * وما بيعرفش ده عطل عنده ولا عندنا ولا عند جوجل.
+ */
+function networkError(e: unknown): GeminiError {
+  if (e instanceof GeminiTimeout) return { kind: 'network', message: e.message }
+  if (e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError')) {
+    return { kind: 'network', message: new GeminiTimeout().message }
+  }
+  return { kind: 'network', message: 'مقدرناش نوصل لجوجل دلوقتي. جرّب تاني بعد شوية.' }
 }
 
 export type GeminiError =
@@ -150,7 +209,7 @@ export async function listModels(apiKey: string): Promise<GeminiResult<GeminiMod
 
     return { ok: true, data: models }
   } catch (e) {
-    return { ok: false, error: { kind: 'network', message: String(e).slice(0, 200) } }
+    return { ok: false, error: networkError(e) }
   }
 }
 
@@ -236,7 +295,7 @@ export async function generate(input: {
 
     return { ok: true, data: text.trim() }
   } catch (e) {
-    return { ok: false, error: { kind: 'network', message: String(e).slice(0, 200) } }
+    return { ok: false, error: networkError(e) }
   }
 }
 
@@ -475,7 +534,7 @@ export async function agentTurn(input: {
 
     return { ok: true, data: { text, calls } }
   } catch (e) {
-    return { ok: false, error: { kind: 'network', message: String(e).slice(0, 200) } }
+    return { ok: false, error: networkError(e) }
   }
 }
 
@@ -521,7 +580,7 @@ export async function listImageModels(apiKey: string): Promise<GeminiResult<Gemi
 
     return { ok: true, data: models }
   } catch (e) {
-    return { ok: false, error: { kind: 'network', message: String(e).slice(0, 200) } }
+    return { ok: false, error: networkError(e) }
   }
 }
 
@@ -603,6 +662,6 @@ export async function editImage(input: {
       data: { mimeType: img.mimeType ?? 'image/png', dataBase64: img.data },
     }
   } catch (e) {
-    return { ok: false, error: { kind: 'network', message: String(e).slice(0, 200) } }
+    return { ok: false, error: networkError(e) }
   }
 }

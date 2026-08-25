@@ -4,16 +4,19 @@ import { notFound } from 'next/navigation'
 import { and, asc, eq, inArray } from 'drizzle-orm'
 import { AlertTriangle, ArrowRight, MapPin, MessageCircle, Phone, StickyNote, User } from 'lucide-react'
 import { db } from '@/db'
-import { orderEvents, orderItems, orders, productVariants } from '@/db/schema'
+import { categories, orderEvents, orderItems, orders, productOptions, products, productVariants } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { formatMoney, formatDateTime } from '@/lib/utils'
 import { statusMeta } from '@/lib/order-status'
 import { stageMeta } from '@/lib/checkout-stage'
+import { inferStoreKind, type StoreKind } from '@/lib/store-kind'
 import { publicStoreUrl } from '@/lib/domain'
 import { Card } from '@/components/ui'
 import { Reveal } from '@/components/motion'
 import { OrderNote, StatusControls } from '../status-controls'
 import { IncompleteActions } from '../incomplete-actions'
+import { ConvertCart } from '../convert-cart'
+import { regionsFor } from '@/lib/regions'
 
 export const metadata = { title: 'تفاصيل الطلب' }
 
@@ -47,6 +50,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
    */
   const bareIds = items.filter((i) => !i.variantId).map((i) => i.productId!).filter(Boolean)
   const needsOptionIds = new Set<string>()
+  let missingOptionNames: string[] = []
 
   if (order.isIncomplete && bareIds.length) {
     const rows = await db
@@ -60,6 +64,43 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         ),
       )
     for (const r of rows) needsOptionIds.add(r.productId)
+
+    /*
+      أسماء الخيارات زي ما التاجر سمّاها — «المقاس» أو «الوزن» أو
+      «النكهة». الرسالة الجاهزة بتستخدمها بدل ما تفترض إن كل متجر
+      بيبيع هدوم ويسأل العميل عن مقاسه.
+    */
+    if (needsOptionIds.size) {
+      const names = await db
+        .selectDistinct({ name: productOptions.name })
+        .from(productOptions)
+        .where(inArray(productOptions.productId, [...needsOptionIds]))
+      missingOptionNames = names.map((n) => n.name)
+    }
+  }
+
+  /*
+    نشاط المتجر مستنتَج من كتالوجه — عشان الرسالة تتكلم بلغة نشاطه.
+    استعلامان خفيفان وللسلة المتروكة بس.
+  */
+  let kind: StoreKind = 'generic'
+  if (order.isIncomplete) {
+    const [cats, prods] = await Promise.all([
+      db
+        .select({ name: categories.name })
+        .from(categories)
+        .where(eq(categories.storeId, store.id))
+        .limit(20),
+      db
+        .select({ name: products.name })
+        .from(products)
+        .where(eq(products.storeId, store.id))
+        .limit(30),
+    ])
+    kind = inferStoreKind({
+      categories: cats.map((c) => c.name),
+      products: prods.map((p) => p.name),
+    })
   }
 
   const meta = statusMeta(order.isIncomplete ? 'incomplete' : order.status)
@@ -254,6 +295,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               الوحيدة المفيدة في الشاشة دي.
             */}
             {order.isIncomplete ? (
+              <>
               <IncompleteActions
                 orderId={order.id}
                 stage={order.checkoutStage}
@@ -266,8 +308,28 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                   total: formatMoney(order.total, order.currency),
                   resumeUrl: `${publicStoreUrl(store)}/checkout?resume=${encodeURIComponent(order.recoveryToken ?? '')}`,
                   missingOptions: needsOptionIds.size > 0,
+                  optionNames: missingOptionNames,
+                  kind,
                 }}
               />
+
+              {/*
+                نص السلات بتترد على الواتساب بـ«تمام ابعتهولي» —
+                والتاجر كان بيقعد يعمل الطلب من الأول بإيده.
+              */}
+              <ConvertCart
+                orderId={order.id}
+                regions={regionsFor(store.country)}
+                initial={{
+                  name: order.customerName,
+                  phone: order.customerPhone,
+                  email: order.customerEmail,
+                  city: address?.city ?? null,
+                  area: address?.area ?? null,
+                  street: address?.street ?? null,
+                }}
+              />
+              </>
             ) : (
               <StatusControls orderId={order.id} status={order.status} isIncomplete={false} />
             )}

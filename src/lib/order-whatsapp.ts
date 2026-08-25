@@ -1,5 +1,5 @@
 import 'server-only'
-import { readTemplates, sendWhatsapp } from './whatsapp'
+import { readTemplates, sendWhatsapp, sendWhatsappDocument } from './whatsapp'
 import { fillTemplate, templateFor, type TemplateKey } from './whatsapp-templates'
 import { formatMoney } from './utils'
 
@@ -22,6 +22,8 @@ type Store = { id: string; name: string }
 
 export type OrderMessage = {
   orderNumber: number
+  /** معرّف الطلب — للسجل بس، مش بيتحط في نص الرسالة */
+  orderId?: string
   phone: string
   /** رابط تتبّع الطلب — بنطاق التاجر */
   trackUrl: string
@@ -34,11 +36,14 @@ export async function whatsappOrderPlaced(
     currency: string
     cod: boolean
     customerName?: string | null
-    /** رابط الفاتورة — بيتحط جوّه نفس الرسالة */
+    /** رابط صفحة الفاتورة — بيتحط جوّه نفس الرسالة */
     invoiceUrl: string
+    /** ملف الفاتورة PDF — بيتبعت كمستند مع نفس الرسالة */
+    invoicePdfUrl?: string
   },
 ): Promise<void> {
-  await send(store, o.phone, 'order_placed', {
+  const templates = await readTemplates(store.id)
+  const text = fillTemplate(templateFor(templates, 'order_placed'), {
     اسم_المتجر: store.name,
     اسم_العميل: o.customerName ?? '',
     رقم_الطلب: String(o.orderNumber),
@@ -47,6 +52,42 @@ export async function whatsappOrderPlaced(
     الرابط: o.trackUrl,
     رابط_الفاتورة: o.invoiceUrl,
   })
+
+  if (!text || !o.phone) return
+
+  /**
+   * الفاتورة مستند مع نفس الرسالة، مش رسالة تانية.
+   *
+   * **الباقات المجانية عند مزوّدي واتساب بتسمح برسالة واحدة كل
+   * دقيقة.** رسالة تأكيد وبعدها رسالة فاتورة معناها إن التانية
+   * بترجع ٤٢٩ وتضيع. المستند بيتبعت والنص بيبقى تعليقه — رسالة
+   * واحدة فيها الاتنين.
+   *
+   * ولو المزوّد رفض المستند (باقة ما بتدعمش المرفقات، أو الملف
+   * ما اتجابش)، بنرجع للنص العادي: التأكيد أهم من المرفق، والفاتورة
+   * لسه رابطها جوّه النص.
+   */
+  if (o.invoicePdfUrl) {
+    const doc = await sendWhatsappDocument(
+      store.id,
+      o.phone,
+      o.invoicePdfUrl,
+      `فاتورة-${o.orderNumber}.pdf`,
+      text,
+      { event: 'wa_order_placed', orderId: o.orderId },
+    )
+    if (doc.ok) return
+    if (doc.error === 'واتساب مش مربوط') return
+    console.error('فشل إرسال الفاتورة كمستند، بنرجع للنص:', doc.error)
+  }
+
+  const res = await sendWhatsapp(store.id, o.phone, text, {
+    event: 'wa_order_placed',
+    orderId: o.orderId,
+  })
+  if (!res.ok && res.error !== 'واتساب مش مربوط') {
+    console.error('فشل إرسال واتساب الطلب:', res.error)
+  }
 }
 
 /**
@@ -88,7 +129,7 @@ export async function whatsappOrderStatus(
     اسم_العميل: o.customerName ?? '',
     رقم_الطلب: String(o.orderNumber),
     الرابط: o.trackUrl,
-  })
+  }, o.orderId)
 }
 
 /**
@@ -102,6 +143,8 @@ async function send(
   phone: string,
   key: TemplateKey,
   vars: Record<string, string>,
+  /** رقم الطلب اللي الرسالة بتخصّه — عشان السجل يربطها بيه */
+  orderId?: string,
 ): Promise<void> {
   if (!phone) return
 
@@ -109,7 +152,7 @@ async function send(
   const text = fillTemplate(templateFor(templates, key), vars)
   if (!text) return
 
-  const res = await sendWhatsapp(store.id, phone, text)
+  const res = await sendWhatsapp(store.id, phone, text, { event: `wa_${key}`, orderId })
   if (!res.ok && res.error !== 'واتساب مش مربوط') {
     console.error('فشل إرسال واتساب الطلب:', res.error)
   }

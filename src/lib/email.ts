@@ -66,7 +66,27 @@ function fromHeader(senderName?: string | null): string {
   */
   const clean = name.replace(/["<>]/g, '').trim().slice(0, 50)
 
-  return `${encodeDisplayName(clean)} <${address}>`
+  /**
+   * «اسم المتجر عبر زاوية» لا «اسم المتجر» لوحده.
+   *
+   * **ده اللي رجّع الرسايل من السبام.** لما بدأنا نبعت باسم المتجر،
+   * الترويسة بقت `atlosa <no-reply@zawyaeg.site>` — اسم علامة
+   * وعنوان على نطاق تاني خالص. ودي بالظبط بصمة انتحال الهوية اللي
+   * فلاتر جيميل بتدوّر عليها: الاسم بيدّعي جهة، والنطاق بتاع جهة
+   * تانية، ومفيش أي حاجة بتربطهم.
+   *
+   * جيميل نفسه بيحل المشكلة دي بكلمة «via» وبيعرضها للمستخدم. لما
+   * إحنا نكتبها في الاسم من الأول، الترويسة بتبقى صادقة: العميل
+   * بيشوف اسم متجره، والفلتر بيشوف اسمًا متسقًا مع النطاق اللي
+   * الرسالة موقّعة منه فعلًا.
+   *
+   * الحل النهائي إن التاجر يوثّق نطاقه ويبعت من عليه — ساعتها الاسم
+   * والنطاق بتوعه هو ومفيش «عبر».
+   */
+  const platform = (process.env.NEXT_PUBLIC_APP_NAME ?? 'زاوية').replace(/["<>]/g, '').trim()
+  const display = platform && clean !== platform ? `${clean} عبر ${platform}` : clean
+
+  return `${encodeDisplayName(display)} <${address}>`
 }
 
 export type MessageContext = {
@@ -106,8 +126,17 @@ export async function sendEmail(options: {
    * سرّه) — دي جاية مننا فعلًا وباسمنا صح.
    */
   senderName?: string | null
+  /**
+   * مرفقات — الفاتورة PDF مثلًا.
+   *
+   * **بايتات لا رابط.** Resend بيقبل الاتنين، بس الرابط معناه إنه
+   * هيروح يجيب الملف من عندنا وقت الإرسال — وأي تقطّع لحظتها بيبعت
+   * الرسالة بلا مرفق من غير ما حد يعرف. البايتات بتضمن إن اللي
+   * اتبعت هو اللي إحنا ولّدناه.
+   */
+  attachments?: Array<{ filename: string; content: Buffer }>
 }): Promise<SendResult> {
-  const { to, subject, html, text, log, replyTo, senderName, bulk } = options
+  const { to, subject, html, text, log, replyTo, senderName, bulk, attachments } = options
 
   if (!isEmailConfigured()) {
     console.warn(
@@ -152,6 +181,14 @@ export async function sendEmail(options: {
         html,
         text: text ?? toPlainText(html),
         ...(replyTo ? { reply_to: replyTo } : {}),
+        ...(attachments?.length
+          ? {
+              attachments: attachments.map((a) => ({
+                filename: a.filename,
+                content: a.content.toString('base64'),
+              })),
+            }
+          : {}),
         /*
           `List-Unsubscribe-Post` اتشال قبل كده: «إلغاء بضغطة واحدة»
           بيوعد بعنوان https بيستقبل POST وإحنا مالناش، والوعد اللي

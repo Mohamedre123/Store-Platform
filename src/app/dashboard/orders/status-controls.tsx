@@ -12,6 +12,7 @@ import { ORDER_STATUSES, nextStatus, statusMeta } from '@/lib/order-status'
 import type { OrderStatus } from '@/db/schema'
 import { Button, Card, Textarea } from '@/components/ui'
 import { cn } from '@/lib/utils'
+import { ChannelPicker, useNotifyChannel } from '@/components/dashboard/channel-picker'
 
 /**
  * تغيير حالة الطلب.
@@ -32,13 +33,14 @@ export function StatusControls({
   const [pending, start] = useTransition()
   const [target, setTarget] = useState<OrderStatus | null>(null)
   const router = useRouter()
+  const [channel, setChannel] = useNotifyChannel()
 
   const next = isIncomplete ? null : nextStatus(status)
 
   function change(to: OrderStatus) {
     setTarget(to)
     start(async () => {
-      await updateOrderStatusAction(orderId, to)
+      await updateOrderStatusAction(orderId, to, channel)
       setTarget(null)
     })
   }
@@ -46,6 +48,12 @@ export function StatusControls({
   return (
     <Card className="flex flex-col gap-4 p-5">
       <h2 className="font-semibold">حالة الطلب</h2>
+
+      {/*
+        القناة قبل الأزرار مش بعدها: التاجر بيقرا اللي هيحصل قبل ما
+        يدوس — والاختيار بيفضل على أي زرار حالة يضغطه بعدها.
+      */}
+      <ChannelPicker value={channel} onChange={setChannel} />
 
       {next && (
         <Button size="lg" loading={pending && target === next} onClick={() => change(next)}>

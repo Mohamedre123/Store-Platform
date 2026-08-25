@@ -28,6 +28,7 @@ import { notifyTeam } from '@/lib/notify-team'
 import { whatsappOrderStatus } from '@/lib/order-whatsapp'
 import { after } from 'next/server'
 import type { OrderStatus } from '@/db/schema'
+import { normalizeChannel, wantsEmail, wantsWhatsapp, type NotifyChannel } from '@/lib/notify-channel'
 
 /**
  * تحوّلات حالة الطلب والشحنة — بمعزل عن جلسة التاجر.
@@ -108,7 +109,16 @@ export async function applyOrderStatus(
   orderId: string,
   status: OrderStatus,
   actor: Actor,
+  /**
+   * القناة اللي التاجر اختارها لحظة الضغط.
+   *
+   * الافتراضي «الاتنين» عن قصد: الويب هوك من بوابة الدفع وشركة
+   * الشحن بينادي نفس الدالة ومالوش تاجر يختار — والعميل ساعتها لازم
+   * يتبلّغ بكل طريق متاح.
+   */
+  channel: NotifyChannel = 'both',
 ): Promise<void> {
+  const notify = normalizeChannel(channel)
   const [order] = await db
     .select({
       id: orders.id,
@@ -354,7 +364,7 @@ export async function applyOrderStatus(
    * برّه المعاملة وبغير await: العميل لازم يتبلّغ، بس لو البريد وقع
    * الحالة تفضل متغيّرة — الحالة اتغيّرت فعلًا والمخزون اتعدّل.
    */
-  if (order.customerEmail && isEmailableStatus(status) && isEmailConfigured()) {
+  if (wantsEmail(notify) && order.customerEmail && isEmailableStatus(status) && isEmailConfigured()) {
     void (async () => {
       const theme = await getStoreTheme(store.id)
       const storeEmail = store.email
@@ -399,18 +409,20 @@ export async function applyOrderStatus(
    * بيسكت لو الواتساب مش مربوط — الحالة اتغيّرت فعلًا ومينفعش
    * إشعار يوقّعها.
    */
-  if (order.customerPhone) {
-    const notify = whatsappOrderStatus(store, {
+  if (wantsWhatsapp(notify) && order.customerPhone) {
+    const sending = whatsappOrderStatus(store, {
       orderNumber: order.orderNumber,
+      orderId: order.id,
+      customerName: order.customerName,
       phone: order.customerPhone,
       status,
       trackUrl: `${publicStoreUrl(store)}/order/${order.orderNumber}?t=${encodeURIComponent(order.recoveryToken ?? '')}`,
     }).catch((e) => console.error('فشل إرسال واتساب حالة الطلب:', e))
 
     try {
-      after(notify)
+      after(sending)
     } catch {
-      void notify
+      void sending
     }
   }
 }

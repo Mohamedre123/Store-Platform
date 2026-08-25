@@ -1,7 +1,7 @@
 import 'server-only'
 import { eq } from 'drizzle-orm'
 import { db } from '@/db'
-import { messagingSettings } from '@/db/schema'
+import { messageLog, messagingSettings } from '@/db/schema'
 import { decryptJson, encryptJson } from './crypto'
 import type { Templates } from './whatsapp-templates'
 
@@ -170,11 +170,132 @@ function e164(phone: string): string {
   return digits ? `+${digits}` : ''
 }
 
+/**
+ * قيد رسالة الواتساب في نفس سجل البريد.
+ *
+ * **الغياب ده كان بيخلّي عطل الواتساب مستحيل يتشاف.** الرسالة بتفشل
+ * (الجلسة اتفصلت، الرصيد خلص، حد الرسايل في الدقيقة على الباقة
+ * المجانية) والخطأ بيروح في `console.error` على الخادم — والتاجر
+ * قاعد قدام لوحته شايف الطلب اتأكد وفاكر إن العميل اتبلّغ.
+ *
+ * ونفس الجدول لا جدول تاني: صفحة الرسايل بتقرا منه، فالواتساب بيبان
+ * جنب البريد من غير أي شغل إضافي.
+ */
+async function record(
+  ctx: LogContext | undefined,
+  recipient: string,
+  text: string,
+  status: 'sent' | 'failed',
+  error?: string,
+) {
+  if (!ctx) return
+  try {
+    await db.insert(messageLog).values({
+      storeId: ctx.storeId,
+      channel: 'whatsapp',
+      event: ctx.event,
+      recipient,
+      body: text.slice(0, 500),
+      status,
+      provider: ctx.provider ?? 'whatsapp',
+      errorMessage: error?.slice(0, 300) ?? null,
+      orderId: ctx.orderId ?? null,
+      customerId: ctx.customerId ?? null,
+      sentAt: status === 'sent' ? new Date() : null,
+    })
+  } catch (e) {
+    console.error('فشل تسجيل رسالة واتساب:', e)
+  }
+}
+
+export type LogContext = {
+  storeId: string
+  /** نوع الرسالة: order_placed | order_shipped | cart_recovery … */
+  event: string
+  orderId?: string
+  customerId?: string
+  provider?: string
+}
+
 export async function sendWhatsapp(
   storeId: string,
   phone: string,
   text: string,
+  /** سياق التسجيل — من غيره الإرسال بيتم بس ما بيتسجّلش */
+  log?: Omit<LogContext, 'storeId'>,
 ): Promise<SendResult> {
+  const ctx: LogContext | undefined = log ? { storeId, ...log } : undefined
+
+  const to = e164(phone)
+  if (to.length < 9) {
+    await record(ctx, phone, text, 'failed', 'رقم غير صالح')
+    return { ok: false, error: 'رقم غير صالح' }
+  }
+
+  const [row] = await db
+    .select({
+      provider: messagingSettings.whatsappProvider,
+      creds: messagingSettings.whatsappCredentials,
+      phoneId: messagingSettings.whatsappPhoneId,
+    })
+    .from(messagingSettings)
+    .where(eq(messagingSettings.storeId, storeId))
+    .limit(1)
+
+  const provider = normalizeProvider(row?.provider)
+  if (provider === 'off') {
+    /*
+      «مش مربوط» ما بيتسجّلش: ده إعداد ناقص لا عطل إرسال. لو سجّلناه،
+      سجل رسايل التاجر اللي مش مستخدم واتساب أصلًا بيمتلي فشل مالوش
+      معنى، والفشل الحقيقي بيضيع وسطه.
+    */
+    return { ok: false, error: 'واتساب مش مربوط' }
+  }
+
+  const secrets = decryptJson<Secrets>(row?.creds ?? null)
+  const key = secrets?.apiKey ?? secrets?.token
+  if (!key) {
+    await record(ctx, to, text, 'failed', 'مفتاح واتساب ناقص')
+    return { ok: false, error: 'مفتاح واتساب ناقص' }
+  }
+
+  const res =
+    provider === 'wasender'
+      ? await sendViaWasender(key, to, text)
+      : await sendViaCloud(key, row?.phoneId ?? '', to, text)
+
+  await record(
+    ctx ? { ...ctx, provider } : undefined,
+    to,
+    text,
+    res.ok ? 'sent' : 'failed',
+    res.ok ? undefined : res.error,
+  )
+
+  return res
+}
+
+/**
+ * إرسال مستند (الفاتورة PDF).
+ *
+ * ## برابط مش ببايتات
+ * المزوّدين الاتنين بياخدوا رابط الملف وبيجيبوه بنفسهم. رفع الملف
+ * في الطلب معناه ميجابايت في كل رسالة على استدعاء بلا خادم، والرابط
+ * عندنا أصلًا ومحمي برمز الطلب.
+ *
+ * ## بيسكت لو المزوّد ما بيدعمش
+ * الفاتورة موجودة كرابط في رسالة التأكيد على أي حال. فشل إرسال
+ * المستند ما يصحّش يمنع الطلب ولا يقلق التاجر.
+ */
+export async function sendWhatsappDocument(
+  storeId: string,
+  phone: string,
+  documentUrl: string,
+  filename: string,
+  caption: string,
+  log?: Omit<LogContext, 'storeId'>,
+): Promise<SendResult> {
+  const ctx: LogContext | undefined = log ? { storeId, ...log } : undefined
   const to = e164(phone)
   if (to.length < 9) return { ok: false, error: 'رقم غير صالح' }
 
@@ -195,9 +316,47 @@ export async function sendWhatsapp(
   const key = secrets?.apiKey ?? secrets?.token
   if (!key) return { ok: false, error: 'مفتاح واتساب ناقص' }
 
-  return provider === 'wasender'
-    ? sendViaWasender(key, to, text)
-    : sendViaCloud(key, row?.phoneId ?? '', to, text)
+  let res: SendResult
+  try {
+    if (provider === 'wasender') {
+      const r = await fetch('https://www.wasenderapi.com/api/send-message', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to, text: caption, documentUrl, fileName: filename }),
+        signal: AbortSignal.timeout(20_000),
+      })
+      res = r.ok
+        ? { ok: true }
+        : { ok: false, error: `${r.status}: ${(await r.text()).slice(0, 200)}` }
+    } else {
+      const r = await fetch(`https://graph.facebook.com/v21.0/${row?.phoneId ?? ''}/messages`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          to: to.replace(/\D/g, ''),
+          type: 'document',
+          document: { link: documentUrl, filename, caption },
+        }),
+        signal: AbortSignal.timeout(20_000),
+      })
+      res = r.ok
+        ? { ok: true }
+        : { ok: false, error: `${r.status}: ${(await r.text()).slice(0, 200)}` }
+    }
+  } catch (e) {
+    res = { ok: false, error: e instanceof Error ? e.message : 'فشل الاتصال' }
+  }
+
+  await record(
+    ctx ? { ...ctx, provider } : undefined,
+    to,
+    `[مستند] ${filename}`,
+    res.ok ? 'sent' : 'failed',
+    res.ok ? undefined : res.error,
+  )
+
+  return res
 }
 
 /** البوابة السهلة — رقم عادي مربوط بمسح كود */
