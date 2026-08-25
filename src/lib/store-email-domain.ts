@@ -258,6 +258,32 @@ export async function removeEmailDomain(storeId: string): Promise<void> {
 }
 
 /**
+ * بيحاول يوثّق النطاق لوحده لو لسه معلّق.
+ *
+ * **التاجر ما يصحّش يدوس زرار «تحقّق».** هو ضاف السجلات خلاص؛
+ * الانتشار بياخد وقت، وإحنا اللي المفروض نشوف امتى خلص. الدالة دي
+ * بتتنادى في الخلفية لما يفتح لوحته، وبتسكت لو مفيش حاجة تتعمل.
+ *
+ * بتتخطّى نفسها لو النطاق موثّق خلاص أو لسه ما اتسجّلش — عشان ما
+ * نستهلكش حصّة المزوّد على حاجة ما اتغيّرتش.
+ */
+export async function autoVerifyEmailDomain(storeId: string): Promise<void> {
+  const [store] = await db
+    .select({ id: stores.emailDomainId, status: stores.emailDomainStatus })
+    .from(stores)
+    .where(eq(stores.id, storeId))
+    .limit(1)
+
+  if (!store?.id || store.status === 'verified') return
+
+  try {
+    await refreshEmailDomain(storeId)
+  } catch (e) {
+    console.error('فشل التحقق التلقائي من نطاق البريد:', e)
+  }
+}
+
+/**
  * عنوان الإرسال بتاع المتجر — لو نطاقه موثّق.
  *
  * بيرجّع `null` لو لسه ما وثّقش، والإرسال بيرجع لنطاق المنصة.

@@ -1,6 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { after } from 'next/server'
+import { startEmailDomain } from '@/lib/store-email-domain'
 import { and, eq, ne } from 'drizzle-orm'
 import { db } from '@/db'
 import { stores } from '@/db/schema'
@@ -64,7 +66,26 @@ export async function verifyDomainAction(): Promise<DomainState> {
       .update(stores)
       .set({ customDomainVerifiedAt: new Date() })
       .where(eq(stores.id, store.id))
+
+    /**
+     * البريد بيتظبط لوحده مع النطاق — من غير أي خطوة زيادة.
+     *
+     * **التاجر ما يصحّش يتعلّم إن فيه صفحة تانية لازم يفتحها.** هو
+     * وثّق نطاقه خلاص، والبريد جزء من نطاقه زي الموقع بالظبط. فبنسجّل
+     * `mail.<نطاقه>` عند مزوّد البريد في نفس اللحظة، والسجلات بتظهر
+     * له في صفحة النطاق مع باقي سجلاته.
+     *
+     * ولو فشل، النطاق بيفضل موثّقًا للموقع والبريد بيكمّل من نطاق
+     * المنصة — عطل في البريد ما يصحّش يمنع متجره من الاشتغال.
+     */
+    after(
+      startEmailDomain(store.id, store.customDomain).catch((e) =>
+        console.error('فشل تجهيز بريد النطاق:', e),
+      ),
+    )
+
     revalidatePath('/dashboard/settings/domain')
+    revalidatePath('/dashboard/settings/email')
     return { verified: true, notice: result.message }
   }
 

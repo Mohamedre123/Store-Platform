@@ -106,18 +106,39 @@ export async function issueCustomerOtp(input: {
     }
   }
 
-  /* البريد اللي هنبعت عليه لو الوسيلة رقم: بريد الحساب المسجّل */
-  let emailTarget: string | null =
-    input.identity.kind === 'email' ? input.identity.value : null
+  /**
+   * الوسيلة التانية من حساب العميل.
+   *
+   * ## ليه الاتنين مش واحدة
+   * العميل بيدخل برقمه أو ببريده، بس حسابه غالبًا فيه الاتنين
+   * (الطلب بيسجّلهم). فلو دخل ببريده وعنده رقم، **الواتساب أسرع
+   * وأضمن** — بيتفتح في ثانية، وما بيدخلش سبام.
+   *
+   * ودي مش رفاهية: البريد من نطاق جديد بيروح السبام حتى وهو
+   * مصادَق عليه بالكامل (SPF وDKIM وDMARC كلهم PASS). والعميل اللي
+   * ما وصلهوش الرمز ما بيدخلش، واللي ما بيدخلش ما بيشتريش.
+   */
+  const other = await db
+    .select({ phone: customers.phone, email: customers.email })
+    .from(customers)
+    .where(
+      and(
+        eq(customers.storeId, input.storeId),
+        input.identity.kind === 'phone'
+          ? eq(customers.phone, input.identity.value)
+          : eq(customers.email, input.identity.value),
+      ),
+    )
+    .limit(1)
 
-  if (input.identity.kind === 'phone') {
-    const [existing] = await db
-      .select({ email: customers.email })
-      .from(customers)
-      .where(and(eq(customers.storeId, input.storeId), eq(customers.phone, input.identity.value)))
-      .limit(1)
-    emailTarget = existing?.email ?? null
-  }
+  const account = other[0]
+
+  const emailTarget: string | null =
+    input.identity.kind === 'email' ? input.identity.value : (account?.email ?? null)
+
+  /* الرقم اللي هنبعت عليه واتساب — المكتوب أو اللي على حسابه */
+  const phoneTarget: string | null =
+    input.identity.kind === 'phone' ? input.identity.value : (account?.phone ?? null)
 
   const code = generateOtp(CODE_LENGTH)
   const dev = process.env.NODE_ENV === 'development'
@@ -144,7 +165,21 @@ export async function issueCustomerOtp(input: {
 
   let channel: Channel | null = null
 
-  if (input.identity.kind === 'phone') {
+  /**
+   * الواتساب الأول دايمًا — حتى لو العميل دخل ببريده.
+   *
+   * **البريد بيروح السبام حتى وهو مصادَق عليه بالكامل.** اتأكدنا من
+   * ترويسة رسالة حقيقية: SPF نجح، وDKIM نجح، وDMARC نجح — وراحت
+   * السبام برضو. السبب سمعة النطاق الجديد، ودي بتتبني بالوقت لا
+   * بالكود.
+   *
+   * والواتساب بيوصل في ثانية ومفيهوش سبام أصلًا. فطالما معانا رقم
+   * العميل والمتجر مربوط، الرمز بيروح عليه — والبريد بيبقى الاحتياطي.
+   *
+   * ده مش تحايل على المشكلة: ده الطريق اللي فعلًا بيوصل في السوق
+   * اللي بنشتغل فيه.
+   */
+  if (phoneTarget) {
     /*
       الرسالة باسم المتجر لا باسمنا: العميل بيشتري من التاجر ومش
       عارفنا، ورمز جاي من اسم غريب ما بيتكتبش.
@@ -152,23 +187,21 @@ export async function issueCustomerOtp(input: {
     const templates = await readTemplates(input.storeId)
     const wa = await sendWhatsapp(
       input.storeId,
-      input.identity.value,
+      phoneTarget,
       fillTemplate(templateFor(templates, 'otp'), {
         اسم_المتجر: input.brand.name,
         كود: code,
         دقايق: String(TTL),
       }),
+      { event: 'customer_login_otp' },
     )
     if (wa.ok) channel = 'whatsapp'
   }
 
   /*
-    البريد للي كتب بريده بس.
-
-    اللي كتب رقمه ومتجره مش مربوط بواتساب لازم يعرف كده صراحةً،
-    مش ياخد رمزًا في مكان تاني من غير ما حد يقوله.
+    البريد احتياطي: لما الواتساب مش مربوط، أو مفيش رقم على الحساب.
   */
-  if (!channel && input.identity.kind === 'email' && emailTarget && isEmailConfigured()) {
+  if (!channel && emailTarget && isEmailConfigured()) {
     const mail = customerCodeEmail(input.brand, code, TTL)
     const sent = await sendEmail({
       to: emailTarget,
@@ -194,8 +227,13 @@ export async function issueCustomerOtp(input: {
   return {
     ok: true,
     channel: channel ?? 'email',
+    /* اللي اتبعت عليه فعلًا — مش اللي العميل كتبه */
     masked: mask(
-      channel === 'email' && emailTarget ? { kind: 'email', value: emailTarget } : input.identity,
+      channel === 'email' && emailTarget
+        ? { kind: 'email', value: emailTarget }
+        : channel === 'whatsapp' && phoneTarget
+          ? { kind: 'phone', value: phoneTarget }
+          : input.identity,
     ),
     devCode: dev ? code : undefined,
   }

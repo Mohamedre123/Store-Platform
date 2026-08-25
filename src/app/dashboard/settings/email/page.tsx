@@ -1,4 +1,7 @@
 import { PageHeader } from '@/components/dashboard/page-shell'
+import { after } from 'next/server'
+import { autoVerifyEmailDomain } from '@/lib/store-email-domain'
+import { getDashboardContext } from '@/lib/store-context'
 import { emailDiagnosticsAction } from './actions'
 import { EmailPanel } from './email-panel'
 
@@ -15,6 +18,14 @@ export const metadata = { title: 'بريد المتجر' }
  * الصفحة دي بتوري اللي بيحصل فعلًا وبتخلّي التاجر يجرّب بنفسه.
  */
 export default async function EmailSettingsPage() {
+  const { store } = await getDashboardContext()
+
+  /*
+    التحقق بيحصل لوحده في الخلفية: التاجر ضاف السجلات خلاص، وإحنا
+    اللي المفروض نشوف امتى انتشرت — مش هو اللي يقعد يدوس «تحقّق».
+  */
+  after(autoVerifyEmailDomain(store.id))
+
   const diagnostics = await emailDiagnosticsAction()
 
   return (
