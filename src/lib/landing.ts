@@ -142,6 +142,21 @@ export type LandingTokens = {
   font: 'plex' | 'cairo' | 'tajawal' | 'almarai' | 'system'
   /** عرض المحتوى — الصفحة الضيّقة بتركّز الانتباه */
   width: 'narrow' | 'normal' | 'wide'
+  /**
+   * حركة ظهور الأقسام مع التمرير.
+   *
+   * **مفتاح واحد للصفحة كلها عن قصد.** لو كل بلوك ليه حركته، الصفحة
+   * بتبقى كرنفال: كل قسم داخل بشكل مختلف والعين ما بتستقرّش. الصفحات
+   * اللي بتبيع بتستخدم حركة واحدة متكرّرة — التكرار هو اللي بيخلّي
+   * الحركة تبان مقصودة مش عشوائية.
+   */
+  animation: 'none' | 'fade' | 'rise' | 'zoom' | 'slide' | 'blur'
+  /** سرعة الحركة */
+  animationSpeed: 'slow' | 'normal' | 'fast'
+  /** تنفّس الأقسام — المسافة الرأسية بينها */
+  spacing: 'tight' | 'normal' | 'roomy'
+  /** حدّة الظلال على البطاقات */
+  shadow: 'none' | 'soft' | 'strong'
 }
 
 export const DEFAULT_TOKENS: LandingTokens = {
@@ -152,6 +167,10 @@ export const DEFAULT_TOKENS: LandingTokens = {
   radius: 'md',
   font: 'plex',
   width: 'normal',
+  animation: 'rise',
+  animationSpeed: 'normal',
+  spacing: 'normal',
+  shadow: 'soft',
 }
 
 export function mergeTokens(saved: Record<string, unknown> | null | undefined): LandingTokens {
@@ -163,6 +182,35 @@ export const WIDTH_PX: Record<LandingTokens['width'], string> = {
   narrow: '42rem',
   normal: '56rem',
   wide: '72rem',
+}
+
+/** أسماء الحركات زي ما التاجر بيشوفها في الأزرار */
+export const ANIMATIONS: Array<{ key: LandingTokens['animation']; label: string; hint: string }> = [
+  { key: 'none', label: 'بدون', hint: 'الأقسام تظهر على طول' },
+  { key: 'fade', label: 'ظهور', hint: 'تدرّج هادي — الأخفّ والأأمن' },
+  { key: 'rise', label: 'طلوع', hint: 'بيطلع من تحت مع الظهور' },
+  { key: 'slide', label: 'انزلاق', hint: 'بيدخل من الجنب' },
+  { key: 'zoom', label: 'تقريب', hint: 'بيكبر شوية وهو داخل' },
+  { key: 'blur', label: 'وضوح', hint: 'بيبان من ضبابية' },
+]
+
+export const SPEED_MS: Record<LandingTokens['animationSpeed'], number> = {
+  slow: 900,
+  normal: 600,
+  fast: 350,
+}
+
+/** المسافة الرأسية بين الأقسام */
+export const SPACING_PX: Record<LandingTokens['spacing'], string> = {
+  tight: '2rem',
+  normal: '3.5rem',
+  roomy: '5.5rem',
+}
+
+export const SHADOWS: Record<LandingTokens['shadow'], string> = {
+  none: 'none',
+  soft: '0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px -12px rgb(0 0 0 / 0.12)',
+  strong: '0 2px 4px rgb(0 0 0 / 0.06), 0 18px 40px -16px rgb(0 0 0 / 0.25)',
 }
 
 /** قوالب جاهزة — التاجر يبدأ من واحد بدل صفحة بيضا */

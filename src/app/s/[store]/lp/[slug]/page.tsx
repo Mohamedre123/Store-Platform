@@ -5,11 +5,12 @@ import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { funnels, productVariants, products } from '@/db/schema'
 import { getStore } from '@/lib/storefront'
-import { mergeTokens, WIDTH_PX, type Block } from '@/lib/landing'
+import { mergeTokens, SHADOWS, SPACING_PX, SPEED_MS, WIDTH_PX, type Block } from '@/lib/landing'
 import { FONT_STACKS, RADIUS_PX } from '@/lib/customization'
 import { CartProvider } from '@/components/storefront/cart'
 import { StoreLinkProvider } from '@/components/storefront/store-link'
 import { LandingBlock, type LandingProduct } from '@/components/storefront/landing-blocks'
+import { LandingReveal, RevealFallback } from '@/components/storefront/landing-reveal'
 
 export const dynamic = 'force-dynamic'
 
@@ -120,6 +121,8 @@ export default async function LandingPage({
     '--lp-surface': tokens.surface,
     '--lp-text': tokens.text,
     '--lp-radius': RADIUS_PX[tokens.radius],
+    '--lp-gap': SPACING_PX[tokens.spacing],
+    '--lp-shadow': SHADOWS[tokens.shadow],
     fontFamily: FONT_STACKS[tokens.font],
     background: tokens.background,
     color: tokens.text,
@@ -133,17 +136,24 @@ export default async function LandingPage({
       <CartProvider storeSlug={store.slug} storeIdentifier={identifier}>
         <div style={vars} className="min-h-screen-safe">
           <div className="mx-auto px-4 sm:px-6" style={{ maxWidth: WIDTH_PX[tokens.width] }}>
+            <RevealFallback />
             {blocks.length === 0 ? (
               <p className="py-24 text-center opacity-60">الصفحة دي لسه فاضية.</p>
             ) : (
-              blocks.map((b) => (
-                <LandingBlock
+              blocks.map((b, i) => (
+                <LandingReveal
                   key={b.id}
-                  block={b}
-                  product={product}
-                  currency={store.currency}
-                  storeIdentifier={identifier}
-                />
+                  animation={tokens.animation}
+                  durationMs={SPEED_MS[tokens.animationSpeed]}
+                  index={i}
+                >
+                  <LandingBlock
+                    block={b}
+                    product={product}
+                    currency={store.currency}
+                    storeIdentifier={identifier}
+                  />
+                </LandingReveal>
               ))
             )}
           </div>

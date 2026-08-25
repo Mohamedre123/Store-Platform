@@ -171,3 +171,53 @@ export async function dismissIncompleteAction(orderId: string) {
 
   revalidatePath('/dashboard/orders')
 }
+
+/**
+ * مسح الطلب نهائيًا — من اللوحة ومن حساب العميل.
+ *
+ * ## ليه موجود أصلًا وفيه «ملغي»
+ * «ملغي» بيسيب الطلب ظاهرًا للعميل في حسابه بحالة ملغية، وده الصح
+ * في أغلب الحالات — العميل ليه حق يشوف إن طلبه اتلغى ويعرف امتى.
+ *
+ * لكن فيه حالات الطلب نفسه مش المفروض يكون موجود: طلب تجريبي التاجر
+ * عمله وهو بيجرّب المتجر، طلب اتسجّل مرتين بالغلط، أو طلب العميل
+ * نفسه طالب إن أثره يتشال. سيبانه ملغي في حساب العميل بيخلّيه يفتكر
+ * إنه اشترى ورجّع، وبيلوّث سجله.
+ *
+ * ## المخزون بيرجع
+ * لو الطلب كان لسه محسوبًا على المخزون، المسح من غير ترجيع بيسيب
+ * الكمية ناقصة **للأبد** ومن غير أي أثر يشرح ليه — بحركة مخزون
+ * مالهاش طلب تشاور عليه. فبنمرّ بـ«ملغي» الأول: ده بيرجّع المخزون
+ * ويسجّل الحركة ويصحّح عدد المبيعات، وبعدين نمسح.
+ *
+ * الحركة بتفضل في سجل المخزون بعد ما الطلب يتمسح — وده مقصود: الكمية
+ * اتحرّكت فعلًا، وسجل المخزون لازم يفضل متّزنًا.
+ */
+export async function deleteOrderAction(
+  orderId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { store, user } = await getDashboardContext()
+
+  const [order] = await db
+    .select({ id: orders.id, status: orders.status, isIncomplete: orders.isIncomplete })
+    .from(orders)
+    .where(and(eq(orders.id, orderId), eq(orders.storeId, store.id)))
+    .limit(1)
+
+  if (!order) return { ok: false, error: 'الطلب مش موجود' }
+
+  /*
+    الإلغاء الأول عشان المخزون يرجع وحركته تتسجّل. الطلب الناقص
+    والملغي والمرتجع ما اتخصمش منهم أصلًا، فبيتمسحوا على طول.
+  */
+  const counted = !['cancelled', 'returned', 'incomplete'].includes(order.status)
+  if (counted && !order.isIncomplete) {
+    /* بلا إشعار: مالوش معنى نبلّغ العميل بإلغاء طلب هيتمسح بعده بثانية */
+    await applyOrderStatus(store, orderId, 'cancelled', { type: 'merchant', userId: user.id }, 'none')
+  }
+
+  await db.delete(orders).where(and(eq(orders.id, orderId), eq(orders.storeId, store.id)))
+
+  revalidatePath('/dashboard/orders')
+  return { ok: true }
+}

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { saveLandingAction } from '../actions'
 import {
+  ANIMATIONS,
   BLOCK_LIBRARY,
   DEFAULT_TOKENS,
   blockDef,
@@ -38,6 +39,24 @@ const WIDTHS = [
   { value: 'narrow' as const, label: 'ضيّقة' },
   { value: 'normal' as const, label: 'عادية' },
   { value: 'wide' as const, label: 'واسعة' },
+]
+
+const SPEEDS = [
+  { value: 'slow' as const, label: 'هادية' },
+  { value: 'normal' as const, label: 'عادية' },
+  { value: 'fast' as const, label: 'سريعة' },
+]
+
+const SPACINGS = [
+  { value: 'tight' as const, label: 'مضغوطة' },
+  { value: 'normal' as const, label: 'عادية' },
+  { value: 'roomy' as const, label: 'واسعة' },
+]
+
+const SHADOW_OPTS = [
+  { value: 'none' as const, label: 'بدون' },
+  { value: 'soft' as const, label: 'خفيفة' },
+  { value: 'strong' as const, label: 'قوية' },
 ]
 
 const SWATCHES = ['#634b9a', '#0f4c81', '#15803d', '#b3341f', '#c9a227', '#0d9488', '#1b1b1f']
@@ -427,6 +446,103 @@ export function LandingEditor({
                         )}
                       >
                         {r.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/*
+                  الحركة.
+
+                  أزرار لا قايمة منسدلة: التاجر بيجرّب الحركات واحدة
+                  ورا التانية والمعاينة جنبه بتتحدّث — والقايمة
+                  المنسدلة بتخلّي كل تجربة تلات ضغطات بدل واحدة.
+                */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-sm font-medium">حركة ظهور الأقسام</span>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {ANIMATIONS.map((a) => (
+                      <button
+                        key={a.key}
+                        type="button"
+                        title={a.hint}
+                        onClick={() => setTokens({ ...tokens, animation: a.key })}
+                        className={cn(
+                          'min-h-9 rounded-lg border text-xs font-medium',
+                          tokens.animation === a.key
+                            ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]'
+                            : 'border-[var(--border-strong)] text-[var(--fg-muted)]',
+                        )}
+                      >
+                        {a.label}
+                      </button>
+                    ))}
+                  </div>
+                  <span className="text-xs text-[var(--fg-subtle)]">
+                    {ANIMATIONS.find((a) => a.key === tokens.animation)?.hint}
+                  </span>
+                </div>
+
+                {tokens.animation !== 'none' && (
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-sm font-medium">سرعة الحركة</span>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {SPEEDS.map((x) => (
+                        <button
+                          key={x.value}
+                          type="button"
+                          onClick={() => setTokens({ ...tokens, animationSpeed: x.value })}
+                          className={cn(
+                            'min-h-9 rounded-lg border text-xs font-medium',
+                            tokens.animationSpeed === x.value
+                              ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]'
+                              : 'border-[var(--border-strong)] text-[var(--fg-muted)]',
+                          )}
+                        >
+                          {x.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-sm font-medium">تنفّس الأقسام</span>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {SPACINGS.map((x) => (
+                      <button
+                        key={x.value}
+                        type="button"
+                        onClick={() => setTokens({ ...tokens, spacing: x.value })}
+                        className={cn(
+                          'min-h-9 rounded-lg border text-xs font-medium',
+                          tokens.spacing === x.value
+                            ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]'
+                            : 'border-[var(--border-strong)] text-[var(--fg-muted)]',
+                        )}
+                      >
+                        {x.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-sm font-medium">ظلال البطاقات</span>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {SHADOW_OPTS.map((x) => (
+                      <button
+                        key={x.value}
+                        type="button"
+                        onClick={() => setTokens({ ...tokens, shadow: x.value })}
+                        className={cn(
+                          'min-h-9 rounded-lg border text-xs font-medium',
+                          tokens.shadow === x.value
+                            ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]'
+                            : 'border-[var(--border-strong)] text-[var(--fg-muted)]',
+                        )}
+                      >
+                        {x.label}
                       </button>
                     ))}
                   </div>

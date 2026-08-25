@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowLeft, Check, Loader2, MessageSquarePlus, Trash2 } from 'lucide-react'
 import {
   addOrderNoteAction,
+  deleteOrderAction,
   dismissIncompleteAction,
   updateOrderStatusAction,
 } from './actions'
@@ -95,7 +96,7 @@ export function StatusControls({
         الإلغاء والإرجاع بيرجّعوا الكمية للمخزون تلقائيًا.
       </p>
 
-      {isIncomplete && (
+      {isIncomplete ? (
         <Button
           variant="ghost"
           className="text-[var(--color-danger)]"
@@ -109,6 +110,43 @@ export function StatusControls({
         >
           <Trash2 className="h-4 w-4" aria-hidden="true" />
           تجاهل السلة دي
+        </Button>
+      ) : (
+        /*
+          المسح النهائي غير الإلغاء.
+
+          «ملغي» بيسيب الطلب في حساب العميل بحالة ملغية — وده الصح
+          في أغلب الحالات، العميل ليه حق يشوف اللي حصل. المسح للحالات
+          اللي الطلب نفسه مش المفروض يكون موجود: تجربة التاجر، تسجيل
+          مكرّر، أو العميل طالب إن أثره يتشال.
+
+          التحذير بيقول **بالظبط** إيه اللي هيحصل: الإلغاء بيرجّع
+          المخزون قبل المسح، والطلب بيختفي من حساب العميل كمان — ودي
+          حاجة التاجر بيفتكرها بتحصل في لوحته بس.
+        */
+        <Button
+          variant="ghost"
+          className="text-[var(--color-danger)]"
+          onClick={() => {
+            if (
+              !confirm(
+                'هيتمسح الطلب نهائيًا — من لوحتك ومن حساب العميل في المتجر، ومفيش رجوع.\n\n' +
+                  'المخزون هيرجع مكانه أوتوماتيك.\n\n' +
+                  'لو عايز تلغيه بس والعميل يفضل شايفه، اقفل ودوس «ملغي».\n\n' +
+                  'تمسحه؟',
+              )
+            ) {
+              return
+            }
+            start(async () => {
+              const res = await deleteOrderAction(orderId)
+              if (res.ok) router.push('/dashboard/orders')
+              else alert(res.error)
+            })
+          }}
+        >
+          <Trash2 className="h-4 w-4" aria-hidden="true" />
+          امسح الطلب نهائيًا
         </Button>
       )}
     </Card>
