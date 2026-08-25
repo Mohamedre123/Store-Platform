@@ -1,16 +1,19 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { notFound } from 'next/navigation'
-import { and, asc, eq } from 'drizzle-orm'
-import { ArrowRight, MapPin, MessageCircle, Phone, StickyNote, User } from 'lucide-react'
+import { and, asc, eq, inArray } from 'drizzle-orm'
+import { AlertTriangle, ArrowRight, MapPin, MessageCircle, Phone, StickyNote, User } from 'lucide-react'
 import { db } from '@/db'
-import { orderEvents, orderItems, orders } from '@/db/schema'
+import { orderEvents, orderItems, orders, productVariants } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { formatMoney, formatDateTime } from '@/lib/utils'
 import { statusMeta } from '@/lib/order-status'
+import { stageMeta } from '@/lib/checkout-stage'
+import { publicStoreUrl } from '@/lib/domain'
 import { Card } from '@/components/ui'
 import { Reveal } from '@/components/motion'
 import { OrderNote, StatusControls } from '../status-controls'
+import { IncompleteActions } from '../incomplete-actions'
 
 export const metadata = { title: 'تفاصيل الطلب' }
 
@@ -34,6 +37,30 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       .where(eq(orderEvents.orderId, order.id))
       .orderBy(asc(orderEvents.createdAt)),
   ])
+
+  /**
+   * البنود اللي لسه محتاجة مقاس أو لون.
+   *
+   * السلة المتروكة بتتحفظ حتى لو العميل ما اختارش، عشان ده بالظبط
+   * اللي التاجر محتاج يعرفه. بنعرفه بالسؤال: المنتج ده ليه متغيّرات
+   * نشطة والسطر جاي من غير واحد؟ استعلام واحد وللسلات الناقصة بس.
+   */
+  const bareIds = items.filter((i) => !i.variantId).map((i) => i.productId!).filter(Boolean)
+  const needsOptionIds = new Set<string>()
+
+  if (order.isIncomplete && bareIds.length) {
+    const rows = await db
+      .selectDistinct({ productId: productVariants.productId })
+      .from(productVariants)
+      .where(
+        and(
+          eq(productVariants.storeId, store.id),
+          eq(productVariants.isActive, true),
+          inArray(productVariants.productId, bareIds),
+        ),
+      )
+    for (const r of rows) needsOptionIds.add(r.productId)
+  }
 
   const meta = statusMeta(order.isIncomplete ? 'incomplete' : order.status)
   const address = order.shippingAddress
@@ -72,10 +99,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         <Reveal delay={40}>
           <Card className="border-[var(--color-warning)] bg-[var(--color-warning-soft)] p-4">
             <p className="text-sm font-semibold text-[var(--color-warning)]">
-              العميل كتب رقمه وما كمّلش الطلب
+              وقف عند: {stageMeta(order.checkoutStage).label}
             </p>
             <p className="mt-1 text-sm text-[var(--fg-muted)]">
-              اتحفظ لحظة ما كتب رقمه في الشيك أوت. كلّمه — دي فلوس على وشك تضيع.
+              {stageMeta(order.checkoutStage).detail} كلّمه من الرسالة الجاهزة على اليمين — دي فلوس
+              على وشك تضيع.
             </p>
           </Card>
         </Reveal>
@@ -91,13 +119,41 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               </div>
               <ul className="divide-y divide-[var(--border)]">
                 {items.map((i) => (
-                  <li key={i.id} className="flex items-center gap-3 p-4">
+                  <li key={i.id} className="flex items-start gap-3 p-4">
                     <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-[var(--surface-2)]">
                       {i.image && <Image src={i.image} alt="" fill sizes="56px" className="object-cover" />}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium">{i.name}</span>
-                      <span className="tabular text-xs text-[var(--fg-subtle)]">
+                      <span className="block text-sm font-medium leading-snug">{i.name}</span>
+
+                      {/*
+                        الخيارات مفكوكة تحت الاسم.
+
+                        اللي بيغلّف الطلب بيدوّر على «المقاس: XL» — مش
+                        على جزء من سطر اسم مدموج. والاسم لوحده كان
+                        بيخلّيه يفتح المنتج عشان يتأكد.
+                      */}
+                      {i.options.length > 0 && (
+                        <span className="mt-1 flex flex-wrap gap-1">
+                          {i.options.map((o) => (
+                            <span
+                              key={`${o.name}-${o.value}`}
+                              className="rounded-md bg-[var(--surface-2)] px-1.5 py-0.5 text-[11px] text-[var(--fg-muted)]"
+                            >
+                              {o.name}: <span className="font-medium text-[var(--fg)]">{o.value}</span>
+                            </span>
+                          ))}
+                        </span>
+                      )}
+
+                      {i.productId && needsOptionIds.has(i.productId) && (
+                        <span className="mt-1 flex items-center gap-1 text-[11px] font-medium text-[var(--color-warning)]">
+                          <AlertTriangle className="h-3 w-3" aria-hidden="true" />
+                          لسه ما اختارش المقاس أو اللون
+                        </span>
+                      )}
+
+                      <span className="tabular mt-1 block text-xs text-[var(--fg-subtle)]">
                         {formatMoney(i.price, order.currency)} × {i.quantity}
                       </span>
                     </span>
@@ -148,22 +204,42 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           <Reveal delay={100}>
             <Card className="flex flex-col gap-4 p-5">
               <h2 className="font-semibold">المسار الزمني</h2>
-              <ol className="flex flex-col gap-3">
-                {events.map((e) => (
-                  <li key={e.id} className="flex gap-3">
-                    <span
-                      className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[var(--primary)]"
-                      aria-hidden="true"
-                    />
-                    <span className="flex-1">
-                      <span className="block text-sm">{e.message}</span>
-                      <span className="block text-xs text-[var(--fg-subtle)]">
-                        {formatDateTime(e.createdAt)}
+
+              {events.length === 0 ? (
+                /*
+                  السلات اللي اتحفظت قبل تتبّع المراحل مالهاش أحداث.
+                  المسار الفاضي من غير كلمة بيبان عطلًا — والتاجر
+                  بيفتكر إن حاجة باظت مش إن السجل قديم.
+                */
+                <p className="text-sm text-[var(--fg-subtle)]">
+                  مفيش خطوات متسجّلة على الطلب ده.
+                </p>
+              ) : (
+                <ol className="flex flex-col gap-3">
+                  {events.map((e) => (
+                    <li key={e.id} className="flex gap-3">
+                      <span
+                        className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
+                        style={{
+                          background:
+                            e.type === 'stage'
+                              ? 'var(--color-warning)'
+                              : e.type === 'message_sent'
+                                ? 'var(--color-success)'
+                                : 'var(--primary)',
+                        }}
+                        aria-hidden="true"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm leading-snug">{e.message}</span>
+                        <span className="block text-xs text-[var(--fg-subtle)]">
+                          {formatDateTime(e.createdAt)}
+                        </span>
                       </span>
-                    </span>
-                  </li>
-                ))}
-              </ol>
+                    </li>
+                  ))}
+                </ol>
+              )}
               <OrderNote orderId={order.id} />
             </Card>
           </Reveal>
@@ -172,7 +248,29 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         {/* الجانب */}
         <div className="flex flex-col gap-6">
           <Reveal delay={80}>
-            <StatusControls orderId={order.id} status={order.status} isIncomplete={order.isIncomplete} />
+            {/*
+              السلة المتروكة مالهاش حالة تتغيّر — ليها عميل يتكلّم.
+              الأزرار السبعة اللي كانت هنا كانت بتشغل مكان الحاجة
+              الوحيدة المفيدة في الشاشة دي.
+            */}
+            {order.isIncomplete ? (
+              <IncompleteActions
+                orderId={order.id}
+                stage={order.checkoutStage}
+                phone={order.customerPhone}
+                context={{
+                  storeName: store.name,
+                  customerName: order.customerName,
+                  productName: items[0]?.name ?? null,
+                  itemCount: items.length,
+                  total: formatMoney(order.total, order.currency),
+                  resumeUrl: `${publicStoreUrl(store)}/checkout?resume=${encodeURIComponent(order.recoveryToken ?? '')}`,
+                  missingOptions: needsOptionIds.size > 0,
+                }}
+              />
+            ) : (
+              <StatusControls orderId={order.id} status={order.status} isIncomplete={false} />
+            )}
           </Reveal>
 
           <Reveal delay={120}>

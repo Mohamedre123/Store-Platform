@@ -29,7 +29,14 @@ export type CartItem = {
 
 type CartContext = {
   items: CartItem[]
-  add: (item: Omit<CartItem, 'quantity'>, quantity?: number) => void
+  /**
+   * `silent` بيضيف من غير ما يفتح الدرج.
+   *
+   * الدرج بيتفتح عشان يأكّد للعميل إن الإضافة تمّت — بس ده صح لما
+   * هو اللي ضغط. استرجاع السلة من رابط تذكيرة بيضيف بنودًا هو مش
+   * طالبها دلوقتي، والدرج بيقع فوق الشيك أوت اللي جه عشانه.
+   */
+  add: (item: Omit<CartItem, 'quantity'>, quantity?: number, silent?: boolean) => void
   remove: (productId: string, variantId?: string) => void
   setQuantity: (productId: string, quantity: number, variantId?: string) => void
   clear: () => void
@@ -161,7 +168,7 @@ export function CartProvider({
       */
       needsOptions: items.some((i) => !i.variantId && pendingOptions[i.productId]),
 
-      add(item, quantity = 1) {
+      add(item, quantity = 1, silent = false) {
         setItems((prev) => {
           const existing = prev.find((p) => sameLine(p, item.productId, item.variantId))
           if (existing) {
@@ -173,12 +180,18 @@ export function CartProvider({
           }
           return [...prev, { ...item, quantity }]
         })
-        // القُمع محتاج يعرف كام واحد ضاف فعلًا مقابل كام واحد شاف
-        if (track) trackEvent(storeIdentifier, 'add_to_cart', undefined, item.productId)
+        /*
+          الاسترجاع مش «إضافة» في القياس.
+
+          العميل ما ضافش حاجة دلوقتي — إحنا رجّعنا سلّته. تسجيله
+          كـ`add_to_cart` بيضخّم قُمع الإضافة بأحداث محدّش عملها،
+          ونسبة التحويل بتبان أوطى من الحقيقة.
+        */
+        if (track && !silent) trackEvent(storeIdentifier, 'add_to_cart', undefined, item.productId)
 
         // في وضع الصفحة مفيش درج يفتح — الزرار نفسه بيأكّد الإضافة،
         // ونقل العميل لصفحة السلة مع كل إضافة كان هيقطع تصفّحه
-        if (mode === 'drawer') setOpen(true)
+        if (mode === 'drawer' && !silent) setOpen(true)
       },
 
       remove(productId, variantId) {

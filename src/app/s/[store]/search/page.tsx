@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { Search } from 'lucide-react'
 import { getStore, getStoreTheme, listingGrid, searchProducts } from '@/lib/storefront'
 import { ProductCard } from '@/components/storefront/product-card'
+import { loadProductOptions } from '@/lib/product-options'
 import { SearchBox } from '@/components/storefront/search-box'
 
 export const dynamic = 'force-dynamic'
@@ -25,6 +26,12 @@ export default async function SearchPage({
   const { listing } = theme.custom
 
   const results = q ? await searchProducts(store.id, q, listing.perPage || 40) : []
+
+  /* خيارات نتائج البحث — عشان العميل يختار مقاسه من غير ما يفتح المنتج */
+  const optionSets = await loadProductOptions(
+    store.id,
+    results.map((p) => p.id),
+  )
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
@@ -54,6 +61,8 @@ export default async function SearchPage({
             {results.map((p) => (
               <ProductCard
                 key={p.id}
+                optionSet={optionSets.get(p.id)}
+                action="choose"
                 product={p}
                 currency={store.currency}
                 style={listing.cardStyle}

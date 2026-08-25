@@ -4,6 +4,7 @@ import { Package } from 'lucide-react'
 import { getStore, getStoreTheme, listCategories, listProducts, listingGrid } from '@/lib/storefront'
 import { parseSort } from '@/lib/sort-options'
 import { ProductCard } from '@/components/storefront/product-card'
+import { loadProductOptions } from '@/lib/product-options'
 import { ListingControls } from '@/components/storefront/listing-controls'
 
 export const dynamic = 'force-dynamic'
@@ -30,6 +31,18 @@ export default async function ProductsPage({
     listing.showCategoryFilter ? listCategories(store.id) : Promise.resolve([]),
   ])
 
+  /*
+    خيارات المنتجات المعروضة — استعلام واحد للصفحة كلها.
+
+    من غيرها العميل بيضيف تيشيرت بلا مقاس من هنا، ويكتشف إنه لازم
+    يختار بعد ما يوصل السلة. المنتج البسيط ما بيرجّعش حاجة، فالصفحة
+    اللي مالهاش خيارات ما بتدفعش تمن حاجة.
+  */
+  const optionSets = await loadProductOptions(
+    store.id,
+    items.map((p) => p.id),
+  )
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
       <h1 className="mb-6 text-2xl font-bold tracking-tight sm:text-3xl">كل المنتجات</h1>
@@ -50,6 +63,8 @@ export default async function ProductsPage({
           {items.map((p) => (
             <ProductCard
               key={p.id}
+              optionSet={optionSets.get(p.id)}
+              action="choose"
               product={p}
               currency={store.currency}
               style={listing.cardStyle}

@@ -2,7 +2,7 @@ import { SLink as Link } from '@/components/storefront/store-link'
 import Image from 'next/image'
 import { notFound } from 'next/navigation'
 import { and, eq } from 'drizzle-orm'
-import { CheckCircle2, Clock, MessageCircle, Package, Truck } from 'lucide-react'
+import { CheckCircle2, Clock, FileText, MessageCircle, Package, Truck } from 'lucide-react'
 import { db } from '@/db'
 import { orderItems, orders, returns, thankYouSettings } from '@/db/schema'
 import { getStore } from '@/lib/storefront'
@@ -181,13 +181,25 @@ export default async function OrderPage({
         <div className="mt-10 rounded-[var(--sf-radius)] border border-[var(--sf-text)]/12">
           <ul className="divide-y divide-[var(--sf-text)]/10">
             {items.map((i) => (
-              <li key={i.id} className="flex items-center gap-3 p-4">
+              <li key={i.id} className="flex items-start gap-3 p-4">
                 <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[var(--sf-radius)] bg-[var(--sf-text)]/6">
                   {i.image && <Image src={i.image} alt="" fill sizes="56px" className="object-cover" />}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">{i.name}</span>
-                  <span className="tabular text-xs opacity-60">الكمية: {i.quantity}</span>
+                  <span className="block text-sm font-medium leading-snug">{i.name}</span>
+
+                  {/* المقاس واللون — العميل بيراجع بيهم إنه طلب صح */}
+                  {i.options.length > 0 && (
+                    <span className="mt-0.5 flex flex-wrap gap-x-3 text-xs opacity-65">
+                      {i.options.map((o) => (
+                        <span key={`${o.name}-${o.value}`}>
+                          {o.name}: <span className="font-medium opacity-100">{o.value}</span>
+                        </span>
+                      ))}
+                    </span>
+                  )}
+
+                  <span className="tabular mt-0.5 block text-xs opacity-60">الكمية: {i.quantity}</span>
                 </span>
                 <span className="tabular shrink-0 text-sm font-medium">
                   {formatMoney(i.total, order.currency)}
@@ -245,7 +257,22 @@ export default async function OrderPage({
         </span>
       </div>
 
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+      {/*
+        الفاتورة في متناول إيده على طول.
+
+        بتتبعت على الواتساب وقت التأكيد، بس الرسايل بتتوه. العميل
+        اللي بيدوّر على فاتورته بيفتح صفحة طلبه — فلازم يلاقيها هنا
+        من غير ما يسأل التاجر.
+      */}
+      <Link
+        href={`/order/${order.orderNumber}/invoice?t=${encodeURIComponent(t)}`}
+        className="mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-[var(--sf-radius)] border border-[var(--sf-text)]/15 px-5 font-medium transition-colors hover:bg-[var(--sf-text)]/5"
+      >
+        <FileText className="h-4 w-4" aria-hidden="true" />
+        اعرض الفاتورة
+      </Link>
+
+      <div className="mt-3 flex flex-col gap-3 sm:flex-row">
         {(settings?.showWhatsappButton ?? true) && store.whatsapp && (
           <a
             href={`https://wa.me/${store.whatsapp.replace(/[^\d]/g, '')}?text=${encodeURIComponent(

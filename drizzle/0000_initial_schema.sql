@@ -390,6 +390,7 @@ CREATE TABLE "orders" (
 	"utm" jsonb,
 	"event_id" text,
 	"is_incomplete" boolean DEFAULT false NOT NULL,
+	"checkout_stage" text,
 	"abandoned_at" timestamp with time zone,
 	"reminders_sent" integer DEFAULT 0 NOT NULL,
 	"last_reminder_at" timestamp with time zone,

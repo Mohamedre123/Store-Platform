@@ -7,6 +7,7 @@ import { regionsFor } from '@/lib/regions'
 import { paymentProvider } from '@/lib/providers'
 import { CheckoutForm } from './checkout-form'
 import { EmptyCart } from './empty-cart'
+import { ResumeCart } from './resume-cart'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,8 +27,16 @@ export const maxDuration = 60
 
 export const metadata = { title: 'إتمام الطلب' }
 
-export default async function CheckoutPage({ params }: { params: Promise<{ store: string }> }) {
+export default async function CheckoutPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ store: string }>
+  /** `?resume=` جاي من رسائل استرداد السلة المتروكة */
+  searchParams: Promise<{ resume?: string }>
+}) {
   const { store: identifier } = await params
+  const { resume } = await searchParams
   const store = await getStore(identifier)
   if (!store) notFound()
 
@@ -54,7 +63,12 @@ export default async function CheckoutPage({ params }: { params: Promise<{ store
           </p>
         </div>
 
-        <CustomerLoginForm storeIdentifier={identifier} redirectTo="/checkout" compact />
+        {/* الرمز بيعدّي مع الدخول — وإلا يدخل ويلاقي سلّته لسه فاضية */}
+        <CustomerLoginForm
+          storeIdentifier={identifier}
+          redirectTo={resume ? `/checkout?resume=${encodeURIComponent(resume)}` : '/checkout'}
+          compact
+        />
       </div>
     )
   }
@@ -122,35 +136,38 @@ export default async function CheckoutPage({ params }: { params: Promise<{ store
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
       <h1 className="mb-8 text-2xl font-bold tracking-tight sm:text-3xl">إتمام الطلب</h1>
 
-      <EmptyCart>
-        <CheckoutForm
-          storeIdentifier={identifier}
-          currency={store.currency}
-          country={store.country}
-          regions={regionsFor(store.country)}
-          shippingByCity={ship.byCity}
-          defaultShipping={ship.defaultPrice}
-          freeOver={ship.freeOver}
-          carrierName={ship.carrierName}
-          payments={options}
-          config={{
-            fieldName: settings?.fieldName ?? 'required',
-            fieldPhone: settings?.fieldPhone ?? 'required',
-            fieldEmail: settings?.fieldEmail ?? 'optional',
-            fieldCity: settings?.fieldCity ?? 'required',
-            fieldArea: settings?.fieldArea ?? 'optional',
-            fieldStreet: settings?.fieldStreet ?? 'required',
-            fieldBuilding: settings?.fieldBuilding ?? 'optional',
-            fieldNotes: settings?.fieldNotes ?? 'optional',
-            addressMode: settings?.addressMode ?? 'structured',
-            showCouponField: settings?.showCouponField ?? true,
-            otpEnabled: settings?.otpEnabled ?? false,
-            minOrderEnabled: settings?.minOrderEnabled ?? false,
-            minOrderAmount: settings?.minOrderAmount ?? 0,
-            captureIncomplete: settings?.captureIncompleteOrders ?? true,
-          }}
-        />
-      </EmptyCart>
+      <ResumeCart storeIdentifier={identifier} token={resume ?? ''}>
+        <EmptyCart>
+          <CheckoutForm
+            storeIdentifier={identifier}
+            currency={store.currency}
+            country={store.country}
+            regions={regionsFor(store.country)}
+            shippingByCity={ship.byCity}
+            defaultShipping={ship.defaultPrice}
+            freeOver={ship.freeOver}
+            carrierName={ship.carrierName}
+            payments={options}
+            account={{ name: customer.name, phone: customer.phone, email: customer.email }}
+            config={{
+              fieldName: settings?.fieldName ?? 'required',
+              fieldPhone: settings?.fieldPhone ?? 'required',
+              fieldEmail: settings?.fieldEmail ?? 'optional',
+              fieldCity: settings?.fieldCity ?? 'required',
+              fieldArea: settings?.fieldArea ?? 'optional',
+              fieldStreet: settings?.fieldStreet ?? 'required',
+              fieldBuilding: settings?.fieldBuilding ?? 'optional',
+              fieldNotes: settings?.fieldNotes ?? 'optional',
+              addressMode: settings?.addressMode ?? 'structured',
+              showCouponField: settings?.showCouponField ?? true,
+              otpEnabled: settings?.otpEnabled ?? false,
+              minOrderEnabled: settings?.minOrderEnabled ?? false,
+              minOrderAmount: settings?.minOrderAmount ?? 0,
+              captureIncomplete: settings?.captureIncompleteOrders ?? true,
+            }}
+          />
+        </EmptyCart>
+      </ResumeCart>
     </div>
   )
 }

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { Banknote, CheckCircle2, Loader2, Lock, Tag, Truck } from 'lucide-react'
 import { useCart } from '@/components/storefront/cart'
+import { CartLineOptions } from '@/components/storefront/cart-line-options'
 import { useStoreHref } from '@/components/storefront/store-link'
 import {
   applyCouponAction,
@@ -57,6 +58,7 @@ export function CheckoutForm({
   defaultShipping,
   freeOver,
   carrierName,
+  account,
 }: {
   storeIdentifier: string
   currency: string
@@ -69,15 +71,24 @@ export function CheckoutForm({
   freeOver: number | null
   /** اسم شركة الشحن لما سعرها هو اللي بيحكم — بيطمّن العميل مين هيوصّله */
   carrierName?: string | null
+  /**
+   * بيانات الحساب اللي داخل.
+   *
+   * العميل سجّل دخوله قبل الشيك أوت أصلًا، فبياناته معانا. إعادة
+   * كتابتها كل مرة خطوة زيادة بتضيّع طلبات — والرقم منها هو اللي
+   * بيخلّي السلة المتروكة تتحفظ من أول ثانية.
+   */
+  account: { name: string | null; phone: string | null; email: string | null }
 }) {
-  const { items, subtotal, clear } = useCart()
+  const { items, subtotal, clear, pendingOptions, needsOptions } = useCart()
   const router = useRouter()
   const href = useStoreHref()
   const [pending, startSubmit] = useTransition()
 
-  const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [email, setEmail] = useState('')
+  const [name, setName] = useState(account.name ?? '')
+  const [phone, setPhone] = useState(account.phone ?? '')
+  const [email, setEmail] = useState(account.email ?? '')
+  const accountPhone = account.phone ?? ''
   const [city, setCity] = useState('')
   const [area, setArea] = useState('')
   const [street, setStreet] = useState('')
@@ -116,6 +127,27 @@ export function CheckoutForm({
 
   const draftToken = useRef<string | undefined>(undefined)
   const captured = useRef(false)
+
+  /** لمس خانة الدفع = وصل لآخر خطوة، حتى لو ما أكّدش */
+  const [touchedPayment, setTouchedPayment] = useState(false)
+  /** عدّل بياناته بإيده — مش الاسم اللي جه جاهز من حسابه */
+  const [touchedContact, setTouchedContact] = useState(false)
+
+  const draftKey = `zw_draft_${storeIdentifier}`
+
+  /*
+    استرجاع رمز المسوّدة قبل أي التقاط.
+
+    لازم يتقرا في `useLayoutEffect`-زي التوقيت ده (تأثير بلا تبعيات
+    بيجري قبل تأثير الالتقاط اللي مؤجّل ١٢٠٠ مللي)، وإلا الالتقاط
+    الأول بيتم برمز جديد وبيتعمل سجل مكرّر.
+  */
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(draftKey)
+      if (saved) draftToken.current = saved
+    } catch {}
+  }, [draftKey])
 
   function requestOtp() {
     setOtpMsg(null)
@@ -178,39 +210,90 @@ export function CheckoutForm({
   }
 
   /**
+   * المرحلة اللي العميل وصلها.
+   *
+   * التاجر بيشوفها على السلة المتروكة وبيبني عليها الرسالة اللي
+   * يبعتها. «حطّ في السلة وخرج» و«ملا عنوانه ووقف عند الدفع»
+   * الاتنين سلة متروكة — بس المسافة من الشرا مختلفة، والكلام اللي
+   * يرجّع كل واحد فيهم مختلف.
+   *
+   * بنقيسها من **فعل العميل** لا من الخانة المليانة: الاسم والرقم
+   * جايين من حسابه ومتحطّين له، فلو حسبناهم خطوة، كل واحد يفتح
+   * الصفحة يبقى «كتب بياناته» وخطوة «حطّ في السلة وبس» ما تحصلش
+   * أبدًا — وهي أكتر خطوة بيتساب عندها الطلب.
+   */
+  const stage: 'cart' | 'contact' | 'address' | 'payment' = touchedPayment
+    ? 'payment'
+    : street.trim() || area.trim() || city.trim()
+      ? 'address'
+      : touchedContact
+        ? 'contact'
+        : 'cart'
+
+  /**
    * التقاط الطلب الناقص.
    *
-   * بيشتغل أول ما الرقم يبقى صالح، وبعد ما العميل يبطّل كتابة.
-   * ده اللي بيخلي التاجر يشوف الطلب حتى لو العميل قفل الصفحة —
+   * بيشتغل أول ما يبقى معانا رقم نكلّمه عليه، وبعد ما العميل يبطّل
+   * كتابة. ده اللي بيخلي التاجر يشوف الطلب حتى لو العميل قفل الصفحة —
    * ومن غيره الطلب بيضيع من غير ما حد يعرف إنه كان موجودًا.
+   *
+   * ورقم الحساب المسجّل بيسدّ الفجوة الكبيرة: العميل لازم يسجّل
+   * دخوله قبل الشيك أوت، فمعانا رقمه من قبل ما يكتب حرف. من غير
+   * كده السلة اللي اتسابت قبل ما يملا الخانات ما كانتش بتتحفظ
+   * أصلًا — وهي أكتر سلة بتتساب.
    */
   useEffect(() => {
     if (!config.captureIncomplete || items.length === 0) return
-    if (!isValidPhone(phone)) return
+
+    const reachable = isValidPhone(phone) ? phone : accountPhone
+    if (!reachable || !isValidPhone(reachable)) return
 
     const timer = setTimeout(async () => {
       const result = await captureIncompleteOrder({
         storeIdentifier,
-        phone,
+        phone: reachable,
         name: name || undefined,
+        /* بريد الحساب لو الخانة فاضية — التذكيرة التلقائية بتمشي على البريد */
+        email: email || account.email || undefined,
         city: city || undefined,
         lines: items.map((i) => ({ productId: i.productId, quantity: i.quantity, variantId: i.variantId })),
         draftToken: draftToken.current,
+        stage,
       })
       if (result) {
         draftToken.current = result.token
         captured.current = true
+        /*
+          الرمز بيتحفظ عشان الزيارة الجاية تكمّل على نفس السجل.
+          من غيره العميل اللي رجع بعد ساعة بيعمل سلة متروكة تانية،
+          والتاجر بيلاقي طلبين ناقصين لنفس الشخص ويكلّمه مرتين.
+        */
+        try {
+          localStorage.setItem(draftKey, result.token)
+        } catch {}
       }
     }, 1200)
 
     return () => clearTimeout(timer)
-  }, [phone, name, city, items, storeIdentifier, config.captureIncomplete])
+  }, [phone, name, email, city, items, storeIdentifier, config.captureIncomplete, stage, accountPhone, account.email, draftKey])
 
   const show = (mode: FieldMode) => mode !== 'hidden'
   const req = (mode: FieldMode) => mode === 'required'
 
   function submit() {
     setError(null)
+
+    /*
+      الخيارات قبل أي فحص تاني.
+
+      الخادم بيرفض الطلب ده أصلًا، لكن الرسالة اللي بتيجي منه بتقول
+      «حدّده من السلة» — والعميل هنا مش في السلة. الفحص هنا بيوجّهه
+      للخيارات اللي قدامه في الملخّص بدل ما يدوّر.
+    */
+    if (needsOptions) {
+      setError('فيه منتج محتاج تحدّد مقاسه أو لونه — حدّده من ملخّص الطلب')
+      return
+    }
 
     if (!isValidPhone(phone)) {
       setError('اكتب رقم تليفون صحيح')
@@ -272,6 +355,8 @@ export function CheckoutForm({
       try {
         localStorage.removeItem('zw_cart_note')
         localStorage.removeItem('zw_bookings')
+        /* المسوّدة بقت طلبًا — رمزها لازم يتشال وإلا الزيارة الجاية تكتب فوقه */
+        localStorage.removeItem(draftKey)
       } catch {}
 
       /**
@@ -311,7 +396,7 @@ export function CheckoutForm({
           {show(config.fieldName) && (
             <label className="flex flex-col gap-1.5">
               <span className="text-sm font-medium">الاسم {req(config.fieldName) && <span className="text-red-500">*</span>}</span>
-              <input value={name} onChange={(e) => setName(e.target.value)} className={input} placeholder="محمد أحمد" />
+              <input value={name} onChange={(e) => { setName(e.target.value); setTouchedContact(true) }} className={input} placeholder="محمد أحمد" />
             </label>
           )}
 
@@ -321,7 +406,7 @@ export function CheckoutForm({
             </span>
             <input
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => { setPhone(e.target.value); setTouchedContact(true) }}
               inputMode="tel"
               dir="ltr"
               className={`${input} text-start`}
@@ -337,7 +422,7 @@ export function CheckoutForm({
               </span>
               <input
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => { setEmail(e.target.value); setTouchedContact(true) }}
                 type="email"
                 dir="ltr"
                 className={`${input} text-start`}
@@ -405,7 +490,10 @@ export function CheckoutForm({
             <button
               key={p.gateway}
               type="button"
-              onClick={() => setGateway(p.gateway)}
+              onClick={() => {
+                setGateway(p.gateway)
+                setTouchedPayment(true)
+              }}
               aria-pressed={gateway === p.gateway}
               className={`flex min-h-16 items-start gap-3 rounded-[var(--sf-radius)] border p-4 text-start transition-colors ${
                 gateway === p.gateway
@@ -473,23 +561,52 @@ export function CheckoutForm({
       </div>
 
       {/* الملخص */}
-      <aside className="lg:sticky lg:top-20 lg:self-start">
+      {/*
+        `min-w-0` هي اللي بتمنع الصفحة من إنها تتزحلق يمين وشمال على الفون.
+
+        عنصر الشبكة عرضه الأدنى الافتراضي `auto`، يعني بيرفض يصغّر عن
+        عرض محتواه — وصف كود الخصم (خانة + زرار «تطبيق») محتواه أعرض
+        من ٣٧٥ بكسل بشوية. النتيجة إن الصفحة كلها كانت بتتزق عشرين
+        بكسل، والترويسة والفوتر معاها.
+      */}
+      <aside className="min-w-0 lg:sticky lg:top-20 lg:self-start">
         <div className="flex flex-col gap-4 rounded-[var(--sf-radius)] border border-[var(--sf-text)]/12 bg-[var(--sf-surface)] p-4">
           <h2 className="font-bold">ملخص الطلب</h2>
 
           <ul className="flex flex-col gap-3">
             {items.map((i) => (
-              <li key={`${i.productId}-${i.variantId ?? ''}`} className="flex items-center gap-3">
-                <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[var(--sf-radius)] bg-[var(--sf-text)]/6">
-                  {i.image && <Image src={i.image} alt="" fill sizes="56px" className="object-cover" />}
-                  <span className="absolute -end-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--sf-primary)] px-1 text-[10px] font-bold text-white tabular-nums">
-                    {i.quantity}
+              <li key={`${i.productId}-${i.variantId ?? ''}`} className="flex flex-col gap-2">
+                <div className="flex items-center gap-3">
+                  <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[var(--sf-radius)] bg-[var(--sf-text)]/6">
+                    {i.image && <Image src={i.image} alt="" fill sizes="56px" className="object-cover" />}
+                    <span className="absolute -end-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--sf-primary)] px-1 text-[10px] font-bold text-white tabular-nums">
+                      {i.quantity}
+                    </span>
                   </span>
-                </span>
-                <span className="min-w-0 flex-1 truncate text-sm">{i.name}</span>
-                <span className="tabular shrink-0 text-sm font-medium">
-                  {formatMoney(i.price * i.quantity, currency)}
-                </span>
+                  <span className="min-w-0 flex-1 text-sm leading-snug">{i.name}</span>
+                  <span className="tabular shrink-0 text-sm font-medium">
+                    {formatMoney(i.price * i.quantity, currency)}
+                  </span>
+                </div>
+
+                {/*
+                  الخيار الناقص بيتحدّد من هنا مباشرة.
+
+                  العميل اللي ضاف من الصفحة الرئيسية بضغطة وصل لآخر
+                  خطوة من غير مقاس. رجوعه للسلة عشان يختار معناه إنه
+                  يسيب النموذج اللي ملاه — وده مكان بيتساب فيه الطلب
+                  فعلًا.
+                */}
+                {!i.variantId && pendingOptions[i.productId] && (
+                  <CartLineOptions
+                    productId={i.productId}
+                    name={i.name}
+                    slug={i.slug}
+                    image={i.image}
+                    quantity={i.quantity}
+                    optionSet={pendingOptions[i.productId]}
+                  />
+                )}
               </li>
             ))}
           </ul>
@@ -634,7 +751,9 @@ export function CheckoutForm({
           <button
             type="button"
             onClick={submit}
-            disabled={pending || items.length === 0 || (config.otpEnabled && !otpVerified)}
+            disabled={
+              pending || items.length === 0 || needsOptions || (config.otpEnabled && !otpVerified)
+            }
             className="flex min-h-13 w-full items-center justify-center gap-2 rounded-[var(--sf-radius)] bg-[var(--sf-primary)] px-6 font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
           >
             {pending && <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />}
@@ -654,9 +773,15 @@ export function CheckoutForm({
                 : 'تأكيد الطلب'}
           </button>
 
-          <p className="text-center text-xs opacity-55">
-            بتأكيدك للطلب بتوافق على شروط المتجر
-          </p>
+          {needsOptions ? (
+            <p className="text-center text-xs font-medium text-[var(--sf-primary)]">
+              حدّد خيارات المنتج فوق عشان تقدر تأكّد الطلب
+            </p>
+          ) : (
+            <p className="text-center text-xs opacity-55">
+              بتأكيدك للطلب بتوافق على شروط المتجر
+            </p>
+          )}
         </div>
       </aside>
     </div>

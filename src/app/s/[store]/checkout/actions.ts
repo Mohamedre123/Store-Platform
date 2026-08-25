@@ -19,6 +19,8 @@ import {
 } from '@/db/schema'
 import { getStore, getStoreTheme } from '@/lib/storefront'
 import { computeTotals, getCheckoutSettings, priceCart } from '@/lib/checkout'
+import { furthestStage, STAGE_EVENT } from '@/lib/checkout-stage'
+import type { CheckoutStage } from '@/db/schema'
 import { isEmailConfigured, sendEmail } from '@/lib/email'
 import {
   newOrderNotificationEmail,
@@ -113,14 +115,21 @@ const orderSchema = z.object({
  *
  * ده الفرق بين إن التاجر يشوف طلبًا ضائعًا ويكلّم صاحبه، وبين إنه
  * ما يعرفش أصلًا إن حد كان قرّب يشتري.
+ *
+ * ## المرحلة
+ * كل نداء بيقول العميل وصل لفين. المرحلة بتتقدّم ولا بترجع أبدًا:
+ * اللي كتب عنوانه ورجع مسحه لسه عارف المتجر بيوصّل لعنده — ورسالة
+ * «لسه ما كتبتش عنوانك» بعد ما كتبه بتبان غباءً وبتحرق الرسالة.
  */
 export async function captureIncompleteOrder(input: {
   storeIdentifier: string
   phone: string
   name?: string
+  email?: string
   city?: string
   lines: Array<{ productId: string; quantity: number; variantId?: string }>
   draftToken?: string
+  stage?: CheckoutStage
 }): Promise<{ token: string } | null> {
   const store = await getStore(input.storeIdentifier)
   if (!store) return null
@@ -131,7 +140,13 @@ export async function captureIncompleteOrder(input: {
   const phone = normalizePhone(input.phone, store.country === 'EG' ? '20' : '966')
   if (phone.replace(/\D/g, '').length < 10) return null
 
-  const { lines } = await priceCart(store.id, input.lines, await visitorId())
+  /*
+    السطر اللي بينقصه مقاس بيتحفظ هنا لا بيتشال: ده بالظبط اللي
+    التاجر محتاج يشوفه — «حطّ التيشيرت ومختارش المقاس فوقف».
+  */
+  const { lines } = await priceCart(store.id, input.lines, await visitorId(), {
+    keepMissingOptions: true,
+  })
   if (lines.length === 0) return null
 
   const totals = await computeTotals({
@@ -145,24 +160,47 @@ export async function captureIncompleteOrder(input: {
   const token = input.draftToken || generateToken(16)
 
   const [existing] = await db
-    .select({ id: orders.id })
+    .select({ id: orders.id, stage: orders.checkoutStage })
     .from(orders)
     .where(and(eq(orders.storeId, store.id), eq(orders.recoveryToken, token)))
     .limit(1)
 
+  /* المرحلة بتتقدّم بس — التراجع بيخلّي الرسالة تتكلم عن ماضٍ عدّى */
+  const stage = furthestStage(existing?.stage ?? null, input.stage ?? 'cart')
+
   const shared = {
     customerName: input.name || null,
     customerPhone: phone,
+    /*
+      البريد بيتحفظ هنا عشان التذكيرة التلقائية تلاقي طريقًا توصل بيه.
+      من غيره كل سلة متروكة كانت بتتخطّى في المهمة اليومية — الاستعلام
+      بيشترط بريدًا، والالتقاط كان بيسيبه فاضيًا دايمًا.
+    */
+    customerEmail: input.email?.trim() || null,
     shippingAddress: { city: input.city, country: store.country },
     subtotal: totals.subtotal,
     shippingTotal: totals.shipping,
     total: totals.total,
     costTotal: totals.costTotal,
     abandonedAt: new Date(),
+    checkoutStage: stage,
   }
 
   if (existing) {
     await db.update(orders).set(shared).where(eq(orders.id, existing.id))
+
+    /* حدث واحد لكل خطوة اتقدّمت — التكرار بيحوّل المسار الزمني لضوضاء */
+    if (stage !== existing.stage) {
+      await db.insert(orderEvents).values({
+        orderId: existing.id,
+        storeId: store.id,
+        type: 'stage',
+        message: STAGE_EVENT[stage],
+        meta: { stage },
+        actorType: 'customer',
+      })
+    }
+
     await db.delete(orderItems).where(eq(orderItems.orderId, existing.id))
     await db.insert(orderItems).values(
       lines.map((l) => ({
@@ -171,6 +209,8 @@ export async function captureIncompleteOrder(input: {
         productId: l.productId,
         variantId: l.variantId ?? null,
         name: l.name,
+        variantTitle: l.variantTitle,
+        options: l.options,
         image: l.image,
         price: l.price,
         costPrice: l.costPrice,
@@ -202,6 +242,15 @@ export async function captureIncompleteOrder(input: {
     })
     .returning({ id: orders.id })
 
+  await db.insert(orderEvents).values({
+    orderId: created.id,
+    storeId: store.id,
+    type: 'stage',
+    message: STAGE_EVENT[stage],
+    meta: { stage },
+    actorType: 'customer',
+  })
+
   await db.insert(orderItems).values(
     lines.map((l) => ({
       orderId: created.id,
@@ -209,6 +258,8 @@ export async function captureIncompleteOrder(input: {
       productId: l.productId,
       variantId: l.variantId ?? null,
       name: l.name,
+      variantTitle: l.variantTitle,
+      options: l.options,
       image: l.image,
       price: l.price,
       costPrice: l.costPrice,
@@ -218,6 +269,93 @@ export async function captureIncompleteOrder(input: {
   )
 
   return { token }
+}
+
+/**
+ * استرجاع السلة المتروكة من رمزها.
+ *
+ * كل رسايل الاسترداد — البريد والواتساب والرسالة اللي التاجر بيبعتها
+ * بإيده — بتنتهي بـ`/checkout?resume=…`. الرمز ده كان بيتولّد
+ * وبيتبعت **وما بيتقراش**: العميل بيدوس على الرابط، ولو فاتحه من
+ * موبايله بدل الكمبيوتر اللي طلب منه، بيلاقي «سلتك فاضية».
+ *
+ * يعني كل جهد الاسترداد كان بيقع في آخر خطوة. هنا بنرجّع البنود
+ * من الطلب الناقص نفسه، والمتصفح بيملا السلة بيها.
+ *
+ * الرمز عشوائي ١٦ بايت وبيخصّ سلة ناقصة بس — مفيش بيانات دفع
+ * ولا حساب وراه، وأقصى اللي بيوصّله إنه يشوف المنتجات اللي في
+ * سلّته هو.
+ */
+export async function resumeCartAction(input: {
+  storeIdentifier: string
+  token: string
+}): Promise<Array<{
+  productId: string
+  variantId?: string
+  name: string
+  slug: string
+  image?: string
+  price: number
+  quantity: number
+  maxStock?: number
+}> | null> {
+  const store = await getStore(input.storeIdentifier)
+  if (!store || !input.token) return null
+
+  const [order] = await db
+    .select({ id: orders.id })
+    .from(orders)
+    .where(
+      and(
+        eq(orders.storeId, store.id),
+        eq(orders.recoveryToken, input.token),
+        eq(orders.isIncomplete, true),
+      ),
+    )
+    .limit(1)
+
+  if (!order) return null
+
+  /*
+    السلَج والمخزون بييجوا من المنتج الحالي لا من لقطة الطلب: الطلب
+    الناقص ممكن يكون عدّى عليه يومين، والعميل لازم يرجع لسلة
+    بأسعار ومخزون النهاردة — مش بأرقام قديمة هتترفض عند التأكيد.
+  */
+  const rows = await db
+    .select({
+      productId: orderItems.productId,
+      variantId: orderItems.variantId,
+      name: orderItems.name,
+      image: orderItems.image,
+      price: orderItems.price,
+      quantity: orderItems.quantity,
+      slug: products.slug,
+      productStock: products.stock,
+      trackInventory: products.trackInventory,
+      status: products.status,
+      variantStock: productVariants.stock,
+    })
+    .from(orderItems)
+    .innerJoin(products, eq(products.id, orderItems.productId))
+    .leftJoin(productVariants, eq(productVariants.id, orderItems.variantId))
+    .where(eq(orderItems.orderId, order.id))
+
+  return rows
+    .filter((r) => r.status === 'active' && r.productId)
+    .map((r) => ({
+      productId: r.productId!,
+      variantId: r.variantId ?? undefined,
+      name: r.name,
+      slug: r.slug,
+      image: r.image ?? undefined,
+      price: r.price,
+      quantity: r.quantity,
+      maxStock: r.variantId
+        ? (r.variantStock ?? undefined)
+        : r.trackInventory
+          ? r.productStock
+          : undefined,
+    }))
 }
 
 /* ────────────────────────── إنشاء الطلب ────────────────────────── */
@@ -473,6 +611,8 @@ async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
         productId: l.productId,
         variantId: l.variantId ?? null,
         name: l.name,
+        variantTitle: l.variantTitle,
+        options: l.options,
         image: l.image,
         price: l.price,
         costPrice: l.costPrice,
@@ -714,6 +854,15 @@ async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
     واتساب أول حاجة: هو الطريق الوحيد للعميل اللي مساب بريده،
     والبريد بيتخطّى تمامًا لو المزوّد مش مضبوط.
   */
+  const orderUrl = `${publicStoreUrl(store!)}/order/${result.orderNumber}?t=${encodeURIComponent(token)}`
+  const invoiceUrl = `${publicStoreUrl(store!)}/order/${result.orderNumber}/invoice?t=${encodeURIComponent(token)}`
+
+  /*
+    رسالة واحدة فيها التتبّع والفاتورة.
+
+    الباقات المجانية عند مزوّدي واتساب بتسمح برسالة واحدة كل دقيقة،
+    فرسالة فاتورة منفصلة ورا التأكيد كانت بترجع ٤٢٩ وتضيع خالص.
+  */
   after(
     whatsappOrderPlaced(store!, {
       orderNumber: result.orderNumber,
@@ -721,7 +870,9 @@ async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
       total: totals.total,
       currency: store!.currency,
       cod: input.paymentGateway === 'cod',
-      trackUrl: `${publicStoreUrl(store!)}/order/${result.orderNumber}?t=${encodeURIComponent(token)}`,
+      customerName: input.name ?? null,
+      trackUrl: orderUrl,
+      invoiceUrl,
     }).catch((e) => console.error('فشل إرسال واتساب الطلب:', e)),
   )
 
@@ -735,6 +886,16 @@ async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
     totals,
     input,
     phone,
+    /*
+      بريد الحساب لو الخانة فاضية.
+
+      خانة البريد اختيارية في الشيك أوت وأغلب اللي بيشتري من الفون
+      بيسيبها — لكن العميل لازم يسجّل دخوله قبل الطلب، وحسابه ممكن
+      يكون فيه بريد. تجاهله معناه إننا عندنا عنوان العميل وبنمتنع
+      عن إرسال فاتورته.
+    */
+    fallbackEmail: account.email,
+    invoiceUrl,
     }).catch((e) => console.error('فشل إرسال بريد الطلب:', e)),
   )
 
@@ -863,7 +1024,15 @@ async function sendOrderEmails(ctx: {
   orderId: string
   orderNumber: number
   token: string
-  lines: Array<{ name: string; quantity: number; total: number }>
+  lines: Array<{
+    name: string
+    quantity: number
+    total: number
+    options: Array<{ name: string; value: string }>
+  }>
+  /** بريد الحساب — بيتستخدم لو خانة البريد في الشيك أوت فاضية */
+  fallbackEmail?: string | null
+  invoiceUrl: string
   totals: {
     subtotal: number
     shipping: number
@@ -883,8 +1052,10 @@ async function sendOrderEmails(ctx: {
   }
   phone: string
 }) {
-  const { store, orderId, orderNumber, token, lines, totals, input, phone } = ctx
+  const { store, orderId, orderNumber, token, lines, totals, input, phone, invoiceUrl } = ctx
   if (!store || !isEmailConfigured()) return
+
+  const customerEmail = input.email || ctx.fallbackEmail || null
 
   const theme = await getStoreTheme(store.id)
   const brandInfo = {
@@ -913,7 +1084,7 @@ async function sendOrderEmails(ctx: {
     trackUrl: `${publicStoreUrl(store)}/order/${orderNumber}?t=${encodeURIComponent(token)}`,
   }
 
-  if (input.email) {
+  if (customerEmail) {
     /**
      * الفاتورة بتتبعت مع التأكيد.
      *
@@ -925,8 +1096,8 @@ async function sendOrderEmails(ctx: {
      * فشلت ما يصحّش تأخّر رد الشيك أوت.
      */
     void sendEmail({
-      to: input.email,
-      ...orderInvoiceEmail(brandInfo, order),
+      to: customerEmail,
+      ...orderInvoiceEmail(brandInfo, { ...order, trackUrl: invoiceUrl }),
       replyTo: store.email ?? undefined,
       senderName: store.name,
       log: { storeId: store.id, event: 'order_invoice', orderId },
@@ -934,7 +1105,7 @@ async function sendOrderEmails(ctx: {
 
     const mail = orderConfirmationEmail(brandInfo, order)
     await sendEmail({
-      to: input.email,
+      to: customerEmail,
       ...mail,
       /*
         الرد على بريد التاجر لا على عنوان لا يُرد عليه.

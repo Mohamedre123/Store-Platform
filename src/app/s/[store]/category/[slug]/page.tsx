@@ -12,6 +12,7 @@ import {
 } from '@/lib/storefront'
 import { parseSort } from '@/lib/sort-options'
 import { ProductCard } from '@/components/storefront/product-card'
+import { loadProductOptions } from '@/lib/product-options'
 import { ListingControls } from '@/components/storefront/listing-controls'
 
 export const dynamic = 'force-dynamic'
@@ -55,6 +56,12 @@ export default async function CategoryPage({
     listing.showCategoryFilter ? listCategories(store.id) : Promise.resolve([]),
   ])
 
+  /* خيارات المنتجات المعروضة — عشان العميل يختار مقاسه من على البطاقة */
+  const optionSets = await loadProductOptions(
+    store.id,
+    items.map((p) => p.id),
+  )
+
   const gridClass = listingGrid(listing)
 
   return (
@@ -79,6 +86,8 @@ export default async function CategoryPage({
             {items.map((p) => (
               <ProductCard
                 key={p.id}
+                optionSet={optionSets.get(p.id)}
+                action="choose"
                 product={p}
                 currency={store.currency}
                 style={listing.cardStyle}

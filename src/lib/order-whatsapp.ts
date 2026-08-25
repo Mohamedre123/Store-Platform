@@ -29,7 +29,14 @@ export type OrderMessage = {
 
 export async function whatsappOrderPlaced(
   store: Store,
-  o: OrderMessage & { total: number; currency: string; cod: boolean; customerName?: string | null },
+  o: OrderMessage & {
+    total: number
+    currency: string
+    cod: boolean
+    customerName?: string | null
+    /** رابط الفاتورة — بيتحط جوّه نفس الرسالة */
+    invoiceUrl: string
+  },
 ): Promise<void> {
   await send(store, o.phone, 'order_placed', {
     اسم_المتجر: store.name,
@@ -38,8 +45,23 @@ export async function whatsappOrderPlaced(
     الإجمالي: formatMoney(o.total, o.currency),
     طريقة_الدفع: o.cod ? 'عند الاستلام' : 'أونلاين',
     الرابط: o.trackUrl,
+    رابط_الفاتورة: o.invoiceUrl,
   })
 }
+
+/**
+ * ## ليه الفاتورة جوّه رسالة التأكيد مش رسالة لوحدها
+ *
+ * كانت رسالتين: «استلمنا طلبك» وبعدها «دي فاتورتك». والباقات
+ * المجانية عند مزوّدي واتساب بتسمح **برسالة واحدة كل دقيقة** —
+ * فالتانية كانت بترجع ٤٢٩ وتضيع، والعميل ياخد التأكيد بلا فاتورة.
+ *
+ * ورسالة واحدة فيها الرابطين أحسن للعميل أصلًا: إشعارين ورا بعض من
+ * نفس المتجر في نفس الثانية بيتقروا إزعاجًا.
+ *
+ * ورابط مش مرفق: صفحة الفاتورة بتتفتح على الفون فورًا، وفيها زرار
+ * حفظ PDF لو حبّها ورقة.
+ */
 
 /** الحالات اللي ليها رسالة — الباقي بيعدّي بلا إزعاج */
 const STATUS_KEYS = new Set<TemplateKey>([

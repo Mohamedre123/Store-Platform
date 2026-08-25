@@ -2,6 +2,7 @@ import 'server-only'
 import { and, eq, isNotNull, lt, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { orderItems, orders, stores } from '@/db/schema'
+import type { CheckoutStage } from '@/db/schema'
 import { getStoreTheme } from './storefront'
 import { isEmailConfigured, sendEmail } from './email'
 import { abandonedCartEmail } from './store-emails'
@@ -28,6 +29,20 @@ import { runAutomations } from './automation'
 
 export type ReminderResult = { sent: number; skipped: number; errors: number }
 
+/**
+ * جملة التذكيرة حسب الخطوة اللي وقف عندها.
+ *
+ * التذكيرة الواحدة اللي بتتقال للكل بتخاطب حد ما وصلش لحاجة —
+ * فاللي ملا عنوانه ووصل للدفع بيحسّ إن المتجر مش شايفه. وهو
+ * بالذات أقرب واحد للشرا، فخسارته أغلى.
+ */
+const RESUME_LINE: Record<CheckoutStage, string> = {
+  cart: 'سيبت المنتجات دي في سلتك ومكمّلتش الطلب. لسه موجودة — كمّل في ثانية.',
+  contact: 'بياناتك اتحفظت وفاضل عنوان التوصيل بس. كمّل من هنا وطلبك يبقى في السكة.',
+  address: 'عنوانك متسجّل وطلبك جاهز — فاضل تختار طريقة الدفع وتأكّد بس.',
+  payment: 'طلبك وقف عند خطوة الدفع. لو حصلت مشكلة، جرّب تاني من هنا أو اختار الدفع عند الاستلام.',
+}
+
 export async function sendAbandonedCartReminders(limit = 50): Promise<ReminderResult> {
   const result: ReminderResult = { sent: 0, skipped: 0, errors: 0 }
   if (!isEmailConfigured()) return result
@@ -42,6 +57,7 @@ export async function sendAbandonedCartReminders(limit = 50): Promise<ReminderRe
       total: orders.total,
       currency: orders.currency,
       recoveryToken: orders.recoveryToken,
+      checkoutStage: orders.checkoutStage,
       storeName: stores.name,
       storeSlug: stores.slug,
       storeLogo: stores.logoLight,
@@ -66,7 +82,12 @@ export async function sendAbandonedCartReminders(limit = 50): Promise<ReminderRe
   for (const cart of candidates) {
     try {
       const items = await db
-        .select({ name: orderItems.name, quantity: orderItems.quantity, total: orderItems.total })
+        .select({
+          name: orderItems.name,
+          quantity: orderItems.quantity,
+          total: orderItems.total,
+          options: orderItems.options,
+        })
         .from(orderItems)
         .where(eq(orderItems.orderId, cart.id))
 
@@ -83,6 +104,7 @@ export async function sendAbandonedCartReminders(limit = 50): Promise<ReminderRe
           lines: items,
           total: cart.total,
           currency: cart.currency,
+          stageLine: RESUME_LINE[cart.checkoutStage ?? 'cart'],
           resumeUrl: `${publicStoreUrl({
             slug: cart.storeSlug,
             customDomain: cart.storeDomain,

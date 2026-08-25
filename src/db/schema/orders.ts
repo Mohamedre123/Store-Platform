@@ -14,6 +14,20 @@ export type OrderStatus =
   | 'returned'
 
 export type PaymentStatus = 'unpaid' | 'pending' | 'paid' | 'failed' | 'refunded' | 'partially_refunded'
+
+/**
+ * آخر خطوة وصلها العميل قبل ما يسيب.
+ *
+ * الطلب الناقص من غير الخطوة دي بيبقى «حد كان بيشتري ومشي» — والتاجر
+ * ما يعرفش يقوله إيه. اللي حطّ في السلة وبس محتاج دفعة، واللي كتب
+ * عنوانه ووقف عند الدفع محتاج طمأنة على طريقة الدفع. نفس الرسالة
+ * للاتنين بتضيّع الاتنين.
+ */
+export type CheckoutStage =
+  | 'cart'     // حطّ في السلة ووصل الشيك أوت وبس
+  | 'contact'  // كتب اسمه ورقمه
+  | 'address'  // كتب عنوانه
+  | 'payment'  // اختار طريقة الدفع ووقف قبل التأكيد
 export type OrderSource = 'storefront' | 'quick_checkout' | 'funnel' | 'whatsapp' | 'manual' | 'api' | 'marketplace'
 
 export type ShippingAddress = {
@@ -82,6 +96,8 @@ export const orders = pgTable(
 
     // استرداد السلات المتروكة
     isIncomplete: boolean('is_incomplete').notNull().default(false),
+    /** آخر خطوة وصلها العميل — بتحدّد الرسالة اللي التاجر يبعتها */
+    checkoutStage: text('checkout_stage').$type<CheckoutStage>(),
     abandonedAt: timestamp('abandoned_at', { withTimezone: true }),
     remindersSent: integer('reminders_sent').notNull().default(0),
     lastReminderAt: timestamp('last_reminder_at', { withTimezone: true }),

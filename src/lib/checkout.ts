@@ -1,7 +1,7 @@
 import 'server-only'
 import { and, eq, inArray } from 'drizzle-orm'
 import { db } from '@/db'
-import { carrierAccounts, checkoutSettings, paymentMethods, products, productVariants, shippingRates, shippingZones, stores } from '@/db/schema'
+import { carrierAccounts, checkoutSettings, paymentMethods, productOptions, productOptionValues, products, productVariants, shippingRates, shippingZones, stores } from '@/db/schema'
 import { applyBps } from './utils'
 import { assignBucket, getRunningPriceExperiments, variantValue } from './experiments'
 
@@ -20,6 +20,18 @@ export type PricedLine = {
   /** المتغيّر المختار — سعره ومخزونه بيغلبوا بتوع المنتج */
   variantId?: string | null
   name: string
+  /** اسم المنتج لوحده من غير المقاس — للفواتير والجداول */
+  productName: string
+  /** «أحمر / XL» — عنوان المتغيّر زي ما التاجر سمّاه */
+  variantTitle: string | null
+  /**
+   * الخيارات مفكوكة: المقاس = XL، اللون = أحمر.
+   *
+   * الاسم المدموج «تيشيرت — أحمر / XL» بيتقرا، لكن ما ينفعش يتفرز
+   * ولا يتبحث فيه ولا يتحط في بوليصة شحن. اللي بيغلّف الطلب بيدوّر
+   * على «المقاس» — مش على جزء من سطر نص.
+   */
+  options: Array<{ name: string; value: string }>
   slug: string
   image: string | null
   price: number
@@ -51,12 +63,56 @@ export type CheckoutIssue =
   | { kind: 'needs_options'; names: string[] }
 
 /**
+ * «المقاس → XL» لمجموعة معرّفات قيم.
+ *
+ * المتغيّر مخزَّن كمعرّفات قيم بس (`optionValueIds`)، وعنوانه المدموج
+ * «أحمر / XL» مالوش تفصيل. الفاتورة وبوليصة الشحن محتاجين الاتنين:
+ * اسم الخيار وقيمته، كل واحد لوحده.
+ */
+async function loadOptionLabels(
+  valueIds: string[],
+): Promise<Map<string, { name: string; value: string; position: number }>> {
+  const ids = [...new Set(valueIds)].filter(Boolean)
+  const out = new Map<string, { name: string; value: string; position: number }>()
+  if (ids.length === 0) return out
+
+  const rows = await db
+    .select({
+      id: productOptionValues.id,
+      value: productOptionValues.value,
+      name: productOptions.name,
+      position: productOptions.position,
+    })
+    .from(productOptionValues)
+    .innerJoin(productOptions, eq(productOptions.id, productOptionValues.optionId))
+    .where(inArray(productOptionValues.id, ids))
+
+  for (const r of rows) out.set(r.id, { name: r.name, value: r.value, position: r.position })
+  return out
+}
+
+/**
  * تسعير السلة من قاعدة البيانات.
  *
  * `visitorId` بيستخدم في تجارب السعر بس: السعر المعروض للزائر لازم
  * يكون هو نفسه اللي بيتحاسب. عرض سعر ومحاسبة سعر تاني نصب مش تجربة.
  */
-export async function priceCart(storeId: string, lines: CartLine[], visitorId?: string | null) {
+export async function priceCart(
+  storeId: string,
+  lines: CartLine[],
+  visitorId?: string | null,
+  opts?: {
+    /**
+     * يسمح بسطر منتج ليه مقاسات والعميل ما اختارش.
+     *
+     * للسلة المتروكة بس. الطلب الحقيقي بيترفض — لكن السلة المتروكة
+     * هدفها إن التاجر يشوف اللي حصل، و«حطّ تيشيرت ومختارش المقاس»
+     * دي أهم معلومة فيها. لو رمينا السطر ده، السلة بتتحفظ فاضية أو
+     * ما بتتحفظش أصلًا، والتاجر ما يعرفش إن حد كان قرّب يشتري.
+     */
+    keepMissingOptions?: boolean
+  },
+) {
   const ids = [...new Set(lines.map((l) => l.productId))].filter(Boolean)
   if (ids.length === 0) return { lines: [] as PricedLine[], issue: { kind: 'empty' } as CheckoutIssue }
 
@@ -99,6 +155,7 @@ export async function priceCart(storeId: string, lines: CartLine[], visitorId?: 
           stock: productVariants.stock,
           image: productVariants.image,
           isActive: productVariants.isActive,
+          optionValueIds: productVariants.optionValueIds,
         })
         .from(productVariants)
         .where(
@@ -106,6 +163,18 @@ export async function priceCart(storeId: string, lines: CartLine[], visitorId?: 
         )
     : []
   const variantById = new Map(variantRows.map((v) => [v.id, v]))
+
+  /**
+   * أسماء الخيارات وقيمها للمتغيّرات اللي في السلة.
+   *
+   * استعلام واحد لكل السلة: العميل اللي شارى تلات مقاسات ما يستاهلش
+   * تلات رحلات. والنتيجة بتتخزّن على سطر الطلب كلقطة — لو التاجر
+   * غيّر اسم الخيار من «المقاس» لـ«الحجم» بعدين، الطلب القديم يفضل
+   * مكتوب فيه اللي العميل شافه وقت الشرا.
+   */
+  const optionLabels = await loadOptionLabels(
+    variantRows.flatMap((v) => v.optionValueIds ?? []),
+  )
 
   /**
    * المنتجات اللي ليها مقاسات والسطر جاي من غير اختيار.
@@ -156,9 +225,10 @@ export async function priceCart(storeId: string, lines: CartLine[], visitorId?: 
       continue
     }
 
-    if (!line.variantId && needsOptions.has(p.id)) {
+    const optionsMissing = !line.variantId && needsOptions.has(p.id)
+    if (optionsMissing) {
       missingOptions.push(p.name)
-      continue
+      if (!opts?.keepMissingOptions) continue
     }
 
     /*
@@ -177,6 +247,15 @@ export async function priceCart(storeId: string, lines: CartLine[], visitorId?: 
     const costPrice = useVariant ? (variant.costPrice ?? p.costPrice) : p.costPrice
     const name = useVariant ? `${p.name} — ${variant.title}` : p.name
 
+    /* الخيارات مرتّبة بترتيب التاجر — «المقاس» قبل «اللون» لو هو رتّبهم كده */
+    const options = useVariant
+      ? (variant.optionValueIds ?? [])
+          .map((id) => optionLabels.get(id))
+          .filter((o): o is NonNullable<typeof o> => Boolean(o))
+          .sort((a, b) => a.position - b.position)
+          .map((o) => ({ name: o.name, value: o.value }))
+      : []
+
     // المتغيّر بيتتبّع مخزونه دايمًا؛ المنتج حسب إعداده
     const available = useVariant ? variant.stock : p.trackInventory ? p.stock : null
 
@@ -192,6 +271,9 @@ export async function priceCart(storeId: string, lines: CartLine[], visitorId?: 
       productId: p.id,
       variantId: useVariant ? variant.id : null,
       name,
+      productName: p.name,
+      variantTitle: useVariant ? variant.title : null,
+      options,
       slug: p.slug,
       image: (useVariant ? variant.image : null) ?? p.images[0] ?? null,
       price,
@@ -207,7 +289,7 @@ export async function priceCart(storeId: string, lines: CartLine[], visitorId?: 
     يصلّحها بضغطة، والباقي بيحتاج يغيّر سلته. وبتتقال حتى لو باقي
     السطور سليمة — الطلب اللي بينقصه مقاس ما ينفعش يعدّي نُصّه.
   */
-  if (missingOptions.length) {
+  if (missingOptions.length && !opts?.keepMissingOptions) {
     return { lines: priced, issue: { kind: 'needs_options', names: missingOptions } as CheckoutIssue }
   }
 

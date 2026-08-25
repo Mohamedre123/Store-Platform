@@ -9,6 +9,7 @@ import { ImageUpload } from '@/components/ui/image-upload'
 import { formatMoney, fromMinorUnits, toMinorUnits } from '@/lib/utils'
 import { SeoFields } from '@/components/dashboard/seo-fields'
 import { ImproveButton } from '@/components/dashboard/improve-button'
+import { VariantsEditor, type EditorOption, type EditorVariant } from './variants-editor'
 
 type Product = {
   id: string
@@ -37,11 +38,14 @@ export function ProductForm({
   categories,
   currency,
   storeName,
+  variants = { options: [], variants: [] },
 }: {
   product?: Product
   categories: Array<{ id: string; name: string }>
   currency: string
   storeName: string
+  /** المقاسات والألوان المحفوظة — فاضية للمنتج الجديد */
+  variants?: { options: EditorOption[]; variants: EditorVariant[] }
 }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(saveProductAction, null)
   const [images, setImages] = useState<string[]>(product?.images ?? [])
@@ -81,8 +85,15 @@ export function ProductForm({
       {state?.error && <Alert>{state.error}</Alert>}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
-        {/* العمود الأساسي */}
-        <div className="flex flex-col gap-6">
+        {/*
+          العمود الأساسي.
+
+          `min-w-0` مقصودة: جدول تركيبات المقاسات أعرض من الفون
+          وبيتمرّر جوّه غلافه — لكن عنصر الشبكة عرضه الأدنى `auto`،
+          فكان بيتمدّد لعرض الجدول ويزحلق الصفحة كلها بدل ما يسيبه
+          يتمرّر في مكانه.
+        */}
+        <div className="flex min-w-0 flex-col gap-6">
           <Card className="flex flex-col gap-5 p-5">
             <div className="flex flex-col gap-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -235,6 +246,18 @@ export function ProductForm({
               </div>
             )}
           </Card>
+
+          {/*
+            المقاسات قبل السيو مباشرة: التاجر بيدخل يظبّط المنتج،
+            والخيارات جزء من «إيه اللي بيتباع» — مش إعداد متقدّم
+            يتحط في آخر الصفحة وينساه.
+          */}
+          <VariantsEditor
+            initialOptions={variants.options}
+            initialVariants={variants.variants}
+            basePrice={price}
+            currency={currency}
+          />
 
           <Card className="p-5">
             <SeoFields

@@ -18,7 +18,25 @@ export type StoreBrand = {
   primary: string
 }
 
-type OrderLine = { name: string; quantity: number; total: number }
+type OrderLine = {
+  name: string
+  quantity: number
+  total: number
+  /**
+   * المقاس واللون مفكوكين.
+   *
+   * الفاتورة اللي مكتوب فيها «تيشيرت» بس مش فاتورة: العميل ما يقدرش
+   * يراجع إنه طلب المقاس الصح، والتاجر ما يقدرش يثبت إنه بعت اللي
+   * اتطلب. والاسم المدموج «تيشيرت — أحمر / XL» بيتقرا صعب في جدول.
+   */
+  options?: Array<{ name: string; value: string }>
+}
+
+/** «المقاس: XL · اللون: أحمر» — سطر واحد تحت اسم الصنف */
+function optionsLine(l: OrderLine): string {
+  if (!l.options || l.options.length === 0) return ''
+  return l.options.map((o) => `${o.name}: ${o.value}`).join(' · ')
+}
 
 type OrderInfo = {
   orderNumber: number
@@ -92,6 +110,7 @@ function linesTable(lines: OrderLine[], currency: string) {
       (l) => `<tr>
         <td style="padding:8px 0;border-bottom:1px solid ${BORDER};font-size:14px;">
           ${escapeHtml(l.name)} <span style="color:${MUTED};">× ${l.quantity}</span>
+          ${optionsLine(l) ? `<div style="font-size:12px;color:${MUTED};margin-top:2px;">${escapeHtml(optionsLine(l))}</div>` : ''}
         </td>
         <td align="left" style="padding:8px 0;border-bottom:1px solid ${BORDER};font-size:14px;white-space:nowrap;">
           ${formatMoney(l.total, currency)}
@@ -240,6 +259,7 @@ export function orderInvoiceEmail(store: StoreBrand, o: OrderInfo) {
         <td style="padding:10px 0;border-bottom:1px solid ${BORDER};font-size:14px;">
           ${escapeHtml(l.name)}
           <span style="color:${MUTED};"> × ${l.quantity}</span>
+          ${optionsLine(l) ? `<div style="font-size:12px;color:${MUTED};margin-top:3px;">${escapeHtml(optionsLine(l))}</div>` : ''}
         </td>
         <td style="padding:10px 0;border-bottom:1px solid ${BORDER};font-size:14px;text-align:left;white-space:nowrap;">
           ${formatMoney(l.total, o.currency)}
@@ -322,7 +342,11 @@ export function orderInvoiceEmail(store: StoreBrand, o: OrderInfo) {
       `فاتورة طلب رقم #${o.orderNumber} من ${store.name}`,
       when,
       '',
-      ...o.lines.map((l) => `${l.name} × ${l.quantity} — ${formatMoney(l.total, o.currency)}`),
+      ...o.lines.map(
+        (l) =>
+          `${l.name} × ${l.quantity} — ${formatMoney(l.total, o.currency)}` +
+          (optionsLine(l) ? `\n  (${optionsLine(l)})` : ''),
+      ),
       '',
       `المنتجات: ${formatMoney(o.subtotal, o.currency)}`,
       o.discount > 0 ? `خصم: −${formatMoney(o.discount, o.currency)}` : '',
@@ -497,7 +521,22 @@ export function orderStatusEmail(
 /** تذكير السلة المتروكة */
 export function abandonedCartEmail(
   store: StoreBrand,
-  o: { customerName: string | null; lines: OrderLine[]; total: number; currency: string; resumeUrl: string; couponCode?: string | null },
+  o: {
+    customerName: string | null
+    lines: OrderLine[]
+    total: number
+    currency: string
+    resumeUrl: string
+    couponCode?: string | null
+    /**
+     * الجملة اللي بتقول له وقف فين.
+     *
+     * «سيبت المنتجات دي في سلتك» بتتقال لواحد ملا عنوانه ووصل
+     * للدفع، فتبان إن المتجر مش شايف اللي هو عمله. الجملة المبنية
+     * على مرحلته بتقول له الخطوة اللي فاضلة بالظبط.
+     */
+    stageLine?: string | null
+  },
 ) {
   const greeting = o.customerName ? `أهلًا ${escapeHtml(o.customerName)}،` : 'أهلًا،'
 
@@ -512,7 +551,7 @@ export function abandonedCartEmail(
     <p style="margin:0 0 6px;font-size:15px;">${greeting}</p>
     <p style="margin:0 0 18px;font-size:19px;font-weight:bold;">سلتك لسه مستنياك 🛒</p>
     <p style="margin:0 0 20px;font-size:15px;line-height:1.9;color:${MUTED};">
-      سيبت المنتجات دي في سلتك ومكمّلتش الطلب. لسه موجودة — كمّل في ثانية.
+      ${o.stageLine ? escapeHtml(o.stageLine) : 'سيبت المنتجات دي في سلتك ومكمّلتش الطلب. لسه موجودة — كمّل في ثانية.'}
     </p>
 
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:16px;">

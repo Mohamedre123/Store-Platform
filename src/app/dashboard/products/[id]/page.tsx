@@ -6,6 +6,7 @@ import { getDashboardContext } from '@/lib/store-context'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { ProductForm } from '../product-form'
 import { DeleteProduct } from '../delete-product'
+import { loadProductVariants, toEditorVariants } from '@/lib/variants'
 
 export const metadata = { title: 'تعديل المنتج' }
 
@@ -21,11 +22,14 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
 
   if (!product) notFound()
 
-  const cats = await db
-    .select({ id: categories.id, name: categories.name })
-    .from(categories)
-    .where(eq(categories.storeId, store.id))
-    .orderBy(asc(categories.sortOrder))
+  const [cats, saved] = await Promise.all([
+    db
+      .select({ id: categories.id, name: categories.name })
+      .from(categories)
+      .where(eq(categories.storeId, store.id))
+      .orderBy(asc(categories.sortOrder)),
+    loadProductVariants(product.id),
+  ])
 
   return (
     <div className="flex flex-col gap-8">
@@ -52,6 +56,14 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
         categories={cats}
         currency={store.currency}
         storeName={store.name}
+        variants={{
+          options: saved.options.map((o) => ({
+            name: o.name,
+            displayAs: o.displayAs,
+            values: o.values.map((v) => ({ value: v.value, hex: v.hex })),
+          })),
+          variants: toEditorVariants(saved.variants),
+        }}
       />
     </div>
   )

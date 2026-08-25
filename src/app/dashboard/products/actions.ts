@@ -11,6 +11,7 @@ import { recordAudit } from '@/lib/audit'
 import { deleteImage } from '@/lib/storage'
 import { slugify, toMinorUnits } from '@/lib/utils'
 import { renderSeoSlug } from '@/lib/seo-template'
+import { saveProductVariants } from '@/lib/variants'
 
 export type FormState = { error?: string; fieldErrors?: Record<string, string> } | null
 
@@ -166,6 +167,56 @@ const productSchema = z.object({
   images: z.array(z.string()).default([]),
 })
 
+/**
+ * المقاسات والألوان الجاية من المحرّر.
+ *
+ * التركيبات نفسها بتتولّد على الخادم من الخيارات — اللي جاي من هنا
+ * سعر ومخزون لكل تركيبة بس. الشكل مرن عن قصد: أي صف تركيبة مش
+ * موجودة في الخيارات بيتجاهل بدل ما يخلّي حفظ المنتج كله يفشل.
+ */
+const variantsSchema = z.object({
+  options: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1).max(40),
+        displayAs: z.enum(['swatch', 'button', 'dropdown']).catch('button'),
+        values: z
+          .array(
+            z.object({
+              value: z.string().trim().min(1).max(40),
+              hex: z.string().trim().max(9).nullable().optional(),
+            }),
+          )
+          .max(50),
+      }),
+    )
+    .max(3)
+    .default([]),
+  variants: z
+    .array(
+      z.object({
+        values: z.array(z.string()).min(1),
+        price: z.number().int().min(0),
+        stock: z.number().int().min(0).max(1_000_000),
+        sku: z.string().trim().max(60).nullable().optional(),
+        isActive: z.boolean(),
+      }),
+    )
+    .max(300)
+    .default([]),
+})
+
+/** يقرا حمولة المحرّر — الشكل التالف بيرجّع «مفيش خيارات» لا استثناء */
+function parseVariants(raw: FormDataEntryValue | null) {
+  if (!raw) return { options: [], variants: [] }
+  try {
+    const parsed = variantsSchema.safeParse(JSON.parse(String(raw)))
+    return parsed.success ? parsed.data : { options: [], variants: [] }
+  } catch {
+    return { options: [], variants: [] }
+  }
+}
+
 export async function saveProductAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const { store } = await getDashboardContext()
   const id = String(formData.get('id') ?? '') || null
@@ -190,6 +241,7 @@ export async function saveProductAction(_prev: FormState, formData: FormData): P
 
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) }
   const d = parsed.data
+  const variantData = parseVariants(formData.get('variants'))
 
   const price = toMinorUnits(d.price)
   if (price <= 0) return { fieldErrors: { price: 'السعر لازم يكون أكبر من صفر' } }
@@ -268,6 +320,8 @@ export async function saveProductAction(_prev: FormState, formData: FormData): P
       .set({ ...values, ...slugUpdate })
       .where(and(eq(products.id, id), eq(products.storeId, store.id)))
 
+    await saveProductVariants(store.id, id, variantData.options, variantData.variants)
+
     // أي تعديل يدوي على الكمية يتسجّل — عشان سؤال «المخزون راح فين؟» يبقى له إجابة
     if (before.stock !== stock) {
       await db.insert(inventoryMovements).values({
@@ -291,6 +345,8 @@ export async function saveProductAction(_prev: FormState, formData: FormData): P
         ),
       })
       .returning({ id: products.id })
+
+    await saveProductVariants(store.id, created.id, variantData.options, variantData.variants)
 
     if (stock > 0) {
       await db.insert(inventoryMovements).values({

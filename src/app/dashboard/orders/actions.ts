@@ -41,6 +41,36 @@ export async function addOrderNoteAction(orderId: string, note: string) {
   revalidatePath(`/dashboard/orders/${orderId}`)
 }
 
+/**
+ * تسجيل إن التاجر كلّم صاحب السلة المتروكة.
+ *
+ * من غير السطر ده، التاجر اللي بيراجع سلاته بعد يومين ما بيعرفش
+ * كلّم مين — فيكلّم الواحد مرتين وتلاتة، والعميل يحسّها مطاردة
+ * ويسيب المتجر خالص.
+ */
+export async function logRecoveryMessageAction(orderId: string, label: string) {
+  const { store, user } = await getDashboardContext()
+
+  const [order] = await db
+    .select({ id: orders.id })
+    .from(orders)
+    .where(and(eq(orders.id, orderId), eq(orders.storeId, store.id)))
+    .limit(1)
+
+  if (!order) return
+
+  await db.insert(orderEvents).values({
+    orderId,
+    storeId: store.id,
+    type: 'message_sent',
+    message: `التاجر بعت رسالة استرداد: ${label}`,
+    actorType: 'merchant',
+    actorId: user.id,
+  })
+
+  revalidatePath(`/dashboard/orders/${orderId}`)
+}
+
 /** حذف طلب ناقص — التاجر شافه وقرّر إنه مش هيتابعه */
 export async function dismissIncompleteAction(orderId: string) {
   const { store } = await getDashboardContext()
