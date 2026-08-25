@@ -31,6 +31,32 @@ export function platformToken(): string | null {
   return process.env.WASENDER_TOKEN || null
 }
 
+/**
+ * ترجمة خطأ البوابة لكلام التاجر يعرف يتصرّف على أساسه.
+ *
+ * نص البوابة إنجليزي وتقني، وأشهر خطأ فيه بيقول «الرقم متسجّل خلاص»
+ * — والتاجر بيفهمها إن فيه حد تاني واخد رقمه، وهو اللي سجّله بنفسه
+ * على موقع البوابة قبل ما ييجي هنا. الفرق ده هو كل الفرق بين إنه
+ * يحلّها في تلاتين ثانية وإنه يسيب الموضوع.
+ */
+function explain(status: number, body: string): string {
+  const lower = body.toLowerCase()
+
+  if (lower.includes('already been taken')) {
+    return 'الرقم ده متسجّل عندك في البوابة بالفعل. امسح الجلسة من حسابك على wasenderapi وارجع اربط من هنا — إحنا بننشئها ونطلّع الكود بدالك.'
+  }
+  if (status === 401 || status === 403) {
+    return 'التوكن مرفوض. راجع «Personal Access Token» من إعدادات حسابك على البوابة.'
+  }
+  if (lower.includes('limit') || status === 402) {
+    return 'خلص عدد الجلسات المسموح في باقتك على البوابة. امسح جلسة قديمة أو رقّي الباقة.'
+  }
+  if (status === 422) {
+    return `البوابة رفضت البيانات: ${body.slice(0, 150)}`
+  }
+  return `${status}: ${body.slice(0, 180)}`
+}
+
 type CreateResult =
   | { ok: true; sessionId: string; apiKey: string }
   | { ok: false; error: string }
@@ -60,7 +86,7 @@ async function call(
       باقتك» حلّهم مختلف تمامًا، والرسالة العامة بتخلّي التاجر يقعد
       يجرّب من غير ما يعرف يعمل إيه.
     */
-    if (!res.ok) return { ok: false, error: `${res.status}: ${text.slice(0, 200)}` }
+    if (!res.ok) return { ok: false, error: explain(res.status, text) }
 
     const parsed = JSON.parse(text) as { data?: Record<string, unknown> } & Record<string, unknown>
     return { ok: true, data: parsed.data ?? parsed }

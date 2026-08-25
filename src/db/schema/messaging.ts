@@ -2,7 +2,14 @@ import { pgTable, uuid, text, boolean, integer, jsonb, timestamp, index, uniqueI
 import { stores } from './tenancy'
 import { createdAt, updatedAt, money } from './_shared'
 
-export type Channel = 'sms' | 'whatsapp' | 'telegram' | 'email' | 'push' | 'chat'
+/**
+ * قناة الرسالة.
+ *
+ * `system` مش قناة بيوصل منها حاجة للعميل — هي مكان تسجيل الأعطال
+ * الداخلية (انهيار في تأكيد طلب مثلًا) جنب باقي السجل، عشان يبقى
+ * فيه مكان واحد نبص فيه لما حاجة تقع.
+ */
+export type Channel = 'sms' | 'whatsapp' | 'telegram' | 'email' | 'push' | 'chat' | 'system'
 
 /** أحداث الطلب التي يمكن أن تُطلق رسالة تلقائية */
 export type AutomationEvent =

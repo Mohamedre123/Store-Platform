@@ -9,6 +9,7 @@ import { db } from '@/db'
 import {
   customers,
   inventoryMovements,
+  messageLog,
   orderEvents,
   orderItems,
   orders,
@@ -221,7 +222,50 @@ export async function captureIncompleteOrder(input: {
 
 /* ────────────────────────── إنشاء الطلب ────────────────────────── */
 
+/**
+ * تأكيد الطلب.
+ *
+ * **العميل ما يصحّش يشوف صفحة خطأ هنا أبدًا.** هو ملا اسمه ورقمه
+ * وعنوانه ووصل لآخر خطوة؛ انهيار غير متوقّع بيوريه شاشة سودا
+ * ما بتقولش إذا كان طلبه اتسجّل ولا لأ، فيطلب تاني أو يسيب.
+ *
+ * والانهيار ده بيتسجّل بنصّه في سجل الرسايل — من غيره بنفضل
+ * نخمّن، والخطأ اللي مش مكتوب مالوش أثر نمشي وراه.
+ */
 export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
+  try {
+    return await placeOrder(raw)
+  } catch (e) {
+    const detail = e instanceof Error ? [e.message, e.stack ?? ''].join('\n') : String(e)
+    console.error('انهيار في تأكيد الطلب:', detail)
+
+    /* التسجيل بيحتاج معرّف المتجر — بنحاول نجيبه من غير ما نوقع تاني */
+    try {
+      const id = (raw as { storeIdentifier?: string } | null)?.storeIdentifier
+      const store = id ? await getStore(id) : null
+      if (store) {
+        await db.insert(messageLog).values({
+          storeId: store.id,
+          channel: 'system',
+          event: 'checkout_error',
+          recipient: '-',
+          body: 'انهيار في تأكيد الطلب',
+          status: 'failed',
+          errorMessage: detail.slice(0, 1000),
+        })
+      }
+    } catch {
+      /* التسجيل نفسه وقع — مش هنخلّي ده يخفي الرسالة عن العميل */
+    }
+
+    return {
+      ok: false,
+      error: 'حصلت مشكلة عندنا. كلّم المتجر وهو هيشوف طلبك — ما تطلبش تاني عشان ما يتكررش.',
+    }
+  }
+}
+
+async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
   const parsed = orderSchema.safeParse(raw)
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? 'فيه بيانات ناقصة' }

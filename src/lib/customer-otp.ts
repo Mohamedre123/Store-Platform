@@ -67,11 +67,15 @@ function mask(identity: Identity): string {
 }
 
 /**
- * يبعت رمز دخول على الوسيلة المناسبة.
+ * يبعت رمز دخول **على الوسيلة اللي العميل كتبها — وبس**.
  *
- * الترتيب للرقم: واتساب (مجاني للتاجر ومقروء فورًا) ← بريد الحساب
- * المسجّل لو موجود. الرسايل النصية محتاجة مزوّدًا مدفوعًا لسه ما
- * اتربطش، فما بندّعيش إننا بعتنا عليها.
+ * كان فيه رجوع للبريد لما الواتساب مش مربوط: العميل يكتب رقمه،
+ * والرمز يروح على بريد مسجّل من زمان هو ممكن ما يفتحوش أصلًا —
+ * ويفضل يبصّ في واتسابه ومفيش حاجة جاية. الرجوع الصامت ده بيبان
+ * عطلًا مش مساعدة.
+ *
+ * دلوقتي: كتب رقمه ← واتساب. كتب بريده ← بريد. ولو الوسيلة اللي
+ * اختارها مش شغّالة، بنقوله بصراحة ونعرض عليه التانية.
  */
 export async function issueCustomerOtp(input: {
   storeId: string
@@ -157,7 +161,13 @@ export async function issueCustomerOtp(input: {
     if (wa.ok) channel = 'whatsapp'
   }
 
-  if (!channel && emailTarget && isEmailConfigured()) {
+  /*
+    البريد للي كتب بريده بس.
+
+    اللي كتب رقمه ومتجره مش مربوط بواتساب لازم يعرف كده صراحةً،
+    مش ياخد رمزًا في مكان تاني من غير ما حد يقوله.
+  */
+  if (!channel && input.identity.kind === 'email' && emailTarget && isEmailConfigured()) {
     const mail = customerCodeEmail(input.brand, code, TTL)
     const sent = await sendEmail({
       to: emailTarget,
@@ -173,7 +183,7 @@ export async function issueCustomerOtp(input: {
       ok: false,
       error:
         input.identity.kind === 'phone'
-          ? 'مقدرناش نبعت رمزًا على الرقم ده. جرّب تدخل ببريدك بدل الرقم.'
+          ? 'المتجر ده لسه ما ربطش واتساب، فمقدرناش نبعت رمزًا على الرقم. ادخل ببريدك بدل الرقم.'
           : 'مقدرناش نبعت الرمز دلوقتي. جرّب تاني بعد شوية.',
     }
   }
