@@ -7,8 +7,17 @@ import { db } from '@/db'
 import { stores } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { isEmailConfigured, safeReplyTo, sendEmail } from '@/lib/email'
-import { customerCodeEmail } from '@/lib/store-emails'
+import {
+  abandonedCartEmail,
+  customerCodeEmail,
+  merchantMessageEmail,
+  newOrderNotificationEmail,
+  orderInvoiceEmail,
+  orderStatusEmail,
+} from '@/lib/store-emails'
+import { publicStoreUrl } from '@/lib/domain'
 import { getStoreTheme } from '@/lib/storefront'
+import { lastDnsError, platformDnsReady } from '@/lib/platform-dns'
 import {
   refreshEmailDomain,
   removeEmailDomain,
@@ -46,6 +55,14 @@ export type EmailDiagnostics = {
   }
   /** سجلات النطاق اللي بيتبعت منه دلوقتي — من DNS مباشرةً */
   dns: Array<{ label: string; name: string; found: string | null }>
+  /**
+   * حالة التوثيق التلقائي.
+   *
+   * من غير السطر ده، «النطاق لسه معلّق» بيبقى طريقًا مسدودًا: مفيش
+   * وسيلة تعرف مفتاح ناقص من نطاق تحت فريق تاني من صلاحية غلط،
+   * والتلاتة علاجهم مختلف تمامًا.
+   */
+  autoDns: { ready: boolean; error: string | null }
 }
 
 /** بيقرا سجل TXT/MX من خوادم عامة — مش من كاش النظام */
@@ -136,6 +153,7 @@ export async function emailDiagnosticsAction(): Promise<EmailDiagnostics> {
       records: row?.emailDnsRecords ?? [],
     },
     dns,
+    autoDns: { ready: platformDnsReady(), error: lastDnsError() },
   }
 }
 
@@ -187,10 +205,129 @@ export async function sendDeliveryTestAction(
     : { ok: false, message: `المزوّد رفض: ${res.error}`, from: diag.from }
 }
 
+/**
+ * تجربة كل رسالة في المنصة مرة واحدة.
+ *
+ * ## ليه الكل مش واحدة
+ * «الميل بيروح السبام» مش حالة واحدة. رمز الدخول ممكن يوصل والفاتورة
+ * تروح السبام، أو العكس — وده حصل فعلًا. اختبار رسالة واحدة بيدّي
+ * إجابة عن رسالة واحدة، وإحنا بنستنتج منها على الباقي غلط.
+ *
+ * الدالة دي بتبعت **كل** قالب: الرمز، الفاتورة بمرفقها، الست حالات
+ * للطلب، السلة المتروكة، إشعار التاجر، ورسالة التاجر اليدوية. تفتح
+ * الوارد والسبام مرة واحدة وتشوف كل واحدة راحت فين.
+ *
+ * ## المهلة بين الرسايل
+ * المزوّد بيقبل رسالتين في الثانية. من غير المهلة نص القايمة بترجع
+ * ٤٢٩ وتتحسب «فشلت» وهي ما اتبعتتش أصلًا.
+ */
+export async function sendFullSuiteAction(
+  to: string,
+): Promise<{ ok: boolean; from: string; results: Array<{ label: string; ok: boolean; note: string }> }> {
+  const { store } = await getDashboardContext()
+
+  const address = to.trim().toLowerCase()
+  const diag = await emailDiagnosticsAction()
+  if (!address.includes('@')) return { ok: false, from: diag.from, results: [] }
+
+  const theme = await getStoreTheme(store.id)
+  const own = await storeSenderAddress(store.id)
+  const brand = {
+    name: store.name,
+    logo: store.logoLight,
+    primary: theme.custom.identity.primary,
+    slug: store.slug,
+    email: store.email,
+  }
+
+  const home = publicStoreUrl({ slug: store.slug })
+  const trackUrl = `${home}/order/1001`
+  const order = {
+    orderNumber: 1001,
+    customerName: 'عميل تجريبي',
+    lines: [{ name: 'منتج تجريبي', quantity: 1, total: 250, options: [{ name: 'المقاس', value: 'L' }] }],
+    subtotal: 250,
+    shipping: 40,
+    discount: 0,
+    total: 290,
+    currency: store.currency,
+    address: 'القاهرة — مدينة نصر',
+    phone: '+201000000000',
+    trackUrl,
+    paymentLabel: 'الدفع عند الاستلام',
+    placedAt: new Date(),
+  }
+
+  const jobs: Array<{ label: string; mail: { subject: string; html: string; text?: string }; attach?: boolean }> = [
+    { label: 'رمز الدخول', mail: customerCodeEmail(brand, '123456', 10) },
+    { label: 'الفاتورة (تأكيد الطلب)', mail: orderInvoiceEmail(brand, order) },
+    { label: 'إشعار التاجر بطلب جديد', mail: newOrderNotificationEmail(brand, order, `${home}`) },
+    {
+      label: 'السلة المتروكة',
+      mail: abandonedCartEmail(brand, {
+        customerName: order.customerName,
+        lines: order.lines,
+        total: order.total,
+        currency: order.currency,
+        resumeUrl: `${home}/checkout`,
+        stageLine: 'وصلت لخطوة الدفع وما كمّلتش',
+      }),
+    },
+    {
+      label: 'رسالة يدوية من التاجر',
+      mail: merchantMessageEmail(brand, {
+        subject: `رسالة من ${store.name}`,
+        body: 'ده نص تجريبي.\n\nالرسالة دي بتتبعت من صفحة الطلب لما التاجر يكتب للعميل.',
+        actionUrl: trackUrl,
+        actionLabel: 'افتح الطلب',
+      }),
+    },
+  ]
+
+  for (const status of ['confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'returned'] as const) {
+    jobs.push({
+      label: `حالة الطلب: ${status}`,
+      mail: orderStatusEmail(brand, status, {
+        orderNumber: 1001,
+        customerName: order.customerName,
+        total: order.total,
+        currency: order.currency,
+        trackUrl,
+        trackingNumber: status === 'shipped' ? 'EG123456789' : null,
+        carrier: status === 'shipped' ? 'بوسطة' : null,
+      }),
+    })
+  }
+
+  const results: Array<{ label: string; ok: boolean; note: string }> = []
+
+  for (const [i, job] of jobs.entries()) {
+    /* رسالتين في الثانية عند المزوّد — المهلة بتمنع ٤٢٩ كاذبة */
+    if (i > 0) await new Promise((r) => setTimeout(r, 700))
+
+    const res = await sendEmail({
+      to: address,
+      ...job.mail,
+      senderAddress: own,
+      replyTo: safeReplyTo(store.email),
+      log: { storeId: store.id, event: 'delivery_test' },
+    })
+
+    results.push({
+      label: job.label,
+      ok: res.ok,
+      note: res.ok ? job.mail.subject : `المزوّد رفض: ${res.error}`,
+    })
+  }
+
+  return { ok: results.every((r) => r.ok), from: diag.from, results }
+}
+
 /* ────────────────────── نطاق المتجر ────────────────────── */
 
 export async function startEmailDomainAction(): Promise<
-  { ok: true; records: DnsRecord[]; domain: string } | { ok: false; error: string }
+  | { ok: true; records: DnsRecord[]; domain: string; status: string; dnsError: string | null }
+  | { ok: false; error: string }
 > {
   const { store } = await getDashboardContext()
 
@@ -198,7 +335,18 @@ export async function startEmailDomainAction(): Promise<
   if (!res.ok) return { ok: false, error: res.error }
 
   revalidatePath('/dashboard/settings/email')
-  return { ok: true, records: res.state.records, domain: res.state.domain ?? '' }
+  return {
+    ok: true,
+    records: res.state.records,
+    domain: res.state.domain ?? '',
+    status: res.state.status,
+    /*
+      سبب فشل الكتابة بيرجع مع النجاح مش بدله: النطاق **اتسجّل**
+      فعلًا عند المزوّد، اللي فشل هو كتابة سجلاته. الاتنين حالتين
+      مختلفتين، ودمجهم في «فشل» بيخلّي التاجر يعيد التسجيل بلا فايدة.
+    */
+    dnsError: lastDnsError(),
+  }
 }
 
 export async function verifyEmailDomainAction(): Promise<

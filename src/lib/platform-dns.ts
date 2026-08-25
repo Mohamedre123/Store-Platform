@@ -42,9 +42,26 @@ function query(): string {
   return team ? `?teamId=${encodeURIComponent(team)}` : ''
 }
 
+/**
+ * آخر سبب فشل — بيتعرض للتاجر في صفحة البريد.
+ *
+ * الاستدعاء ده بيجري في الخلفية، فلو ابتلع الخطأ محدّش بيعرف ليه
+ * النطاق فضل معلّق: مفتاح ناقص؟ نطاق تحت فريق تاني؟ صلاحية غلط؟
+ * الأسباب دي مختلفة تمامًا في العلاج، والصمت بيخلّيهم واحدة.
+ */
+let lastError: string | null = null
+
+/** آخر سبب فشل في كتابة السجلات — `null` لو آخر محاولة نجحت */
+export function lastDnsError(): string | null {
+  return lastError
+}
+
 async function api<T>(path: string, init?: RequestInit): Promise<T | null> {
   const key = token()
-  if (!key) return null
+  if (!key) {
+    lastError = 'VERCEL_API_TOKEN مش موجود في متغيّرات البيئة'
+    return null
+  }
 
   try {
     const res = await fetch(`${API}${path}`, {
@@ -65,14 +82,20 @@ async function api<T>(path: string, init?: RequestInit): Promise<T | null> {
         عايزينه أصلًا. باقي الأخطاء بتتسجّل عشان نشوفها في اللوج.
       */
       if (!/already exists|conflict/i.test(body)) {
-        console.error('Vercel DNS:', res.status, body.slice(0, 200))
+        let reason = body.slice(0, 200)
+        try {
+          reason = (JSON.parse(body) as { error?: { message?: string } }).error?.message ?? reason
+        } catch {}
+        lastError = `${res.status}: ${reason}`
+        console.error('Vercel DNS:', lastError)
       }
       return null
     }
 
     return JSON.parse(body) as T
   } catch (e) {
-    console.error('Vercel DNS:', e instanceof Error ? e.message : e)
+    lastError = e instanceof Error ? e.message : 'فشل الاتصال بـVercel'
+    console.error('Vercel DNS:', lastError)
     return null
   }
 }
@@ -112,16 +135,31 @@ export async function ensurePlatformDns(
   sendingDomain: string,
   records: DnsRecord[],
 ): Promise<number> {
+  lastError = null
+
   const root = platformRoot()
-  if (!root || !token()) return 0
+  if (!root) {
+    lastError = 'NEXT_PUBLIC_ROOT_DOMAIN مش مضبوط'
+    return 0
+  }
+  if (!token()) {
+    lastError = 'VERCEL_API_TOKEN مش موجود في متغيّرات البيئة'
+    return 0
+  }
 
   /* نطاق التاجر الخاص مش منطقتنا — مش بنكتب فيها */
-  if (sendingDomain !== root && !sendingDomain.endsWith(`.${root}`)) return 0
+  if (sendingDomain !== root && !sendingDomain.endsWith(`.${root}`)) {
+    lastError = `${sendingDomain} مش تحت ${root} — سجلاته عند صاحبه`
+    return 0
+  }
 
   const list = await api<{ records: VercelRecord[] }>(
     `/v4/domains/${encodeURIComponent(root)}/records${query() ? `${query()}&limit=200` : '?limit=200'}`,
   )
-  if (!list) return 0
+  if (!list) {
+    lastError ??= `مقدرناش نقرا سجلات ${root} — راجع صلاحية المفتاح والفريق`
+    return 0
+  }
 
   const existing = new Set(
     list.records.map((r) => `${r.type.toUpperCase()}|${r.name.toLowerCase()}|${strip(r.value)}`),

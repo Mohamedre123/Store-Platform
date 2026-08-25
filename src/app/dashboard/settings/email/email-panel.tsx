@@ -5,6 +5,7 @@ import { Check, Copy, Globe, Mail, RefreshCw, Send, TriangleAlert, X } from 'luc
 import {
   removeEmailDomainAction,
   sendDeliveryTestAction,
+  sendFullSuiteAction,
   startEmailDomainAction,
   verifyEmailDomainAction,
   type EmailDiagnostics,
@@ -26,6 +27,7 @@ export function EmailPanel({ initial }: { initial: EmailDiagnostics }) {
 
   const [testTo, setTestTo] = useState('')
   const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [suite, setSuite] = useState<Array<{ label: string; ok: boolean; note: string }>>([])
 
   const [domainMsg, setDomainMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [records, setRecords] = useState<DnsRecord[]>(initial.ownDomain.records)
@@ -76,6 +78,26 @@ export function EmailPanel({ initial }: { initial: EmailDiagnostics }) {
           <p className="rounded-lg bg-[var(--color-danger-soft)] px-3 py-2 text-sm text-[var(--color-danger)]">
             خدمة البريد مش مضبوطة على المنصة — مفيش أي رسالة بتخرج.
           </p>
+        )}
+
+        {/*
+          حالة التوثيق التلقائي.
+
+          ده الجزء اللي بيشتغل لوحده في الخلفية، ولما بيفشل ما كانش
+          بيقول حاجة — النطاق بيفضل معلّق والرسايل بتخرج من نطاق
+          المنصة، والتاجر شايف كل حاجة «تمام» وهي مش تمام.
+        */}
+        {!diag.autoDns.ready ? (
+          <p className="rounded-lg bg-[var(--color-warning-soft)] px-3 py-2 text-xs leading-relaxed text-[var(--color-warning)]">
+            التوثيق التلقائي مقفول — <span dir="ltr">VERCEL_API_TOKEN</span> مش موجود في متغيّرات
+            البيئة. رسايلك بتخرج من نطاق المنصة المشترك لحد ما يتضاف.
+          </p>
+        ) : (
+          diag.autoDns.error && (
+            <p className="rounded-lg bg-[var(--color-danger-soft)] px-3 py-2 text-xs leading-relaxed text-[var(--color-danger)]">
+              التوثيق التلقائي فشل: <span dir="ltr">{diag.autoDns.error}</span>
+            </p>
+          )
         )}
 
         <div className="flex flex-col gap-2 border-t border-[var(--border)] pt-4">
@@ -129,6 +151,7 @@ export function EmailPanel({ initial }: { initial: EmailDiagnostics }) {
             onClick={() =>
               start(async () => {
                 setTestMsg(null)
+                setSuite([])
                 const res = await sendDeliveryTestAction(testTo)
                 setTestMsg({ ok: res.ok, text: res.message })
               })
@@ -138,6 +161,59 @@ export function EmailPanel({ initial }: { initial: EmailDiagnostics }) {
             ابعت
           </Button>
         </div>
+
+        {/*
+          كل الرسايل مرة واحدة.
+
+          «الميل بيروح السبام» مش حالة واحدة: الفاتورة كانت بتوصل
+          الوارد ورمز الدخول بيروح السبام في نفس الوقت. اختبار رسالة
+          واحدة بيدّي إجابة عن رسالة واحدة بس، والباقي تخمين.
+        */}
+        <Button
+          variant="ghost"
+          loading={pending}
+          disabled={!testTo.includes('@')}
+          className="self-start"
+          onClick={() =>
+            start(async () => {
+              setTestMsg(null)
+              setSuite([])
+              const res = await sendFullSuiteAction(testTo)
+              setSuite(res.results)
+              setTestMsg({
+                ok: res.ok,
+                text: res.ok
+                  ? `اتبعتت ${res.results.length} رسالة من ${res.from}. افتح الوارد والسبام وشوف كل واحدة راحت فين.`
+                  : 'فيه رسايل المزوّد رفضها — التفاصيل تحت.',
+              })
+            })
+          }
+        >
+          <Send className="h-4 w-4" aria-hidden="true" />
+          ابعت كل الرسايل (رمز الدخول، الفاتورة، كل حالات الطلب، السلة المتروكة)
+        </Button>
+
+        {suite.length > 0 && (
+          <ul className="flex flex-col gap-1.5 border-t border-[var(--border)] pt-3">
+            {suite.map((r) => (
+              <li key={r.label} className="flex items-start gap-2 text-xs">
+                <span
+                  className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full"
+                  style={{
+                    background: r.ok ? 'var(--color-success-soft)' : 'var(--color-danger-soft)',
+                    color: r.ok ? 'var(--color-success)' : 'var(--color-danger)',
+                  }}
+                >
+                  {r.ok ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium">{r.label}</span>
+                  <span className="block break-words text-[var(--fg-subtle)]">{r.note}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
 
         {testMsg && (
           <p
@@ -284,7 +360,14 @@ export function EmailPanel({ initial }: { initial: EmailDiagnostics }) {
                   return
                 }
                 setRecords(res.records)
-                setStatus('pending')
+                setStatus(res.status as typeof status)
+                setDomainMsg(
+                  res.status === 'verified'
+                    ? { ok: true, text: `تمام — رسايلك بتخرج من ${res.domain} من دلوقتي.` }
+                    : res.dnsError
+                      ? { ok: false, text: `النطاق اتسجّل بس السجلات ما اتكتبتش: ${res.dnsError}` }
+                      : { ok: true, text: 'النطاق اتسجّل. السجلات بتنتشر — دوس «تحقّق» بعد دقيقة.' },
+                )
               })
             }
           >
