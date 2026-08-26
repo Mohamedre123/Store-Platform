@@ -2,13 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { Check, Send, TriangleAlert, X } from 'lucide-react'
-import {
-  sendDeliveryTestAction,
-  sendDomainComparisonAction,
-  sendFullSuiteAction,
-  sendVariableIsolationAction,
-  type EmailDiagnostics,
-} from './actions'
+import { sendDeliveryTestAction, type EmailDiagnostics } from './actions'
 import { Button, Card, Input } from '@/components/ui'
 
 /**
@@ -24,7 +18,6 @@ export function EmailPanel({ initial }: { initial: EmailDiagnostics }) {
 
   const [testTo, setTestTo] = useState('')
   const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null)
-  const [suite, setSuite] = useState<Array<{ label: string; ok: boolean; note: string }>>([])
 
   return (
     <div className="flex flex-col gap-6">
@@ -122,7 +115,6 @@ export function EmailPanel({ initial }: { initial: EmailDiagnostics }) {
             onClick={() =>
               start(async () => {
                 setTestMsg(null)
-                setSuite([])
                 const res = await sendDeliveryTestAction(testTo)
                 setTestMsg({ ok: res.ok, text: res.message })
               })
@@ -134,115 +126,25 @@ export function EmailPanel({ initial }: { initial: EmailDiagnostics }) {
         </div>
 
         {/*
-          كل الرسايل مرة واحدة.
+          أزرار الإرسال بالجملة اتشالت.
 
-          «الميل بيروح السبام» مش حالة واحدة: الفاتورة كانت بتوصل
-          الوارد ورمز الدخول بيروح السبام في نفس الوقت. اختبار رسالة
-          واحدة بيدّي إجابة عن رسالة واحدة بس، والباقي تخمين.
+          كانت بتبعت ٦ لـ١١ رسالة شبه متطابقة لنفس الصندوق في دقيقة.
+          الشكل ده **هو** حملة سبام عند جيميل، وكل دفعة بتقع في السبام
+          وتتساب هناك بتتحسب إشارة سلبية على المرسِل كله. الاختبار كان
+          بيخرّب الحاجة اللي بيقيسها، والنتيجة كانت بتسوء كل جولة لحد
+          ما المرسِل نفسه اتصنّف — مش الرسالة.
+
+          فضل زرار واحد بيبعت رسالة واحدة. وحتى هو بمهلة.
         */}
-        <Button
-          variant="ghost"
-          loading={pending}
-          disabled={!testTo.includes('@')}
-          className="self-start"
-          onClick={() =>
-            start(async () => {
-              setTestMsg(null)
-              setSuite([])
-              const res = await sendFullSuiteAction(testTo)
-              setSuite(res.results)
-              setTestMsg({
-                ok: res.ok,
-                text: res.ok
-                  ? `اتبعتت ${res.results.length} رسالة من ${res.from}. افتح الوارد والسبام وشوف كل واحدة راحت فين.`
-                  : 'فيه رسايل المزوّد رفضها — التفاصيل تحت.',
-              })
-            })
-          }
-        >
-          <Send className="h-4 w-4" aria-hidden="true" />
-          ابعت كل الرسايل (رمز الدخول، الفاتورة، كل حالات الطلب، السلة المتروكة)
-        </Button>
-
-        {/*
-          الاختبار اللي بيقطع الشك.
-
-          «القالب ولا النطاق؟» الاتنين بيدّوا نفس العَرَض وعلاجهم
-          مختلف تمامًا — القالب بيتصلّح في ساعة، والسمعة بتاخد
-          أسابيع. من غير الإجابة دي كل تغيير بنعمله تخمين.
-        */}
-        <Button
-          variant="ghost"
-          loading={pending}
-          disabled={!testTo.includes('@')}
-          className="self-start"
-          onClick={() =>
-            start(async () => {
-              setTestMsg(null)
-              setSuite([])
-              const res = await sendDomainComparisonAction(testTo)
-              setSuite(res.results.map((r) => ({ label: `${r.label} — ${r.from}`, ok: r.ok, note: r.note })))
-              setTestMsg({
-                ok: res.results.every((r) => r.ok),
-                text: 'تلات رسايل بنفس المحتوى بالحرف، والفرق بينهم اسم المرسِل بس. شوف [1] و[2] و[3] راحوا فين — اللي يوصل الوارد هو الصيغة اللي هنمشي بيها.',
-              })
-            })
-          }
-        >
-          <Send className="h-4 w-4" aria-hidden="true" />
-          اختبار المقارنة: نفس الرسالة بتلات صيغ مرسِل
-        </Button>
-
-        {/*
-          عزل المتغيّرات.
-
-          نفس المجموعة اتبعتت مرتين وطلعت نفس النتيجة بالحرف — يعني
-          التصنيف حتمي. وده بيخلّي تغيير متغيّر واحد وشوف الحكم بيقلب
-          ولا لأ اختبارًا حقيقيًا، مش تخمينًا زي كل اللي فات.
-        */}
-        <Button
-          variant="ghost"
-          loading={pending}
-          disabled={!testTo.includes('@')}
-          className="self-start"
-          onClick={() =>
-            start(async () => {
-              setTestMsg(null)
-              setSuite([])
-              const res = await sendVariableIsolationAction(testTo)
-              setSuite(res.results)
-              setTestMsg({
-                ok: res.results.every((r) => r.ok),
-                text: 'ست نسخ من نفس الرسالة اللي بتروح السبام دايمًا، كل واحدة فيها فرق واحد بس. اللي توصل الوارد بتقول السبب على طول.',
-              })
-            })
-          }
-        >
-          <Send className="h-4 w-4" aria-hidden="true" />
-          عزل السبب: نفس الرسالة بست نسخ
-        </Button>
-
-        {suite.length > 0 && (
-          <ul className="flex flex-col gap-1.5 border-t border-[var(--border)] pt-3">
-            {suite.map((r) => (
-              <li key={r.label} className="flex items-start gap-2 text-xs">
-                <span
-                  className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full"
-                  style={{
-                    background: r.ok ? 'var(--color-success-soft)' : 'var(--color-danger-soft)',
-                    color: r.ok ? 'var(--color-success)' : 'var(--color-danger)',
-                  }}
-                >
-                  {r.ok ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block font-medium">{r.label}</span>
-                  <span className="block break-words text-[var(--fg-subtle)]">{r.note}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
+        <div className="flex items-start gap-2 rounded-lg bg-[var(--color-warning-soft)] px-3 py-2.5 text-xs leading-relaxed text-[var(--color-warning)]">
+          <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span>
+            <strong>جرّب بحساب، مش كل شوية.</strong> كل رسالة تجريبية بتقع في السبام وتتساب
+            هناك بتقلّل ثقة جيميل في مرسِلك. لو رسالة راحت السبام، ادوس عليها{' '}
+            <strong>«ليست غير مرغوب فيها»</strong> قبل ما تجرّب تاني — وإلا كل تجربة بتخلّي
+            الوضع أسوأ.
+          </span>
+        </div>
 
         {testMsg && (
           <p
