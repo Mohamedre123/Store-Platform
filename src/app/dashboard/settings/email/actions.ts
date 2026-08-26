@@ -7,6 +7,7 @@ import { db } from '@/db'
 import { stores } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { isEmailConfigured, safeReplyTo, sendEmail } from '@/lib/email'
+import { toPlainText } from '@/lib/email-plain'
 import {
   abandonedCartEmail,
   customerCodeEmail,
@@ -382,6 +383,119 @@ export async function sendDomainComparisonAction(
       from: v.from.replace(/=?UTF-8?B?[^?]+?=/, store.name),
       ok: res.ok,
       note: res.ok ? `اتبعتت — دوّر على «[${i + 1}]» في الوارد والسبام` : `المزوّد رفض: ${res.error}`,
+    })
+  }
+
+  return { results }
+}
+
+/**
+ * رسالة واحدة، كل نسخة فيها فرق واحد بس.
+ *
+ * ## ليه الاختبار ده
+ * جرّبنا نفس المجموعة مرتين وطلعت **نفس النتيجة بالحرف**: نفس التلات
+ * رسايل في الوارد ونفس التمنية في السبام. يعني التصنيف حتمي لا
+ * عشوائي — نفس المُدخل بياخد نفس الحكم.
+ *
+ * وده بيفتح باب ما كانش مفتوح: نقدر نغيّر **متغيّرًا واحدًا** ونشوف
+ * الحكم بيقلب ولا لأ. كل الجولات اللي فاتت كانت بتغيّر كذا حاجة مرة
+ * واحدة، فحتى لما النتيجة تتحسّن ما كناش نعرف مين السبب.
+ *
+ * ## النسخ
+ * كلها نفس الرسالة اللي بتروح السبام دايمًا (تأكيد الطلب)، والفرق
+ * بين كل واحدة والأصل حاجة واحدة موصوفة في اسمها.
+ *
+ * اللي يوصل الوارد بيقول السبب مباشرةً — مش بالاستنتاج.
+ */
+/* تعبيرات التجريد — معرّفة هنا عشان تتقرا، ومكتوبة مرة واحدة */
+const STRIP_LINKS = /<a\b[^>]*>([\s\S]*?)<\/a>/g
+const STRIP_URLS = /https?:\/\/\S+/g
+const STRIP_FOOTER = /<tr><td style="padding-top:24px[\s\S]*?<\/td><\/tr>/
+
+export async function sendVariableIsolationAction(
+  to: string,
+): Promise<{ results: Array<{ label: string; ok: boolean; note: string }> }> {
+  const { store } = await getDashboardContext()
+
+  const address = to.trim().toLowerCase()
+  if (!address.includes('@')) return { results: [] }
+
+  const theme = await getStoreTheme(store.id)
+  const brand = {
+    name: store.name,
+    logo: store.logoLight,
+    primary: theme.custom.identity.primary,
+    slug: store.slug,
+    email: store.email,
+  }
+
+  const home = publicStoreUrl({ slug: store.slug })
+  const base = orderStatusEmail(brand, 'confirmed', {
+    orderNumber: 1001,
+    customerName: 'عميل تجريبي',
+    total: 29000,
+    currency: store.currency,
+    trackUrl: `${home}/order/1001`,
+    lines: [{ name: 'منتج تجريبي', quantity: 1, total: 25000 }],
+    address: 'القاهرة',
+  })
+
+  /** نفس الرسالة بلا أي وسم — نص صافي */
+  const asText = base.text ?? toPlainText(base.html)
+
+  const variants: Array<{ label: string; subject: string; html: string; text?: string }> = [
+    { label: 'الأصل زي ما هو', subject: base.subject, html: base.html, text: base.text },
+    {
+      label: 'من غير روابط خالص',
+      subject: base.subject,
+      html: base.html.replace(STRIP_LINKS, '$1'),
+      text: asText.replace(STRIP_URLS, ''),
+    },
+    {
+      label: 'نص صافي بلا HTML',
+      subject: base.subject,
+      html: `<pre style="font-family:inherit;white-space:pre-wrap">${asText.replace(/[<>&]/g, '')}</pre>`,
+      text: asText,
+    },
+    {
+      label: 'موضوع بلا رقم طلب',
+      subject: `تأكيد طلبك من ${store.name}`,
+      html: base.html,
+      text: base.text,
+    },
+    {
+      label: 'موضوع بلا اسم المتجر',
+      subject: 'تأكيد طلبك',
+      html: base.html,
+      text: base.text,
+    },
+    {
+      label: 'من غير تذييل المتجر',
+      subject: base.subject,
+      /* التذييل هو آخر صف في الجدول — بيتشال بالكامل */
+      html: base.html.replace(STRIP_FOOTER, ''),
+      text: base.text,
+    },
+  ]
+
+  const results = []
+  for (const [i, v] of variants.entries()) {
+    /* تباعد عشان كل واحدة تتقيّم لوحدها لا كدفعة */
+    if (i > 0) await new Promise((r) => setTimeout(r, 2500))
+
+    const res = await sendEmail({
+      to: address,
+      subject: `[${i + 1}] ${v.subject}`,
+      html: v.html,
+      text: v.text,
+      sender: { name: store.name, slug: store.slug },
+      log: { storeId: store.id, event: 'delivery_test' },
+    })
+
+    results.push({
+      label: `[${i + 1}] ${v.label}`,
+      ok: res.ok,
+      note: res.ok ? `اتبعتت — دوّر على «[${i + 1}]»` : `المزوّد رفض: ${res.error}`,
     })
   }
 

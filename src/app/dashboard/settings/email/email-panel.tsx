@@ -6,6 +6,7 @@ import {
   sendDeliveryTestAction,
   sendDomainComparisonAction,
   sendFullSuiteAction,
+  sendVariableIsolationAction,
   type EmailDiagnostics,
 } from './actions'
 import { Button, Card, Input } from '@/components/ui'
@@ -190,6 +191,35 @@ export function EmailPanel({ initial }: { initial: EmailDiagnostics }) {
         >
           <Send className="h-4 w-4" aria-hidden="true" />
           اختبار المقارنة: نفس الرسالة بتلات صيغ مرسِل
+        </Button>
+
+        {/*
+          عزل المتغيّرات.
+
+          نفس المجموعة اتبعتت مرتين وطلعت نفس النتيجة بالحرف — يعني
+          التصنيف حتمي. وده بيخلّي تغيير متغيّر واحد وشوف الحكم بيقلب
+          ولا لأ اختبارًا حقيقيًا، مش تخمينًا زي كل اللي فات.
+        */}
+        <Button
+          variant="ghost"
+          loading={pending}
+          disabled={!testTo.includes('@')}
+          className="self-start"
+          onClick={() =>
+            start(async () => {
+              setTestMsg(null)
+              setSuite([])
+              const res = await sendVariableIsolationAction(testTo)
+              setSuite(res.results)
+              setTestMsg({
+                ok: res.results.every((r) => r.ok),
+                text: 'ست نسخ من نفس الرسالة اللي بتروح السبام دايمًا، كل واحدة فيها فرق واحد بس. اللي توصل الوارد بتقول السبب على طول.',
+              })
+            })
+          }
+        >
+          <Send className="h-4 w-4" aria-hidden="true" />
+          عزل السبب: نفس الرسالة بست نسخ
         </Button>
 
         {suite.length > 0 && (
