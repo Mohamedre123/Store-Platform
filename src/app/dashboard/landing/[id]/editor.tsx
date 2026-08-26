@@ -135,6 +135,25 @@ export function LandingEditor({
     setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, settings } : b)))
   }, [])
 
+  /** حركة القسم — `undefined` معناها يرجع لحركة الصفحة */
+  const setBlockAnimation = useCallback(
+    (id: string, animation: LandingTokens['animation'] | undefined) => {
+      setBlocks((prev) =>
+        prev.map((b) => {
+          if (b.id !== id) return b
+          /*
+            المفتاح بيتشال خالص لا بيتحط `undefined`: الإعدادات
+            بتتخزّن JSON، و`undefined` بيتحوّل `null` وقت الحفظ
+            فبيبقى «حركة اسمها null» بدل «ارجع للافتراضي».
+          */
+          const { animation: _drop, ...rest } = b
+          return animation ? { ...rest, animation } : rest
+        }),
+      )
+    },
+    [],
+  )
+
   function addBlock(type: string) {
     const def = blockDef(type)
     if (!def) return
@@ -353,6 +372,48 @@ export function LandingEditor({
                       block={current}
                       onChange={(s) => patchBlock(current.id, s)}
                     />
+
+                    {/*
+                      حركة القسم ده وحده.
+
+                      «زي الصفحة» هو الافتراضي وهو الصح في الأغلب:
+                      التكرار بيخلّي الحركة تبان مقصودة. التجاوز
+                      هنا لقسم يستاهل يتفرّق — الواجهة أو الدعوة
+                      الأخيرة — مش عشان يتحطّ على كل قسم.
+                    */}
+                    <div className="flex flex-col gap-1.5 border-t border-[var(--border)] pt-4">
+                      <span className="text-sm font-medium">حركة القسم ده</span>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setBlockAnimation(current.id, undefined)}
+                          className={cn(
+                            'min-h-9 rounded-lg border text-xs font-medium',
+                            !current.animation
+                              ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]'
+                              : 'border-[var(--border-strong)] text-[var(--fg-muted)]',
+                          )}
+                        >
+                          زي الصفحة
+                        </button>
+                        {ANIMATIONS.map((a) => (
+                          <button
+                            key={a.key}
+                            type="button"
+                            title={a.hint}
+                            onClick={() => setBlockAnimation(current.id, a.key)}
+                            className={cn(
+                              'min-h-9 rounded-lg border text-xs font-medium',
+                              current.animation === a.key
+                                ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]'
+                                : 'border-[var(--border-strong)] text-[var(--fg-muted)]',
+                            )}
+                          >
+                            {a.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

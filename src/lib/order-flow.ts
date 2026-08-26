@@ -139,6 +139,7 @@ export async function applyOrderStatus(
       customerId: orders.customerId,
       trackingNumber: orders.trackingNumber,
       shippingCarrier: orders.shippingCarrier,
+      shippingAddress: orders.shippingAddress,
     })
     .from(orders)
     .where(and(eq(orders.id, orderId), eq(orders.storeId, store.id)))
@@ -386,6 +387,28 @@ export async function applyOrderStatus(
     void (async () => {
       const theme = await getStoreTheme(store.id)
       const storeEmail = store.email
+
+      /*
+        أصناف الطلب بتتقرا هنا لا في القالب.
+
+        الرسايل اللي بتوصل الوارد عندنا كلها فيها محتوى حقيقي —
+        أصناف وأسعار وعنوان. واللي كان بيروح السبام أرفعهم: سطرين
+        ورقم. والاستعلام ده رخيص وبيتعمل مرة لكل تغيير حالة.
+      */
+      const lines = await db
+        .select({
+          name: orderItems.name,
+          quantity: orderItems.quantity,
+          total: orderItems.total,
+          options: orderItems.options,
+        })
+        .from(orderItems)
+        .where(eq(orderItems.orderId, order.id))
+
+      const addr = order.shippingAddress
+      const address =
+        [addr?.city, addr?.area, addr?.street, addr?.building].filter(Boolean).join(' — ') || null
+
       const mail = orderStatusEmail(
         { name: store.name, logo: store.logoLight, primary: theme.custom.identity.primary, email: store.email, slug: store.slug },
         status,
@@ -397,6 +420,8 @@ export async function applyOrderStatus(
           trackingNumber: order.trackingNumber,
           carrier: order.shippingCarrier,
           trackUrl: `${publicStoreUrl(store)}/order/${order.orderNumber}?t=${encodeURIComponent(order.recoveryToken ?? '')}`,
+          lines,
+          address,
         },
       )
       await sendEmail({

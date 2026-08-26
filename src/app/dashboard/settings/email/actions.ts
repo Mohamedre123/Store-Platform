@@ -187,8 +187,11 @@ export async function sendDeliveryTestAction(
  * الوارد والسبام مرة واحدة وتشوف كل واحدة راحت فين.
  *
  * ## المهلة بين الرسايل
- * المزوّد بيقبل رسالتين في الثانية. من غير المهلة نص القايمة بترجع
- * ٤٢٩ وتتحسب «فشلت» وهي ما اتبعتتش أصلًا.
+ * ثواني لا أجزاء من ثانية. المزوّد بيقبل رسالتين في الثانية، لكن
+ * المشكلة الأكبر مش عنده: **إحدى عشرة رسالة شبه متطابقة لنفس العنوان
+ * في تمن ثواني هي بالظبط شكل حملة سبام.** الاختبار بالسرعة دي بيخلق
+ * المشكلة اللي بيقيسها، ونتيجته ما بتقولش حاجة عن رسالة واحدة بتتبعت
+ * لعميل حقيقي في يومه العادي.
  */
 export async function sendFullSuiteAction(
   to: string,
@@ -263,6 +266,8 @@ export async function sendFullSuiteAction(
         trackUrl,
         trackingNumber: status === 'shipped' ? 'EG123456789' : null,
         carrier: status === 'shipped' ? 'بوسطة' : null,
+        lines: order.lines,
+        address: order.address,
       }),
     })
   }
@@ -270,8 +275,16 @@ export async function sendFullSuiteAction(
   const results: Array<{ label: string; ok: boolean; note: string }> = []
 
   for (const [i, job] of jobs.entries()) {
-    /* رسالتين في الثانية عند المزوّد — المهلة بتمنع ٤٢٩ كاذبة */
-    if (i > 0) await new Promise((r) => setTimeout(r, 700))
+    /*
+      تباعد بالثواني لا بأجزائها.
+
+      المزوّد بيقبل رسالتين في الثانية، لكن المشكلة الأكبر مش عنده:
+      **إحدى عشرة رسالة شبه متطابقة لنفس العنوان في تمن ثواني هي
+      بالظبط شكل حملة سبام.** الاختبار بالسرعة دي بيخلق المشكلة اللي
+      بيقيسها، ونتيجته ما بتقولش حاجة عن رسالة واحدة بتتبعت لعميل
+      حقيقي في يومه العادي.
+    */
+    if (i > 0) await new Promise((r) => setTimeout(r, 2500))
 
     const res = await sendEmail({
       to: address,

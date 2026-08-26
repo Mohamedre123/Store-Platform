@@ -3,6 +3,11 @@ import { emailDiagnosticsAction } from './actions'
 import { EmailPanel } from './email-panel'
 
 export const dynamic = 'force-dynamic'
+/*
+  اختبار كل الرسايل بيباعد بين الواحدة والتانية بثواني عشان ما
+  تتقيّمش كدفعة — يعني الفعل بياخد نص دقيقة، والافتراضي بيقطعه.
+*/
+export const maxDuration = 60
 export const metadata = { title: 'بريد المتجر' }
 
 /**

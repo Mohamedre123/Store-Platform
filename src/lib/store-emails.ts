@@ -510,11 +510,37 @@ function timelineHtml(current: StatusKey, primary: string) {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;"><tr>${cells}</tr></table>`
 }
 
-/** رسالة تغيير حالة الطلب — بهوية المتجر */
+/**
+ * رسالة تغيير حالة الطلب — بهوية المتجر.
+ *
+ * ## ليه ملخّص الطلب جوّاها
+ * الرسايل اللي بتوصل الوارد عندنا كلها مشتركة في حاجة واحدة: **محتوى
+ * حقيقي**. الفاتورة وصلت وفيها أصناف وإجماليات، والسلة المتروكة وصلت
+ * وفيها المنتجات، وإشعار التاجر وصل وفيه الأصناف والعنوان. واللي راح
+ * السبام كان أرفعهم: سطر ترحيب وجملة ورقم طلب.
+ *
+ * رسالة معاملاتية فيها سطرين ورقم بتتقرا عند الفلتر إشعارًا آليًا
+ * مجهولًا؛ اللي فيها أصناف وأسعار وعنوان بتتقرا إيصالًا من جهة
+ * بتتعامل مع حد فعلًا.
+ *
+ * وده مش تحسين تسليم بس — العميل اللي بيوصله «طلبك في الطريق» عايز
+ * يفتكر الطلب ده كان إيه أصلًا من غير ما يفتح المتجر.
+ */
 export function orderStatusEmail(
   store: StoreBrand,
   status: StatusKey,
-  o: { orderNumber: number; customerName: string | null; total: number; currency: string; trackUrl: string; trackingNumber?: string | null; carrier?: string | null },
+  o: {
+    orderNumber: number
+    customerName: string | null
+    total: number
+    currency: string
+    trackUrl: string
+    trackingNumber?: string | null
+    carrier?: string | null
+    /** أصناف الطلب — بتتعرض كملخّص تحت الحالة */
+    lines?: OrderLine[]
+    address?: string | null
+  },
 ) {
   const copy = STATUS_COPY[status]
   const greeting = o.customerName ? `أهلًا ${escapeHtml(o.customerName)}،` : 'أهلًا،'
@@ -542,6 +568,22 @@ export function orderStatusEmail(
       <span style="font-size:17px;font-weight:bold;"> #${o.orderNumber}</span>
       <span style="font-size:14px;color:${MUTED};"> — ${formatMoney(o.total, o.currency)}</span>
     </div>
+
+    ${
+      o.lines && o.lines.length > 0
+        ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:18px;">
+             ${linesTable(o.lines, o.currency)}
+           </table>`
+        : ''
+    }
+
+    ${
+      o.address
+        ? `<p style="margin:0 0 20px;font-size:14px;line-height:1.8;color:${MUTED};">
+             التوصيل إلى: <strong style="color:${INK};">${escapeHtml(o.address)}</strong>
+           </p>`
+        : ''
+    }
 
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;">
       <tr><td align="center" style="border-radius:10px;background-color:${store.primary};">

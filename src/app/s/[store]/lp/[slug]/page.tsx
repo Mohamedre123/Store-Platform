@@ -143,7 +143,7 @@ export default async function LandingPage({
               blocks.map((b, i) => (
                 <LandingReveal
                   key={b.id}
-                  animation={tokens.animation}
+                  animation={b.animation ?? tokens.animation}
                   durationMs={SPEED_MS[tokens.animationSpeed]}
                   index={i}
                 >
