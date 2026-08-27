@@ -30,7 +30,20 @@ const COLORS = {
   page: '#f4f3f9',
 }
 
-function layout(inner: string, preheader: string) {
+/*
+  مفيش نص مخفي في الرسالة.
+
+  كان فيه سطر معاينة متخبّي بتلات طرق مع بعض — `display:none`
+  و`opacity:0` و`max-height:0` — في **كل** رسالة بعتناها من أول يوم.
+  والتكديس ده بالذات هو اللي الفلاتر بتسمّيه إخفاء محتوى: نص موجود
+  في الرسالة والمستقبِل ما بيشوفهوش. الحيلة دي أصلها إعلانات بتخبّي
+  كلمات عشان تعدّي من الفحص، فالفلاتر بتسجّل عليها مباشرةً.
+
+  ومكسبه كان سطر المعاينة في قايمة الوارد. وجيميل بياخد السطر ده من
+  أول كلام ظاهر في الرسالة لو ما لقاش واحدًا مخصّصًا — يعني كنا
+  بندفع تهمة إخفاء محتوى تمن حاجة بتحصل لوحدها.
+*/
+function layout(inner: string, _preheader: string) {
   return `<!doctype html>
 <html lang="ar" dir="rtl" xmlns:v="urn:schemas-microsoft-com:vml">
 <head>
@@ -44,7 +57,6 @@ function layout(inner: string, preheader: string) {
 <body style="margin:0;padding:0;background-color:${COLORS.page};">
 
 <!-- نص المعاينة: يظهر في قائمة الرسائل جنب العنوان -->
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${preheader}</div>
 
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${COLORS.page};">
   <tr>

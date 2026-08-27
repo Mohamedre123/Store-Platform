@@ -121,7 +121,20 @@ function storeHome(store: StoreBrand): string | null {
  * الفاتورة كانت الرسالة الوحيدة اللي بتوصل الوارد، والفرق الوحيد
  * في جسمها كان رابط على نطاق المرسِل. بقى في تذييل كل رسالة.
  */
-function layout(store: StoreBrand, inner: string, preheader: string) {
+/*
+  مفيش نص مخفي في الرسالة.
+
+  كان فيه سطر معاينة متخبّي بتلات طرق مع بعض — `display:none`
+  و`opacity:0` و`max-height:0` — في **كل** رسالة بعتناها من أول يوم.
+  والتكديس ده بالذات هو اللي الفلاتر بتسمّيه إخفاء محتوى: نص موجود
+  في الرسالة والمستقبِل ما بيشوفهوش. الحيلة دي أصلها إعلانات بتخبّي
+  كلمات عشان تعدّي من الفحص، فالفلاتر بتسجّل عليها مباشرةً.
+
+  ومكسبه كان سطر المعاينة في قايمة الوارد. وجيميل بياخد السطر ده من
+  أول كلام ظاهر في الرسالة لو ما لقاش واحدًا مخصّصًا — يعني كنا
+  بندفع تهمة إخفاء محتوى تمن حاجة بتحصل لوحدها.
+*/
+function layout(store: StoreBrand, inner: string, _preheader: string) {
   const home = storeHome(store)
 
   return `<!doctype html>
@@ -134,7 +147,6 @@ function layout(store: StoreBrand, inner: string, preheader: string) {
 <title>${escapeHtml(store.name)}</title>
 </head>
 <body style="margin:0;padding:0;background:#ffffff;">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(preheader)}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
   <tr><td align="center" style="padding:24px 16px;">
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="520" style="width:520px;max-width:100%;font-family:-apple-system,'Segoe UI',Tahoma,Arial,sans-serif;color:${INK};font-size:15px;line-height:1.9;">
