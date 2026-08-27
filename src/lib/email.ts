@@ -17,8 +17,16 @@ import { toPlainText } from './email-plain'
 
 export type SendResult = { ok: true; id?: string } | { ok: false; error: string }
 
+type EmailProvider = 'resend' | 'postmark'
+
+function emailProvider(): EmailProvider {
+  return process.env.EMAIL_PROVIDER?.trim().toLowerCase() === 'postmark' ? 'postmark' : 'resend'
+}
+
 export function isEmailConfigured(): boolean {
-  return Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM)
+  const hasProviderKey =
+    emailProvider() === 'postmark' ? Boolean(process.env.POSTMARK_SERVER_TOKEN) : Boolean(process.env.RESEND_API_KEY)
+  return Boolean(hasProviderKey && process.env.EMAIL_FROM)
 }
 
 /** بريد إلغاء الاشتراك — بيتقرا من عنوان المرسل نفسه */
@@ -78,14 +86,12 @@ function platformName(): string {
  * وسمعة العنوان الواحد بتتراكم من كل التجّار مع بعض بدل ما كل متجر
  * جديد يبدأ من الصفر.
  */
-function fromHeader(store?: { name?: string | null; slug?: string | null } | null): string {
+function fromHeader(_store?: { name?: string | null; slug?: string | null } | null): string {
   const configured = process.env.EMAIL_FROM ?? ''
   const address = configured.match(/<([^>]+)>/)?.[1] ?? configured.trim()
   if (!address.includes('@')) return configured
 
-  const name = store?.name?.trim()
-  const display = name ? `${name} عبر ${platformName()}` : platformName()
-  return `${encodeDisplayName(display)} <${address}>`
+  return `${encodeDisplayName(platformName())} <${address}>`
 }
 
 
@@ -236,6 +242,68 @@ export async function sendEmail(options: {
     return { ok: false, error: 'not_configured' }
   }
 
+  if (emailProvider() === 'postmark') {
+    try {
+      const headers = bulk
+        ? [
+            {
+              Name: 'List-Unsubscribe',
+              Value: unsubscribeUrl
+                ? `<${unsubscribeUrl}>, <mailto:${unsubscribeAddress()}?subject=unsubscribe>`
+                : `<mailto:${unsubscribeAddress()}?subject=unsubscribe>`,
+            },
+            ...(unsubscribeUrl ? [{ Name: 'List-Unsubscribe-Post', Value: 'List-Unsubscribe=One-Click' }] : []),
+          ]
+        : undefined
+
+      const res = await fetch('https://api.postmarkapp.com/email', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'X-Postmark-Server-Token': process.env.POSTMARK_SERVER_TOKEN!,
+        },
+        body: JSON.stringify({
+          From: fromOverride || fromHeader(sender),
+          To: to,
+          Subject: subject,
+          HtmlBody: html,
+          TextBody: text ?? toPlainText(html),
+          MessageStream: process.env.POSTMARK_MESSAGE_STREAM?.trim() || 'outbound',
+          TrackOpens: false,
+          TrackLinks: 'None',
+          ...(replyTo ? { ReplyTo: replyTo } : {}),
+          ...(log?.event ? { Tag: log.event.slice(0, 1000) } : {}),
+          ...(attachments?.length
+            ? {
+                Attachments: attachments.map((a) => ({
+                  Name: a.filename,
+                  Content: a.content.toString('base64'),
+                  ContentType: a.filename.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream',
+                })),
+              }
+            : {}),
+          ...(headers ? { Headers: headers } : {}),
+        }),
+      })
+
+      if (!res.ok) {
+        const body = await res.text()
+        console.error('فشل إرسال البريد عبر Postmark:', res.status, body)
+        await record(log, to, subject, 'failed', { error: `${res.status}: ${body.slice(0, 300)}` }, 'postmark')
+        return { ok: false, error: `provider_${res.status}` }
+      }
+
+      const data = (await res.json()) as { MessageID?: string }
+      await record(log, to, subject, 'sent', { providerRef: data.MessageID }, 'postmark')
+      return { ok: true, id: data.MessageID }
+    } catch (err) {
+      console.error('خطأ في إرسال البريد عبر Postmark:', err)
+      await record(log, to, subject, 'failed', { error: String(err).slice(0, 300) }, 'postmark')
+      return { ok: false, error: 'network' }
+    }
+  }
+
   try {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -346,6 +414,7 @@ async function record(
   subject: string,
   status: 'sent' | 'failed',
   extra: { providerRef?: string; error?: string },
+  provider: EmailProvider = 'resend',
 ) {
   if (!ctx) return
   try {
@@ -356,7 +425,7 @@ async function record(
       recipient,
       body: subject,
       status,
-      provider: 'resend',
+      provider,
       providerRef: extra.providerRef ?? null,
       errorMessage: extra.error ?? null,
       orderId: ctx.orderId ?? null,
