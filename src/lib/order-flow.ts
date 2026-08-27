@@ -1,5 +1,5 @@
 import 'server-only'
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, ne, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import {
   customers,
@@ -150,8 +150,25 @@ export async function applyOrderStatus(
   const restocking = ['cancelled', 'returned'].includes(status)
   const wasCounted = !['cancelled', 'returned', 'incomplete'].includes(order.status)
 
+  /**
+   * الانتقال بيتقفل على مستوى قاعدة البيانات لا في الذاكرة.
+   *
+   * الحارس فوق (`order.status === status`) بيقرا وبعدين يكتب، ومفيش
+   * حاجة بينهم. ضغطتين على «بيتجهّز» في نفس اللحظة بيقروا الاتنين
+   * «مؤكّد»، فيعدّوا الاتنين، ويتبعت إيميلين لنفس العميل عن نفس
+   * الخطوة — وده ظهر فعلًا في سجل الرسايل: نفس الطلب ونفس الحدث
+   * مرتين بفارق أربع دقايق.
+   *
+   * وأخطر منه في الإلغاء: الاتنين بيرجّعوا المخزون، فالكمية بتتزوّد
+   * الضِّعف وتفضل غلط من غير ما حد ياخد باله.
+   *
+   * الشرط `ne(status)` بيخلّي التحديث نفسه هو القفل: أول واحد بيغيّر
+   * صفًّا، والتاني بيرجع صفر صفوف فبيقف قبل أي أثر جانبي.
+   */
+  let applied = false
+
   await db.transaction(async (tx) => {
-    await tx
+    const changed = await tx
       .update(orders)
       .set({
         status,
@@ -160,7 +177,13 @@ export async function applyOrderStatus(
         deliveredAt: status === 'delivered' ? new Date() : undefined,
         paymentStatus: status === 'delivered' ? 'paid' : undefined,
       })
-      .where(and(eq(orders.id, orderId), eq(orders.storeId, store.id)))
+      .where(
+        and(eq(orders.id, orderId), eq(orders.storeId, store.id), ne(orders.status, status)),
+      )
+      .returning({ id: orders.id })
+
+    if (changed.length === 0) return
+    applied = true
 
     if (restocking && wasCounted) {
       const items = await tx
