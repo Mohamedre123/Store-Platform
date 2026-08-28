@@ -55,6 +55,22 @@ export type IssueResult =
   | { ok: true; channel: Channel; masked: string; devCode?: string }
   | { ok: false; error: string }
 
+function emailDeliveryErrorMessage(error: string): string {
+  if (error === 'not_configured') {
+    return 'خدمة البريد غير مضبوطة حاليًا. راجع إعدادات البريد ثم جرّب مرة أخرى.'
+  }
+  if (error === 'provider_401' || error === 'provider_403') {
+    return 'مفتاح خدمة البريد غير صالح أو لا يملك صلاحية الإرسال. راجع BREVO_API_KEY.'
+  }
+  if (error === 'provider_400' || error === 'provider_422') {
+    return 'خدمة البريد رفضت عنوان المرسل. تأكد أن info@zawyaeg.site موثّق في Brevo وأن EMAIL_FROM مطابق له.'
+  }
+  if (error === 'provider_429') {
+    return 'تم الوصول إلى حد الإرسال المؤقت لخدمة البريد. جرّب بعد قليل.'
+  }
+  return 'تعذّر إرسال الرمز عبر البريد حاليًا. جرّب مرة أخرى بعد قليل.'
+}
+
 /** يخفي وسط الرقم أو البريد — بيأكّد للعميل إنه الصح من غير ما نكشفه */
 function mask(identity: Identity): string {
   if (identity.kind === 'email') {
@@ -163,6 +179,7 @@ export async function issueCustomerOtp(input: {
   })
 
   let channel: Channel | null = null
+  let emailError: string | null = null
 
   /**
    * الواتساب الأول دايمًا — حتى لو العميل دخل ببريده.
@@ -200,15 +217,20 @@ export async function issueCustomerOtp(input: {
   /*
     البريد احتياطي: لما الواتساب مش مربوط، أو مفيش رقم على الحساب.
   */
-  if (!channel && emailTarget && isEmailConfigured()) {
-    const mail = customerCodeEmail(input.brand, code, TTL, emailTarget)
-    const sent = await sendEmail({
-      to: emailTarget,
-      ...mail,
-      sender: { name: input.brand.name, slug: input.brand.slug },
-      log: { storeId: input.storeId, event: 'customer_login_otp' },
-    })
-    if (sent.ok) channel = 'email'
+  if (!channel && emailTarget) {
+    if (!isEmailConfigured()) {
+      emailError = 'not_configured'
+    } else {
+      const mail = customerCodeEmail(input.brand, code, TTL, emailTarget)
+      const sent = await sendEmail({
+        to: emailTarget,
+        ...mail,
+        sender: { name: input.brand.name, slug: input.brand.slug },
+        log: { storeId: input.storeId, event: 'customer_login_otp' },
+      })
+      if (sent.ok) channel = 'email'
+      else emailError = sent.error
+    }
   }
 
   if (!channel && !dev) {
@@ -217,7 +239,7 @@ export async function issueCustomerOtp(input: {
       error:
         input.identity.kind === 'phone'
           ? 'المتجر ده لسه ما ربطش واتساب، فمقدرناش نبعت رمزًا على الرقم. ادخل ببريدك بدل الرقم.'
-          : 'مقدرناش نبعت الرمز دلوقتي. جرّب تاني بعد شوية.',
+          : emailDeliveryErrorMessage(emailError ?? 'network'),
     }
   }
 
