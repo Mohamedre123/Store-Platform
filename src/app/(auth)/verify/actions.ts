@@ -6,6 +6,22 @@ import { issueEmailOtp, verifyEmailOtp } from '@/lib/otp'
 
 export type VerifyState = { error?: string; notice?: string; devCode?: string } | null
 
+function emailSendErrorMessage(error: string): string {
+  if (error === 'not_configured') {
+    return 'خدمة البريد غير مضبوطة حاليًا. راجع إعدادات البريد ثم اطلب رمزًا جديدًا.'
+  }
+  if (error === 'provider_401' || error === 'provider_403') {
+    return 'مفتاح خدمة البريد غير صالح أو لا يملك صلاحية الإرسال. راجع BREVO_API_KEY.'
+  }
+  if (error === 'provider_400' || error === 'provider_422') {
+    return 'خدمة البريد رفضت عنوان المرسل. تأكد أن info@zawyaeg.site موثّق في Brevo وأن EMAIL_FROM مطابق له.'
+  }
+  if (error === 'provider_429') {
+    return 'تم الوصول لحد الإرسال المؤقت لخدمة البريد. جرّب بعد قليل.'
+  }
+  return 'تعذّر إرسال الرمز الآن. جرّب مرة أخرى بعد قليل.'
+}
+
 export async function verifyCodeAction(_prev: VerifyState, formData: FormData): Promise<VerifyState> {
   const user = await getCurrentUser()
   if (!user) redirect('/login')
@@ -39,7 +55,7 @@ export async function resendCodeAction(): Promise<VerifyState> {
     if (result.reason === 'cooldown') {
       return { error: `استنى ${result.secondsLeft} ثانية قبل ما تطلب رمز جديد.` }
     }
-    return { error: 'مقدرناش نبعت الرمز دلوقتي. جرّب كمان شوية.' }
+    return { error: emailSendErrorMessage(result.sendError) }
   }
 
   if (result.autoVerified) redirect('/dashboard')

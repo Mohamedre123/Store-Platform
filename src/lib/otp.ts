@@ -12,7 +12,7 @@ const { length: CODE_LENGTH, ttlMinutes: CODE_TTL_MINUTES, maxAttempts: MAX_ATTE
 export type IssueResult =
   | { ok: true; autoVerified: boolean; devCode?: string }
   | { ok: false; reason: 'cooldown'; secondsLeft: number }
-  | { ok: false; reason: 'send_failed' }
+  | { ok: false; reason: 'send_failed'; sendError: string }
 
 /**
  * يُصدر رمز تحقق ويبعته على البريد.
@@ -71,7 +71,7 @@ export async function issueEmailOtp(userId: string, email: string, name?: string
   const message = verificationEmail(code, name)
   const sent = await sendEmail({ to: email, ...message })
 
-  if (!sent.ok) return { ok: false, reason: 'send_failed' }
+  if (!sent.ok) return { ok: false, reason: 'send_failed', sendError: sent.error }
 
   return {
     ok: true,
