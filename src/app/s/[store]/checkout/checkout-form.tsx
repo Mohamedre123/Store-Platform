@@ -361,6 +361,14 @@ export function CheckoutForm({
         localStorage.removeItem('zw_bookings')
         /* المسوّدة بقت طلبًا — رمزها لازم يتشال وإلا الزيارة الجاية تكتب فوقه */
         localStorage.removeItem(draftKey)
+        /*
+          وبصمة السلة معاه.
+
+          البصمة بتمنع تسجيل نفس السلة مرتين. لو سيبناها، العميل
+          اللي طلب نفس المنتجات تاني كان بيتسكّت عنه — سلّته الجديدة
+          شبه القديمة، فالحارس بيقول «دي اتسجّلت» والتاجر ما يشوفهاش.
+        */
+        localStorage.removeItem(`zw_cartsig_${storeIdentifier}`)
       } catch {}
 
       /**

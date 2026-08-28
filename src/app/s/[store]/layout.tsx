@@ -16,6 +16,7 @@ import { LuckyWheel } from '@/components/storefront/lucky-wheel'
 import { getWheelConfig } from '@/lib/wheel'
 import { aiAllowed, getAiConfig, isReady } from '@/lib/ai/settings'
 import { StoreLinkProvider } from '@/components/storefront/store-link'
+import { getCurrentCustomer } from '@/lib/customer-auth'
 import { FONT_STACKS, RADIUS_PX } from '@/lib/customization'
 
 export const dynamic = 'force-dynamic'
@@ -83,6 +84,14 @@ export default async function StorefrontLayout({
     كل رسالة بتستهلك من رصيد التاجر، وتجاربه وهو بيظبّط الشكل ما
     يصحّش تتحسب عليه.
   */
+  /*
+    العميل المسجَّل — بيروح للسلة عشان تفضل مقفولة على صاحبها.
+
+    `getCurrentCustomer` مغلّفة بـcache فالنداء ده ما بيزوّدش رحلة:
+    صفحات المتجر اللي بتحتاجه بتقرا نفس النتيجة في نفس الطلب.
+  */
+  const customer = await getCurrentCustomer(store.id)
+
   const ai = await getAiConfig(store.id)
   /*
     والاشتراك شرط تالت. من غيره الزائر بيلاقي أيقونة شات بتفتح
@@ -152,6 +161,7 @@ export default async function StorefrontLayout({
         storeIdentifier={identifier}
         mode={custom.cart.mode}
         track={!isPreview}
+        customerId={customer?.id ?? null}
       >
       <div
         style={vars}

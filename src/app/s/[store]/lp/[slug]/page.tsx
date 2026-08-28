@@ -5,6 +5,7 @@ import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { funnels, productVariants, products } from '@/db/schema'
 import { getStore } from '@/lib/storefront'
+import { getCurrentCustomer } from '@/lib/customer-auth'
 import { mergeTokens, SHADOWS, SPACING_PX, SPEED_MS, WIDTH_PX, type Block } from '@/lib/landing'
 import { FONT_STACKS, RADIUS_PX } from '@/lib/customization'
 import { CartProvider } from '@/components/storefront/cart'
@@ -60,6 +61,9 @@ export default async function LandingPage({
   const isPreview = h.get('x-zawya-preview') === '1'
   const funnel = await loadFunnel(store.id, slug, isPreview)
   if (!funnel) notFound()
+
+  /* صاحب السلة — صفحة الهبوط ليها سلة زي أي صفحة في المتجر */
+  const customer = await getCurrentCustomer(store.id)
 
   // عدّاد المشاهدات — مش في المعاينة عشان ما نلوّثش أرقام التاجر
   if (!isPreview) {
@@ -133,7 +137,11 @@ export default async function LandingPage({
 
   return (
     <StoreLinkProvider base={base}>
-      <CartProvider storeSlug={store.slug} storeIdentifier={identifier}>
+      <CartProvider
+        storeSlug={store.slug}
+        storeIdentifier={identifier}
+        customerId={customer?.id ?? null}
+      >
         <div style={vars} className="min-h-screen-safe">
           <div className="mx-auto px-4 sm:px-6" style={{ maxWidth: WIDTH_PX[tokens.width] }}>
             <RevealFallback />
