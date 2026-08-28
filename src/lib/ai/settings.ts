@@ -96,10 +96,22 @@ export function isReady(cfg: AiConfig): cfg is AiConfig & { apiKey: string; mode
  * اللي بيشتغل.
  */
 export async function isAssistantReady(storeId: string): Promise<boolean> {
-  if (!(await aiAllowed(storeId))) return false
+  /*
+    ترتيب الفحوص مقصود: الأرخص الأول.
 
+    `aiAllowed` بيسأل قاعدة البيانات مرتين (حالة الاشتراك، وهل
+    المتجر بتاع الإدارة). ولأن الدالة دي بتتنادى في تخطيط اللوحة —
+    يعني مع **كل** صفحة يفتحها التاجر — تقديمها كان بيضيف
+    استعلامين على كل صفحة حتى للمتاجر اللي مش مفعّلة الذكاء أصلًا،
+    وهي الأغلبية.
+
+    `getAiConfig` مغلّفة بـcache وبتتقرا في نفس الطلب أصلًا، فالخروج
+    من هنا بيبقى ببلاش.
+  */
   const pro = await getAiConfig(storeId, GEMINI_PRO_SLUG)
   if (!pro.enabled) return false
+
+  if (!(await aiAllowed(storeId))) return false
 
   if (pro.apiKey && pro.model) return true
 
