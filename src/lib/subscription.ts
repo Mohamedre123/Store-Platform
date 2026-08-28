@@ -33,6 +33,14 @@ export async function activateStore(input: {
   /** طلب الاشتراك اللي اتقبل — لو التفعيل جه من طلب */
   requestId?: string
   note?: string
+  /**
+   * التاجر بدأها بنفسه — التجربة بس.
+   *
+   * بيتكتب في `paymentReference` عشان السجل يفرّق بين «الإدارة
+   * فعّلت» و«التاجر بدأ تجربته». من غير التفرقة دي، صف في
+   * `subscriptions` مالوش أب معروف.
+   */
+  selfServe?: boolean
 }): Promise<ActivationResult> {
   const plan = getPlan(input.plan)
   if (!plan) return { ok: false, error: 'الباقة مش معروفة' }
@@ -94,7 +102,7 @@ export async function activateStore(input: {
       يستنى تجديدًا مش هييجي.
     */
     autoRenew: false,
-    paymentReference: input.requestId ?? null,
+    paymentReference: input.requestId ?? (input.selfServe ? 'self_trial' : null),
   })
 
   if (input.requestId) {
@@ -127,6 +135,14 @@ export async function deactivateStore(storeId: string, adminId: string): Promise
     .update(stores)
     .set({
       status: 'suspended',
+      /*
+        الباقة بتتشال كمان.
+
+        سيبها كانت بتخلّي صف الإدارة يقول «موقوف · الباقة: شهري»
+        في نفس السطر — والاتنين مع بعض بيخلّوا اللي بيقرا يشك هو
+        مشترك ولا لأ.
+      */
+      plan: null,
       subscribedUntil: past,
       trialEndsAt: past,
       activatedAt: new Date(),

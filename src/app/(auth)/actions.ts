@@ -22,7 +22,6 @@ import {
 import { createSession, destroySession, hashPassword, verifyPassword } from '@/lib/auth'
 import { isValidSlug } from '@/lib/domain'
 import { issueEmailOtp } from '@/lib/otp'
-import { config } from '@/lib/config'
 import { uniqueAccountId } from '@/lib/account-id'
 import { isAdminEmail } from '@/lib/admin'
 import { contentFor } from '@/lib/theme-content'
@@ -125,18 +124,25 @@ export async function signupAction(_prev: FormState, formData: FormData): Promis
       .values({ email, passwordHash, name, publicId, isPlatformAdmin: isAdminEmail(email) })
       .returning({ id: users.id })
 
-    const trialEndsAt = new Date()
-    trialEndsAt.setDate(trialEndsAt.getDate() + config.trialDays)
+    /*
+      المتجر الجديد بيفتح **مجاني لا تجريبي**.
 
+      التجربة كانت بتتدّي تلقائي عند التسجيل، فكل حساب جديد كان
+      بيخرج وكل المميزات مفتوحة عنده ٣ أيام من غير ما يطلبها —
+      يعني القفل كان موجود في الكود ومش شغّال على حد. ومع كده،
+      اللي ما بدأش يبيع في أول ٣ أيام كان بيخسر تجربته وهو مش
+      دايس عليها أصلًا.
+
+      دلوقتي التاجر بيبدأها بإيده من صفحة الاشتراك وقت ما يجهز،
+      فبتتسجّل باسمه وبتاريخها.
+    */
     const [store] = await tx
       .insert(stores)
       .values({
         slug: storeSlug,
         name: storeName,
         email,
-        status: 'trial',
-        plan: 'trial',
-        trialEndsAt,
+        status: 'free',
       })
       .returning({ id: stores.id })
 

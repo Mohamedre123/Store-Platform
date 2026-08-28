@@ -1,4 +1,5 @@
 import type { PlanKey } from '@/db/schema'
+import { config } from './config'
 
 /**
  * باقات المنصة.
@@ -38,10 +39,11 @@ export const PLANS: Plan[] = [
     key: 'trial',
     name: 'تجربة مجانية',
     price: 0,
-    days: 3,
+    /* المدة من config عشان ما يبقاش فيه رقمين للحاجة الواحدة */
+    days: config.trialDays,
     interval: 'trial',
-    tagline: 'تلات أيام بكل المميزات — من غير أي دفع.',
-    features: [...FULL_FEATURES, 'بتتوقف لوحدها بعد ٣ أيام'],
+    tagline: `${config.trialDays} أيام بكل المميزات — من غير أي دفع.`,
+    features: [...FULL_FEATURES, `بتتوقف لوحدها بعد ${config.trialDays} أيام`],
   },
   {
     key: 'monthly',
@@ -72,6 +74,7 @@ export function getPlan(key: string | null | undefined): Plan | null {
 export const PAID_PLANS = PLANS.filter((p) => p.price > 0)
 
 export const STATUS_LABEL: Record<string, string> = {
+  free: 'الباقة المجانية',
   trial: 'فترة تجريبية',
   active: 'اشتراك نشط',
   past_due: 'انتهى الاشتراك',

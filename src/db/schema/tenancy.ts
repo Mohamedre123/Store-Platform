@@ -1,7 +1,15 @@
 import { pgTable, uuid, text, boolean, integer, timestamp, jsonb, index, uniqueIndex } from 'drizzle-orm/pg-core'
 import { createdAt, updatedAt, deletedAt } from './_shared'
 
-export type StoreStatus = 'trial' | 'active' | 'past_due' | 'suspended'
+/**
+ * حالة المتجر.
+ *
+ * `free` هي حالة المتجر الجديد: **التجربة مش بتتدّي تلقائي**. المتجر
+ * بيفتح على الباقة المجانية (٥ طلبات، والذكاء وصفحات الهبوط والنطاق
+ * مقفولين)، والتاجر هو اللي بيبدأ التجربة بإيده لما يجهز — فبتتسجّل
+ * باسمه وبتاريخها، وإحنا عارفين مين بدأها وإمتى.
+ */
+export type StoreStatus = 'free' | 'trial' | 'active' | 'past_due' | 'suspended'
 /** مفاتيح الباقات — تفاصيلها (السعر والمدة) في src/lib/plans.ts */
 export type PlanKey = 'trial' | 'monthly' | 'yearly'
 export type MemberRole = 'owner' | 'admin' | 'staff'

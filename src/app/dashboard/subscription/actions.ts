@@ -4,8 +4,9 @@ import { revalidatePath } from 'next/cache'
 import { and, desc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/db'
-import { subscriptionRequests } from '@/db/schema'
+import { stores, subscriptionRequests } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { activateStore } from '@/lib/subscription'
 import { ensureAccountId } from '@/lib/account-id'
 import { getPlan } from '@/lib/plans'
 import { paymentMessage, whatsappLink } from '@/lib/billing'
@@ -91,6 +92,49 @@ export async function requestSubscriptionAction(raw: unknown): Promise<RequestSt
       }),
     ),
   }
+}
+
+/**
+ * بدء التجربة المجانية — **بإيد التاجر من غير ما يكلّم حد**.
+ *
+ * ## ليه دي مختلفة عن الباقات المدفوعة
+ * التجربة مبتكلّفش حاجة، فمفيش تحويل يتراجع ومفيش حاجة تتأكّد منها.
+ * تعليقها على موافقة الإدارة كان هيخلّي التاجر يستنى مننا عشان
+ * يجرّب — وده أسوأ من إنه ما يجرّبش.
+ *
+ * الباقات المدفوعة عكسها تمامًا: ما بتلمسش حالة المتجر خالص لحد ما
+ * الإدارة تفعّل، عشان محدّش ياخد اشتراك بضغطة زرار من غير ما يدفع.
+ *
+ * ## مرة واحدة بس
+ * الشرط `trialEndsAt IS NULL`. من غيره التاجر بيدوس الزرار كل ٣
+ * أيام ويفضل مجرّب للأبد.
+ */
+export async function startTrialAction(): Promise<{ ok?: boolean; error?: string }> {
+  const { store, user } = await getDashboardContext()
+
+  const [row] = await db
+    .select({ trialEndsAt: stores.trialEndsAt, subscribedUntil: stores.subscribedUntil })
+    .from(stores)
+    .where(eq(stores.id, store.id))
+    .limit(1)
+
+  if (!row) return { error: 'المتجر مش موجود' }
+  if (row.trialEndsAt) return { error: 'التجربة المجانية اتستخدمت قبل كده.' }
+  if (row.subscribedUntil && new Date(row.subscribedUntil) > new Date()) {
+    return { error: 'عندك اشتراك شغّال بالفعل.' }
+  }
+
+  const res = await activateStore({
+    storeId: store.id,
+    plan: 'trial',
+    adminId: user.id,
+    selfServe: true,
+  })
+  if (!res.ok) return { error: res.error }
+
+  revalidatePath('/dashboard/subscription')
+  revalidatePath('/dashboard')
+  return { ok: true }
 }
 
 /** إلغاء طلب معلّق — التاجر اللي دفع بالغلط أو غيّر رأيه */

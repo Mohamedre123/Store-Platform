@@ -1,4 +1,4 @@
-import { and, count, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm'
+import { and, count, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm'
 import { Clock, Inbox, ShieldCheck, Users } from 'lucide-react'
 import { db } from '@/db'
 import { orders, storeMembers, stores, subscriptionRequests, users } from '@/db/schema'
@@ -81,12 +81,19 @@ export default async function AdminPage({
       isAdmin: users.isPlatformAdmin,
     })
     .from(stores)
-    .innerJoin(
+    /*
+      leftJoin لا innerJoin.
+
+      المتجر اللي مالوش صف مالك — تسجيل وقع في نصّه، أو عضوية
+      اتمسحت — كان بيختفي من اللوحة تمامًا مع innerJoin. متجر شغّال
+      ومحدّش شايفه من الإدارة نقطة عمياء، مش صف زيادة.
+    */
+    .leftJoin(
       storeMembers,
       and(eq(storeMembers.storeId, stores.id), eq(storeMembers.role, 'owner')),
     )
-    .innerJoin(users, eq(users.id, storeMembers.userId))
-    .where(filter)
+    .leftJoin(users, eq(users.id, storeMembers.userId))
+    .where(and(isNull(stores.deletedAt), filter))
     .orderBy(desc(stores.createdAt))
     .limit(PAGE_SIZE)
 
@@ -145,7 +152,10 @@ export default async function AdminPage({
     .from(subscriptionRequests)
     .where(eq(subscriptionRequests.status, 'pending'))
 
-  const [{ n: storesTotal } = { n: 0 }] = await db.select({ n: count() }).from(stores)
+  const [{ n: storesTotal } = { n: 0 }] = await db
+    .select({ n: count() })
+    .from(stores)
+    .where(isNull(stores.deletedAt))
 
   const now = Date.now()
 
@@ -162,8 +172,8 @@ export default async function AdminPage({
       storeId: r.storeId,
       storeName: r.storeName,
       storeSlug: r.storeSlug,
-      ownerName: r.ownerName,
-      ownerEmail: r.ownerEmail,
+      ownerName: r.ownerName ?? 'مافيش مالك',
+      ownerEmail: r.ownerEmail ?? '—',
       accountId: r.accountId,
       status: r.status,
       statusLabel: r.isAdmin

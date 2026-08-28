@@ -1,5 +1,5 @@
 import { and, desc, eq } from 'drizzle-orm'
-import { Crown, Gift, Package, Receipt, ShieldCheck } from 'lucide-react'
+import { Crown, Package, Receipt, ShieldCheck } from 'lucide-react'
 import { db } from '@/db'
 import { subscriptionRequests, subscriptions } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
@@ -13,6 +13,7 @@ import { AccountBadge } from '@/components/dashboard/account-badge'
 import { Reveal } from '@/components/motion'
 import { Card } from '@/components/ui'
 import { PayPanel, type PayPlan } from './pay-panel'
+import { TrialCard } from './trial-card'
 
 export const metadata = { title: 'الاشتراك' }
 
@@ -180,31 +181,25 @@ export default async function SubscriptionPage() {
         </Reveal>
       )}
 
-      {/* الباقة التجريبية */}
+      {/* الباقة التجريبية — التاجر بيبدأها بإيده */}
       {!ent.isAdmin && (
         <Reveal delay={60}>
-          <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
-            <div className="flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--color-warning-soft)] text-[var(--color-warning)]">
-                <Gift className="h-5 w-5" aria-hidden="true" />
-              </span>
-              <div>
-                <h3 className="font-semibold">{trial.name}</h3>
-                <p className="mt-0.5 text-sm text-[var(--fg-muted)]">{trial.tagline}</p>
-              </div>
-            </div>
-            <span className="rounded-lg bg-[var(--surface-2)] px-3 py-2 text-sm font-medium text-[var(--fg-muted)]">
-              {ent.onTrial
-                ? `شغّالة — فاضل ${ent.daysLeft ?? 0} يوم`
-                : store.trialEndsAt
-                  ? 'اتستخدمت خلاص'
-                  : 'بتبدأ مع أول متجر'}
-            </span>
-          </Card>
+          <TrialCard
+            name={trial.name}
+            tagline={trial.tagline}
+            state={ent.onTrial ? 'running' : store.trialEndsAt ? 'used' : 'available'}
+            daysLeft={ent.daysLeft}
+          />
         </Reveal>
       )}
 
-      {/* الدفع */}
+      {/*
+        الدفع.
+
+        الملاحظة تحت مقصودة: التاجر لازم يعرف إن ضغطة «تم الدفع»
+        **ما بتفعّلش حاجة** قبل ما يدوسها — لا بعد ما يستنى ويسأل
+        ليه المميزات لسه مقفولة.
+      */}
       {!ent.isAdmin && (
         <Reveal delay={90}>
           <PayPanel
