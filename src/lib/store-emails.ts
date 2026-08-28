@@ -556,6 +556,12 @@ export function orderStatusEmail(
 ) {
   const copy = STATUS_COPY[status]
   const greeting = o.customerName ? `أهلًا ${escapeHtml(o.customerName)}،` : 'أهلًا،'
+  const plainLines = (o.lines ?? []).map((line) => {
+    const options = optionsLine(line)
+    return `${line.name} × ${line.quantity} — ${formatMoney(line.total, o.currency)}${
+      options ? ` (${options})` : ''
+    }`
+  })
 
   const tracking =
     status === 'shipped' && o.trackingNumber
@@ -609,7 +615,31 @@ export function orderStatusEmail(
   return {
     subject: `${copy.subject(o.orderNumber)} — ${store.name}`,
     html: layout(store, inner, copy.body),
-    text: `${greeting}\n${copy.title}\n${copy.body}\n\nرقم الطلب: #${o.orderNumber}\n${o.trackUrl}`,
+    /*
+      النسخة النصية ليست «بديلًا مختصرًا». عملاء البريد وفلاتره يقرأون
+      الجزأين، والفارق الكبير بين HTML فيه أصناف وإجمالي وعنوان وبين نص
+      فيه سطران ورابط يجعل الرسالة تبدو مولّدة أو ناقصة. السلة المتروكة
+      كانت تصل للوارد لأنها تحافظ على ملخص المنتجات في النسخة النصية؛
+      رسائل الحالات يجب أن تحمل نفس الدليل على أنها معاملة حقيقية.
+    */
+    text: [
+      greeting,
+      copy.title,
+      copy.body,
+      '',
+      `طلب رقم #${o.orderNumber} من ${store.name}`,
+      `الإجمالي: ${formatMoney(o.total, o.currency)}`,
+      ...plainLines,
+      o.address ? `التوصيل إلى: ${o.address}` : '',
+      status === 'shipped' && o.trackingNumber
+        ? `${o.carrier ? `${o.carrier} — ` : ''}رقم الشحنة: ${o.trackingNumber}`
+        : '',
+      '',
+      `تفاصيل الطلب: ${o.trackUrl}`,
+      store.email ? `${store.name} — ${store.email}` : store.name,
+    ]
+      .filter(Boolean)
+      .join('\n'),
   }
 }
 
