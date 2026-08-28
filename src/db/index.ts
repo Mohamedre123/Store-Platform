@@ -41,15 +41,34 @@ function createClient(): Client {
   })
 }
 
+/**
+ * العميل بيتخزّن **في كل البيئات** — الإنتاج قبل التطوير.
+ *
+ * ## الباج اللي كان هنا
+ * التخزين كان مشروط بـ`NODE_ENV !== 'production'`، يعني في الإنتاج
+ * ما بيتخزّنش خالص. و`db` تحت ده Proxy بينادي `getDb()` مع **كل**
+ * قراءة خاصية — فكل `db.select` وكل `db.insert` وكل `db.transaction`
+ * كان بيعمل `postgres()` جديد، يعني تجميعة اتصالات جديدة بالكامل،
+ * ومحدّش بيقفلها.
+ *
+ * صفحة واحدة فيها عشرين استعلام كانت بتفتح عشرين اتصال بالبوّابة.
+ * حدّ Supavisor ٢٠٠ عميل، فالحد كان بيتاكل في دقايق والقاعدة ترد
+ * `EMAXCONN` — والنتيجة إن **الموقع كله** يقع: المتاجر واللوحة
+ * والشيك أوت مع بعض. وبيرجع لوحده بعد ما `idle_timeout` يفضّيهم،
+ * فالعطل كان بيبان «عشوائي» ومربوط بالنشر وهو مش كده.
+ *
+ * التخزين هنا بيخلّي كل نسخة تفتح اتصالًا واحدًا وتفضل عليه — وده
+ * بالظبط اللي `max: 1` فوق مكتوب عشانه.
+ */
 function getDb(): Db {
-  if (!globalForDb.__zawyaDb) {
-    const client = globalForDb.__zawyaClient ?? createClient()
-    if (process.env.NODE_ENV !== 'production') globalForDb.__zawyaClient = client
-    const instance = drizzle(client, { schema })
-    if (process.env.NODE_ENV !== 'production') globalForDb.__zawyaDb = instance
-    return instance
-  }
-  return globalForDb.__zawyaDb
+  if (globalForDb.__zawyaDb) return globalForDb.__zawyaDb
+
+  const client = globalForDb.__zawyaClient ?? createClient()
+  globalForDb.__zawyaClient = client
+
+  const instance = drizzle(client, { schema })
+  globalForDb.__zawyaDb = instance
+  return instance
 }
 
 /**
