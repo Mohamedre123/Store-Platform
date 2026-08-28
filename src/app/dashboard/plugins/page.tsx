@@ -4,7 +4,7 @@ import { storePlugins } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
-import { getAiConfig, getClaudeConfig, GEMINI_PRO_SLUG, GEMINI_SLUG } from '@/lib/ai/settings'
+import { aiAllowed, getAiConfig, getClaudeConfig, GEMINI_PRO_SLUG, GEMINI_SLUG } from '@/lib/ai/settings'
 import { readTemplates, readWhatsapp } from '@/lib/whatsapp'
 import { platformToken } from '@/lib/whatsapp-onboard'
 import { PluginsManager, type PluginRow } from './plugins-manager'
@@ -31,6 +31,7 @@ export default async function PluginsPage() {
   const gemini = await getAiConfig(store.id, GEMINI_SLUG)
   const pro = await getAiConfig(store.id, GEMINI_PRO_SLUG)
   const claude = await getClaudeConfig(store.id)
+  const aiOk = await aiAllowed(store.id)
 
   const whatsapp = {
     settings: await readWhatsapp(store.id),
@@ -48,6 +49,7 @@ export default async function PluginsPage() {
 
       <Reveal>
         <PluginsManager
+          aiLocked={!aiOk}
           installed={rows as PluginRow[]}
           whatsapp={whatsapp}
           gemini={{

@@ -38,6 +38,7 @@ import { trackExperimentConversions } from '@/lib/experiments'
 import { generateToken } from '@/lib/crypto'
 import { normalizePhone } from '@/lib/utils'
 import { getCurrentCustomer } from '@/lib/customer-auth'
+import { orderQuotaForStore } from '@/lib/entitlements'
 import { startPayment } from '@/lib/payment-dispatch'
 import { consumeFromDefaultBranch } from '@/lib/branches'
 import { notifyTeam } from '@/lib/notify-team'
@@ -420,6 +421,25 @@ async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
   const store = await getStore(input.storeIdentifier)
   if (!store) return { ok: false, error: 'المتجر مش موجود' }
   if (!store.isPublished) return { ok: false, error: 'المتجر مش متاح للطلب دلوقتي' }
+
+  /**
+   * حدّ طلبات المتجر غير المشترك.
+   *
+   * **الفحص هنا قبل أي كتابة**، وقبل خصم المخزون وتسجيل الكوبون
+   * بالذات: الرفض بعد الخصم بيسيب كمية ناقصة وكوبون متحرق لطلب
+   * ما اتعملش.
+   *
+   * والرسالة للعميل ما بتقولش «التاجر مش مشترك». ده كلام بين المنصة
+   * والتاجر، والعميل مالوش دعوة بيه — كل اللي يخصّه إن الطلب مش
+   * هيمشي دلوقتي ومين يكلّم.
+   */
+  const quota = await orderQuotaForStore(store.id)
+  if (quota.blocked) {
+    return {
+      ok: false,
+      error: 'المتجر مش بيستقبل طلبات جديدة دلوقتي. كلّم المتجر مباشرة عشان يساعدك.',
+    }
+  }
 
   /**
    * الطلب لازم يكون ليه صاحب مسجّل.

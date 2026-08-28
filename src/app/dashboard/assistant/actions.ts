@@ -7,7 +7,7 @@ import { db } from '@/db'
 import { aiConversations, aiMessages, type AiToolCall } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { recordAudit } from '@/lib/audit'
-import { getAiConfig, isReady, GEMINI_PRO_SLUG, GEMINI_SLUG } from '@/lib/ai/settings'
+import { aiAllowed, getAiConfig, isReady, GEMINI_PRO_SLUG, GEMINI_SLUG } from '@/lib/ai/settings'
 import { getStoreBrief, briefLine } from '@/lib/ai/store-context'
 import { agentTurn, type AgentMessage } from '@/lib/ai/gemini'
 import { AGENT_TOOLS, executeTool, getTool } from '@/lib/ai/agent-tools'
@@ -36,6 +36,10 @@ type KeyResult =
   | { ok: false; error: string; needsSetup: boolean }
 
 async function resolveKey(storeId: string): Promise<KeyResult> {
+  if (!(await aiAllowed(storeId))) {
+    return { ok: false, error: 'الميزة دي للمشتركين — اشترك من صفحة الاشتراك وهتتفتح على طول.', needsSetup: false }
+  }
+
   const pro = await getAiConfig(storeId, GEMINI_PRO_SLUG)
   if (!pro.enabled) {
     return { ok: false, error: 'فعّل إضافة Gemini Pro الأول.', needsSetup: true }

@@ -14,7 +14,7 @@ import { MobileNav } from '@/components/storefront/mobile-nav'
 import { AnnouncementBar } from '@/components/storefront/announcement-bar'
 import { LuckyWheel } from '@/components/storefront/lucky-wheel'
 import { getWheelConfig } from '@/lib/wheel'
-import { getAiConfig, isReady } from '@/lib/ai/settings'
+import { aiAllowed, getAiConfig, isReady } from '@/lib/ai/settings'
 import { StoreLinkProvider } from '@/components/storefront/store-link'
 import { FONT_STACKS, RADIUS_PX } from '@/lib/customization'
 
@@ -84,7 +84,13 @@ export default async function StorefrontLayout({
     يصحّش تتحسب عليه.
   */
   const ai = await getAiConfig(store.id)
-  const botReady = !isPreview && ai.botEnabled && isReady(ai)
+  /*
+    والاشتراك شرط تالت. من غيره الزائر بيلاقي أيقونة شات بتفتح
+    وبتقول «المساعد مش مفعّل» — ده بيبان عطل في متجر التاجر، مش
+    ميزة مقفولة عندنا.
+  */
+  const botReady =
+    !isPreview && ai.botEnabled && isReady(ai) && (await aiAllowed(store.id))
 
   /**
    * لو الطلب جه من نطاق المتجر، الوكيل بيحط الترويسة دي وتبقى الروابط

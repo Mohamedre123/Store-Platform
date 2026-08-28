@@ -23,6 +23,8 @@ import { createSession, destroySession, hashPassword, verifyPassword } from '@/l
 import { isValidSlug } from '@/lib/domain'
 import { issueEmailOtp } from '@/lib/otp'
 import { config } from '@/lib/config'
+import { uniqueAccountId } from '@/lib/account-id'
+import { isAdminEmail } from '@/lib/admin'
 import { contentFor } from '@/lib/theme-content'
 import { suggestStoreSlug } from '@/lib/utils'
 
@@ -104,12 +106,24 @@ export async function signupAction(_prev: FormState, formData: FormData): Promis
 
   const passwordHash = await hashPassword(password)
 
+  /*
+    معرّف الحساب بيتولّد **قبل** المعاملة لا جوّاها.
+
+    التوليد بيسأل قاعدة البيانات عن التصادم، والسؤال ده جوّه معاملة
+    فيها إدخال في ١٢ جدول بيطوّل قفلها من غير داعي — والمعرّف مالوش
+    أي علاقة بباقي الصفوف.
+  */
+  const publicId = await uniqueAccountId()
+
   /**
    * إنشاء الحساب والمتجر في معاملة واحدة.
    * لو أي خطوة فشلت، ما ينفعش يفضل حساب من غير متجر أو متجر من غير إعدادات.
    */
   const userId = await db.transaction(async (tx) => {
-    const [user] = await tx.insert(users).values({ email, passwordHash, name }).returning({ id: users.id })
+    const [user] = await tx
+      .insert(users)
+      .values({ email, passwordHash, name, publicId, isPlatformAdmin: isAdminEmail(email) })
+      .returning({ id: users.id })
 
     const trialEndsAt = new Date()
     trialEndsAt.setDate(trialEndsAt.getDate() + config.trialDays)
@@ -121,6 +135,7 @@ export async function signupAction(_prev: FormState, formData: FormData): Promis
         name: storeName,
         email,
         status: 'trial',
+        plan: 'trial',
         trialEndsAt,
       })
       .returning({ id: stores.id })
@@ -207,7 +222,14 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
   const { email, password } = parsed.data
 
   const [user] = await db
-    .select({ id: users.id, passwordHash: users.passwordHash, emailVerifiedAt: users.emailVerifiedAt, name: users.name })
+    .select({
+      id: users.id,
+      passwordHash: users.passwordHash,
+      emailVerifiedAt: users.emailVerifiedAt,
+      name: users.name,
+      publicId: users.publicId,
+      isPlatformAdmin: users.isPlatformAdmin,
+    })
     .from(users)
     .where(eq(users.email, email))
     .limit(1)
@@ -217,7 +239,21 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
   if (!user?.passwordHash) return invalid
   if (!(await verifyPassword(password, user.passwordHash))) return invalid
 
-  await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id))
+  /*
+    الدخول بيصلّح اللي ناقص في الصف.
+
+    الحسابات اللي اتعملت قبل معرّف الحساب مالهاش واحد، وعلامة الإدارة
+    ممكن تكون لسه ما اتكتبتش على حساب الإدارة. الاتنين بيتظبطوا هنا
+    مرة واحدة بدل ما التاجر يلاقي مكان المعرّف فاضي ويسأل عليه.
+  */
+  await db
+    .update(users)
+    .set({
+      lastLoginAt: new Date(),
+      publicId: user.publicId ?? (await uniqueAccountId()),
+      isPlatformAdmin: user.isPlatformAdmin || isAdminEmail(email),
+    })
+    .where(eq(users.id, user.id))
   await createSession(user.id, await requestMeta())
 
   if (!user.emailVerifiedAt) {

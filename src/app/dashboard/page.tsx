@@ -26,6 +26,8 @@ import { Card } from "@/components/ui";
 import { Rail } from "@/components/rail";
 import { Reveal, SpotlightCard } from "@/components/motion";
 import { PublishBanner } from "./publish-banner";
+import { getEntitlements, getOrderQuota } from "@/lib/entitlements";
+import { QuotaBanner } from "./quota-banner";
 
 export const metadata = { title: "لوحة التحكم" };
 
@@ -38,6 +40,16 @@ const startOfToday = () => {
 export default async function DashboardHome() {
   const { store } = await getDashboardContext();
   const today = startOfToday();
+
+  /*
+    حالة الاشتراك في أول الصفحة الرئيسية.
+
+    الحد اللي بيوقف الطلبات لازم يوصل للتاجر **قبل** ما يقف — لو
+    اكتشفه لما عميل قاله «مش عارف أطلب»، الرسالة وصلت متأخرة يوم
+    كامل من البيع.
+  */
+  const ent = await getEntitlements(store);
+  const quota = await getOrderQuota(store);
 
   // كل الأرقام في دفعة واحدة متوازية بدل ٧ رحلات متتالية للخادم — ده اللي
   // كان بيخلي الصفحة الرئيسية تقيلة على مابتفتح.
@@ -150,6 +162,23 @@ export default async function DashboardHome() {
 
   return (
     <div className="flex flex-col gap-8">
+      {!ent.active && (
+        <Reveal>
+          <QuotaBanner
+            used={quota.used}
+            limit={quota.limit}
+            blocked={quota.blocked}
+            expired={ent.expired}
+          />
+        </Reveal>
+      )}
+
+      {ent.active && ent.onTrial && ent.daysLeft !== null && ent.daysLeft <= 2 && (
+        <Reveal>
+          <QuotaBanner used={quota.used} limit={null} blocked={false} trialDaysLeft={ent.daysLeft} />
+        </Reveal>
+      )}
+
       <Reveal>
         <PublishBanner initialPublished={store.isPublished} storeUrl={publicStoreUrl(store)} />
       </Reveal>

@@ -2,6 +2,7 @@ import 'server-only'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { cache } from 'react'
+import { notFound } from 'next/navigation'
 import { getCurrentUser, getMemberStoresFull, type SessionUser } from './auth'
 import { stores } from '@/db/schema'
 
@@ -44,6 +45,20 @@ export async function getActiveStore(): Promise<ActiveStore> {
   const { store } = await getDashboardContext()
   return store
 }
+
+/**
+ * بوابة لوحة إدارة المنصة.
+ *
+ * **بترجّع 404 لا 403.** الرد بـ«ممنوع» بيأكّد إن المسار موجود، فأي
+ * حد بيجرّب يعرف إن في لوحة إدارة ويفضل يحاول. «مش موجود» بيخلّي
+ * المسار غير مميّز عن أي مسار غلط.
+ */
+export const requirePlatformAdmin = cache(async (): Promise<SessionUser> => {
+  const user = await getCurrentUser()
+  if (!user) redirect('/login')
+  if (!user.isPlatformAdmin) notFound()
+  return user
+})
 
 /** يتأكد أن الدور يسمح بإجراء حسّاس (حذف، فوترة، صلاحيات) */
 export function assertRole(role: string, allowed: string[]) {

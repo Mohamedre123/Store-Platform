@@ -1,77 +1,102 @@
-import { desc, eq } from 'drizzle-orm'
-import { Check, Crown, Receipt, Sparkles } from 'lucide-react'
+import { and, desc, eq } from 'drizzle-orm'
+import { Crown, Gift, Package, Receipt, ShieldCheck } from 'lucide-react'
 import { db } from '@/db'
-import { subscriptions } from '@/db/schema'
+import { subscriptionRequests, subscriptions } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
-import { PLANS, STATUS_LABEL, daysLeft } from '@/lib/plans'
-import { brand } from '@/lib/brand'
+import { getEntitlements, getOrderQuota } from '@/lib/entitlements'
+import { ensureAccountId } from '@/lib/account-id'
+import { PLANS, PAID_PLANS, STATUS_LABEL, getPlan, daysLeft } from '@/lib/plans'
+import { billing } from '@/lib/billing'
 import { formatMoney, formatDate } from '@/lib/utils'
 import { PageHeader } from '@/components/dashboard/page-shell'
+import { AccountBadge } from '@/components/dashboard/account-badge'
 import { Reveal } from '@/components/motion'
 import { Card } from '@/components/ui'
+import { PayPanel, type PayPlan } from './pay-panel'
 
 export const metadata = { title: 'الاشتراك' }
-
-/**
- * رابط التواصل للاشتراك — واتساب لو رقم الدعم متظبّط، وإلا بريد.
- * من غير الشرط ده الرابط بيطلع ‎wa.me/‎ فاضي وميفتحش حاجة.
- */
-function contactHref(planName: string, storeName: string) {
-  const message = `عايز أشترك في خطة ${planName} لمتجر ${storeName}`
-  const wa = brand.supportWhatsapp.replace(/[^\d]/g, '')
-  if (wa) return `https://wa.me/${wa}?text=${encodeURIComponent(message)}`
-  return `mailto:${brand.supportEmail}?subject=${encodeURIComponent('طلب اشتراك')}&body=${encodeURIComponent(message)}`
-}
 
 const SUB_STATUS: Record<string, { label: string; bg: string; fg: string }> = {
   trialing: { label: 'تجريبي', bg: 'var(--color-warning-soft)', fg: 'var(--color-warning)' },
   active: { label: 'شغّال', bg: 'var(--color-success-soft)', fg: 'var(--color-success)' },
-  past_due: { label: 'متأخّر', bg: 'var(--color-danger-soft)', fg: 'var(--color-danger)' },
+  past_due: { label: 'انتهى', bg: 'var(--color-danger-soft)', fg: 'var(--color-danger)' },
   cancelled: { label: 'ملغي', bg: 'var(--surface-2)', fg: 'var(--fg-muted)' },
 }
 
+const REQUEST_STATUS: Record<string, { label: string; bg: string; fg: string }> = {
+  pending: { label: 'تحت المراجعة', bg: 'var(--color-info-soft)', fg: 'var(--color-info)' },
+  approved: { label: 'اتقبل', bg: 'var(--color-success-soft)', fg: 'var(--color-success)' },
+  rejected: { label: 'اترفض', bg: 'var(--color-danger-soft)', fg: 'var(--color-danger)' },
+}
+
 export default async function SubscriptionPage() {
-  const { store } = await getDashboardContext()
+  const { store, user } = await getDashboardContext()
 
-  /*
-    سجل الاشتراكات.
+  const [ent, quota, accountId] = await Promise.all([
+    getEntitlements(store),
+    getOrderQuota(store),
+    ensureAccountId(user.id, user.publicId),
+  ])
 
-    حالة المتجر بتقول «مشترك لحد امتى» بس. السجل بيقول **إيه اللي
-    اتدفع وإمتى** — وده اللي التاجر بيحتاجه لما يسأل «أنا دفعت
-    الشهر ده ولا لأ» أو يطلب فاتورة.
-  */
-  const history = await db
-    .select({
-      id: subscriptions.id,
-      plan: subscriptions.plan,
-      status: subscriptions.status,
-      amount: subscriptions.amount,
-      currency: subscriptions.currency,
-      interval: subscriptions.interval,
-      startedAt: subscriptions.startedAt,
-      currentPeriodEnd: subscriptions.currentPeriodEnd,
-      autoRenew: subscriptions.autoRenew,
-      paymentReference: subscriptions.paymentReference,
-    })
-    .from(subscriptions)
-    .where(eq(subscriptions.storeId, store.id))
-    .orderBy(desc(subscriptions.createdAt))
-    .limit(24)
+  const [history, requests] = await Promise.all([
+    db
+      .select({
+        id: subscriptions.id,
+        plan: subscriptions.plan,
+        status: subscriptions.status,
+        amount: subscriptions.amount,
+        currency: subscriptions.currency,
+        interval: subscriptions.interval,
+        startedAt: subscriptions.startedAt,
+        currentPeriodEnd: subscriptions.currentPeriodEnd,
+      })
+      .from(subscriptions)
+      .where(eq(subscriptions.storeId, store.id))
+      .orderBy(desc(subscriptions.createdAt))
+      .limit(24),
+    db
+      .select({
+        id: subscriptionRequests.id,
+        plan: subscriptionRequests.plan,
+        status: subscriptionRequests.status,
+        amount: subscriptionRequests.amount,
+        note: subscriptionRequests.note,
+        createdAt: subscriptionRequests.createdAt,
+      })
+      .from(subscriptionRequests)
+      .where(eq(subscriptionRequests.storeId, store.id))
+      .orderBy(desc(subscriptionRequests.createdAt))
+      .limit(10),
+  ])
 
-  const isTrial = store.status === 'trial'
-  const until = isTrial ? store.trialEndsAt : store.subscribedUntil
-  const left = daysLeft(until)
-  const expired = left !== null && left < 0
+  const pending = requests.find((r) => r.status === 'pending') ?? null
 
-  const tone = expired
-    ? { bg: 'var(--color-danger-soft)', fg: 'var(--color-danger)' }
-    : isTrial
-      ? { bg: 'var(--color-warning-soft)', fg: 'var(--color-warning)' }
-      : { bg: 'var(--color-success-soft)', fg: 'var(--color-success)' }
+  const tone = ent.isAdmin
+    ? { bg: 'var(--primary-soft)', fg: 'var(--primary)' }
+    : !ent.active
+      ? { bg: 'var(--color-danger-soft)', fg: 'var(--color-danger)' }
+      : ent.onTrial
+        ? { bg: 'var(--color-warning-soft)', fg: 'var(--color-warning)' }
+        : { bg: 'var(--color-success-soft)', fg: 'var(--color-success)' }
+
+  const payPlans: PayPlan[] = PAID_PLANS.map((p) => ({
+    key: p.key as PayPlan['key'],
+    name: p.name,
+    price: formatMoney(p.price, store.currency),
+    tagline: p.tagline,
+    features: p.features,
+    highlight: p.highlight,
+  }))
+
+  const trial = PLANS.find((p) => p.key === 'trial')!
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="الاشتراك" description="خطتك الحالية وخيارات الترقية." />
+      <PageHeader
+        title="الاشتراك"
+        description="باقتك الحالية، وإزاي تفتح كل المميزات."
+        action={<AccountBadge accountId={accountId} />}
+      />
 
       {/* الحالة الحقيقية */}
       <Reveal>
@@ -81,85 +106,119 @@ export default async function SubscriptionPage() {
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg"
               style={{ background: tone.bg, color: tone.fg }}
             >
-              <Crown className="h-5 w-5" aria-hidden="true" />
+              {ent.isAdmin ? (
+                <ShieldCheck className="h-5 w-5" aria-hidden="true" />
+              ) : (
+                <Crown className="h-5 w-5" aria-hidden="true" />
+              )}
             </span>
             <div>
-              <h2 className="font-semibold">{STATUS_LABEL[store.status] ?? store.status}</h2>
+              <h2 className="font-semibold">
+                {ent.isAdmin
+                  ? 'حساب إدارة المنصة'
+                  : ent.onTrial
+                    ? 'فترة تجريبية'
+                    : (STATUS_LABEL[store.status] ?? store.status)}
+              </h2>
               <p className="mt-0.5 text-sm text-[var(--fg-muted)]">
-                {until ? (
-                  expired ? (
-                    <>انتهت في {formatDate(until)} — جدّد عشان متجرك يفضل شغّال.</>
-                  ) : (
-                    <>
-                      {isTrial ? 'التجربة بتنتهي' : 'التجديد'} في {formatDate(until)}
-                      {left !== null && ` — فاضل ${left} يوم`}
-                    </>
-                  )
+                {ent.isAdmin ? (
+                  <>كل المميزات مفتوحة من غير اشتراك.</>
+                ) : ent.active && ent.until ? (
+                  <>
+                    {ent.onTrial ? 'التجربة بتنتهي' : 'الاشتراك بينتهي'} في{' '}
+                    {formatDate(ent.until)}
+                    {ent.daysLeft !== null && ` — فاضل ${ent.daysLeft} يوم`}
+                  </>
+                ) : ent.expired && ent.until ? (
+                  <>انتهى في {formatDate(ent.until)} — المميزات مقفولة لحد ما تجدّد.</>
                 ) : (
-                  'متجرك شغّال. اختار خطة لما تجهز.'
+                  <>مفيش اشتراك شغّال — اختار باقة وافتح كل المميزات.</>
                 )}
               </p>
             </div>
           </div>
+
+          {!ent.active && quota.limit !== null && (
+            <span
+              className="flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium"
+              style={{
+                background: quota.blocked ? 'var(--color-danger-soft)' : 'var(--surface-2)',
+                color: quota.blocked ? 'var(--color-danger)' : 'var(--fg-muted)',
+              }}
+            >
+              <Package className="h-4 w-4" aria-hidden="true" />
+              <span className="tabular">
+                {quota.used} / {quota.limit} طلب
+              </span>
+            </span>
+          )}
         </Card>
       </Reveal>
 
-      {/* الخطط */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        {PLANS.map((plan, i) => (
-          <Reveal key={plan.key} delay={i * 70}>
-            <Card
-              className={`flex h-full flex-col gap-4 p-5 ${
-                plan.highlight ? 'border-[var(--primary)] ring-1 ring-[var(--primary)]' : ''
-              }`}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h3 className="font-bold">{plan.name}</h3>
-                  <p className="mt-0.5 text-xs text-[var(--fg-muted)]">{plan.tagline}</p>
-                </div>
-                {plan.highlight && (
-                  <span className="flex shrink-0 items-center gap-1 rounded-md bg-[var(--primary-soft)] px-2 py-1 text-xs font-medium text-[var(--primary)]">
-                    <Sparkles className="h-3 w-3" aria-hidden="true" />
-                    الأشهر
-                  </span>
-                )}
+      {/* اللي بيقف من غير اشتراك — بيتقال صريح بدل ما التاجر يكتشفه لوحده */}
+      {!ent.active && (
+        <Reveal delay={40}>
+          <Card className="flex flex-col gap-3 p-5">
+            <h2 className="font-semibold">اللي بيتفتح بالاشتراك</h2>
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {[
+                'أدوات الذكاء الاصطناعي — الرد على العملاء، المساعد، ومصمّم الثيمات',
+                'صفحات الهبوط — إنشاء وتعديل بلا حدود',
+                `الطلبات — من غير اشتراك المتجر بيستقبل ${quota.limit ?? 5} طلبات وبعدها بيقف`,
+                'ربط نطاقك الخاص بدل النطاق الفرعي',
+              ].map((f) => (
+                <li key={f} className="flex items-start gap-2 text-sm text-[var(--fg-muted)]">
+                  <span
+                    className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--primary)]"
+                    aria-hidden="true"
+                  />
+                  {f}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </Reveal>
+      )}
+
+      {/* الباقة التجريبية */}
+      {!ent.isAdmin && (
+        <Reveal delay={60}>
+          <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--color-warning-soft)] text-[var(--color-warning)]">
+                <Gift className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <div>
+                <h3 className="font-semibold">{trial.name}</h3>
+                <p className="mt-0.5 text-sm text-[var(--fg-muted)]">{trial.tagline}</p>
               </div>
+            </div>
+            <span className="rounded-lg bg-[var(--surface-2)] px-3 py-2 text-sm font-medium text-[var(--fg-muted)]">
+              {ent.onTrial
+                ? `شغّالة — فاضل ${ent.daysLeft ?? 0} يوم`
+                : store.trialEndsAt
+                  ? 'اتستخدمت خلاص'
+                  : 'بتبدأ مع أول متجر'}
+            </span>
+          </Card>
+        </Reveal>
+      )}
 
-              <div className="flex items-baseline gap-1">
-                <span className="tabular text-2xl font-bold tracking-tight">
-                  {formatMoney(plan.priceMonthly, store.currency)}
-                </span>
-                <span className="text-sm text-[var(--fg-muted)]">/ شهر</span>
-              </div>
+      {/* الدفع */}
+      {!ent.isAdmin && (
+        <Reveal delay={90}>
+          <PayPanel
+            plans={payPlans}
+            payTo={billing.payTo}
+            hasPending={Boolean(pending)}
+            pendingPlan={pending ? (getPlan(pending.plan)?.name ?? null) : null}
+            renewing={ent.active && !ent.onTrial}
+          />
+        </Reveal>
+      )}
 
-              <ul className="flex flex-1 flex-col gap-2">
-                {plan.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-sm">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-[var(--color-success)]" aria-hidden="true" />
-                    <span className="text-[var(--fg-muted)]">{f}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <a
-                href={contactHref(plan.name, store.name)}
-                target={brand.supportWhatsapp ? '_blank' : undefined}
-                rel={brand.supportWhatsapp ? 'noopener noreferrer' : undefined}
-                className={`flex min-h-11 items-center justify-center rounded-lg px-4 text-sm font-semibold transition-opacity hover:opacity-90 ${
-                  plan.highlight
-                    ? 'bg-[var(--primary)] text-[var(--primary-fg)]'
-                    : 'border border-[var(--border-strong)] text-[var(--fg)]'
-                }`}
-              >
-                اختار {plan.name}
-              </a>
-            </Card>
-          </Reveal>
-        ))}
-      </div>
-
-      {history.length > 0 && (
+      {/* طلبات الاشتراك */}
+      {requests.length > 0 && (
         <Reveal>
           <section className="flex flex-col gap-3">
             <div className="flex items-start gap-2">
@@ -167,6 +226,67 @@ export default async function SubscriptionPage() {
                 className="mt-1 h-4 w-4 shrink-0 text-[var(--fg-subtle)]"
                 aria-hidden="true"
               />
+              <div>
+                <h2 className="font-semibold">طلباتك</h2>
+                <p className="mt-0.5 text-sm text-[var(--fg-muted)]">
+                  كل مرة بعتّ فيها تأكيد دفع — وردّنا عليها.
+                </p>
+              </div>
+            </div>
+
+            <Card className="overflow-hidden p-0">
+              <div className="scroll-x">
+                <table className="w-full min-w-[30rem] text-sm">
+                  <thead>
+                    <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
+                      <th className="p-3 text-start font-medium">الباقة</th>
+                      <th className="p-3 text-start font-medium">المبلغ</th>
+                      <th className="p-3 text-start font-medium">التاريخ</th>
+                      <th className="p-3 text-start font-medium">الحالة</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {requests.map((r) => {
+                      const meta = REQUEST_STATUS[r.status] ?? REQUEST_STATUS.pending
+                      return (
+                        <tr key={r.id} className="border-b border-[var(--border)] last:border-0">
+                          <td className="p-3">{getPlan(r.plan)?.name ?? r.plan}</td>
+                          <td className="tabular whitespace-nowrap p-3">
+                            {formatMoney(r.amount, store.currency)}
+                          </td>
+                          <td className="whitespace-nowrap p-3 text-xs text-[var(--fg-muted)]">
+                            {formatDate(r.createdAt)}
+                          </td>
+                          <td className="p-3">
+                            <span
+                              className="inline-block rounded-md px-2 py-0.5 text-xs font-medium"
+                              style={{ background: meta.bg, color: meta.fg }}
+                            >
+                              {meta.label}
+                            </span>
+                            {r.note && (
+                              <span className="mt-1 block text-xs text-[var(--fg-subtle)]">
+                                {r.note}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </section>
+        </Reveal>
+      )}
+
+      {/* سجل الفترات */}
+      {history.length > 0 && (
+        <Reveal>
+          <section className="flex flex-col gap-3">
+            <div className="flex items-start gap-2">
+              <Crown className="mt-1 h-4 w-4 shrink-0 text-[var(--fg-subtle)]" aria-hidden="true" />
               <div>
                 <h2 className="font-semibold">سجل الاشتراكات</h2>
                 <p className="mt-0.5 text-sm text-[var(--fg-muted)]">
@@ -180,7 +300,7 @@ export default async function SubscriptionPage() {
                 <table className="w-full min-w-[34rem] text-sm">
                   <thead>
                     <tr className="border-b border-[var(--border)] bg-[var(--surface-2)]">
-                      <th className="p-3 text-start font-medium">الخطة</th>
+                      <th className="p-3 text-start font-medium">الباقة</th>
                       <th className="p-3 text-start font-medium">المبلغ</th>
                       <th className="p-3 text-start font-medium">من</th>
                       <th className="p-3 text-start font-medium">لحد</th>
@@ -190,13 +310,13 @@ export default async function SubscriptionPage() {
                   <tbody>
                     {history.map((h) => {
                       const meta = SUB_STATUS[h.status] ?? SUB_STATUS.trialing
+                      const left = daysLeft(h.currentPeriodEnd)
                       return (
                         <tr key={h.id} className="border-b border-[var(--border)] last:border-0">
                           <td className="p-3">
-                            {PLANS.find((p) => p.key === h.plan)?.name ?? h.plan}
+                            {getPlan(h.plan)?.name ?? h.plan}
                             <span className="block text-xs text-[var(--fg-subtle)]">
                               {h.interval === 'year' ? 'سنوي' : 'شهري'}
-                              {h.autoRenew ? ' · بيتجدّد تلقائي' : ''}
                             </span>
                           </td>
                           <td className="tabular whitespace-nowrap p-3">
@@ -207,6 +327,11 @@ export default async function SubscriptionPage() {
                           </td>
                           <td className="whitespace-nowrap p-3 text-xs text-[var(--fg-muted)]">
                             {h.currentPeriodEnd ? formatDate(h.currentPeriodEnd) : '—'}
+                            {left !== null && left >= 0 && h.status === 'active' && (
+                              <span className="block text-[var(--fg-subtle)]">
+                                فاضل {left} يوم
+                              </span>
+                            )}
                           </td>
                           <td className="p-3">
                             <span
@@ -226,22 +351,6 @@ export default async function SubscriptionPage() {
           </section>
         </Reveal>
       )}
-
-      <Reveal>
-        <p className="text-sm text-[var(--fg-subtle)]">
-          الدفع الإلكتروني للاشتراك لسه بيتربط. لحد ما يخلص، الاشتراك بيتفعّل بالتواصل معانا
-          {brand.supportEmail ? (
-            <>
-              {' '}
-              على{' '}
-              <a href={`mailto:${brand.supportEmail}`} className="text-[var(--primary)] hover:underline">
-                {brand.supportEmail}
-              </a>
-            </>
-          ) : null}
-          .
-        </p>
-      </Reveal>
     </div>
   )
 }

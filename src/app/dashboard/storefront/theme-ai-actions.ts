@@ -7,7 +7,7 @@ import { db } from '@/db'
 import { aiConversations, aiMessages, storeThemes } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { recordAudit } from '@/lib/audit'
-import { designerKey, getClaudeConfig, isClaudeReady } from '@/lib/ai/settings'
+import { aiAllowed, designerKey, getClaudeConfig, isClaudeReady } from '@/lib/ai/settings'
 import { getStoreBrief } from '@/lib/ai/store-context'
 import { generateTheme } from '@/lib/ai/theme-generator'
 import { themePlanSchema, checkContrast, type ThemePlan } from '@/lib/ai/theme-schema'
@@ -77,6 +77,10 @@ export async function sendThemeRequestAction(raw: unknown): Promise<ThemeChatSta
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? 'بيانات ناقصة' }
 
   const { store, user } = await getDashboardContext()
+  if (!(await aiAllowed(store.id))) {
+    return { ok: false, error: 'الميزة دي للمشتركين — اشترك من صفحة الاشتراك وهتتفتح على طول.' }
+  }
+
   const cfg = await getClaudeConfig(store.id)
 
   if (!cfg.enabled) {

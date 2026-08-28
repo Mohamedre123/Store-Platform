@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { getStore } from '@/lib/storefront'
-import { getAiConfig, isReady, GEMINI_PRO_SLUG } from '@/lib/ai/settings'
+import { aiAllowed, getAiConfig, isReady, GEMINI_PRO_SLUG } from '@/lib/ai/settings'
 import { getStoreBrief } from '@/lib/ai/store-context'
 import { buildBotSystem, checkLimits, logBotMessage, splitWhatsappMarker } from '@/lib/ai/bot'
 import { generate, type ChatMessage } from '@/lib/ai/gemini'
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
   if (!store) return NextResponse.json({ error: 'المتجر مش موجود' }, { status: 404 })
 
   const cfg = await getAiConfig(store.id)
-  if (!cfg.botEnabled || !isReady(cfg)) {
+  if (!cfg.botEnabled || !isReady(cfg) || !(await aiAllowed(store.id))) {
     return NextResponse.json({ error: 'المساعد مش مفعّل' }, { status: 404 })
   }
 

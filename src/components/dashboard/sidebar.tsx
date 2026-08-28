@@ -18,6 +18,7 @@ import {
   Globe,
   Plug,
   Settings,
+  ShieldCheck,
   ShoppingBag,
   Star,
   Store,
@@ -171,6 +172,7 @@ export function Sidebar({
   storeUrl,
   userName,
   userEmail,
+  isPlatformAdmin,
   onLogout,
 }: {
   storeName: string
@@ -187,6 +189,13 @@ export function Sidebar({
   storeUrl: string
   userName: string
   userEmail: string
+  /**
+   * لوحة إدارة المنصة — بتظهر لحساب الإدارة وحده.
+   *
+   * البند بيتخفي هنا، لكن الإخفاء ده راحة مش حماية: المسار نفسه
+   * بيرجّع 404 وكل فعل جوّاه بيعيد فحص الصلاحية.
+   */
+  isPlatformAdmin: boolean
   onLogout: () => void
 }) {
   const pathname = usePathname()
@@ -299,6 +308,23 @@ export function Sidebar({
 
   const footer = (
     <div className="border-t border-[var(--border)] p-3">
+      {isPlatformAdmin && (
+        <Link
+          href="/dashboard/admin"
+          onClick={() => setOpen(false)}
+          aria-current={isActive(pathname, '/dashboard/admin') ? 'page' : undefined}
+          className={cn(
+            'mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors',
+            isActive(pathname, '/dashboard/admin')
+              ? 'bg-[var(--primary-soft)] text-[var(--primary)]'
+              : 'text-[var(--primary)] hover:bg-[var(--primary-soft)]',
+          )}
+        >
+          <ShieldCheck className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+          إدارة المنصة
+        </Link>
+      )}
+
       <Link
         href="/dashboard/subscription"
         onClick={() => setOpen(false)}

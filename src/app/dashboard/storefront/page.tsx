@@ -14,7 +14,7 @@ import { ImageSpecHint } from './image-spec-hint'
 import { PageBuilder } from './page-builder'
 import { listPickerCategories } from './picker-actions'
 import { ThemeDesigner } from './theme-designer'
-import { getClaudeConfig, isClaudeReady } from '@/lib/ai/settings'
+import { aiAllowed, getClaudeConfig, isClaudeReady } from '@/lib/ai/settings'
 
 export const metadata = { title: 'المتجر' }
 
@@ -28,6 +28,7 @@ export default async function StorefrontPage() {
     .limit(1)
 
   const claude = await getClaudeConfig(store.id)
+  const aiOk = await aiAllowed(store.id)
   const pickerCategories = await listPickerCategories()
   const current = getTheme(theme?.themeSlug ?? 'zawya')
   const sections = (theme?.homeSections ?? []) as Section[]
@@ -81,7 +82,7 @@ export default async function StorefrontPage() {
           في الجاهز، واللي مش لاقي بينزل ويلاقي البديل.
         */}
         <Reveal delay={80}>
-          <ThemeDesigner enabled={isClaudeReady(claude)} />
+          <ThemeDesigner enabled={aiOk && isClaudeReady(claude)} />
         </Reveal>
       </section>
 

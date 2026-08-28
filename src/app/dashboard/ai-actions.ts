@@ -2,7 +2,7 @@
 
 import { z } from 'zod'
 import { getDashboardContext } from '@/lib/store-context'
-import { getAiConfig, isReady } from '@/lib/ai/settings'
+import { aiAllowed, getAiConfig, isReady } from '@/lib/ai/settings'
 import { getStoreBrief } from '@/lib/ai/store-context'
 import { generate } from '@/lib/ai/gemini'
 import { TASKS, buildPrompt, buildSystem, parseSuggestions, type TaskKey } from '@/lib/ai/tasks'
@@ -34,6 +34,10 @@ export async function improveTextAction(raw: unknown): Promise<ImproveState> {
   if (!TASKS[task]) return { ok: false, error: 'نوع التحسين مش معروف' }
 
   const { store } = await getDashboardContext()
+  if (!(await aiAllowed(store.id))) {
+    return { ok: false, error: 'الميزة دي للمشتركين — اشترك من صفحة الاشتراك وهتتفتح على طول.' }
+  }
+
   const cfg = await getAiConfig(store.id)
 
   if (!cfg.enabled) {

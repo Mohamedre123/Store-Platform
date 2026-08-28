@@ -5,6 +5,8 @@ import { db } from '@/db'
 import { storeThemes } from '@/db/schema'
 import { getTheme } from '@/lib/themes'
 import { getDashboardContext } from '@/lib/store-context'
+import { ensureAccountId } from '@/lib/account-id'
+import { AccountBadge } from '@/components/dashboard/account-badge'
 import { readWhatsapp } from '@/lib/whatsapp'
 import { WhatsappIcon } from '@/components/storefront/whatsapp-icon'
 import { storeUrl } from '@/lib/domain'
@@ -16,7 +18,15 @@ import { SettingsForm } from './settings-form'
 export const metadata = { title: 'الإعدادات' }
 
 export default async function SettingsPage() {
-  const { store } = await getDashboardContext()
+  const { store, user } = await getDashboardContext()
+
+  /*
+    معرّف الحساب هنا كمان لا في صفحة الاشتراك بس.
+
+    التاجر اللي الدعم بيسأله «إيه معرّف حسابك» بيدوّر عليه في
+    «الإعدادات» أول حاجة — وده أطبع مكان يتلاقى فيه بيانات حسابه.
+  */
+  const accountId = await ensureAccountId(user.id, user.publicId)
 
   /*
     ألوان الهوية بتتقرا من توكنز الثيم مباشرةً — نفس المصدر اللي
@@ -39,7 +49,11 @@ export default async function SettingsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="الإعدادات" description="بيانات متجرك وتفضيلاته." />
+      <PageHeader
+        title="الإعدادات"
+        description="بيانات متجرك وتفضيلاته."
+        action={<AccountBadge accountId={accountId} />}
+      />
 
       <Reveal>
         <SettingsForm store={store} colors={colors} />

@@ -5,6 +5,7 @@ import { BarChart3, Check, HelpCircle, MessageCircle, Sparkles, Target } from 'l
 import { savePluginAction } from './actions'
 import { PLUGINS, type PluginDef } from '@/lib/plugins'
 import { Alert } from '@/components/ui'
+import { Locked } from '@/components/dashboard/locked'
 import { AppCard } from './app-card'
 import { WhatsappCard } from './whatsapp-card'
 import type { WhatsappSettings } from '@/lib/whatsapp'
@@ -71,7 +72,15 @@ export function PluginsManager({
   gemini,
   pro,
   claude,
+  aiLocked,
 }: {
+  /**
+   * قسم الذكاء مقفول — التاجر مش مشترك.
+   *
+   * البلور هنا واجهة بس: كل فعل في `ai-actions.ts` بيعيد الفحص على
+   * الخادم، لأن `pointer-events-none` بتتشال من أدوات المطوّرين.
+   */
+  aiLocked: boolean
   installed: PluginRow[]
   whatsapp: {
     settings: WhatsappSettings
@@ -126,7 +135,13 @@ export function PluginsManager({
   const report = (slug: string, active: boolean) =>
     setLive((v) => ({ ...v, [slug]: { active, configured: active || (v[slug]?.configured ?? false) } }))
 
-  const activeCount = PLUGINS.filter((d) => live[d.slug]?.active).length
+  /*
+    إضافات الذكاء ما بتتحسبش «مفعّلة» وهي مقفولة — العدّاد اللي بيقول
+    «٣ مفعّلة» وهي مش شغّالة بيكدّب على التاجر في أول سطر بيقراه.
+  */
+  const activeCount = PLUGINS.filter(
+    (d) => live[d.slug]?.active && !(aiLocked && d.group === 'ai'),
+  ).length
 
   return (
     <div className="flex flex-col gap-8">
@@ -156,6 +171,29 @@ export function PluginsManager({
               </div>
             </div>
 
+            {aiLocked && g.key === 'ai' ? (
+              <Locked description="بوت بيرد على عملائك، ومساعد بيدير متجرك من الشات، ومصمّم بيعمل ثيمات وصفحات هبوط من وصف واحد.">
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {items.map((def) => {
+                    const look = LOOKS[def.slug] ?? { initials: '??', gradient: 'var(--primary)' }
+                    return (
+                      <AppCard
+                        key={def.slug}
+                        name={def.name}
+                        desc={def.desc}
+                        initials={look.initials}
+                        gradient={look.gradient}
+                        badge={look.badge}
+                        active={false}
+                        configured={false}
+                      >
+                        <span />
+                      </AppCard>
+                    )
+                  })}
+                </div>
+              </Locked>
+            ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {items.map((def) => {
                 const look = LOOKS[def.slug] ?? { initials: '??', gradient: 'var(--primary)' }
@@ -191,6 +229,7 @@ export function PluginsManager({
                 )
               })}
             </div>
+            )}
           </section>
         )
       })}

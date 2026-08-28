@@ -7,6 +7,7 @@ import { db } from '@/db'
 import { sessions, users, storeMembers, stores } from '@/db/schema'
 import { generateToken, hashToken } from './crypto'
 import { ROOT_DOMAIN } from './domain'
+import { isAdminEmail } from './admin'
 import { config } from './config'
 
 const SESSION_COOKIE = 'zawya_session'
@@ -39,6 +40,8 @@ async function sessionCookieDomain(): Promise<string | undefined> {
 
 export type SessionUser = {
   id: string
+  /** معرّف الحساب المعروض — ZW-XXXXXXXX */
+  publicId: string | null
   email: string
   name: string
   emailVerifiedAt: Date | null
@@ -113,6 +116,7 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
   const rows = await db
     .select({
       id: users.id,
+      publicId: users.publicId,
       email: users.email,
       name: users.name,
       phone: users.phone,
@@ -126,7 +130,18 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
     .where(and(eq(sessions.tokenHash, hashToken(token)), gt(sessions.expiresAt, new Date())))
     .limit(1)
 
-  return rows[0] ?? null
+  const row = rows[0]
+  if (!row) return null
+
+  /*
+    صلاحية الإدارة = العمود **أو** البريد المكتوب في الكود.
+
+    لو اعتمدنا على العمود وحده، الحساب اللي اتعمل قبل الهجرة بيدخل
+    ويلاقي اللوحة مش موجودة — من غير أي رسالة تقوله ليه. الجمع هنا
+    بيخلّي البريد يشتغل من أول دخول، والعمود يفضل الطريق لإضافة
+    حساب تاني من غير نشر.
+  */
+  return { ...row, isPlatformAdmin: row.isPlatformAdmin || isAdminEmail(row.email) }
 })
 
 /* ────────────────────────── المتاجر ────────────────────────── */

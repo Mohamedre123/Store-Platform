@@ -2,6 +2,8 @@ import { pgTable, uuid, text, boolean, integer, timestamp, jsonb, index, uniqueI
 import { createdAt, updatedAt, deletedAt } from './_shared'
 
 export type StoreStatus = 'trial' | 'active' | 'past_due' | 'suspended'
+/** مفاتيح الباقات — تفاصيلها (السعر والمدة) في src/lib/plans.ts */
+export type PlanKey = 'trial' | 'monthly' | 'yearly'
 export type MemberRole = 'owner' | 'admin' | 'staff'
 export type AddressMode = 'structured' | 'simple' | 'hidden'
 export type FieldMode = 'required' | 'optional' | 'hidden'
@@ -15,6 +17,19 @@ export const users = pgTable(
   'users',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+
+    /**
+     * معرّف الحساب المعروض — «ZW-XXXXXXXX».
+     *
+     * الـuuid مالوش لازمة في محادثة: التاجر اللي بيبعت تأكيد دفعه
+     * على واتساب مش هينسخ ٣٦ حرفًا صح، والدعم مش هيقراهم من صورة.
+     * ده معرّف قصير بحروف مالهاش شبيه (من غير O و0 وI و1)، بيتقال
+     * بالصوت ويتكتب من غير غلط — وبيه بندوّر على الحساب.
+     *
+     * nullable في المخطط عشان الحسابات القديمة: الهجرة بتملاه
+     * لكل واحد فيهم، والتسجيل الجديد بيولّده في نفس المعاملة.
+     */
+    publicId: text('public_id'),
     email: text('email').notNull(),
     passwordHash: text('password_hash'),
     name: text('name').notNull(),
@@ -27,7 +42,10 @@ export const users = pgTable(
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  (t) => [uniqueIndex('users_email_unique').on(t.email)],
+  (t) => [
+    uniqueIndex('users_email_unique').on(t.email),
+    uniqueIndex('users_public_id_unique').on(t.publicId),
+  ],
 )
 
 /**
@@ -114,6 +132,18 @@ export const stores = pgTable(
     status: text('status').$type<StoreStatus>().notNull().default('trial'),
     trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }),
     subscribedUntil: timestamp('subscribed_until', { withTimezone: true }),
+
+    /**
+     * الباقة السارية — والتفعيل **بإيد إدارة المنصة لا بالكود**.
+     *
+     * مفيش بوابة دفع: التاجر بيحوّل على محفظة أو إنستا باي وبيبعت
+     * صورة التحويل، يعني مفيش أي إشارة تلقائية تقول «اتدفع». فالتفعيل
+     * قرار بشري، والأعمدة دي بتسجّل مين اتخذه وإمتى عشان يفضل ليه أثر.
+     */
+    plan: text('plan').$type<PlanKey>(),
+    activatedAt: timestamp('activated_at', { withTimezone: true }),
+    activatedBy: uuid('activated_by'),
+
     isPublished: boolean('is_published').notNull().default(false),
 
     // ترقيم الطلبات لكل متجر على حدة

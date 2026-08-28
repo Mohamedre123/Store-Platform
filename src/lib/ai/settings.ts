@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { storePlugins } from '@/db/schema'
 import { decryptJson } from '@/lib/crypto'
+import { getEntitlements, getStoreBilling } from '@/lib/entitlements'
 
 /**
  * إعدادات إضافات الذكاء الاصطناعي.
@@ -95,6 +96,8 @@ export function isReady(cfg: AiConfig): cfg is AiConfig & { apiKey: string; mode
  * اللي بيشتغل.
  */
 export async function isAssistantReady(storeId: string): Promise<boolean> {
+  if (!(await aiAllowed(storeId))) return false
+
   const pro = await getAiConfig(storeId, GEMINI_PRO_SLUG)
   if (!pro.enabled) return false
 
@@ -161,3 +164,21 @@ export function designerKey(cfg: ClaudeConfig): string | null {
 export function isClaudeReady(cfg: ClaudeConfig): boolean {
   return cfg.enabled && Boolean(designerKey(cfg)) && Boolean(cfg.model)
 }
+
+/**
+ * الذكاء الاصطناعي مسموح للمتجر ده؟
+ *
+ * ## ليه الفحص هنا لا في كل شاشة
+ * أدوات الذكاء ليها ٧ مداخل: الإضافات، زرار التحسين، فقاعة «حدّد
+ * واسأل»، مساعد اللوحة، مصمّم الثيمات، مولّد صفحات الهبوط، وبوت
+ * المتجر للزوار. لو كل مدخل حسب الشرط بنفسه، أول واحد يتنسي بيفضل
+ * مفتوحًا — وميزة مقفولة من ٦ أبواب ومفتوحة من السابع مش مقفولة.
+ *
+ * مغلّفة بـcache زي باقي قرّاء الإعدادات، فما بتزوّدش رحلة على الطلب.
+ */
+export const aiAllowed = cache(async (storeId: string): Promise<boolean> => {
+  const billing = await getStoreBilling(storeId)
+  if (!billing) return false
+  const ent = await getEntitlements(billing)
+  return ent.features.ai
+})

@@ -10,7 +10,26 @@ import { encryptJson } from '@/lib/crypto'
 import { recordAudit } from '@/lib/audit'
 import { verifyKey, type GeminiModel } from '@/lib/ai/gemini'
 import { verifyKey as verifyClaude } from '@/lib/ai/claude'
-import { getAiConfig, getClaudeConfig, CLAUDE_SLUG, GEMINI_PRO_SLUG, GEMINI_SLUG } from '@/lib/ai/settings'
+import {
+  aiAllowed,
+  getAiConfig,
+  getClaudeConfig,
+  CLAUDE_SLUG,
+  GEMINI_PRO_SLUG,
+  GEMINI_SLUG,
+} from '@/lib/ai/settings'
+import { LOCKED_MESSAGE } from '@/lib/entitlements'
+
+/**
+ * بوابة إضافات الذكاء.
+ *
+ * الحفظ **والتحقّق** الاتنين مقفولين. التحقّق وحده بينادي جوجل
+ * وأنثروبيك من خادمنا — فسيبه مفتوح معناه إن غير المشترك يستخدم
+ * مسارنا كوسيط لفحص مفاتيح، وده استهلاك على حسابنا مالوش مقابل.
+ */
+async function aiGate(storeId: string): Promise<{ error: string } | null> {
+  return (await aiAllowed(storeId)) ? null : { error: LOCKED_MESSAGE.ai }
+}
 import { getStoreBrief, suggestBrief } from '@/lib/ai/store-context'
 
 export type VerifyState =
@@ -30,6 +49,9 @@ export type VerifyState =
  */
 export async function verifyGeminiKeyAction(apiKey: string): Promise<VerifyState> {
   const { store } = await getDashboardContext()
+
+  const gate = await aiGate(store.id)
+  if (gate) return { ok: false, error: gate.error }
 
   const key = apiKey.trim()
   if (!key) return { ok: false, error: 'الصق المفتاح الأول' }
@@ -68,6 +90,10 @@ export async function saveGeminiAction(raw: unknown): Promise<SaveState> {
   const input = parsed.data
 
   const { store, user } = await getDashboardContext()
+
+  const gate = await aiGate(store.id)
+  if (gate) return gate
+
   const current = await getAiConfig(store.id, GEMINI_SLUG)
 
   /*
@@ -152,6 +178,10 @@ export async function saveGeminiProAction(raw: unknown): Promise<SaveState> {
   const input = parsed.data
 
   const { store, user } = await getDashboardContext()
+
+  const gate = await aiGate(store.id)
+  if (gate) return gate
+
   const current = await getAiConfig(store.id, GEMINI_PRO_SLUG)
   const base = await getAiConfig(store.id, GEMINI_SLUG)
 
@@ -220,7 +250,10 @@ export async function verifyDesignerKeyAction(input: {
   provider: 'claude' | 'gemini'
   apiKey: string
 }): Promise<ClaudeVerifyState> {
-  await getDashboardContext()
+  const { store } = await getDashboardContext()
+
+  const gate = await aiGate(store.id)
+  if (gate) return { ok: false, error: gate.error }
 
   const key = input.apiKey.trim()
   if (!key) return { ok: false, error: 'الصق المفتاح الأول' }
@@ -237,7 +270,10 @@ export async function verifyDesignerKeyAction(input: {
 }
 
 export async function verifyClaudeKeyAction(apiKey: string): Promise<ClaudeVerifyState> {
-  await getDashboardContext()
+  const { store } = await getDashboardContext()
+
+  const gate = await aiGate(store.id)
+  if (gate) return { ok: false, error: gate.error }
 
   const key = apiKey.trim()
   if (!key) return { ok: false, error: 'الصق المفتاح الأول' }
@@ -264,6 +300,10 @@ export async function saveClaudeAction(raw: unknown): Promise<SaveState> {
   const input = parsed.data
 
   const { store, user } = await getDashboardContext()
+
+  const gate = await aiGate(store.id)
+  if (gate) return gate
+
   const current = await getClaudeConfig(store.id)
 
   /*

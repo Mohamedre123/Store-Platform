@@ -2,7 +2,7 @@
 
 import { z } from 'zod'
 import { getDashboardContext } from '@/lib/store-context'
-import { getAiConfig, GEMINI_PRO_SLUG, GEMINI_SLUG } from '@/lib/ai/settings'
+import { aiAllowed, getAiConfig, GEMINI_PRO_SLUG, GEMINI_SLUG } from '@/lib/ai/settings'
 import { getStoreBrief, briefLine } from '@/lib/ai/store-context'
 import { editImage, generate, listImageModels, listModels } from '@/lib/ai/gemini'
 import { uploadImage } from '@/lib/storage'
@@ -33,6 +33,8 @@ export type AssistState =
 async function anyKey(
   storeId: string,
 ): Promise<{ ok: true; apiKey: string; model: string } | { ok: false; error: string }> {
+  if (!(await aiAllowed(storeId))) return { ok: false, error: 'الميزة دي للمشتركين — اشترك من صفحة الاشتراك وهتتفتح على طول.' }
+
   const pro = await getAiConfig(storeId, GEMINI_PRO_SLUG)
   const base = await getAiConfig(storeId, GEMINI_SLUG)
 

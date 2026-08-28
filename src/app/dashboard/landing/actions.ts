@@ -5,6 +5,7 @@ import { and, eq, ne } from 'drizzle-orm'
 import { db } from '@/db'
 import { funnels } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { featureBlock } from '@/lib/entitlements'
 import { slugify } from '@/lib/utils'
 import { BLOCK_LIBRARY, TEMPLATES, type Block, type LandingTokens } from '@/lib/landing'
 
@@ -16,6 +17,16 @@ export async function createLandingAction(input: {
   template: string
   productId: string | null
 }): Promise<LandingState> {
+  /*
+    القفل على الإنشاء والتعديل — مش على الحذف ولا إيقاف النشر.
+
+    الاشتراك اللي خلص مش المفروض يحبس التاجر مع صفحة منشورة ما
+    يقدرش يوقّفها. المنع بيقف عند «اعمل جديد» و«غيّر المحتوى»،
+    والسيطرة على اللي موجود بتفضل معاه.
+  */
+  const blocked = await featureBlock('landing')
+  if (blocked) return blocked
+
   const { store } = await getDashboardContext()
 
   const name = input.name.trim()
@@ -83,6 +94,9 @@ export async function saveLandingAction(input: {
   seoDescription: string
   status: 'draft' | 'published'
 }): Promise<LandingState> {
+  const blocked = await featureBlock('landing')
+  if (blocked) return blocked
+
   const { store } = await getDashboardContext()
 
   const name = input.name.trim()

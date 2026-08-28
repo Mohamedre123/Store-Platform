@@ -37,6 +37,8 @@ export type AuditAction =
   | 'apikey.create'
   | 'apikey.revoke'
   | 'member.role_change'
+  | 'subscription.activate'
+  | 'subscription.deactivate'
 
 /** أسماء الإجراءات بالعربي — المفتاح إنجليزي في قاعدة البيانات */
 export const AUDIT_LABELS: Record<string, string> = {
@@ -59,6 +61,8 @@ export const AUDIT_LABELS: Record<string, string> = {
   'apikey.create': 'إنشاء مفتاح API',
   'apikey.revoke': 'إلغاء مفتاح API',
   'member.role_change': 'تغيير صلاحية موظف',
+  'subscription.activate': 'تفعيل اشتراك',
+  'subscription.deactivate': 'إلغاء تفعيل اشتراك',
 }
 
 export function auditLabel(action: string): string {

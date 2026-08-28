@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { sendAbandonedCartReminders } from '@/lib/abandoned-carts'
 import { rollupAllStores } from '@/lib/analytics-events'
 import { drainJobs, pruneJobs } from '@/lib/jobs'
+import { expireSubscriptions } from '@/lib/subscription'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -65,5 +66,22 @@ export async function GET(req: NextRequest) {
     console.error('فشل سحب طابور المهام:', e)
   }
 
-  return NextResponse.json({ ok: true, ...result, rolledUp, jobs })
+  /*
+    إنهاء الاشتراكات والتجارب اللي خلصت.
+
+    **دي مش اللي بتقفل المميزات** — البوابة في `entitlements` بتقارن
+    التاريخ بالوقت الحالي، فالقفل بيحصل في ثانيته حتى لو المهمة دي
+    ما اشتغلتش. اللي بتعمله إنها بتظبّط `stores.status` عشان يطابق
+    الحقيقة، فالتاجر ولوحة الإدارة يشوفوا نفس الكلام.
+
+    ولأنها كده، فشلها ما يصحّش يخلّي المهمة كلها تبان فاشلة.
+  */
+  let expired = 0
+  try {
+    expired = (await expireSubscriptions()).expired
+  } catch (e) {
+    console.error('فشل إنهاء الاشتراكات المنتهية:', e)
+  }
+
+  return NextResponse.json({ ok: true, ...result, rolledUp, jobs, expired })
 }

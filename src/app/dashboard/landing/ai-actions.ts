@@ -7,8 +7,9 @@ import { db } from '@/db'
 import { aiConversations, aiMessages, categories, funnels, products } from '@/db/schema'
 import type { AiToolCall } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { featureBlock } from '@/lib/entitlements'
 import { recordAudit } from '@/lib/audit'
-import { designerKey, getClaudeConfig, isClaudeReady } from '@/lib/ai/settings'
+import { aiAllowed, designerKey, getClaudeConfig, isClaudeReady } from '@/lib/ai/settings'
 import { getStoreBrief } from '@/lib/ai/store-context'
 import { generateLanding, type ProductContext } from '@/lib/ai/landing-generator'
 import { landingPlanSchema, type LandingPlan } from '@/lib/ai/landing-schema'
@@ -135,10 +136,15 @@ const sendSchema = z.object({
  * «بهوية متجري» بنبعت ألوان المتجر كمان.
  */
 export async function sendLandingRequestAction(raw: unknown): Promise<LandingChatState> {
+  const blocked = await featureBlock('landing')
+  if (blocked) return { ok: false, error: blocked.error }
+
   const parsed = sendSchema.safeParse(raw)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? 'بيانات ناقصة' }
 
   const { store, user } = await getDashboardContext()
+  if (!(await aiAllowed(store.id))) return { ok: false, error: 'الميزة دي للمشتركين — اشترك من صفحة الاشتراك وهتتفتح على طول.' }
+
   const cfg = await getClaudeConfig(store.id)
 
   if (!cfg.enabled) return { ok: false, error: 'فعّل إضافة Claude الأول.', needsSetup: true }
@@ -252,6 +258,9 @@ export async function createLandingFromPlanAction(
    */
   targetId?: string,
 ): Promise<LandingChatState & { landingId?: string }> {
+  const blocked = await featureBlock('landing')
+  if (blocked) return { ok: false, error: blocked.error }
+
   const { store, user } = await getDashboardContext()
 
   const [msg] = await db

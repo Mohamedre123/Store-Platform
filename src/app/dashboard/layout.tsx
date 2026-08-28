@@ -7,7 +7,7 @@ import { Preloader } from '@/components/preloader'
 import { AssistantPanel } from '@/components/dashboard/assistant-panel'
 import { AssistBubble } from '@/components/dashboard/assist-bubble'
 import { Toaster } from '@/components/dashboard/toast'
-import { getAiConfig, isAssistantReady, GEMINI_PRO_SLUG, GEMINI_SLUG } from '@/lib/ai/settings'
+import { aiAllowed, getAiConfig, isAssistantReady, GEMINI_PRO_SLUG, GEMINI_SLUG } from '@/lib/ai/settings'
 import { publicStoreUrl } from '@/lib/domain'
 import { logoutAction } from '@/app/(auth)/actions'
 import { ExternalLink, LogOut } from 'lucide-react'
@@ -31,7 +31,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
     getAiConfig(store.id, GEMINI_SLUG),
     getAiConfig(store.id, GEMINI_PRO_SLUG),
   ])
-  const hasAnyKey = Boolean(gemini.apiKey || pro.apiKey)
+  /*
+    والفقاعة بتتقفل مع الاشتراك زي المساعد بالظبط. لو سبناها، التاجر
+    اللي اشتراكه خلص بيلاقي أيقونة بتفتح صندوق كل إجابته «الميزة دي
+    للمشتركين» — إعلان متنكّر في شكل أداة.
+  */
+  const hasAnyKey = Boolean(gemini.apiKey || pro.apiKey) && (await aiAllowed(store.id))
 
   return (
     <div className="min-h-screen-safe">
@@ -44,6 +49,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         storeUrl={publicStoreUrl(store)}
         userName={user.name}
         userEmail={user.email}
+        isPlatformAdmin={user.isPlatformAdmin}
         onLogout={logoutAction}
       />
 

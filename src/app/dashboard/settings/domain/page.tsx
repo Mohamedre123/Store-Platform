@@ -1,4 +1,6 @@
 import { getDashboardContext } from '@/lib/store-context'
+import { getEntitlements } from '@/lib/entitlements'
+import { Locked } from '@/components/dashboard/locked'
 import { dnsRecordsFor } from '@/lib/custom-domain'
 import { storeUrl } from '@/lib/domain'
 import { PageHeader } from '@/components/dashboard/page-shell'
@@ -10,6 +12,7 @@ export const metadata = { title: 'النطاق المخصص' }
 export default async function DomainPage() {
   const { store } = await getDashboardContext()
 
+  const ent = await getEntitlements(store)
   const token = 'zawya-verify-' + store.id.replace(/-/g, '').slice(0, 24)
   const records = store.customDomain ? dnsRecordsFor(store.customDomain, token) : []
 
@@ -33,11 +36,21 @@ export default async function DomainPage() {
       </Reveal>
 
       <Reveal delay={80}>
-        <DomainForm
-          currentDomain={store.customDomain}
-          verified={Boolean(store.customDomainVerifiedAt)}
-          initialRecords={records}
-        />
+        {ent.features.customDomain ? (
+          <DomainForm
+            currentDomain={store.customDomain}
+            verified={Boolean(store.customDomainVerifiedAt)}
+            initialRecords={records}
+          />
+        ) : (
+          <Locked description="اربط نطاقك الخاص بمتجرك — عنوانك إنت بدل النطاق الفرعي. متاح مع أي باقة.">
+            <DomainForm
+              currentDomain={store.customDomain}
+              verified={Boolean(store.customDomainVerifiedAt)}
+              initialRecords={records}
+            />
+          </Locked>
+        )}
       </Reveal>
     </div>
   )

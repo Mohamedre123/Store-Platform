@@ -7,6 +7,7 @@ import { and, eq, ne } from 'drizzle-orm'
 import { db } from '@/db'
 import { stores } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { featureBlock } from '@/lib/entitlements'
 import { checkDomain, dnsRecordsFor, validateDomain, type DnsRecord } from '@/lib/custom-domain'
 import { generateToken } from '@/lib/crypto'
 
@@ -25,6 +26,16 @@ function tokenFor(storeId: string) {
 }
 
 export async function saveDomainAction(_prev: DomainState, formData: FormData): Promise<DomainState> {
+  /*
+    الربط والتحقّق مقفولين على غير المشترك — **الفكّ مفتوح**.
+
+    التاجر اللي اشتراكه خلص لازم يفضل قادر يشيل النطاق ويرجّع متجره
+    على نطاقه الفرعي. القفل اللي بيحبسه على إعداد مش شغّال بيحوّل
+    انتهاء الاشتراك لمشكلة في متجره هو.
+  */
+  const blocked = await featureBlock('customDomain')
+  if (blocked) return blocked
+
   const { store } = await getDashboardContext()
 
   const parsed = validateDomain(String(formData.get('domain') ?? ''))
@@ -55,6 +66,9 @@ export async function saveDomainAction(_prev: DomainState, formData: FormData): 
 }
 
 export async function verifyDomainAction(): Promise<DomainState> {
+  const blocked = await featureBlock('customDomain')
+  if (blocked) return blocked
+
   const { store } = await getDashboardContext()
   if (!store.customDomain) return { error: 'مافيش نطاق مضاف.' }
 
