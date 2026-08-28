@@ -40,7 +40,7 @@ export function TrialCard({
               {state === 'running'
                 ? `شغّالة دلوقتي — فاضل ${daysLeft ?? 0} يوم، وكل المميزات مفتوحة.`
                 : state === 'used'
-                  ? 'اتستخدمت خلاص. اختار باقة عشان المميزات ترجع تتفتح.'
+                  ? 'تم استخدامها. اختار باقة عشان المميزات ترجع تتفتح.'
                   : tagline}
             </p>
           </div>
@@ -75,7 +75,7 @@ export function TrialCard({
             }}
           >
             {state === 'running' && <Check className="h-4 w-4" aria-hidden="true" />}
-            {state === 'running' ? 'شغّالة' : 'اتستخدمت'}
+            {state === 'running' ? 'شغّالة' : 'تم استخدامها'}
           </span>
         )}
       </div>

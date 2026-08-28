@@ -119,7 +119,7 @@ export async function startTrialAction(): Promise<{ ok?: boolean; error?: string
     .limit(1)
 
   if (!row) return { error: 'المتجر مش موجود' }
-  if (row.trialEndsAt) return { error: 'التجربة المجانية اتستخدمت قبل كده.' }
+  if (row.trialEndsAt) return { error: 'التجربة المجانية تم استخدامها قبل كده.' }
   if (row.subscribedUntil && new Date(row.subscribedUntil) > new Date()) {
     return { error: 'عندك اشتراك شغّال بالفعل.' }
   }
