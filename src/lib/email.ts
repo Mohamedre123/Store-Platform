@@ -17,15 +17,21 @@ import { toPlainText } from './email-plain'
 
 export type SendResult = { ok: true; id?: string } | { ok: false; error: string }
 
-type EmailProvider = 'resend' | 'postmark'
+type EmailProvider = 'resend' | 'postmark' | 'brevo'
 
 function emailProvider(): EmailProvider {
-  return process.env.EMAIL_PROVIDER?.trim().toLowerCase() === 'postmark' ? 'postmark' : 'resend'
+  const provider = process.env.EMAIL_PROVIDER?.trim().toLowerCase()
+  if (provider === 'postmark' || provider === 'brevo') return provider
+  return 'resend'
 }
 
 export function isEmailConfigured(): boolean {
-  const hasProviderKey =
-    emailProvider() === 'postmark' ? Boolean(process.env.POSTMARK_SERVER_TOKEN) : Boolean(process.env.RESEND_API_KEY)
+  const provider = emailProvider()
+  const hasProviderKey = provider === 'postmark'
+    ? Boolean(process.env.POSTMARK_SERVER_TOKEN)
+    : provider === 'brevo'
+      ? Boolean(process.env.BREVO_API_KEY)
+      : Boolean(process.env.RESEND_API_KEY)
   return Boolean(hasProviderKey && process.env.EMAIL_FROM)
 }
 
@@ -92,6 +98,13 @@ function fromHeader(_store?: { name?: string | null; slug?: string | null } | nu
   if (!address.includes('@')) return configured
 
   return `${encodeDisplayName(platformName())} <${address}>`
+}
+
+/** Brevo expects the sender name and address as separate JSON fields. */
+function brevoSender(fromOverride?: string | null): { name: string; email: string } {
+  const configured = fromOverride || process.env.EMAIL_FROM || ''
+  const email = configured.match(/<([^>]+)>/)?.[1]?.trim() ?? configured.trim()
+  return { name: platformName(), email }
 }
 
 
@@ -300,6 +313,61 @@ export async function sendEmail(options: {
     } catch (err) {
       console.error('خطأ في إرسال البريد عبر Postmark:', err)
       await record(log, to, subject, 'failed', { error: String(err).slice(0, 300) }, 'postmark')
+      return { ok: false, error: 'network' }
+    }
+  }
+
+  if (emailProvider() === 'brevo') {
+    try {
+      const headers = bulk
+        ? {
+            'List-Unsubscribe': unsubscribeUrl
+              ? `<${unsubscribeUrl}>, <mailto:${unsubscribeAddress()}?subject=unsubscribe>`
+              : `<mailto:${unsubscribeAddress()}?subject=unsubscribe>`,
+            ...(unsubscribeUrl ? { 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' } : {}),
+          }
+        : undefined
+
+      const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'api-key': process.env.BREVO_API_KEY!,
+        },
+        body: JSON.stringify({
+          sender: brevoSender(fromOverride),
+          to: [{ email: to }],
+          subject,
+          htmlContent: html,
+          textContent: text ?? toPlainText(html),
+          ...(replyTo ? { replyTo: { email: replyTo } } : {}),
+          ...(log?.event ? { tags: [log.event.slice(0, 100)] } : {}),
+          ...(attachments?.length
+            ? {
+                attachment: attachments.map((a) => ({
+                  name: a.filename,
+                  content: a.content.toString('base64'),
+                })),
+              }
+            : {}),
+          ...(headers ? { headers } : {}),
+        }),
+      })
+
+      if (!res.ok) {
+        const body = await res.text()
+        console.error('فشل إرسال البريد عبر Brevo:', res.status, body)
+        await record(log, to, subject, 'failed', { error: `${res.status}: ${body.slice(0, 300)}` }, 'brevo')
+        return { ok: false, error: `provider_${res.status}` }
+      }
+
+      const data = (await res.json()) as { messageId?: string }
+      await record(log, to, subject, 'sent', { providerRef: data.messageId }, 'brevo')
+      return { ok: true, id: data.messageId }
+    } catch (err) {
+      console.error('خطأ في إرسال البريد عبر Brevo:', err)
+      await record(log, to, subject, 'failed', { error: String(err).slice(0, 300) }, 'brevo')
       return { ok: false, error: 'network' }
     }
   }
