@@ -36,11 +36,24 @@ export async function generateMetadata({
     title: { absolute: store.name, template: `%s | ${store.name}` },
     description: store.tagline ?? `تسوّق من ${store.name}`,
     /*
+      أيقونة التبويب: الأيقونة المخصّصة الأول، وبعدها الشعار.
+
+      التاجر بيرفع «أيقونة المتصفح» من الإعدادات، وكانت بتتحفظ في
+      قاعدة البيانات وخلاص — التبويب كان بياخد الشعار بدلها. والشعار
+      عرضه أكبر من طوله عادةً، فبيتصغّر في مربّع ١٦×١٦ لخربشة مش
+      باينة. عشان كده الحقل موجود من أصله.
+
+      و`apple` مطلوبة لوحدها: سفاري بيتجاهل `icon` لما العميل يضيف
+      المتجر لشاشة تليفونه الرئيسية، وبيحط لقطة من الصفحة مكانها.
+
       undefined هنا كان معناه «ورّث» — يعني أيقونة زاوية تظهر في تبويب
       متجر التاجر. القايمة الفاضية بتلغي الوراثة: التاجر من غير شعار
-      ياخد أيقونة المتصفح العادية، أحسن من علامة حد تاني.
+      ولا أيقونة ياخد أيقونة المتصفح العادية، أحسن من علامة حد تاني.
     */
-    icons: store.logoLight ? { icon: store.logoLight } : { icon: [] },
+    icons: (() => {
+      const mark = store.favicon ?? store.logoLight
+      return mark ? { icon: mark, shortcut: mark, apple: mark } : { icon: [] }
+    })(),
     openGraph: { title: store.name, description: store.tagline ?? undefined, type: 'website' },
   }
 }

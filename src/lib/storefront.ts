@@ -33,6 +33,8 @@ export type StorefrontStore = {
   tagline: string | null
   logoLight: string | null
   logoDark: string | null
+  /** أيقونة التبويب — بيرفعها التاجر من الإعدادات */
+  favicon: string | null
   hideNameInHeader: boolean
   phone: string | null
   whatsapp: string | null
@@ -67,6 +69,7 @@ export const getStore = cache(async (identifier: string): Promise<StorefrontStor
       tagline: stores.tagline,
       logoLight: stores.logoLight,
       logoDark: stores.logoDark,
+      favicon: stores.favicon,
       hideNameInHeader: stores.hideNameInHeader,
       phone: stores.phone,
       whatsapp: stores.whatsapp,
