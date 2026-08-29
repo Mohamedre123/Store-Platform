@@ -2,6 +2,7 @@ import { getDashboardContext } from '@/lib/store-context'
 import { getEntitlements } from '@/lib/entitlements'
 import { Locked } from '@/components/dashboard/locked'
 import { dnsRecordsFor } from '@/lib/custom-domain'
+import { vercelDomainsReady } from '@/lib/vercel-domains'
 import { storeUrl } from '@/lib/domain'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
@@ -14,6 +15,16 @@ export default async function DomainPage() {
 
   const ent = await getEntitlements(store)
   const token = 'zawya-verify-' + store.id.replace(/-/g, '').slice(0, 24)
+
+  /*
+    حالة التكامل مع المستضيف.
+
+    من غير مفاتيحه، التاجر يقدر يضيف نطاقه ويظبّط سجلاته وكل
+    حاجة تبان تمام — والنطاق يفضل واقف على 404 لأن التسجيل عند
+    المستضيف ما تمّش. التنبيه ده بيمنع الساعة اللي بيضيّعها وهو
+    بيراجع سجلات مظبوطة أصلًا.
+  */
+  const link = vercelDomainsReady()
   const records = store.customDomain ? dnsRecordsFor(store.customDomain, token) : []
 
   return (
@@ -34,6 +45,23 @@ export default async function DomainPage() {
           </p>
         </div>
       </Reveal>
+
+      {!link.ok && (
+        <Reveal delay={60}>
+          <div className="rounded-xl border border-[var(--color-warning)]/40 bg-[var(--color-warning-soft)] p-4">
+            <p className="text-sm font-semibold text-[var(--color-warning)]">
+              ربط النطاقات مش مفعّل على المنصة
+            </p>
+            <p className="mt-1 text-sm text-[var(--color-warning)]" style={{ opacity: 0.85 }}>
+              تقدر تضيف نطاقك وتظبّط سجلاته، بس مش هيشتغل قبل ما إدارة المنصة تضبط
+              التكامل مع المستضيف.
+            </p>
+            <p dir="ltr" className="mt-2 text-start text-xs text-[var(--color-warning)] font-mono" style={{ opacity: 0.75 }}>
+              {link.reason}
+            </p>
+          </div>
+        </Reveal>
+      )}
 
       <Reveal delay={80}>
         {ent.features.customDomain ? (
