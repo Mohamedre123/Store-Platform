@@ -12,6 +12,7 @@ import {
   type WhatsappProvider,
 } from '@/lib/whatsapp'
 import { normalizePhone } from '@/lib/utils'
+import { appUrl } from '@/lib/domain'
 import { checkTemplates, type Templates } from '@/lib/whatsapp-templates'
 import QRCode from 'qrcode'
 import {
@@ -128,6 +129,13 @@ export async function linkWhatsappAction(phone: string): Promise<LinkState> {
       storeId: store.id,
       storeName: store.name,
       phone: to,
+      /*
+        عنوان استقبال ردود العملاء على تأكيد الطلب.
+
+        بمعرّف المتجر في المسار: البوابة بتبعت رقم ورسالة وبس،
+        فمن غير المعرّف مش هنعرف الرد ده بتاع أنهي متجر.
+      */
+      webhookUrl: appUrl(`/api/webhooks/whatsapp/${store.id}`),
     })
     if (!created.ok) return { ok: false, error: created.error }
     sessionId = created.sessionId

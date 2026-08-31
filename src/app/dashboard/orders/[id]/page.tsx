@@ -14,6 +14,7 @@ import { publicStoreUrl } from '@/lib/domain'
 import { Card } from '@/components/ui'
 import { Reveal } from '@/components/motion'
 import { TrustBadge } from '@/components/dashboard/trust-badge'
+import { ConfirmCard } from '../confirm-card'
 import { loadTrustScore } from '@/lib/trust-score'
 import { OrderNote, StatusControls } from '../status-controls'
 import { IncompleteActions } from '../incomplete-actions'
@@ -308,6 +309,29 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           {!order.isIncomplete && order.customerPhone && (
             <Reveal delay={70}>
               <TrustBadge trust={trust} />
+            </Reveal>
+          )}
+
+          {/*
+            التأكيد تحت الدرجة مباشرةً.
+
+            الاتنين بيخدموا نفس القرار: الدرجة بتقول «في مخاطرة»،
+            والزرار ده هو الرد عليها. فصلهم كان هيخلّي التاجر يشوف
+            التحذير من غير ما يعرف يعمل بيه إيه.
+          */}
+          {!order.isIncomplete && (
+            <Reveal delay={75}>
+              <ConfirmCard
+                orderId={order.id}
+                status={{
+                  hasPhone: Boolean(order.customerPhone),
+                  reply: order.customerConfirm,
+                  sentAt: order.confirmSentAt ? formatDateTime(order.confirmSentAt) : null,
+                  repliedAt: order.customerConfirmAt
+                    ? formatDateTime(order.customerConfirmAt)
+                    : null,
+                }}
+              />
             </Reveal>
           )}
 

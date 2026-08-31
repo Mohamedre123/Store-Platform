@@ -106,6 +106,8 @@ export async function createSession(input: {
   storeId: string
   storeName: string
   phone: string
+  /** عنوان استقبال الردود — بيتبني من نطاق المنصة ومعرّف المتجر */
+  webhookUrl?: string
 }): Promise<CreateResult> {
   const res = await call(input.token, '/whatsapp-sessions', {
     method: 'POST',
@@ -115,7 +117,21 @@ export async function createSession(input: {
       /* بتبطّئ الإرسال شوية وبتقلّل احتمال قفل الرقم */
       account_protection: true,
       log_messages: false,
-      read_incoming_messages: false,
+      /*
+        استقبال الرسايل — عشان تأكيد الطلب يشتغل.
+
+        العميل بيرد «١» أو «٢» على رسالة التأكيد، والويب هوك بيقرا
+        الرد ويسجّله على الطلب ويرد عليه. من غير الاستقبال، الرسالة
+        بتتبعت والرد بيروح في الهوا والتاجر يفضل مستني.
+
+        **وده مش بوت محادثة**: الويب هوك بيتعامل مع ردود التأكيد بس
+        وبيتجاهل أي رسالة تانية بصمت، فرسايل العملاء بتوصل للتاجر
+        زي ما هي.
+      */
+      read_incoming_messages: true,
+      webhook_url: input.webhookUrl,
+      webhook_enabled: Boolean(input.webhookUrl),
+      webhook_events: ['messages.received'],
     },
   })
 

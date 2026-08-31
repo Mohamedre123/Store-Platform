@@ -113,6 +113,18 @@ export const orders = pgTable(
 
     cancelReason: text('cancel_reason'),
     confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+
+    /**
+     * تأكيد العميل نفسه — غير تأكيد التاجر.
+     *
+     * `confirmedAt` معناها «التاجر شاف الطلب وقبله». دي معناها
+     * «العميل قال إنه فعلًا طالب وهيستلم». الفرق بينهم هو كل
+     * الفكرة: الطلب اللي التاجر أكّده والعميل ما ردّش عليه لسه
+     * مخاطرة شحن، والتاجر لازم يشوف الفرق قبل ما يبعت.
+     */
+    confirmSentAt: timestamp('confirm_sent_at', { withTimezone: true }),
+    customerConfirm: text('customer_confirm').$type<'yes' | 'no'>(),
+    customerConfirmAt: timestamp('customer_confirm_at', { withTimezone: true }),
     deliveredAt: timestamp('delivered_at', { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
