@@ -57,9 +57,15 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ storeId: s
   const reply = readReply(msg.text)
   if (!reply) return NextResponse.json({ ok: true })
 
+  /*
+    البحث جوّه متجر الويب هوك وبس.
+
+    الرقم الواحد ممكن يكون طالب من كذا متجر. الفلترة جوّه الاستعلام
+    لا بعده: كده الرد ما يقدرش يلمس طلب متجر تاني مهما حصل.
+  */
   const phone = normalizePhone(msg.phone)
-  const order = await findPendingOrder(phone)
-  if (!order || order.storeId !== store.id) return NextResponse.json({ ok: true })
+  const order = await findPendingOrder(store.id, phone)
+  if (!order) return NextResponse.json({ ok: true })
 
   const answer = await applyReply({
     orderId: order.id,

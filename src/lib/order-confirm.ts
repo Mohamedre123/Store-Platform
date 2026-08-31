@@ -127,16 +127,26 @@ export async function requestConfirmation(input: {
 }
 
 /**
- * بيلاقي الطلب اللي الرد ده بتاعه.
+ * بيلاقي الطلب اللي الرد ده بتاعه — **جوّه متجر واحد**.
  *
- * ## ليه آخر طلب مستني
+ * ## ليه `storeId` شرط لا فلتر بعدين
+ * الرقم الواحد ممكن يكون طالب من كذا متجر على المنصة. لو دوّرنا في
+ * كل المتاجر وأخدنا الأحدث، الرد اللي جاي على واتساب متجر «أ» ممكن
+ * يلاقي طلب متجر «ب» هو الأحدث — فنسكت ومنأكّدش طلب «أ» أصلًا،
+ * والعميل يفتكر إنه أكّد وهو لأ.
+ *
+ * والأخطر: لو الفلترة اتشالت يومًا بالغلط، رد عميل في متجر كان
+ * هيغيّر طلبًا في متجر تاني. الشرط هنا جوّه الاستعلام عشان ده يبقى
+ * **مستحيل** لا «مفحوص بعدين».
+ *
+ * ## وليه آخر طلب مستني
  * الويب هوك بيجيله رقم ورسالة وبس — مفيش رقم طلب في رد العميل. فبناخد
- * **آخر طلب بعتنا له تأكيد ولسه ما ردّش**، وبحد زمني ٤٨ ساعة.
+ * آخر طلب بعتنا له تأكيد ولسه ما ردّش، وبحد زمني ٤٨ ساعة.
  *
  * الحد الزمني مهم: من غيره، «تمام» بعد أسبوعين في سياق تاني خالص كانت
  * هتأكّد طلبًا قديم منسي — والتاجر يشحنه.
  */
-export async function findPendingOrder(phone: string) {
+export async function findPendingOrder(storeId: string, phone: string) {
   const cutoff = new Date(Date.now() - 48 * 3600_000)
 
   const [row] = await db
@@ -149,6 +159,7 @@ export async function findPendingOrder(phone: string) {
     .from(orders)
     .where(
       and(
+        eq(orders.storeId, storeId),
         eq(orders.customerPhone, phone),
         isNotNull(orders.confirmSentAt),
         isNull(orders.customerConfirm),

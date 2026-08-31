@@ -101,6 +101,47 @@ async function call(
  * الاسم بيبان في لوحة البوابة فبنخلّيه اسم المتجر — التاجر اللي
  * عنده أكتر من متجر بيفرّق بينهم من غير ما يفتح كل واحدة.
  */
+/**
+ * حقول الويب هوك في الجلسة.
+ *
+ * الحدثين مع بعض عن قصد: البوابة سمّت الحدث `messages.received` في
+ * توثيقها و`messages.upsert` في نسخ تانية. الاتنين بيوصفوا نفس الحاجة
+ * — رسالة جديدة — وبعتهم مع بعض بيخلّي الربط يشتغل من غير ما نراهن
+ * على تسمية واحدة تتغيّر في تحديث عندهم.
+ */
+function webhookFields(url?: string) {
+  if (!url) return {}
+  return {
+    webhook_url: url,
+    webhook_enabled: true,
+    webhook_events: ['messages.received', 'messages.upsert'],
+  }
+}
+
+/**
+ * بيظبّط الويب هوك على جلسة **موجودة**.
+ *
+ * ## ليه دي لازمة
+ * `createSession` بتتنادى مرة واحدة بس — أول ربط. التاجر اللي جلسته
+ * اتعملت قبل ما نضيف استقبال الردود كان لازم يفصل ويربط تاني عشان
+ * ياخدها، وده طلب تقيل على حد شغّال ومربوط خلاص.
+ *
+ * الدالة دي بتتنادى مع كل ربط، فالجلسة القديمة بتتظبّط لوحدها.
+ *
+ * ## وبتسكت لو فشلت
+ * الإرسال شغّال من غيرها؛ اللي بيقف هو استقبال الردود بس. فشلها
+ * ما يصحّش يمنع التاجر من ربط رقمه.
+ */
+export async function ensureWebhook(
+  token: string,
+  sessionId: string,
+  webhookUrl: string,
+): Promise<void> {
+  await call(token, `/whatsapp-sessions/${encodeURIComponent(sessionId)}`, {
+    method: 'PUT',
+    body: { read_incoming_messages: true, ...webhookFields(webhookUrl) },
+  }).catch(() => undefined)
+}
 export async function createSession(input: {
   token: string
   storeId: string
@@ -129,9 +170,7 @@ export async function createSession(input: {
         زي ما هي.
       */
       read_incoming_messages: true,
-      webhook_url: input.webhookUrl,
-      webhook_enabled: Boolean(input.webhookUrl),
-      webhook_events: ['messages.received'],
+      ...webhookFields(input.webhookUrl),
     },
   })
 

@@ -36,6 +36,7 @@ import { runAutomations } from '@/lib/automation'
 import { recordReferral } from '@/lib/referrals'
 import { trackExperimentConversions } from '@/lib/experiments'
 import { generateToken } from '@/lib/crypto'
+import { enqueue } from '@/lib/jobs'
 import { normalizePhone } from '@/lib/utils'
 import { getCurrentCustomer } from '@/lib/customer-auth'
 import { orderQuotaForStore } from '@/lib/entitlements'
@@ -965,6 +966,34 @@ async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
       email: input.email || null,
     }).catch((e) => console.error('فشل ربط وسيلة العميل:', e)),
   )
+
+  /*
+    حجز طلب التأكيد على واتساب — بعد المهلة اللي التاجر ظبّطها.
+
+    في الطابور لا في `after`: الاستدعاء بلا خادم بيموت لما الرد
+    يخرج، فمفيش طريقة يستنّى خمس دقايق. الطابور بيخزّن المهمة
+    بموعدها، والعامل بيسحبها لما ييجي وقتها.
+
+    ولو التاجر مش مشغّل الميزة، مفيش صف بيتكتب أصلًا — الطابور
+    ما يتملاش بمهام هتترمي وقت التنفيذ.
+  */
+  if (settings?.autoConfirmEnabled) {
+    after(
+      enqueue({
+        storeId: store.id,
+        type: 'order.confirm_request',
+        payload: { orderId: result.orderId! },
+        delayMinutes: settings.autoConfirmDelay,
+        /*
+          محاولتين بس. الرسالة اللي فشلت مرتين غالبًا الواتساب
+          مقطوع أو الباقة خلصت — وإعادة المحاولة خمس مرات بتبعت
+          «أكّد طلبك» بعد ساعات من الطلب، وده بيلخبط العميل أكتر
+          ما بيفيد.
+        */
+        maxAttempts: 2,
+      }).catch((e) => console.error('فشل حجز طلب التأكيد:', e)),
+    )
+  }
 
   const isNewCustomer = customerOrdersBefore === 0
   const autoCtx = {

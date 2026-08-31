@@ -543,8 +543,27 @@ export async function applyShipmentStatus(
     })
   })
 
+  /*
+    حالة الشحنة بتتحوّل لحالة الطلب — والعميل بيتبلّغ.
+
+    ## ليه `picked_up` و`in_transit` اتضافوا
+    كان الطلب بيتحرّك عند «اتسلّم» و«رجع» بس. يعني الشحنة تخرج من
+    المخزن وتفضل يومين في الطريق، والعميل شايف طلبه «قيد التجهيز»
+    وبيسأل التاجر «فين طلبي؟» — وهي أكتر لحظة بيسأل فيها أصلًا.
+
+    خروج الشحنة هو الخبر اللي مستنيه، ورسالة «طلبك في الطريق»
+    بتشيل المكالمة دي من على التاجر.
+
+    ## و`applyOrderStatus` بتتخطّى المكرّر
+    `in_transit` بيتبعت أكتر من مرة من بعض الشركات، والدالة بتخرج
+    من غير ما تعمل حاجة لو الحالة زي ما هي — فالعميل ما بيتبعتلوش
+    «طلبك اتشحن» تلات مرات.
+  */
   if (status === 'delivered') await applyOrderStatus(store, row.orderId, 'delivered', actor)
   else if (status === 'returned') await applyOrderStatus(store, row.orderId, 'returned', actor)
+  else if (status === 'picked_up' || status === 'in_transit' || status === 'out_for_delivery') {
+    await applyOrderStatus(store, row.orderId, 'shipped', actor)
+  }
 
   return { ok: true }
 }

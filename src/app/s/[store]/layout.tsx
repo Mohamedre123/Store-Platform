@@ -17,6 +17,7 @@ import { getWheelConfig } from '@/lib/wheel'
 import { aiAllowed, getAiConfig, isReady } from '@/lib/ai/settings'
 import { StoreLinkProvider } from '@/components/storefront/store-link'
 import { getCurrentCustomer } from '@/lib/customer-auth'
+import { jobTick } from '@/lib/job-tick'
 import { FONT_STACKS, RADIUS_PX } from '@/lib/customization'
 
 export const dynamic = 'force-dynamic'
@@ -103,6 +104,16 @@ export default async function StorefrontLayout({
     `getCurrentCustomer` مغلّفة بـcache فالنداء ده ما بيزوّدش رحلة:
     صفحات المتجر اللي بتحتاجه بتقرا نفس النتيجة في نفس الطلب.
   */
+  /*
+    سحب خفيف للطابور مع حركة المتجر.
+
+    المهام المؤجّلة (طلب تأكيد الطلب بعد ٥ دقايق) بتستنى عاملًا،
+    والعامل المجدول بيجري مرة في اليوم على الخطة المجانية. الزيارات
+    هنا بتشغّله كل دقيقة على الأكتر — والمتجر اللي بيستقبل طلبات
+    عليه حركة بالضرورة.
+  */
+  jobTick()
+
   const customer = await getCurrentCustomer(store.id)
 
   const ai = await getAiConfig(store.id)

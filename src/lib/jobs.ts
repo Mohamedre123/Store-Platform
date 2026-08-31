@@ -27,7 +27,12 @@ import { jobQueue } from '@/db/schema'
  *    الفشل هو اللي بيقول للتاجر إيه اللي حصل.
  */
 
-export type JobType = 'shipment.retry' | 'automation.delayed' | 'webhook.retry' | 'catalog.sync'
+export type JobType =
+  | 'shipment.retry'
+  | 'automation.delayed'
+  | 'webhook.retry'
+  | 'catalog.sync'
+  | 'order.confirm_request'
 
 /** يحجز مهمة للتنفيذ بعد مدة */
 export async function enqueue(input: {
@@ -175,6 +180,28 @@ const HANDLERS: Record<string, Handler> = {
       payload.data ?? {},
     )
     return { ok: true }
+  },
+
+  /*
+    طلب تأكيد الطلب من العميل — بعد مهلة من لحظة الطلب.
+
+    المهلة مقصودة: الرسالة اللي بتوصل في نفس ثانية الطلب بتوصل مع
+    رسالة التأكيد العادية، فالعميل بيشوف اتنين مع بعض ويحتار. وكمان
+    اللي بيطلب وبيغيّر رأيه بيلغي بنفسه في أول دقايق — فالمهلة
+    بتوفّر رسالة على حد أصلًا مش هيكمّل.
+  */
+  'order.confirm_request': async (payload, storeId) => {
+    if (!storeId || typeof payload.orderId !== 'string') return { ok: false, error: 'حمولة ناقصة' }
+    const { requestConfirmation } = await import('./order-confirm')
+    const res = await requestConfirmation({ storeId, orderId: payload.orderId })
+
+    /*
+      «ردّ خلاص» و«مالوش رقم» مش أعطال — بنعتبرها نجاحًا عشان
+      الطابور ما يفضلش يعيد المحاولة خمس مرات على حاجة مالهاش حل.
+    */
+    if (res.ok) return { ok: true }
+    if (/ردّ|رقم تليفون|مش موجود|ناقص|مش مربوط/.test(res.error)) return { ok: true }
+    return { ok: false, error: res.error }
   },
 
   'catalog.sync': async (payload, storeId) => {

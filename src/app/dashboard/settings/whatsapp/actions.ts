@@ -18,6 +18,7 @@ import QRCode from 'qrcode'
 import {
   connectSession,
   createSession,
+  ensureWebhook,
   deleteSession,
   platformToken,
   sessionStatus,
@@ -140,6 +141,15 @@ export async function linkWhatsappAction(phone: string): Promise<LinkState> {
     if (!created.ok) return { ok: false, error: created.error }
     sessionId = created.sessionId
   }
+
+  /*
+    الويب هوك بيتظبّط مع **كل** ربط لا مع الإنشاء بس.
+
+    الجلسة اللي اتعملت قبل ما نضيف استقبال الردود مكانتش هتاخده
+    أبدًا — وكان لازم التاجر يفصل ويربط تاني عشان حاجة إحنا
+    غيّرناها. النداء هنا بيظبّط القديم والجديد بنفس الطريق.
+  */
+  await ensureWebhook(token, sessionId, appUrl(`/api/webhooks/whatsapp/${store.id}`))
 
   const res = await connectSession(token, sessionId)
   if (!res.ok) return { ok: false, error: res.error }
