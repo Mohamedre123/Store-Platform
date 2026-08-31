@@ -8,6 +8,8 @@ import { formatMoney, formatDateTime } from '@/lib/utils'
 import { ORDER_STATUSES, statusMeta } from '@/lib/order-status'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal, SpotlightCard } from '@/components/motion'
+import { TrustBadge } from '@/components/dashboard/trust-badge'
+import { loadTrustScores } from '@/lib/trust-score'
 import { Card } from '@/components/ui'
 import { cn } from '@/lib/utils'
 
@@ -53,6 +55,17 @@ export default async function OrdersPage({
       .where(eq(orders.storeId, store.id))
       .groupBy(orders.status, orders.isIncomplete),
   ])
+
+  /*
+    درجات الثقة لكل أرقام الصفحة في استعلامين.
+
+    التاجر بيمسح القايمة بعينه قبل ما يقرّر يشحن إيه — فالتحذير
+    لازم يبقى هنا، مش جوّه كل طلب على حدة.
+  */
+  const trust = await loadTrustScores(
+    store.id,
+    rows.map((r) => r.customerPhone),
+  )
 
   const incompleteCount = counts.find((c) => c.isIncomplete)?.n ?? 0
   const totalCount = counts.filter((c) => !c.isIncomplete).reduce((n, c) => n + c.n, 0)
@@ -162,6 +175,9 @@ export default async function OrdersPage({
                         >
                           {meta.label}
                         </span>
+                        {o.customerPhone && trust.has(o.customerPhone) && (
+                          <TrustBadge trust={trust.get(o.customerPhone)!} compact />
+                        )}
                       </span>
                       <span className="mt-1 block truncate text-sm text-[var(--fg-muted)]">
                         {o.customerName || 'بدون اسم'}

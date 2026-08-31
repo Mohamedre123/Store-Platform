@@ -13,6 +13,8 @@ import { inferStoreKind, type StoreKind } from '@/lib/store-kind'
 import { publicStoreUrl } from '@/lib/domain'
 import { Card } from '@/components/ui'
 import { Reveal } from '@/components/motion'
+import { TrustBadge } from '@/components/dashboard/trust-badge'
+import { loadTrustScore } from '@/lib/trust-score'
 import { OrderNote, StatusControls } from '../status-controls'
 import { IncompleteActions } from '../incomplete-actions'
 import { ConvertCart } from '../convert-cart'
@@ -105,6 +107,14 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
   const meta = statusMeta(order.isIncomplete ? 'incomplete' : order.status)
   const address = order.shippingAddress
+
+  /*
+    درجة ثقة العميل — بتتحمّل مع الصفحة لا بضغطة زيادة.
+
+    استعلامين مجمّعين، والقرار اللي بتخدمه (أشحن ولا أتصل) بيتاخد
+    في نفس الفتحة دي.
+  */
+  const trust = await loadTrustScore(store.id, order.customerPhone)
 
   /** الربح الحقيقي بعد تكلفة البضاعة والشحن — مش الإيراد */
   const profit = order.total - order.costTotal - order.shippingTotal
@@ -288,6 +298,19 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
         {/* الجانب */}
         <div className="flex flex-col gap-6">
+          {/*
+            درجة الثقة فوق كل حاجة في الجانب.
+
+            القرار اللي التاجر واقف قدامه هنا هو «أشحن ولا أتصل
+            الأول». التحذير اللي بيجي بعد أزرار الحالة بيوصل بعد
+            ما يكون ضغط «قيد التجهيز» خلاص.
+          */}
+          {!order.isIncomplete && order.customerPhone && (
+            <Reveal delay={70}>
+              <TrustBadge trust={trust} />
+            </Reveal>
+          )}
+
           <Reveal delay={80}>
             {/*
               السلة المتروكة مالهاش حالة تتغيّر — ليها عميل يتكلّم.
