@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { Check, EyeOff, HelpCircle, Settings2, X } from 'lucide-react'
+import { Portal } from '@/components/ui/portal'
 
 /**
  * كارت تطبيق في شبكة الإضافات.
@@ -112,6 +113,7 @@ export function AppCard({
       </div>
 
       {open && (
+        <Portal>
         <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
           <button
             type="button"
@@ -140,6 +142,7 @@ export function AppCard({
             <div className="safe-bottom flex-1 overflow-y-auto p-4">{children}</div>
           </div>
         </div>
+        </Portal>
       )}
     </>
   )

@@ -42,6 +42,7 @@ import { BLOCK_LIBRARY, blockMeta, defaultSettings, renderType, type BlockType }
 import type { Section } from '@/db/schema'
 import { Alert, Button } from '@/components/ui'
 import { cn } from '@/lib/utils'
+import { Portal } from '@/components/ui/portal'
 
 /**
  * بنّاء الصفحة الرئيسية.
@@ -305,6 +306,7 @@ export function PageBuilder({
       </div>
 
       {adding && (
+        <Portal>
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 backdrop-blur-sm sm:items-center sm:p-4"
           role="dialog"
@@ -378,6 +380,7 @@ export function PageBuilder({
             </div>
           </div>
         </div>
+        </Portal>
       )}
     </div>
   )

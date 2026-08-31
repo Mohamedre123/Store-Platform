@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import Image from 'next/image'
 import { Check, ImagePlus, Loader2, Sparkles, TriangleAlert, Wand2, X } from 'lucide-react'
 import { assistImageAction, listImageModelsAction } from '@/app/dashboard/assist-actions'
+import { Portal } from '@/components/ui/portal'
 
 /**
  * تعديل صور المنتجات بالوصف.
@@ -113,6 +114,7 @@ export function ImageStudio({
     : ['صورة منتج على خلفية بيضا', 'صورة أجواء دافية للمنتج']
 
   return (
+    <Portal>
     <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center">
       <button
         type="button"
@@ -287,5 +289,6 @@ export function ImageStudio({
         </footer>
       </div>
     </div>
+    </Portal>
   )
 }

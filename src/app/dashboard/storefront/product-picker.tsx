@@ -19,6 +19,7 @@ import {
 } from './picker-actions'
 import { formatMoney } from '@/lib/utils'
 import { cn } from '@/lib/utils'
+import { Portal } from '@/components/ui/portal'
 
 /**
  * منتقي المنتجات.
@@ -125,6 +126,7 @@ export function ProductPicker({
   }
 
   return (
+    <Portal>
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-0 backdrop-blur-sm sm:items-center sm:p-4"
       role="dialog"
@@ -311,6 +313,7 @@ export function ProductPicker({
         </div>
       </div>
     </div>
+    </Portal>
   )
 }
 
