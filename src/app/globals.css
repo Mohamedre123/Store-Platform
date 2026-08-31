@@ -265,6 +265,33 @@
     scrollbar-width: thin;
   }
 
+  /*
+    شريط أفقي على الموبايل، وشبكة عادية فوق كده.
+
+    ## ليه كلاس لوحده مش `scroll-x`
+    `overflow-x: auto` لوحده بيخلّي `overflow-y` يتحسب `auto` كمان —
+    دي قاعدة في CSS مش سهو. فأي عنصر جوّه بيتخطّى الحاوية بكام بكسل
+    (ظل، أو ارتفاع صف مش مظبوط) بيطلّع **اسكرول بار رأسي** في نص
+    الصفحة، والمستخدم يفتكر إن في محتوى تحت.
+
+    الأقسام بتبقى شبكة من `sm` وطالع، يعني مش محتاجة تمرير أفقي
+    أصلًا — فبنشيل الحاوية كلها بدل ما نسيبها تعمل اسكرول مالوش لازمة.
+
+    الشرايط التانية (المنتجات، السلايدر) بتفضل `scroll-x` لأنها
+    بتتمرّر أفقيًا على كل المقاسات.
+  */
+  .rail-sm {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  @media (min-width: 40rem) {
+    .rail-sm {
+      overflow: visible;
+    }
+  }
+
   .surface {
     background-color: var(--surface);
     border: 1px solid var(--border);

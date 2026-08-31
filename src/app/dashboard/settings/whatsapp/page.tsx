@@ -9,7 +9,7 @@ import { TemplatesEditor } from './templates-editor'
 export const metadata = { title: 'واتساب' }
 
 export default async function WhatsappPage() {
-  const { store } = await getDashboardContext()
+  const { store, user } = await getDashboardContext()
   const settings = await readWhatsapp(store.id)
   const templates = await readTemplates(store.id)
 
@@ -26,6 +26,15 @@ export default async function WhatsappPage() {
           easyLink
           storePhone={store.whatsapp ?? store.phone ?? null}
           hasPlatformToken={Boolean(platformToken())}
+          /*
+            نفس بيانات التسجيل اللي في صفحة الإضافات.
+
+            الشاشة واحدة والتاجر بيوصلها من الاتنين، فلو الصفحة دي
+            ما مرّرتش البيانات بيلاقي زر إنشاء الحساب من غير اللي
+            يلزقه — ويفتكر إن الميزة ناقصة، وهي موجودة في الطريق
+            التاني بس.
+          */
+          account={{ name: user.name, email: user.email }}
         />
       </Reveal>
 

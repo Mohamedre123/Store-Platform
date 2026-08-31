@@ -60,7 +60,7 @@ export function CategoriesBlockView({
     <BlockShell background={block.background} chrome={chrome}>
       <BlockHead title={block.title} subtitle={block.subtitle} />
 
-      <div className={`scroll-x flex gap-4 pb-2 sm:grid ${cols}`}>
+      <div className={`rail-sm flex gap-4 pb-2 sm:grid ${cols}`}>
         {items.map((c, i) => (
           <BlockItem key={c.id} chrome={chrome} index={i} className="w-28 shrink-0 sm:w-auto">
             {block.layout === 'tile' ? (
