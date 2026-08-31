@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowUp } from 'lucide-react'
 import { WhatsappIcon } from './whatsapp-icon'
+import { TelegramIcon } from './telegram-icon'
 import type { ToolbarSettings } from '@/lib/customization'
 import { StoreBot } from './store-bot'
 import { normalizePhone } from '@/lib/utils'
@@ -32,6 +33,15 @@ export function StoreToolbar({
   }, [toolbar.backToTop])
 
   const side = toolbar.position === 'start' ? 'start-4' : 'end-4'
+
+  /*
+    تيليجرام بيفتح بالـusername لا بالرقم.
+
+    مافيش رابط محادثة بالرقم زي واتساب، فالتاجر لازم يكون عامل
+    اسم مستخدم. بنشيل @ لو كتبها عشان الرابط ما يبقاش t.me/@x.
+  */
+  const tgUser = (toolbar.telegramUsername || '').trim().replace(/^@+/, '')
+  const tgHref = toolbar.telegramEnabled && tgUser ? `https://t.me/${tgUser}` : null
   const waHref =
     toolbar.whatsappEnabled && toolbar.whatsappNumber
       ? `https://wa.me/${normalizePhone(toolbar.whatsappNumber).replace(/[^\d]/g, '')}?text=${encodeURIComponent(
@@ -55,7 +65,10 @@ export function StoreToolbar({
       className={`fixed z-50 flex flex-col gap-2 ${side} ${
         toolbar.mobileNavEnabled ? 'bottom-[5.5rem] md:bottom-4' : 'bottom-4'
       }`}
-      style={{ display: toolbar.whatsappEnabled || toolbar.backToTop || bot ? undefined : 'none' }}
+      style={{
+        display:
+          toolbar.whatsappEnabled || tgHref || toolbar.backToTop || bot ? undefined : 'none',
+      }}
     >
       {toolbar.backToTop && (
         <button
@@ -82,6 +95,28 @@ export function StoreToolbar({
           */
           liftedOnMobile={toolbar.mobileNavEnabled}
         />
+      )}
+
+      {/*
+        تيليجرام فوق الواتساب.
+
+        الواتساب هو الأشهر في السوق المصري، فبيفضل أقرب للإبهام
+        — تحت خالص. وتيليجرام بيقف فوقه لمن بيفضّله.
+      */}
+      {tgHref && (
+        <a
+          href={tgHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="تواصل على تيليجرام"
+          title="كلّمنا على تيليجرام"
+          className={`flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg ring-2 ring-white/70 transition-transform hover:scale-105 active:scale-95 ${
+            toolbar.showOnMobile ? 'flex' : 'hidden'
+          } ${toolbar.showOnDesktop ? 'md:flex' : 'md:hidden'}`}
+          style={{ background: '#229ED9' }}
+        >
+          <TelegramIcon className="h-7 w-7" />
+        </a>
       )}
 
       {waHref && (

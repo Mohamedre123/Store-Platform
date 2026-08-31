@@ -6,13 +6,14 @@ import {
   ArrowLeft,
   Check,
   ChevronDown,
+  Copy,
   Loader2,
   Mail,
   MessageCircle,
   Send,
   Smartphone,
 } from 'lucide-react'
-import { saveTelegramTokenAction } from './telegram-actions'
+import { listTelegramChatsAction, saveTelegramTokenAction } from './telegram-actions'
 import { Card, Input } from '@/components/ui'
 
 /**
@@ -130,6 +131,12 @@ function TelegramChannel({
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [pending, start] = useTransition()
 
+  /* معرّفات المحادثات اللي كلّمت البوت — بتتجاب بضغطة */
+  const [chats, setChats] = useState<Array<{ id: string; name: string }> | null>(null)
+  const [chatMsg, setChatMsg] = useState<string | null>(null)
+  const [copied, setCopied] = useState<string | null>(null)
+  const [loadingChats, startChats] = useTransition()
+
   return (
     <Channel
       id="telegram"
@@ -159,8 +166,8 @@ function TelegramChannel({
           <strong>٣.</strong> الصق التوكن هنا تحت واحفظ.
         </li>
         <li>
-          <strong>٤.</strong> ابعت أي رسالة للبوت بتاعك من حسابك، وبعدها ضيف مستقبِل «تيليجرام»
-          تحت وحطّ فيه معرّف محادثتك (Chat ID).
+          <strong>٤.</strong> ابعت أي رسالة للبوت بتاعك من حسابك (كلمة «هاي» تكفي)، وبعدها
+          دوس «هات معرّف المحادثة» تحت — هنجيبهولك من غير ما تدوّر.
         </li>
       </ol>
 
@@ -216,6 +223,81 @@ function TelegramChannel({
         >
           {msg.text}
         </p>
+      )}
+
+      {/*
+        معرّف المحادثة مالوش مكان ظاهر في تطبيق تيليجرام.
+
+        التاجر كان لازم يدوّر على بوت تاني يقوله رقمه أو يفتح رابط
+        API بإيده — خطوة تقنية على حد جاي يفتح متجر. الزرار ده
+        بيقرا آخر اللي كلّموا بوته ويحطّ الرقم قدامه.
+      */}
+      {ready && (
+        <div className="mt-3 flex flex-col gap-2">
+          <button
+            type="button"
+            disabled={loadingChats}
+            onClick={() => {
+              setChatMsg(null)
+              setChats(null)
+              startChats(async () => {
+                const res = await listTelegramChatsAction()
+                if (!res.ok) setChatMsg(res.error)
+                else if (res.chats.length === 0)
+                  setChatMsg('مالقيناش أي محادثة. ابعت رسالة لبوتك من تيليجرام الأول وبعدين دوس تاني.')
+                else setChats(res.chats)
+              })
+            }}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[var(--border-strong)] px-4 text-sm font-semibold text-[var(--fg)] transition-colors hover:bg-[var(--surface-2)] disabled:opacity-60"
+          >
+            {loadingChats ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Send className="h-4 w-4" aria-hidden="true" />
+            )}
+            هات معرّف المحادثة
+          </button>
+
+          {chatMsg && <p className="text-xs text-[var(--fg-muted)]">{chatMsg}</p>}
+
+          {chats?.map((c) => (
+            <div
+              key={c.id}
+              className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
+            >
+              <span className="min-w-0 flex-1 truncate text-xs font-medium">{c.name}</span>
+              <bdi dir="ltr" className="tabular shrink-0 text-xs">
+                {c.id}
+              </bdi>
+              <button
+                type="button"
+                aria-label="انسخ المعرّف"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(c.id)
+                  } catch {
+                    /* الحافظة مرفوضة — الرقم ظاهر وينفع ينسخه بإيده */
+                  }
+                  setCopied(c.id)
+                  setTimeout(() => setCopied(null), 1600)
+                }}
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--fg-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--fg)]"
+              >
+                {copied === c.id ? (
+                  <Check className="h-3.5 w-3.5 text-[var(--color-success)]" aria-hidden="true" />
+                ) : (
+                  <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                )}
+              </button>
+            </div>
+          ))}
+
+          {chats && chats.length > 0 && (
+            <p className="text-xs text-[var(--fg-subtle)]">
+              انسخ المعرّف وضيف مستقبِل «تيليجرام» تحت والزقه فيه.
+            </p>
+          )}
+        </div>
       )}
     </Channel>
   )

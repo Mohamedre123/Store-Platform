@@ -155,6 +155,16 @@ export type ToolbarSettings = {
   whatsappEnabled: boolean
   whatsappNumber: string
   whatsappMessage: string
+  /**
+   * تيليجرام كقناة تواصل للعملاء — زي الواتساب بالظبط.
+   *
+   * مالوش أي علاقة ببوت الإشعارات في صفحة الأتمتة: ده رابط
+   * لمحادثة التاجر نفسه عشان العميل يسأله، وده بوت بيبلّغ
+   * التاجر بطلباته. الاتنين على تيليجرام والباقي مختلف.
+   */
+  telegramEnabled: boolean
+  /** اسم المستخدم من غير @ — تيليجرام مالوش روابط بالرقم */
+  telegramUsername: string
   position: 'start' | 'end'
   showOnMobile: boolean
   showOnDesktop: boolean
@@ -332,6 +342,8 @@ export function defaultCustomization(theme: {
       whatsappEnabled: false,
       whatsappNumber: '',
       whatsappMessage: 'مرحبًا، عايز أستفسر عن منتج',
+      telegramEnabled: false,
+      telegramUsername: '',
       position: 'end',
       showOnMobile: true,
       showOnDesktop: true,

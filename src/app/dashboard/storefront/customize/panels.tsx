@@ -920,6 +920,32 @@ export function Panel({
             <Toggle label="يظهر على الكمبيوتر" checked={s.showOnDesktop} onChange={(v) => patch('toolbar', { showOnDesktop: v })} />
           </>
         )}
+
+        {/*
+          تيليجرام تحت الواتساب في نفس المجموعة.
+
+          الاتنين قناة تواصل واحدة في ذهن التاجر — «إزاي العميل
+          يكلّمني». فصلهم في مجموعتين كان هيخلّيه يدوّر على التاني
+          في مكان تاني، أو ما يعرفش إنه موجود أصلًا.
+
+          ومكان الزر والظهور على الموبايل/الكمبيوتر مشتركين —
+          الزرّين بيقفوا فوق بعض في نفس العمود.
+        */}
+        <Toggle
+          label="زر تيليجرام"
+          checked={s.telegramEnabled}
+          onChange={(v) => patch('toolbar', { telegramEnabled: v })}
+        />
+        {s.telegramEnabled && (
+          <TextField
+            label="اسم المستخدم على تيليجرام"
+            hint="من غير @. تلاقيه في تيليجرام ← الإعدادات ← Username. لو مالكش واحد، اعمله من هناك — تيليجرام مابيفتحش محادثة بالرقم."
+            value={s.telegramUsername}
+            onChange={(v) => patch('toolbar', { telegramUsername: v })}
+            placeholder="mystore"
+            ltr
+          />
+        )}
       </Group>
 
       <Group title="أدوات أخرى">
