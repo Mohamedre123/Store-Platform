@@ -12,7 +12,7 @@ import {
   type WhatsappProvider,
 } from '@/lib/whatsapp'
 import { normalizePhone } from '@/lib/utils'
-import { appUrl } from '@/lib/domain'
+import { callbackUrl } from '@/lib/domain'
 import { checkTemplates, type Templates } from '@/lib/whatsapp-templates'
 import QRCode from 'qrcode'
 import {
@@ -120,6 +120,15 @@ export async function linkWhatsappAction(phone: string): Promise<LinkState> {
   const to = normalizePhone(phone, store.country === 'EG' ? '20' : '966')
   if (to.replace(/\D/g, '').length < 10) return { ok: false, error: 'اكتب رقم واتساب صحيح' }
 
+  /*
+    عنوان استقبال الردود — بمضيف الطلب الحالي لا بـROOT_DOMAIN.
+
+    النطاق الجذر بيحوّل لـwww، والمزوّدين مابيتبعوش التحويل في POST
+    فالرد بيموت عند 308. مضيف اللوحة اللي التاجر عليه دلوقتي بالتعريف
+    مضيف ما بيحوّلش.
+  */
+  const hook = await callbackUrl(`/api/webhooks/whatsapp/${store.id}`)
+
   /* جلسة موجودة؟ نكمّل عليها بدل ما نستهلك واحدة جديدة من باقته */
   const current = await readWhatsapp(store.id)
   let sessionId = current.provider === 'wasender' ? current.phoneId : null
@@ -136,7 +145,7 @@ export async function linkWhatsappAction(phone: string): Promise<LinkState> {
         بمعرّف المتجر في المسار: البوابة بتبعت رقم ورسالة وبس،
         فمن غير المعرّف مش هنعرف الرد ده بتاع أنهي متجر.
       */
-      webhookUrl: appUrl(`/api/webhooks/whatsapp/${store.id}`),
+      webhookUrl: hook,
     })
     if (!created.ok) return { ok: false, error: created.error }
     sessionId = created.sessionId
@@ -149,7 +158,7 @@ export async function linkWhatsappAction(phone: string): Promise<LinkState> {
     أبدًا — وكان لازم التاجر يفصل ويربط تاني عشان حاجة إحنا
     غيّرناها. النداء هنا بيظبّط القديم والجديد بنفس الطريق.
   */
-  await ensureWebhook(token, sessionId, appUrl(`/api/webhooks/whatsapp/${store.id}`))
+  await ensureWebhook(token, sessionId, hook)
 
   const res = await connectSession(token, sessionId)
   if (!res.ok) return { ok: false, error: res.error }

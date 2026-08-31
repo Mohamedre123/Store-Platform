@@ -98,6 +98,37 @@ export function appUrl(path = '') {
   return `${protocol()}://${ROOT_DOMAIN}${path}`
 }
 
+/**
+ * عنوان يستقبله مزوّد خارجي — بالمضيف اللي بيشتغل فعلًا.
+ *
+ * ## المشكلة اللي بيحلّها
+ * `appUrl` بتبني من `ROOT_DOMAIN` (`zawyaeg.site`)، والنطاق ده بيحوّل
+ * لـ`www` على مستوى الاستضافة. والتحويل ده قاتل للويب هوك:
+ * **المزوّدين مابيتبعوش التحويل في POST** — بيشوفوا 308 ويعتبروها
+ * فشل ويرموا الرسالة. فالرابط يبان مظبوط في لوحتهم، والرد ما
+ * بيوصلش أبدًا ومفيش خطأ في أي مكان.
+ *
+ * التاجر بيسجّل الويب هوك وهو فاتح اللوحة، والمضيف اللي هو عليه
+ * دلوقتي هو بالتعريف مضيف ما بيحوّلش — فبنستخدمه.
+ *
+ * ## والحارس
+ * ترويسة `host` جاية من الطلب. بنقبلها بس لو تحت نطاق المنصة —
+ * وإلا بنرجع للافتراضي. من غير الشرط ده، ترويسة متلاعب فيها كانت
+ * تقدر تسجّل عنوان بره عندنا يستقبل رسايل عملاء التاجر.
+ */
+export async function callbackUrl(path = ''): Promise<string> {
+  const { headers } = await import('next/headers')
+  const h = await headers()
+  const host = (h.get('x-forwarded-host') ?? h.get('host') ?? '').split(':')[0].toLowerCase()
+
+  const root = ROOT_DOMAIN.split(':')[0].toLowerCase()
+  const trusted = host && (host === root || host.endsWith('.' + root))
+
+  if (!trusted) return appUrl(path)
+
+  const proto = h.get('x-forwarded-proto') ?? 'https'
+  return `${proto}://${host}${path}`
+}
 export function storeUrl(slug: string, path = '') {
   if (!SUBDOMAINS_ENABLED) return `${protocol()}://${ROOT_DOMAIN}/s/${slug}${path}`
   return `${protocol()}://${slug}.${ROOT_DOMAIN}${path}`
