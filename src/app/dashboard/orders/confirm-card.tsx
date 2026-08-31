@@ -50,12 +50,12 @@ export function ConfirmCard({ orderId, status }: { orderId: string; status: Conf
           <h3 className="text-sm font-semibold">تأكيد العميل</h3>
           <p className="mt-0.5 text-xs leading-relaxed text-[var(--fg-muted)]">
             {status.reply === 'yes'
-              ? `العميل أكّد الطلب${status.repliedAt ? ' — ' + status.repliedAt : ''}`
+              ? `العميل أكّد${status.repliedAt ? ' — ' + status.repliedAt : ''} — والطلب اتنقل لـ«بيتجهّز» ووصله بريد وواتساب.`
               : status.reply === 'no'
                 ? `العميل ألغى الطلب${status.repliedAt ? ' — ' + status.repliedAt : ''}`
                 : status.sentAt
                   ? `بعتنا الطلب${' — ' + status.sentAt} ولسه ما ردّش. الصمت مخاطرة زي الرفض.`
-                  : 'ابعتله رسالة واتساب يرد عليها بـ١ أو ٢، والرد بيتسجّل هنا لوحده.'}
+                  : 'ابعتله رسالة واتساب يرد عليها بـ١ أو ٢. لو أكّد، الطلب بينتقل لـ«بيتجهّز» ويوصله بريد وواتساب لوحدهم.'}
           </p>
         </div>
       </div>

@@ -4,6 +4,7 @@ import { db } from '@/db'
 import { orderEvents, orders, stores } from '@/db/schema'
 import { sendWhatsapp } from './whatsapp'
 import { formatMoney } from './utils'
+import { applyOrderStatus, loadFlowStore } from './order-flow'
 
 /**
  * تأكيد الطلب من العميل قبل الشحن.
@@ -161,15 +162,29 @@ export async function findPendingOrder(phone: string) {
 }
 
 /**
- * بيسجّل رد العميل ويرد عليه.
+ * بيسجّل رد العميل، بيحرّك الطلب، وبيرد عليه.
  *
- * ## «لأ» بتلغي الطلب فورًا
- * العميل قال إنه مش عايزه — الشحن بعدها خسارة مؤكّدة. والتاجر بيشوف
- * السبب في مسار الطلب، ويقدر يرجّعه لو كلّمه واتفقوا.
+ * ## الحالة بتتغيّر من `applyOrderStatus` لا بإيدنا
+ * الدالة دي هي نفسها اللي بتشتغل لما التاجر يضغط زر الحالة، ولما
+ * شركة الشحن تبعت تحديث. بتعمل تلات حاجات مع بعض:
  *
- * ## و«أيوه» ما بتغيّرش الحالة
- * التأكيد إشارة للتاجر لا أمر تشغيل: هو اللي بيقرّر إمتى يجهّز ويشحن.
- * لو غيّرنا الحالة تلقائي كنا بنتخطّى قراره في متجره.
+ * - بتغيّر الحالة وتكتبها في مسار الطلب
+ * - **بتبعت بريد وواتساب حالة الطلب للعميل** بنفس القوالب
+ * - وبترجّع الكمية للمخزون في الإلغاء والإرجاع
+ *
+ * الأخيرة دي بالذات السبب إننا ما بنكتبش الحالة بإيدنا: الإلغاء
+ * من غيرها بيسيب كمية محجوزة على طلب مات، والتاجر ما بيلاحظش
+ * غير لما يقف عن البيع.
+ *
+ * ## «أيوه» بتوصّله لـ«بيتجهّز»
+ * العميل أكّد إنه هيستلم، فالطلب بقى جاهز للتجهيز — والعميل بيوصله
+ * بريد وواتساب بكده على طول. ده اللي بيخلّي التأكيد يوفّر خطوة
+ * على التاجر بدل ما يبقى سطر تاني يقراه ويتصرّف فيه.
+ *
+ * ## و«لأ» بتلغي فورًا
+ * العميل قال إنه مش عايزه — الشحن بعدها خسارة مؤكّدة، والمخزون
+ * بيرجع مكانه. والتاجر بيشوف السبب في مسار الطلب ويقدر يرجّعه لو
+ * كلّمه واتفقوا.
  */
 export async function applyReply(input: {
   orderId: string
@@ -181,17 +196,13 @@ export async function applyReply(input: {
 
   await db
     .update(orders)
-    .set({
-      customerConfirm: input.reply,
-      customerConfirmAt: now,
-      ...(input.reply === 'no' ? { status: 'cancelled' as const, cancelledAt: now } : {}),
-    })
+    .set({ customerConfirm: input.reply, customerConfirmAt: now })
     .where(eq(orders.id, input.orderId))
 
   await db.insert(orderEvents).values({
     orderId: input.orderId,
     storeId: input.storeId,
-    type: input.reply === 'yes' ? 'note' : 'status',
+    type: 'note',
     message:
       input.reply === 'yes'
         ? 'العميل أكّد الطلب على واتساب ✅'
@@ -199,8 +210,25 @@ export async function applyReply(input: {
     actorType: 'customer',
   })
 
+  /*
+    الحالة والإشعارات والمخزون — كلهم من الدالة المشتركة.
+
+    ولو فشلت، الرد بيفضل متسجّل على الطلب. التاجر يشوف «العميل أكّد»
+    ويحرّك الحالة بإيده — أحسن بكتير من إننا نبلع الرد كله عشان
+    خطوة بعده وقعت.
+  */
+  const store = await loadFlowStore(input.storeId)
+  if (store) {
+    await applyOrderStatus(
+      store,
+      input.orderId,
+      input.reply === 'yes' ? 'processing' : 'cancelled',
+      { type: 'system', label: 'تأكيد العميل على واتساب' },
+    ).catch((e) => console.error('فشل تحديث حالة الطلب بعد تأكيد العميل:', e))
+  }
+
   const hello = input.customerName ? ` ${input.customerName}` : ''
   return input.reply === 'yes'
-    ? `تمام${hello}! ✅ طلبك اتأكّد وهنجهّزه ونبعتهولك. هنبعتلك تحديث أول ما يتشحن.`
+    ? `تمام${hello}! ✅ طلبك اتأكّد وبدأنا نجهّزه. هنبعتلك تحديث أول ما يتشحن.`
     : `تمام${hello}، الطلب اتلغى ❌ لو كان في غلط أو غيّرت رأيك، كلّمنا وهنساعدك.`
 }
