@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
-import { Check, ExternalLink, Loader2, QrCode, Save, Send, ShieldAlert } from 'lucide-react'
+import { Check, Copy, ExternalLink, Loader2, QrCode, Save, Send, ShieldAlert } from 'lucide-react'
 import {
   linkWhatsappAction,
   saveAccessTokenAction,
@@ -22,17 +22,68 @@ import type { WhatsappProvider, WhatsappSettings } from '@/lib/whatsapp'
  * الطريق الرسمي من ميتا. الفرق بينهم مش تقني بس — فيه مخاطرة
  * حقيقية في الأول، ومكتوبة له بالنص هنا عشان يقرّر وهو عارف.
  */
+/** رابط صفحة إنشاء الحساب مباشرةً — لا الصفحة التعريفية */
+const SIGNUP_URL = 'https://www.wasenderapi.com/register'
+
+/**
+ * سطر بيانات بيتنسخ بضغطة.
+ *
+ * نموذج التسجيل عندهم تطبيق JavaScript ومالوش أي دعم لتعبئة
+ * البيانات من الرابط، فما ينفعش نبعتها معاه. أقرب حاجة للي إحنا
+ * عايزينه إن التاجر يلاقي بياناته جاهزة قدامه فيلزقها من غير ما
+ * يفتكر بريده ولا يكتبه غلط.
+ */
+function CopyRow({ label, value }: { label: string; value: string }) {
+  const [done, setDone] = useState(false)
+
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2">
+      <span className="shrink-0 text-xs text-[var(--fg-subtle)]">{label}</span>
+      <bdi dir="ltr" className="min-w-0 flex-1 truncate text-start text-xs font-medium">
+        {value}
+      </bdi>
+      <button
+        type="button"
+        aria-label={done ? "اتنسخ" : "انسخ " + label}
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(value)
+          } catch {
+            /* الحافظة مرفوضة — القيمة ظاهرة قدامه وينفع ينسخها بإيده */
+          }
+          setDone(true)
+          setTimeout(() => setDone(false), 1600)
+        }}
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--fg-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--fg)]"
+      >
+        {done ? (
+          <Check className="h-3.5 w-3.5 text-[var(--color-success)]" aria-hidden="true" />
+        ) : (
+          <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+        )}
+      </button>
+    </div>
+  )
+}
+
 export function WhatsappForm({
   initial,
   easyLink,
   storePhone,
   hasPlatformToken,
+  account,
 }: {
   initial: WhatsappSettings
   easyLink: boolean
   storePhone: string | null
   /** المنصة حاطّة توكنًا عامًا؟ ساعتها التاجر مش محتاج حساب أصلًا */
   hasPlatformToken: boolean
+  /**
+   * بيانات التاجر — بتتعرض جاهزة للنسخ جنب زر إنشاء الحساب.
+   *
+   * اختيارية عشان صفحة الإعدادات القديمة تفضل شغّالة زي ما هي.
+   */
+  account?: { name: string; email: string }
 }) {
   const [provider, setProvider] = useState<WhatsappProvider>(initial.provider)
   const [apiKey, setApiKey] = useState('')
@@ -139,21 +190,38 @@ export function WhatsappForm({
             <div className="flex flex-col gap-3 rounded-lg bg-[var(--surface-2)] p-4">
               <p className="text-sm font-semibold">خطوة واحدة مرة واحدة</p>
               <ol className="flex flex-col gap-1.5 text-sm text-[var(--fg-muted)]">
-                <li>
-                  ١. اعمل حساب على{' '}
-                  <a
-                    href="https://wasenderapi.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 font-medium text-[var(--primary)] hover:underline"
-                  >
-                    wasenderapi.com
-                    <ExternalLink className="h-3 w-3" aria-hidden="true" />
-                  </a>
-                </li>
-                <li>٢. من الإعدادات، انسخ «Personal Access Token».</li>
+                <li>١. دوس الزر تحت واعمل حساب — دقيقة.</li>
+                <li>٢. من الإعدادات عندهم، انسخ «Personal Access Token».</li>
                 <li>٣. الصقه تحت واحفظ — وبعدها كل حاجة هنا.</li>
               </ol>
+
+              <a
+                href={SIGNUP_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-5 text-sm font-semibold text-[var(--primary-fg)] transition-opacity hover:opacity-90"
+              >
+                اعمل حساب على wasenderapi
+                <ExternalLink className="h-4 w-4" aria-hidden="true" />
+              </a>
+
+              {/*
+                بياناته جاهزة للنسخ.
+
+                نموذج التسجيل عندهم تطبيق JavaScript ومالوش دعم لتعبئة
+                البيانات من الرابط، فما ينفعش نبعتها معاه. الأقرب إننا
+                نحطّها قدامه بضغطة نسخ — التسجيل بيبقى لزق لزق بدل ما
+                يفتكر بريده ويكتبه غلط ويستنى رسالة تأكيد مش جاية.
+              */}
+              {account && (
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs text-[var(--fg-subtle)]">
+                    بياناتك جاهزة — انسخها والزقها عندهم
+                  </span>
+                  <CopyRow label="الاسم" value={account.name} />
+                  <CopyRow label="البريد" value={account.email} />
+                </div>
+              )}
 
               {/*
                 أهم سطر في الصفحة.

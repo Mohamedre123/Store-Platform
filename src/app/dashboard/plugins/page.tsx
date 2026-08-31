@@ -12,7 +12,7 @@ import { PluginsManager, type PluginRow } from './plugins-manager'
 export const metadata = { title: 'الإضافات' }
 
 export default async function PluginsPage() {
-  const { store } = await getDashboardContext()
+  const { store, user } = await getDashboardContext()
 
   const rows = await db
     .select({
@@ -38,6 +38,8 @@ export default async function PluginsPage() {
     templates: await readTemplates(store.id),
     storePhone: store.whatsapp ?? store.phone ?? null,
     hasPlatformToken: Boolean(platformToken()),
+    /* بيانات التسجيل — بتتعرض جاهزة للنسخ، ما بتتبعتش لأي حد */
+    account: { name: user.name, email: user.email },
   }
 
   return (

@@ -18,11 +18,14 @@ export function WhatsappCard({
   templates,
   storePhone,
   hasPlatformToken,
+  account,
 }: {
   settings: WhatsappSettings
   templates: Templates
   storePhone: string | null
   hasPlatformToken: boolean
+  /** اسم التاجر وبريده — بيتعرضوا جاهزين للنسخ عند إنشاء الحساب */
+  account?: { name: string; email: string }
 }) {
   return (
     <div className="flex flex-col gap-5">
@@ -31,6 +34,7 @@ export function WhatsappCard({
         easyLink
         storePhone={storePhone}
         hasPlatformToken={hasPlatformToken}
+        account={account}
       />
       <TemplatesEditor initial={templates} />
     </div>
