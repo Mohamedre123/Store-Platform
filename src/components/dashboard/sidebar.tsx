@@ -140,6 +140,7 @@ export const NAV: NavSection[] = [
     icon: Settings,
     children: [
       { href: '/dashboard/settings', label: 'بيانات المتجر' },
+      { href: '/dashboard/settings/checkout', label: 'الشيك أوت' },
       { href: '/dashboard/settings/domain', label: 'النطاق' },
       { href: '/dashboard/settings/email', label: 'بريد المتجر' },
       { href: '/dashboard/messages', label: 'سجل الرسايل' },
