@@ -1,6 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
+import { after } from 'next/server'
 import { getDashboardContext } from '@/lib/store-context'
 import {
   mergeSecrets,
@@ -179,6 +180,25 @@ export async function whatsappStatusAction(): Promise<'connected' | 'waiting' | 
 
   const token = await tokenFor(store.id)
   if (!token) return 'unknown'
+
+  /*
+    العنوان بيتظبّط هنا كمان لا عند الربط بس.
+
+    الجلسة اللي اتربطت قبل ما نصلّح العنوان بتفضل مسجّلة على
+    عنوان بيحوّل — والردود بتموت عنده بصمت. ولو استنينا التاجر
+    يعيد الربط، هو مش عارف إن في حاجة محتاجة إعادة أصلًا.
+
+    الصفحة دي بتتفتح مع كل زيارة لشاشة الواتساب، فالتصليح بيحصل
+    لوحده. و`ensureWebhook` بتسكت لو فشلت — الحالة أهم من التصليح.
+  */
+  after(
+    ensureWebhook(
+      token,
+      current.phoneId,
+      await callbackUrl(`/api/webhooks/whatsapp/${store.id}`),
+    ).catch((e) => console.error('فشل تظبيط عنوان الردود:', e)),
+  )
+
   return sessionStatus(token, current.phoneId)
 }
 

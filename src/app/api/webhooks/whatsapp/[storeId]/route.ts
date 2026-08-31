@@ -5,6 +5,7 @@ import { stores } from '@/db/schema'
 import { normalizePhone } from '@/lib/utils'
 import { sendWhatsapp } from '@/lib/whatsapp'
 import { applyReply, findPendingOrder, readReply } from '@/lib/order-confirm'
+import { messageLog } from '@/db/schema'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -45,6 +46,25 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ storeId: s
 
   const msg = extract(body)
   if (!msg) return NextResponse.json({ ok: true })
+
+  /*
+    كل رسالة واردة بتتسجّل — حتى اللي بنتجاهلها.
+
+    قعدنا تلات جولات مش عارفين الرد وصل ولا لأ، لأن المسار كان
+    بيرد 200 ويسكت. السطر ده بيخلّي السؤال «البوابة بتبعتلنا؟»
+    له إجابة في سجل الرسايل بدل تخمين.
+  */
+  await db
+    .insert(messageLog)
+    .values({
+      storeId: store.id,
+      channel: 'whatsapp',
+      event: 'inbound',
+      recipient: msg.phone,
+      body: msg.text.slice(0, 400),
+      status: 'sent',
+    })
+    .catch(() => undefined)
 
   /*
     رسايلنا إحنا بترجع في الويب هوك كمان.
