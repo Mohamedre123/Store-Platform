@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { and, count, eq, gte, sum } from "drizzle-orm";
+import Image from "next/image";
+import { and, count, desc, eq, gte, sum } from "drizzle-orm";
 import {
   ArrowLeft,
   Check,
@@ -14,6 +15,7 @@ import {
 import { db } from "@/db";
 import {
   orders,
+  orderItems,
   products,
   customers,
   paymentMethods,
@@ -22,6 +24,7 @@ import {
 import { getDashboardContext } from "@/lib/store-context";
 import { publicStoreUrl } from "@/lib/domain";
 import { formatMoney } from "@/lib/utils";
+import { ORDER_STATUSES } from "@/lib/order-status";
 import { Card } from "@/components/ui";
 import { Rail } from "@/components/rail";
 import { Reveal, SpotlightCard } from "@/components/motion";
@@ -40,6 +43,8 @@ const startOfToday = () => {
 export default async function DashboardHome() {
   const { store } = await getDashboardContext();
   const today = startOfToday();
+  /* آخر تلاتين يوم — نافذة «الأكتر مبيعًا» */
+  const last30 = new Date(Date.now() - 30 * 24 * 3600_000);
 
   /*
     حالة الاشتراك في أول الصفحة الرئيسية.
@@ -96,6 +101,57 @@ export default async function DashboardHome() {
       .select({ n: count() })
       .from(shippingZones)
       .where(and(eq(shippingZones.storeId, store.id), eq(shippingZones.enabled, true))),
+  ]);
+
+  /**
+   * آخر الطلبات وأكتر المنتجات مبيعًا.
+   *
+   * ## ليه اتضافوا
+   * الصفحة كانت أربع أرقام وسطر. وخطوات التجهيز بتختفي أول ما التاجر
+   * يخلّصها — فالمتجر الشغّال، وهو اللي بيفتح اللوحة كل يوم، بيلاقي
+   * الصفحة **أفضى** من المتجر الجديد.
+   *
+   * والرقم لوحده ما بيتعملش بيه حاجة: «٤ طلبات النهاردة» سؤال مش
+   * إجابة — التاجر عايز يعرف **مين** طلب عشان يجهّز ويكلّم. والأكتر
+   * مبيعًا بيقول له يزوّد مخزون إيه ويعلن على إيه.
+   *
+   * ## وبيتجابوا مع الباقي
+   * جوّه نفس `Promise.all` عشان ما يزوّدوش رحلة للخادم على صفحة
+   * بتتفتح كل يوم.
+   */
+  const [latestOrders, topProducts] = await Promise.all([
+    db
+      .select({
+        id: orders.id,
+        number: orders.orderNumber,
+        name: orders.customerName,
+        total: orders.total,
+        status: orders.status,
+        createdAt: orders.createdAt,
+      })
+      .from(orders)
+      .where(and(eq(orders.storeId, store.id), eq(orders.isIncomplete, false)))
+      .orderBy(desc(orders.createdAt))
+      .limit(5),
+    db
+      .select({
+        productId: orderItems.productId,
+        name: orderItems.name,
+        image: orderItems.image,
+        sold: sum(orderItems.quantity),
+      })
+      .from(orderItems)
+      .innerJoin(orders, eq(orders.id, orderItems.orderId))
+      .where(
+        and(
+          eq(orderItems.storeId, store.id),
+          eq(orders.isIncomplete, false),
+          gte(orders.createdAt, last30),
+        ),
+      )
+      .groupBy(orderItems.productId, orderItems.name, orderItems.image)
+      .orderBy(desc(sum(orderItems.quantity)))
+      .limit(5),
   ]);
 
   const stats = [
@@ -287,7 +343,89 @@ export default async function DashboardHome() {
         </Reveal>
       )}
 
-      <Reveal delay={180}>
+      {/*
+        آخر الطلبات — الأول لأنها الحاجة اللي بيتعمل بيها شغل.
+
+        الرقم بيقول «فيه ٤ طلبات»، والقايمة بتقول **مين** — والتاجر
+        بيفتح اللوحة الصبح عشان ده بالظبط.
+      */}
+      {latestOrders.length > 0 && (
+        <Reveal delay={180}>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-semibold">آخر الطلبات</h2>
+              <Link
+                href="/dashboard/orders"
+                className="text-sm text-[var(--primary)] hover:underline"
+              >
+                كلها
+              </Link>
+            </div>
+
+            <Card className="divide-y divide-[var(--border)] p-0">
+              {latestOrders.map((o) => {
+                const meta = ORDER_STATUSES.find((s) => s.key === o.status)
+                return (
+                  <Link
+                    key={o.id}
+                    href={`/dashboard/orders/${o.id}`}
+                    className="flex items-center gap-3 p-3.5 transition-colors hover:bg-[var(--surface-2)] sm:p-4"
+                  >
+                    <span className="tabular shrink-0 text-sm font-semibold text-[var(--fg-muted)]">
+                      #{o.number}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                      {o.name || 'بلا اسم'}
+                    </span>
+                    {meta && (
+                      <span
+                        className="shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium"
+                        style={{ background: meta.bg, color: meta.fg }}
+                      >
+                        {meta.label}
+                      </span>
+                    )}
+                    <span className="tabular shrink-0 text-sm font-semibold">
+                      {formatMoney(o.total, store.currency)}
+                    </span>
+                  </Link>
+                )
+              })}
+            </Card>
+          </div>
+        </Reveal>
+      )}
+
+      {/*
+        الأكتر مبيعًا في آخر ٣٠ يوم.
+
+        بيجاوب على «أزوّد مخزون إيه وأعلن على إيه» — وده قرار التاجر
+        بياخده كل أسبوع، ومكانه الطبيعي قدامه مش جوّه تقرير.
+      */}
+      {topProducts.length > 0 && (
+        <Reveal delay={220}>
+          <div className="flex flex-col gap-3">
+            <h2 className="font-semibold">الأكتر مبيعًا · آخر ٣٠ يوم</h2>
+            <Card className="divide-y divide-[var(--border)] p-0">
+              {topProducts.map((p) => (
+                <div key={p.productId ?? p.name} className="flex items-center gap-3 p-3.5 sm:p-4">
+                  <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-[var(--surface-2)]">
+                    {p.image && (
+                      <Image src={p.image} alt="" fill sizes="40px" className="object-cover" />
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{p.name}</span>
+                  <span className="tabular shrink-0 text-sm text-[var(--fg-muted)]">
+                    {Number(p.sold ?? 0)} مبيع
+                  </span>
+                </div>
+              ))}
+            </Card>
+          </div>
+        </Reveal>
+      )}
+
+      <Reveal delay={260}>
         <p className="text-sm text-[var(--fg-subtle)]">
           عندك {productCount?.n ?? 0} منتج نشط و{customerCount?.n ?? 0} عميل
           مسجّل.

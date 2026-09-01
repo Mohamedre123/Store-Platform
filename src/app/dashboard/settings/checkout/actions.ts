@@ -30,6 +30,7 @@ const schema = z.object({
   fieldStreet: field,
   fieldBuilding: field,
   fieldPostalCode: field,
+  fieldCountry: field,
   fieldNotes: field,
 
   /* العنوان والتوصيل */

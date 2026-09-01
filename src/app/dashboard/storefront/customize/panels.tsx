@@ -157,7 +157,7 @@ export function Panel({
                 label="النص"
                 value={s.text}
                 onChange={(v) => patch('announcement', { text: v })}
-                placeholder="شحن مجاني للطلبات فوق ١٠٠٠ جنيه"
+                
               />
               <TextField
                 label="الرابط"
@@ -361,7 +361,7 @@ export function Panel({
                     hint="سيبه فاضي لو مش عايز زر على الشريحة دي."
                     value={slide.ctaLabel}
                     onChange={(v) => setSlide(slide.id, { ctaLabel: v })}
-                    placeholder="تسوّق دلوقتي"
+                    
                   />
 
                   <LinkPicker
@@ -436,7 +436,7 @@ export function Panel({
                     hint="اسم متجرك، تصنيف، موسم — أي حاجة. بيتكتب صغير ومتباعد فوق العنوان. سيبه فاضي لو مش عايزه."
                     value={slide.eyebrow ?? ''}
                     onChange={(v) => setSlide(slide.id, { eyebrow: v })}
-                    placeholder="ATLAS STORE"
+                    
                   />
 
                   {(slide.eyebrow ?? '').trim() && (
@@ -662,11 +662,24 @@ export function Panel({
           <Toggle label="فلتر الأقسام" checked={s.showCategoryFilter} onChange={(v) => patch('listing', { showCategoryFilter: v })} />
           <Toggle label="الترتيب" checked={s.showSort} onChange={(v) => patch('listing', { showSort: v })} />
           <Toggle label="التقييم على البطاقة" checked={s.showRating} onChange={(v) => patch('listing', { showRating: v })} />
-          <Toggle
-            label="إضافة سريعة للسلة"
-            hint="زر إضافة على البطاقة من غير فتح صفحة المنتج."
-            checked={s.showQuickAdd}
-            onChange={(v) => patch('listing', { showQuickAdd: v })}
+          {/*
+            كان مفتاحًا بقيمتين، والقيمة التالتة («الخيارات») موجودة في
+            الكود من الأول ومكانش ليها مكان تتظبّط منه. فالتاجر اللي
+            قفل الزر ورجّعه كان بياخد «إضافة» بدل «الخيارات» — وشايف
+            إن الخيارات اختفت من غير سبب.
+          */}
+          <Choice
+            label="زر البطاقة"
+            hint="«الخيارات» بتوري المقاسات أو الألوان على البطاقة نفسها، فالعميل يختار ويضيف من غير ما يفتح المنتج."
+            value={s.cardAction ?? (s.showQuickAdd ? 'add' : 'none')}
+            options={[
+              { value: 'none', label: 'من غير زر' },
+              { value: 'add', label: 'إضافة للسلة' },
+              { value: 'choose', label: 'الخيارات' },
+            ]}
+            onChange={(v) =>
+              patch('listing', { cardAction: v, showQuickAdd: v !== 'none' })
+            }
           />
         </Group>
       </>
@@ -794,7 +807,7 @@ export function Panel({
             value={s.about}
             onChange={(v) => patch('footer', { about: v })}
             multiline
-            placeholder="متجر متخصص في…"
+            
           />
           <TextField
             label="حقوق النشر"
@@ -834,7 +847,7 @@ export function Panel({
                   onChange={(v) =>
                     patch('footer', { links: s.links.map((x) => (x.id === l.id ? { ...x, label: v } : x)) })
                   }
-                  placeholder="سياسة الاسترجاع"
+                  
                 />
               </div>
               <div className="flex-1">

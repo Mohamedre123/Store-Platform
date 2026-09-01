@@ -44,6 +44,7 @@ export default async function CheckoutSettingsPage() {
     fieldStreet: row?.fieldStreet ?? 'required',
     fieldBuilding: row?.fieldBuilding ?? 'optional',
     fieldPostalCode: row?.fieldPostalCode ?? 'hidden',
+    fieldCountry: row?.fieldCountry ?? 'hidden',
     fieldNotes: row?.fieldNotes ?? 'optional',
     addressMode: row?.addressMode ?? 'structured',
     deliveryMode: row?.deliveryMode ?? 'delivery',
@@ -76,6 +77,7 @@ export default async function CheckoutSettingsPage() {
           initial={initial}
           currency={store.currency}
           whatsappReady={whatsapp.provider !== 'off' && whatsapp.hasKey}
+          storeWhatsapp={store.whatsapp}
         />
       </Reveal>
     </div>

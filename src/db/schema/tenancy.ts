@@ -201,7 +201,14 @@ export const checkoutSettings = pgTable('checkout_settings', {
   fieldName: text('field_name').$type<FieldMode>().notNull().default('required'),
   fieldPhone: text('field_phone').$type<FieldMode>().notNull().default('required'),
   fieldEmail: text('field_email').$type<FieldMode>().notNull().default('optional'),
-  fieldCountry: text('field_country').$type<FieldMode>().notNull().default('required'),
+  /**
+   * خانة الدولة — **مخفية افتراضيًا**.
+   *
+   * أغلب التجّار بيبيعوا في بلد واحدة، وقايمة الدول عندهم خانة زيادة
+   * على شاشة كل عنصر فيها بيقلّل اللي بيكمّلوا الطلب. واللي بيشحن
+   * لبرّه بيفتحها من إعدادات الشيك أوت.
+   */
+  fieldCountry: text('field_country').$type<FieldMode>().notNull().default('hidden'),
   fieldCity: text('field_city').$type<FieldMode>().notNull().default('required'),
   fieldArea: text('field_area').$type<FieldMode>().notNull().default('optional'),
   fieldStreet: text('field_street').$type<FieldMode>().notNull().default('required'),

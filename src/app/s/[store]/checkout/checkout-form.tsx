@@ -445,8 +445,20 @@ export function CheckoutForm({
     })
   }
 
-  const input =
-    'h-12 w-full rounded-[var(--sf-radius)] border border-[var(--sf-text)]/18 bg-[var(--sf-surface)] px-3 text-base outline-none transition-colors focus:border-[var(--sf-primary)]'
+  /**
+   * أنماط الخانة — **من غير العرض**.
+   *
+   * كان `w-full` جوّه النص المشترك، وأي خانة عايزة عرض تاني بتضيف
+   * `w-28` جنبه. وده ما بيشتغلش: الاتنين بيظبّطوا نفس الخاصية،
+   * والترتيب في ملف الأنماط هو اللي بيحكم لا الترتيب في الوسم — فـ
+   * `w-full` بتكسب، ومنتقي كود الدولة بياخد السطر كله ويزقّ خانة
+   * الرقم لشريط رفيع على الجنب.
+   *
+   * فالعرض بقى بره: كل خانة بتقول عرضها بنفسها ومفيش تعارض أصلًا.
+   */
+  const inputBase =
+    'h-12 rounded-[var(--sf-radius)] border border-[var(--sf-text)]/18 bg-[var(--sf-surface)] px-3 text-base outline-none transition-colors focus:border-[var(--sf-primary)]'
+  const input = `${inputBase} w-full`
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_22rem]">
@@ -484,7 +496,8 @@ export function CheckoutForm({
                   onChange={(e) => setDialCode(e.target.value)}
                   aria-label="كود الدولة"
                   dir="ltr"
-                  className={`${input} w-28 shrink-0 text-start`}
+                  /* `basis` + `shrink-0` بيثبّتوا عرضه، والخانة بتاخد الباقي */
+                  className={`${inputBase} w-[6.5rem] shrink-0 px-2 text-start text-sm`}
                 >
                   {COUNTRIES.map((c) => (
                     <option key={c.code} value={c.dial}>
@@ -497,7 +510,13 @@ export function CheckoutForm({
                   onChange={(e) => { setPhone(e.target.value); setTouchedContact(true) }}
                   inputMode="tel"
                   dir="ltr"
-                  className={`${input} min-w-0 flex-1 text-start`}
+                  /*
+                    `min-w-0` هي اللي بتخلّي الخانة تصغر.
+
+                    عنصر flex عرضه الأدنى الافتراضي `auto` — بيرفض يصغر
+                    عن عرض محتواه، فبيدفع اللي جنبه بره الصف.
+                  */
+                  className={`${inputBase} min-w-0 flex-1 text-start`}
                   placeholder="1012345678"
                 />
               </div>

@@ -126,7 +126,7 @@ export function SettingsForm({
           <input
             value={tagline}
             onChange={(e) => setTagline(e.target.value)}
-            placeholder="جملة قصيرة بتقول متجرك بيبيع إيه ولمين"
+            
             className={field}
           />
           <span className="text-xs text-[var(--fg-subtle)]">بيظهر تحت اسم المتجر وفي نتايج البحث.</span>

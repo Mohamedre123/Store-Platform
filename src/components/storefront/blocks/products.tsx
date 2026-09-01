@@ -74,9 +74,7 @@ export function ProductsBlockView({
     showRating: listing.showRating,
     action:
       block.action === 'inherit'
-        ? listing.showQuickAdd
-          ? ('add' as const)
-          : ('none' as const)
+        ? (listing.cardAction ?? (listing.showQuickAdd ? 'add' : 'none'))
         : block.action,
   }
 

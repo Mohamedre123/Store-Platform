@@ -16,6 +16,7 @@ export type CheckoutSettingsValues = {
   fieldStreet: FieldMode
   fieldBuilding: FieldMode
   fieldPostalCode: FieldMode
+  fieldCountry: FieldMode
   fieldNotes: FieldMode
   addressMode: 'structured' | 'simple' | 'hidden'
   deliveryMode: 'delivery_pickup' | 'delivery' | 'pickup'
@@ -51,11 +52,14 @@ export function CheckoutSettingsForm({
   initial,
   currency,
   whatsappReady,
+  storeWhatsapp,
 }: {
   initial: CheckoutSettingsValues
   currency: string
   /** واتساب مربوط؟ التأكيد التلقائي مالوش معنى من غيره */
   whatsappReady: boolean
+  /** رقم واتساب المتجر — الطلب عبر واتساب مالوش معنى من غيره */
+  storeWhatsapp: string | null
 }) {
   const [v, setV] = useState<CheckoutSettingsValues>(initial)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
@@ -146,6 +150,13 @@ export function CheckoutSettingsForm({
             hint="أغلب المتاجر المصرية مش محتاجاه."
           />
           <Choice
+            label="الدولة"
+            value={v.fieldCountry}
+            options={MODES}
+            onChange={(x) => set('fieldCountry', x)}
+            hint="شغّلها لو بتشحن لأكتر من بلد. المتجر اللي بيبيع في بلد واحدة، القايمة دي خانة زيادة مالهاش لازمة."
+          />
+          <Choice
             label="ملاحظات العميل"
             value={v.fieldNotes}
             options={MODES}
@@ -233,8 +244,26 @@ export function CheckoutSettingsForm({
             label="الطلب عبر واتساب"
             checked={v.whatsappOrderEnabled}
             onChange={(x) => set('whatsappOrderEnabled', x)}
-            hint="زر بيفتح محادثة برسالة فيها المنتج — للعملاء اللي مش مرتاحين للنماذج."
+            hint="زر في صفحة المنتج بيفتح محادثة فيها المنتج والكمية والرابط جاهزين — للعملاء اللي بيفضّلوا يتكلموا قبل ما يدفعوا."
           />
+
+          {/*
+            الميزة محتاجة رقم، والرقم مش هنا.
+
+            التاجر بيفتح المفتاح، ويروح لصفحة المنتج، وما بيلاقيش زرار —
+            وما عندوش أي طريقة يعرف السبب. الشرط التاني (وجود رقم واتساب
+            على المتجر) في شاشة تانية خالص، فلازم يتقال هنا وقت ما
+            بيفتحها لا بعد ما يدوّر.
+          */}
+          {v.whatsappOrderEnabled && !storeWhatsapp && (
+            <p className="rounded-lg bg-[var(--color-warning-soft)] px-3 py-2 text-xs font-medium leading-relaxed text-[var(--color-warning)]">
+              الزر مش هيظهر لحد ما تحطّ رقم واتساب المتجر — من{' '}
+              <a href="/dashboard/settings" className="underline">
+                إعدادات ← بيانات المتجر
+              </a>
+              . ده الرقم اللي العميل هيكلّمك عليه.
+            </p>
+          )}
         </Group>
 
         <Group title="السلة">

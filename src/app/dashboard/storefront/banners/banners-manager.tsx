@@ -120,7 +120,7 @@ export function BannersManager({ banners }: { banners: BannerRow[] }) {
             <input
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
-              placeholder="خصم العيد يبدأ دلوقتي"
+              
               className={`${field} h-11`}
             />
           </label>
@@ -163,7 +163,7 @@ export function BannersManager({ banners }: { banners: BannerRow[] }) {
               <input
                 value={form.ctaLabel}
                 onChange={(e) => setForm({ ...form, ctaLabel: e.target.value })}
-                placeholder="تسوّق دلوقتي"
+                
                 className={`${field} h-11`}
               />
             </label>
