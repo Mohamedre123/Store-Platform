@@ -29,6 +29,34 @@ export function WhatsappCard({
 }) {
   return (
     <div className="flex flex-col gap-5">
+      {/*
+        الفرق بين الربطين — بيتقال هنا لأن ده مكان اللبس.
+
+        الإضافة دي بتخلّي **المنصة** تبعت باسم التاجر: رمز الدخول،
+        وتأكيد الطلب، وحالة الشحن. وزر الواتساب العائم في المتجر حاجة
+        تانية خالص: رابط بيفتح محادثة على رقم التاجر، مالوش أي علاقة
+        بالربط ده ولا محتاجه.
+
+        التاجر اللي عايز الزر بيدخل هنا يربط ويستنى، أو بيربط هنا
+        ويستغرب إن الزر مش ظاهر. السطرين دول بيوفّروا عليه الدورة.
+      */}
+      <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-3 text-xs leading-relaxed text-[var(--fg-muted)]">
+        <span className="font-medium text-[var(--fg)]">مش ده اللي بتدوّر عليه؟</span>{' '}
+        الربط ده عشان <strong>المنصة تبعت رسايل باسمك</strong> (رمز الدخول، تأكيد الطلب،
+        حالة الشحن).
+        <br />
+        أما <strong>زر واتساب العائم</strong> اللي العميل بيضغطه عشان يكلّمك، فمالوش
+        علاقة بالربط ده — بيشتغل برقم متجرك وبس. تلاقيه في{' '}
+        <a href="/dashboard/storefront/customize" className="text-[var(--primary)] underline">
+          تخصيص المتجر ← شريط الأدوات
+        </a>{' '}
+        (ومعاه زر تيليجرام)، والرقم نفسه من{' '}
+        <a href="/dashboard/settings" className="text-[var(--primary)] underline">
+          إعدادات ← بيانات المتجر
+        </a>
+        .
+      </div>
+
       <WhatsappForm
         initial={settings}
         easyLink

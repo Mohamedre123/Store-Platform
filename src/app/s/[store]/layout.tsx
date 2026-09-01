@@ -256,7 +256,12 @@ export default async function StorefrontLayout({
 
           <main className="flex-1">{children}</main>
 
-          <StoreFooter footer={custom.footer} storeName={store.name} policyPages={policyPages} />
+          <StoreFooter
+            footer={custom.footer}
+            storeName={store.name}
+            contact={{ phone: store.phone, whatsapp: store.whatsapp, social: store.socialLinks }}
+            policyPages={policyPages}
+          />
 
           <StoreToolbar
             toolbar={custom.toolbar}

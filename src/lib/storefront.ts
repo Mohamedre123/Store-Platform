@@ -39,6 +39,8 @@ export type StorefrontStore = {
   hideNameInHeader: boolean
   phone: string | null
   whatsapp: string | null
+  /** روابط السوشيال — بتظهر في الفوتر بمجرد ما تتحط */
+  socialLinks: Record<string, string>
   email: string | null
   currency: string
   country: string
@@ -74,6 +76,7 @@ export const getStore = cache(async (identifier: string): Promise<StorefrontStor
       hideNameInHeader: stores.hideNameInHeader,
       phone: stores.phone,
       whatsapp: stores.whatsapp,
+      socialLinks: stores.socialLinks,
       email: stores.email,
       currency: stores.currency,
       country: stores.country,

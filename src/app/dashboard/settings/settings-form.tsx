@@ -19,6 +19,23 @@ const CURRENCIES = [
 const field =
   'h-11 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-sm transition-colors focus:border-[var(--primary)] focus:outline-none'
 
+/**
+ * منصات السوشيال المدعومة في الفوتر.
+ *
+ * المفتاح هو نفسه اللي بيتخزّن وبيتقرا في الفوتر — فإضافة منصة جديدة
+ * سطر هنا وأيقونة هناك، من غير هجرة ولا عمود.
+ */
+const SOCIAL_FIELDS = [
+  { key: 'facebook', label: 'فيسبوك', placeholder: 'https://facebook.com/…' },
+  { key: 'instagram', label: 'إنستجرام', placeholder: 'https://instagram.com/…' },
+  { key: 'tiktok', label: 'تيك توك', placeholder: 'https://tiktok.com/@…' },
+  { key: 'youtube', label: 'يوتيوب', placeholder: 'https://youtube.com/@…' },
+  { key: 'x', label: 'إكس (تويتر)', placeholder: 'https://x.com/…' },
+  { key: 'linkedin', label: 'لينكدإن', placeholder: 'https://linkedin.com/company/…' },
+  { key: 'snapchat', label: 'سناب شات', placeholder: 'https://snapchat.com/add/…' },
+  { key: 'telegram', label: 'تيليجرام', placeholder: 'https://t.me/…' },
+] as const
+
 export function SettingsForm({
   store,
   colors,
@@ -31,6 +48,7 @@ export function SettingsForm({
     email: string | null
     phone: string | null
     whatsapp: string | null
+    socialLinks?: Record<string, string> | null
     logoLight: string | null
     favicon: string | null
     country: string
@@ -46,6 +64,7 @@ export function SettingsForm({
   const [email, setEmail] = useState(store.email ?? '')
   const [phone, setPhone] = useState(store.phone ?? '')
   const [whatsapp, setWhatsapp] = useState(store.whatsapp ?? '')
+  const [social, setSocial] = useState<Record<string, string>>(store.socialLinks ?? {})
   const [logoLight, setLogoLight] = useState<string | null>(store.logoLight)
   const [favicon, setFavicon] = useState<string | null>(store.favicon)
   const [primary, setPrimary] = useState(colors.primary)
@@ -71,6 +90,7 @@ export function SettingsForm({
         email,
         phone,
         whatsapp,
+        social,
         logoLight,
         favicon,
         primary,
@@ -165,6 +185,41 @@ export function SettingsForm({
             className={`${field} text-start`}
           />
         </label>
+
+        {/*
+          بيانات السوشيال — **هنا لا في تخصيص الفوتر**.
+
+          الرابط ده بيتغيّر لما التاجر يفتح حسابًا جديدًا، مش لما يغيّر
+          شكل متجره. واللي بيدوّر عليه بيدوّر جنب التليفون والبريد — مش
+          في شاشة الألوان والخطوط.
+
+          والأيقونة بتظهر في الفوتر **بمجرد ما الرابط يتحط**: مفيش
+          مفتاح تاني يتفتح، ومفيش خانة تفضل فاضية وأيقونتها ظاهرة
+          بتودّي على العدم.
+        */}
+        <div className="flex flex-col gap-4 border-t border-[var(--border)] pt-5">
+          <div>
+            <h3 className="text-sm font-medium">بيانات السوشيال ميديا</h3>
+            <p className="mt-0.5 text-xs text-[var(--fg-subtle)]">
+              حطّ الرابط والأيقونة تظهر في فوتر متجرك على طول. سيب اللي مالكش حساب عليه فاضي.
+            </p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {SOCIAL_FIELDS.map(({ key, label, placeholder }) => (
+              <label key={key} className="flex flex-col gap-1.5">
+                <span className="text-sm font-medium">{label}</span>
+                <input
+                  value={social[key] ?? ''}
+                  onChange={(e) => setSocial((s) => ({ ...s, [key]: e.target.value }))}
+                  dir="ltr"
+                  placeholder={placeholder}
+                  className={`${field} text-start`}
+                />
+              </label>
+            ))}
+          </div>
+        </div>
 
         <div className="flex flex-col gap-4 border-t border-[var(--border)] pt-5">
           <div>

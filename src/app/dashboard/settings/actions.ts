@@ -35,6 +35,13 @@ export async function saveStoreInfoAction(input: {
    */
   primary?: string
   accent?: string
+  /**
+   * روابط السوشيال — المفتاح اسم المنصة والقيمة الرابط.
+   *
+   * الفاضي بيتشال بدل ما يتخزّن: الأيقونة بتظهر بوجود الرابط، والقيمة
+   * الفاضية كانت هتخلّي أيقونة تبان وتودّي على العدم.
+   */
+  social?: Record<string, string>
 }): Promise<SettingsState> {
   const { store } = await getDashboardContext()
 
@@ -59,6 +66,11 @@ export async function saveStoreInfoAction(input: {
       whatsapp: input.whatsapp.trim() ? normalizePhone(input.whatsapp, dial) : null,
       logoLight: input.logoLight,
       favicon: input.favicon,
+      socialLinks: Object.fromEntries(
+        Object.entries(input.social ?? {})
+          .map(([k, v]) => [k, String(v ?? '').trim()])
+          .filter(([, v]) => v),
+      ),
     })
     .where(eq(stores.id, store.id))
 

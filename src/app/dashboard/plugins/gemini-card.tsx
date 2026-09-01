@@ -5,6 +5,7 @@ import { Bot, Check, ExternalLink, KeyRound, Sparkles, TriangleAlert } from 'luc
 import { Alert, Card } from '@/components/ui'
 import type { PluginDef } from '@/lib/plugins'
 import { saveGeminiAction, verifyGeminiKeyAction } from './ai-actions'
+import { RefreshBriefButton } from './refresh-brief'
 
 export type GeminiSaved = {
   enabled: boolean
@@ -223,7 +224,10 @@ export function GeminiCard({
 
             {/* وصف المتجر */}
             <label className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium">متجرك بيبيع إيه؟</span>
+              <span className="flex flex-wrap items-center justify-between gap-2 text-sm font-medium">
+                متجرك بيبيع إيه؟
+                <RefreshBriefButton onDone={setBrief} />
+              </span>
               <textarea
                 value={brief}
                 onChange={(e) => setBrief(e.target.value)}

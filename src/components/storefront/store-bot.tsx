@@ -166,7 +166,7 @@ export function StoreBot({
         aria-label={open ? 'إغلاق المساعد' : 'اسأل مساعد المتجر'}
         aria-expanded={open}
         title="اسأل مساعد المتجر"
-        className="flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg ring-2 ring-white/70 transition-transform hover:scale-105 active:scale-95"
+        className="flex h-11 w-11 items-center justify-center rounded-full text-white shadow-md ring-1 ring-white/60 transition-transform hover:scale-105 active:scale-95"
         style={{ background: accent }}
       >
         {open ? (

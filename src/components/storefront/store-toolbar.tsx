@@ -87,7 +87,7 @@ export function StoreToolbar({
           type="button"
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           aria-label="الرجوع لأعلى"
-          className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--sf-text)]/15 bg-[var(--sf-surface)] text-[var(--sf-text)] shadow-lg transition-all hover:scale-105"
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--sf-text)]/15 bg-[var(--sf-surface)] text-[var(--sf-text)] shadow-lg transition-all hover:scale-105"
           style={{ opacity: scrolled ? 1 : 0, pointerEvents: scrolled ? 'auto' : 'none' }}
         >
           <ArrowUp className="h-5 w-5" aria-hidden="true" />
@@ -122,12 +122,12 @@ export function StoreToolbar({
           rel="noopener noreferrer"
           aria-label="تواصل على تيليجرام"
           title="كلّمنا على تيليجرام"
-          className={`flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg ring-2 ring-white/70 transition-transform hover:scale-105 active:scale-95 ${
+          className={`flex h-11 w-11 items-center justify-center rounded-full text-white shadow-md ring-1 ring-white/60 transition-transform hover:scale-105 active:scale-95 ${
             toolbar.showOnMobile ? 'flex' : 'hidden'
           } ${toolbar.showOnDesktop ? 'md:flex' : 'md:hidden'}`}
           style={{ background: '#229ED9' }}
         >
-          <TelegramIcon className="h-7 w-7" />
+          <TelegramIcon className="h-5 w-5" />
         </a>
       )}
 
@@ -143,12 +143,12 @@ export function StoreToolbar({
             — الأخضر على صورة بانر خضرا بيختفي، والعميل اللي عنده
             سؤال بيسيب المتجر بدل ما يسأل.
           */
-          className={`flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg ring-2 ring-white/70 transition-transform hover:scale-105 active:scale-95 ${
+          className={`flex h-11 w-11 items-center justify-center rounded-full text-white shadow-md ring-1 ring-white/60 transition-transform hover:scale-105 active:scale-95 ${
             toolbar.showOnMobile ? 'flex' : 'hidden'
           } ${toolbar.showOnDesktop ? 'md:flex' : 'md:hidden'}`}
           style={{ background: '#25D366' }}
         >
-          <WhatsappIcon className="h-7 w-7" />
+          <WhatsappIcon className="h-5 w-5" />
         </a>
       )}
     </div>

@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/db'
 import { storePlugins } from '@/db/schema'
@@ -367,4 +367,78 @@ export async function saveClaudeAction(raw: unknown): Promise<SaveState> {
   revalidatePath('/dashboard/plugins')
   revalidatePath('/dashboard/storefront')
   return { ok: true }
+}
+
+/* ────────────────────── تحديث معلومات المساعد ────────────────────── */
+
+export type RefreshBriefState =
+  | { ok: true; brief: string }
+  | { ok: false; error: string }
+
+/**
+ * بيعيد بناء «نبذة المتجر» من بيانات المتجر الحالية.
+ *
+ * ## المشكلة اللي بيحلّها
+ * النبذة كانت بتتولّد **مرة واحدة** — لحظة ما التاجر يتحقّق من مفتاحه —
+ * وبتتخزّن في إعدادات الإضافة. وبعدها بتفضل زي ما هي مهما اتغيّر
+ * المتجر: التاجر يشيل الشحن المجاني، ويضيف أقسام، ويغيّر أسعاره —
+ * والمساعد لسه بيقول كلام الشهر اللي فات.
+ *
+ * والعميل بيسمع الكلام ده على إنه من المتجر، فبيبني عليه قرار شرا.
+ * نبذة قديمة مش تفصيلة شكلية — دي معلومة غلط بتتقال باسم التاجر.
+ *
+ * ## ليه زرار لا تحديث تلقائي
+ * النبذة نص التاجر بيقدر يعدّله بإيده ويزوّد عليه («بنشحن للإسكندرية
+ * في يوم»). التحديث التلقائي كان هيمسح كلامه كل ما يضيف منتج.
+ * الزرار بيخلّي القرار قراره: يدوس لما يبقى غيّر حاجة مهمة.
+ *
+ * ## وبيخدم المساعدين الاتنين
+ * مساعد المتجر (اللي بيكلّم العميل) ومساعد اللوحة (اللي بيكلّم التاجر)
+ * بيقروا من نفس النبذة — فضغطة واحدة بتظبّط الاتنين.
+ */
+export async function refreshAiBriefAction(): Promise<RefreshBriefState> {
+  try {
+    const { store } = await getDashboardContext()
+
+    /*
+      البيانات الحيّة لا المخزَّنة: `getStoreBrief` بتقرا المنتجات
+      والأقسام والأسعار والشحن من القاعدة في اللحظة دي.
+    */
+    const fresh = suggestBrief(await getStoreBrief(store.id))
+
+    /*
+      كل مساعدين المتجر مع بعض.
+
+      مساعد المتجر (اللي بيكلّم العميل) ومساعد اللوحة (اللي بيكلّم
+      التاجر) بيقروا من نبذتين مخزَّنتين في إضافتين مختلفتين. تحديث
+      واحدة وسيبان التانية معناه إن نُصّ المساعدين لسه بيقول كلامًا
+      قديمًا — والتاجر مش هيعرف أنهي واحد فيهم.
+    */
+    const rows = await db
+      .select({ slug: storePlugins.pluginSlug, config: storePlugins.config })
+      .from(storePlugins)
+      .where(
+        and(
+          eq(storePlugins.storeId, store.id),
+          inArray(storePlugins.pluginSlug, ['gemini', 'gemini_pro', 'claude']),
+        ),
+      )
+
+    if (rows.length === 0) return { ok: false, error: 'فعّل مساعد الذكاء الأول.' }
+
+    for (const row of rows) {
+      await db
+        .update(storePlugins)
+        .set({ config: { ...((row.config ?? {}) as Record<string, unknown>), brief: fresh } })
+        .where(
+          and(eq(storePlugins.storeId, store.id), eq(storePlugins.pluginSlug, row.slug)),
+        )
+    }
+
+    revalidatePath('/dashboard/plugins')
+    return { ok: true, brief: fresh }
+  } catch (e) {
+    console.error('فشل تحديث نبذة المساعد:', e)
+    return { ok: false, error: 'حصلت مشكلة وإحنا بنحدّث. جرّب تاني.' }
+  }
 }

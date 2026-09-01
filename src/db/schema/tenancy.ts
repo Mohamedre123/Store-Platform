@@ -111,6 +111,25 @@ export const stores = pgTable(
     phone: text('phone'),
     whatsapp: text('whatsapp'),
 
+    /**
+     * روابط السوشيال — **بيانات متجر لا إعداد شكل**.
+     *
+     * كانت جوّه تخصيص الفوتر، وده مكان غلط: الرابط ده بيتغيّر لما
+     * التاجر يفتح حساب جديد مش لما يغيّر شكل متجره. واللي بيدوّر عليه
+     * بيدوّر في «بيانات المتجر» جنب التليفون والبريد — مش في شاشة
+     * الألوان والخطوط.
+     *
+     * ومكانها هنا معناه إنها متاحة لأي حتة في المتجر تحتاجها، مش
+     * للفوتر وحده.
+     *
+     * jsonb لا أعمدة: المنصات بتزيد وبتقلّ، وعمود لكل واحدة معناه
+     * هجرة مع كل منصة جديدة.
+     */
+    socialLinks: jsonb('social_links')
+      .$type<Record<string, string>>()
+      .notNull()
+      .default({}),
+
     // الإقليم
     country: text('country').notNull().default('EG'),
     currency: text('currency').notNull().default('EGP'),
