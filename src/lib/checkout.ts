@@ -4,6 +4,8 @@ import { db } from '@/db'
 import { carrierAccounts, checkoutSettings, paymentMethods, productOptions, productOptionValues, products, productVariants, shippingRates, shippingZones, stores } from '@/db/schema'
 import { applyBps } from './utils'
 import { assignBucket, getRunningPriceExperiments, variantValue } from './experiments'
+import { paymentProvider } from './providers'
+import type { PaymentOption } from './checkout-ui'
 
 /**
  * حساب الطلب.
@@ -538,4 +540,67 @@ export async function getPaymentMethods(storeId: string) {
     .from(paymentMethods)
     .where(and(eq(paymentMethods.storeId, storeId), eq(paymentMethods.enabled, true)))
     .orderBy(paymentMethods.sortOrder)
+}
+
+/**
+ * طرق الدفع اللي العميل بيشوفها.
+ *
+ * ## ليه هنا لا في الصفحة
+ * الشيك أوت الكامل والدفع السريع لازم يعرضوا **نفس القايمة**. لما
+ * كانت مبنية جوّه صفحة الشيك أوت، أي شاشة تانية بتبيع كانت هتبنيها
+ * تاني — وأول اختلاف بينهم بيبقى عميل شاف طريقة دفع في مكان ومالقاهاش
+ * في مكان تاني في نفس المتجر.
+ *
+ * ## الترتيب
+ * الدفع عند الاستلام الأول لو مشغّل — وهو مفتاحه في **إعدادات الشحن**
+ * لا في طرق الدفع. لو قريناه من هنا كان التاجر يقفله ويلاقيه ظاهر.
+ *
+ * ## ومفيش قايمة فاضية
+ * شيك أوت من غير أي طريقة دفع = زرار «أكّد الطلب» ما بيعملش حاجة،
+ * والعميل بيسيب السلة وهو فاكر إن الموقع باظ.
+ */
+export async function listPaymentOptions(
+  storeId: string,
+  codEnabled: boolean,
+): Promise<PaymentOption[]> {
+  const saved = await getPaymentMethods(storeId)
+
+  const options: PaymentOption[] = saved
+    .filter((p) => p.gateway !== 'cod')
+    .map((p) => {
+      const def = paymentProvider(p.gateway)
+      return {
+        gateway: p.gateway,
+        displayName: p.displayName ?? def?.name ?? p.gateway,
+        instructions: p.instructions,
+        brand: def?.brand ?? null,
+        color: def?.color ?? null,
+        online: Boolean(def),
+      }
+    })
+
+  if (codEnabled) {
+    const row = saved.find((p) => p.gateway === 'cod')
+    options.unshift({
+      gateway: 'cod',
+      displayName: row?.displayName ?? 'الدفع عند الاستلام',
+      instructions: row?.instructions ?? 'تدفع كاش للمندوب لما الطلب يوصلك.',
+      brand: null,
+      color: null,
+      online: false,
+    })
+  }
+
+  if (options.length === 0) {
+    options.push({
+      gateway: 'cod',
+      displayName: 'الدفع عند الاستلام',
+      instructions: null,
+      brand: null,
+      color: null,
+      online: false,
+    })
+  }
+
+  return options
 }

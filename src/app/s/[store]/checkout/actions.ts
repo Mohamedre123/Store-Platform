@@ -114,6 +114,17 @@ const orderSchema = z.object({
    * وإرساله.
    */
   slots: z.record(z.string().uuid(), z.string()).optional(),
+  /**
+   * الشاشة اللي الطلب جه منها.
+   *
+   * التاجر بيقيس عليها: الدفع السريع بيبيع فعلًا ولا بيشتّت؟ من غيرها
+   * الطلبين بيبانوا واحد في التقارير، وقرار تشغيله أو قفله بيبقى
+   * بالإحساس.
+   *
+   * محصورة في قيمتين: `raw` جاي من المتصفح، ومصدر يتكتب من غير حد
+   * كان هيخلّي أي حد يوسم طلبه كأنه جاي من الـAPI أو من واتساب.
+   */
+  source: z.enum(['storefront', 'quick_checkout']).default('storefront'),
 })
 
 /**
@@ -634,7 +645,7 @@ async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
           storeId: store.id,
           orderNumber,
           recoveryToken: input.draftToken || generateToken(16),
-          source: 'storefront',
+          source: input.source,
         })
         .returning({ id: orders.id })
       orderId = created.id

@@ -31,6 +31,9 @@ import { VariantPicker } from '@/components/storefront/variant-picker'
 import { StickyBuyBar } from '@/components/storefront/sticky-buy-bar'
 import { AddToCart } from '@/components/storefront/add-to-cart'
 import { SlotPicker } from '@/components/storefront/slot-picker'
+import type { QuickCheckoutSettings } from '@/components/storefront/quick-checkout'
+import { getCheckoutSettings, getDisplayShipping, listPaymentOptions } from '@/lib/checkout'
+import { regionsFor } from '@/lib/regions'
 
 export const dynamic = 'force-dynamic'
 
@@ -209,6 +212,60 @@ export default async function ProductPage({
     .filter((p) => p.id !== product.id)
     .slice(0, 4)
 
+  /**
+   * الدفع السريع.
+   *
+   * الإعداد كان موجود في لوحة التاجر من غير أي حاجة ترسمه — يشغّله
+   * ويقفله وما يتغيّرش حرف في متجره. القراية هنا هي اللي بتوصّله
+   * لصفحة المنتج.
+   *
+   * الشحن وطرق الدفع ما بيتقروش غير لما يكون مشغّلًا: صفحة المنتج
+   * بيفتحها كل زائر، والمتجر اللي قافل الميزة ما يصحّش يدفع تمنها.
+   */
+  const quickSettings = await getCheckoutSettings(store.id)
+  const quick =
+    (quickSettings?.quickCheckoutEnabled ?? true) && store.isPublished
+      ? await (async () => {
+          /*
+            طرق الدفع محتاجة تعرف الدفع عند الاستلام مفتوح ولا لأ،
+            ومفتاحه في إعداد الشحن — فترتيبهم هنا تبعية حقيقية لا
+            انتظار مالوش لازمة.
+          */
+          const ship = await getDisplayShipping(store.id, store.country)
+          return {
+            storeIdentifier: identifier,
+            currency: store.currency,
+            country: store.country,
+            style: quickSettings?.quickCheckoutStyle ?? 'drawer',
+            showItems: quickSettings?.quickCheckoutShowItems ?? true,
+            regions: regionsFor(store.country),
+            payments: await listPaymentOptions(store.id, ship.codEnabled),
+            shipping: {
+              byCity: ship.byCity,
+              defaultPrice: ship.defaultPrice,
+              freeOver: ship.freeOver,
+            },
+            addressMode: quickSettings?.addressMode ?? 'structured',
+            fieldName: quickSettings?.fieldName ?? 'required',
+            fieldCity: quickSettings?.fieldCity ?? 'required',
+            fieldArea: quickSettings?.fieldArea ?? 'optional',
+            fieldStreet: quickSettings?.fieldStreet ?? 'required',
+            fieldBuilding: quickSettings?.fieldBuilding ?? 'optional',
+            otpEnabled: quickSettings?.otpEnabled ?? false,
+            minOrderEnabled: quickSettings?.minOrderEnabled ?? false,
+            minOrderAmount: quickSettings?.minOrderAmount ?? 0,
+            /*
+              بيانات الحساب — و`null` معناها ضيف. الزرار ساعتها بيضيف
+              للسلة ويوصّله لشاشة الدخول بدل ما يوريه نموذجًا الخادم
+              هيرفضه في آخره.
+            */
+            account: customer
+              ? { name: customer.name, phone: customer.phone, email: customer.email }
+              : null,
+          } satisfies QuickCheckoutSettings
+        })()
+      : null
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
       {/* مسار التنقّل */}
@@ -335,6 +392,7 @@ export default async function ProductPage({
                   currency={store.currency}
                   whatsapp={productPage.showWhatsappAsk ? store.whatsapp : null}
                   showStockCounter={productPage.showStockCounter}
+                  quick={quick}
                 />
               </div>
               <WishlistButton
@@ -379,6 +437,7 @@ export default async function ProductPage({
                     soldOut={soldOut}
                     whatsapp={productPage.showWhatsappAsk ? store.whatsapp : null}
                     productName={product.name}
+                    quick={quick}
                   />
                 </div>
                 <WishlistButton

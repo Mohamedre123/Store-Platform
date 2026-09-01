@@ -2,9 +2,8 @@ import { notFound } from 'next/navigation'
 import { getStore } from '@/lib/storefront'
 import { getCurrentCustomer } from '@/lib/customer-auth'
 import { CustomerLoginForm } from '../account/login-form'
-import { getCheckoutSettings, getDisplayShipping, getPaymentMethods } from '@/lib/checkout'
+import { getCheckoutSettings, getDisplayShipping, listPaymentOptions } from '@/lib/checkout'
 import { regionsFor } from '@/lib/regions'
-import { paymentProvider } from '@/lib/providers'
 import { CheckoutForm } from './checkout-form'
 import { EmptyCart } from './empty-cart'
 import { ResumeCart } from './resume-cart'
@@ -73,64 +72,17 @@ export default async function CheckoutPage({
     )
   }
 
-  const [settings, payments, ship] = await Promise.all([
+  const [settings, ship] = await Promise.all([
     getCheckoutSettings(store.id),
-    getPaymentMethods(store.id),
     getDisplayShipping(store.id, store.country),
   ])
 
-  /**
-   * قايمة طرق الدفع اللي العميل بيشوفها.
-   *
-   * الدفع عند الاستلام بيتحكم فيه إعداد الشحن لا صفّه في طرق الدفع:
-   * مفتاحه هناك، ولو قريناه من هنا كان التاجر يقفله ويلاقيه ظاهر.
-   *
-   * والبوابات المربوطة بتتعرض بلونها واسمها الحقيقي — «Paymob» بحروف
-   * إنجليزي جنب زرار رمادي مش بيطمّن حد على بطاقته.
-   */
-  const codOn = ship.codEnabled
-
-  const options = payments
-    .filter((p) => p.gateway !== 'cod')
-    .map((p) => {
-      const def = paymentProvider(p.gateway)
-      return {
-        gateway: p.gateway,
-        displayName: p.displayName ?? def?.name ?? p.gateway,
-        instructions: p.instructions,
-        brand: def?.brand ?? null,
-        color: def?.color ?? null,
-        online: Boolean(def),
-      }
-    })
-
-  if (codOn) {
-    const saved = payments.find((p) => p.gateway === 'cod')
-    options.unshift({
-      gateway: 'cod',
-      displayName: saved?.displayName ?? 'الدفع عند الاستلام',
-      instructions: saved?.instructions ?? 'تدفع كاش للمندوب لما الطلب يوصلك.',
-      brand: null,
-      color: null,
-      online: false,
-    })
-  }
-
   /*
-    مفيش ولا طريقة؟ الدفع عند الاستلام بيرجع كخيار أخير.
-    شيك أوت من غير أي طريقة دفع زرار «أكّد الطلب» فيه ما بيعملش
-    حاجة — والعميل بيسيب السلة وهو فاكر إن الموقع باظ.
+    القايمة من `listPaymentOptions` لا مبنية هنا: الدفع السريع من صفحة
+    المنتج بيعرض نفس القايمة، ولو كل شاشة بنتها لوحدها أول اختلاف
+    بينهم بيبقى عميل شاف طريقة دفع في مكان ومالقاهاش في التاني.
   */
-  if (options.length === 0) {
-    options.push({
-      gateway: 'cod',
-      displayName: 'الدفع عند الاستلام',
-      instructions: null,
-      brand: null,
-      color: null,
-      online: false,
-    })
-  }
+  const options = await listPaymentOptions(store.id, ship.codEnabled)
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">

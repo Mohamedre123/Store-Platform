@@ -3,23 +3,32 @@
 import { useState } from 'react'
 import { Check, Minus, Plus, ShoppingBag } from 'lucide-react'
 import { useCart, type CartItem } from './cart'
+import { QuickCheckout, type QuickCheckoutSettings } from './quick-checkout'
 
 /**
  * زر الإضافة للسلة.
  *
  * بيتحوّل لـ«اتضاف ✓» ثانيتين بعد الضغط — تأكيد فوري في نفس المكان
  * اللي العميل بيبص فيه، بدل ما يستنى الدرج يفتح عشان يعرف إن الطلب نجح.
+ *
+ * ## والدفع السريع جنبه
+ * الكمية والمتغيّر المختار موجودين هنا أصلًا، فتركيب زرار «اشتري
+ * دلوقتي» في نفس المكان بيخلّي المنتج بمتغيّرات والمنتج العادي ياخدوا
+ * الميزة من غير أي تكرار — `VariantPicker` بيمرّرها لنفس المكوّن.
  */
 export function AddToCart({
   item,
   soldOut,
   whatsapp,
   productName,
+  quick,
 }: {
   item: Omit<CartItem, 'quantity'>
   soldOut: boolean
   whatsapp?: string | null
   productName: string
+  /** إعدادات الدفع السريع — `null` لما التاجر قافله */
+  quick?: QuickCheckoutSettings | null
 }) {
   const { add } = useCart()
   const [quantity, setQuantity] = useState(1)
@@ -86,6 +95,23 @@ export function AddToCart({
           </>
         )}
       </button>
+
+      {quick && (
+        <QuickCheckout
+          item={{
+            productId: item.productId,
+            variantId: item.variantId,
+            name: item.name,
+            slug: item.slug,
+            image: item.image,
+            price: item.price,
+            maxStock: item.maxStock,
+          }}
+          quantity={quantity}
+          soldOut={soldOut}
+          settings={quick}
+        />
+      )}
 
       {whatsapp && (
         <a

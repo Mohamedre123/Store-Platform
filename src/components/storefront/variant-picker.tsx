@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { AddToCart } from './add-to-cart'
+import type { QuickCheckoutSettings } from './quick-checkout'
 import { formatMoney } from '@/lib/utils'
 
 export type PickerOption = {
@@ -38,6 +39,7 @@ export function VariantPicker({
   currency,
   whatsapp,
   showStockCounter,
+  quick,
 }: {
   options: PickerOption[]
   variants: PickerVariant[]
@@ -46,6 +48,8 @@ export function VariantPicker({
   currency: string
   whatsapp?: string | null
   showStockCounter: boolean
+  /** إعدادات الدفع السريع — بتتمرّر لزرار الإضافة عشان ياخد المتغيّر المختار */
+  quick?: QuickCheckoutSettings | null
 }) {
   // نبدأ بأول متغيّر متاح — العميل يلاقي اختيارًا صالحًا قدامه
   const firstAvailable = variants.find((v) => v.stock > 0) ?? variants[0]
@@ -183,6 +187,7 @@ export function VariantPicker({
         soldOut={soldOut}
         whatsapp={whatsapp}
         productName={fallback.name}
+        quick={quick}
       />
     </div>
   )
