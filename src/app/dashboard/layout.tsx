@@ -10,23 +10,11 @@ import { Toaster } from '@/components/dashboard/toast'
 import { aiAllowed, getAiConfig, isAssistantReady, GEMINI_PRO_SLUG, GEMINI_SLUG } from '@/lib/ai/settings'
 import { publicStoreUrl } from '@/lib/domain'
 import { logoutAction } from '@/app/(auth)/actions'
-import { jobTick } from '@/lib/job-tick'
 import { ExternalLink, LogOut } from 'lucide-react'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, store } = await getDashboardContext()
 
-  /*
-    سحب الطابور من حركة اللوحة كمان، مش من المتجر وحده.
-
-    المهام المؤجّلة (طلب تأكيد الطلب بعد دقيقة) كانت بتستنّى زيارة
-    لواجهة المتجر عشان تتسحب. والمتجر الجديد أو اللي لسه بيتجهّز مافيش
-    عليه زوار — فالمهمة بتفضل واقفة أيامًا، والتاجر بيشوف إن الميزة
-    مش شغّالة وهي مستنّية حركة مش موجودة.
-
-    والتاجر نفسه بيفتح لوحته كل يوم. حركته هي أضمن نبضة عندنا.
-  */
-  jobTick()
 
 /*
     المساعد بيتحمّل بس لما يبقى شغّال فعلًا: اللوحة العائمة ملف عميل
