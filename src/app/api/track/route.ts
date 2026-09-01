@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { getStore } from '@/lib/storefront'
 import { isTrackable, recordEvent } from '@/lib/analytics-events'
+import { drainDueJobs } from '@/lib/job-tick'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,6 +59,19 @@ export async function POST(req: NextRequest) {
   } catch {
     // جسم تالف أو قاعدة بيانات مشغولة — الحدث بيضيع والتصفّح بيكمّل
   }
+
+  /*
+    سحب الطابور من هنا — **مش من `after()` في التخطيط**.
+
+    المهام المؤجّلة كانت بتتسحب في شغل مؤجّل لبعد الرد، وده اشتغل
+    محليًا وما اشتغلش على الاستضافة: الصفحة بتتولّد طازة والطابور
+    بيفضل ما اتلمسش. الشغل اللي بعد الرد بيموت مع الدالة.
+
+    والمسار ده استدعاء حقيقي بيتنده من متصفح كل زائر، فالسحب جوّاه
+    بيتنفّذ فعلًا. والزائر مش مستنّي حاجة — `sendBeacon` بتبعت وتمشي،
+    والرد ٢٠٤ فاضي أصلًا.
+  */
+  await drainDueJobs()
 
   return new NextResponse(null, { status: 204 })
 }

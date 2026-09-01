@@ -40,6 +40,38 @@ import { after } from 'next/server'
 let lastTick = 0
 const EVERY_MS = 20_000
 
+/**
+ * سحب **منتظَر** لا مؤجّل.
+ *
+ * ## ليه ده موجود جنب `jobTick`
+ * `after()` بتشتغل محليًا وما اشتغلتش على الاستضافة: جرّبنا على
+ * الإنتاج أربع زيارات متباعدة، والصفحة اتولّدت طازة في كل مرة
+ * (`X-Vercel-Cache: MISS`) — يعني التخطيط اشتغل و`jobTick` اتنادت —
+ * والطابور فضل `pending` بـ`attempts: 0` ما اتلمسش.
+ *
+ * الشغل اللي بيتأجّل لبعد الرد بيموت مع الدالة. والمهمة اللي بتستنّى
+ * دقيقة مالهاش قيمة لو العامل اللي هيسحبها بيتقتل قبل ما يبدأ.
+ *
+ * فبننادي دي من مسار حقيقي (`/api/track` اللي المتصفح بيندهه مع كل
+ * زيارة) وبننتظرها. الزائر مش بيستنّى الرد أصلًا — `sendBeacon` بتبعت
+ * وتمشي — فالانتظار هنا مالوش تكلفة عليه.
+ */
+export async function drainDueJobs(): Promise<void> {
+  const now = Date.now()
+  if (now - lastTick < EVERY_MS) return
+  lastTick = now
+
+  try {
+    const { drainJobs } = await import('./jobs')
+    const summary = await drainJobs(5)
+    if (summary.picked > 0) {
+      console.log(`طابور: سحب ${summary.picked} · نجح ${summary.done} · فشل ${summary.failed}`)
+    }
+  } catch (e) {
+    console.error('فشل سحب الطابور:', e)
+  }
+}
+
 export function jobTick(): void {
   const now = Date.now()
   if (now - lastTick < EVERY_MS) return
