@@ -4,6 +4,7 @@ import { db } from '@/db'
 import { otpCodes } from '@/db/schema'
 import { generateOtp, hashToken, safeEqual } from './crypto'
 import { isEmailConfigured, sendEmail } from './email'
+import { sendWhatsapp, whatsappReady } from './whatsapp'
 
 /**
  * رمز التحقق قبل تأكيد الطلب.
@@ -11,9 +12,15 @@ import { isEmailConfigured, sendEmail } from './email'
  * بيقلّل الطلبات الوهمية — مشكلة حقيقية في الدفع عند الاستلام: حد
  * يطلب برقم مش بتاعه، التاجر يشحن، والشحنة ترجع على حسابه.
  *
- * الرمز مربوط بالتليفون (هوية الطلب) لكن بيتسلّم بالبريد دلوقتي.
- * أول ما SMS أو واتساب يتعاقد عليهم، بيتضاف فرع تسليم هنا من غير ما
- * يتغيّر أي كود بيستدعي الدوال دي.
+ * ## بيروح على رقمه الأول، والبريد احتياطي
+ * الرمز مربوط بالتليفون لأنه هوية الطلب — فالمنطقي إنه يوصل عليه.
+ * وكان بيتسلّم بالبريد وبس، وده كان بيخلّي الخطوة تفشل عند ناس كتير:
+ * البريد من نطاق جديد بيروح السبام حتى وهو مصادَق عليه بالكامل، والعميل
+ * بيقعد يستنّى رمزًا هو مش هيشوفه — وياخد الشاشة دي كأنها عطل.
+ *
+ * فلو المتجر رابط واتساب، الرمز بيروح على رقم الطلب نفسه: بيوصل في
+ * ثانية ومفيهوش سبام. والبريد بيفضل موجود لما الواتساب مش مربوط أو
+ * يفشل — نفس القاعدة اللي رمز دخول العميل ماشي عليها.
  */
 
 const CODE_LENGTH = 6
@@ -21,7 +28,7 @@ const TTL_MINUTES = 10
 const MAX_ATTEMPTS = 5
 
 export type IssueOtpResult =
-  | { ok: true; channel: 'email'; maskedTarget: string }
+  | { ok: true; channel: 'whatsapp' | 'email'; maskedTarget: string }
   | { ok: false; error: string }
 
 export async function issueOrderOtp(input: {
@@ -32,11 +39,22 @@ export async function issueOrderOtp(input: {
   phone: string
   email?: string | null
 }): Promise<IssueOtpResult> {
-  if (!input.email) {
-    return { ok: false, error: 'محتاجين بريدك الإلكتروني عشان نبعتلك رمز التحقق' }
-  }
-  if (!isEmailConfigured()) {
-    return { ok: false, error: 'التحقق مش متاح دلوقتي' }
+  /*
+    الوسايل المتاحة بتتحدّد **قبل** ما نعمل الرمز.
+
+    لو عملناه الأول وما لقيناش طريق يوصله، بنكون مسحنا رمزًا سليم كان
+    العميل لسه شايفه في بريده — وخلّيناه غلط من غير سبب.
+  */
+  const canWhatsapp = Boolean(input.phone) && (await whatsappReady(input.storeId))
+  const canEmail = Boolean(input.email) && isEmailConfigured()
+
+  if (!canWhatsapp && !canEmail) {
+    return {
+      ok: false,
+      error: input.email
+        ? 'التحقق مش متاح دلوقتي'
+        : 'محتاجين بريدك الإلكتروني عشان نبعتلك رمز التحقق',
+    }
   }
 
   const code = generateOtp(CODE_LENGTH)
@@ -55,20 +73,43 @@ export async function issueOrderOtp(input: {
     expiresAt,
   })
 
-  await sendEmail({
-    sender: { name: input.storeName, slug: input.storeSlug },
-    log: { storeId: input.storeId, event: 'order_otp' },
-    to: input.email,
-    subject: `رمز تأكيد طلبك من ${input.storeName}`,
-    html: `<div style="font-family:'Segoe UI',Tahoma,Arial,sans-serif;direction:rtl;text-align:right;max-width:420px;margin:0 auto;padding:24px;">
+  /*
+    نص مكتوب هنا لا قالب التاجر: قالب `otp` بتاع الواتساب مكتوب لرمز
+    **الدخول** («رمز دخولك على…»)، والعميل هنا بيأكّد طلبًا مش بيسجّل
+    دخول. إعادة استخدامه كانت هتوصّله جملة مالهاش علاقة باللي هو فيه.
+  */
+  if (canWhatsapp) {
+    const wa = await sendWhatsapp(
+      input.storeId,
+      input.phone,
+      `رمز تأكيد طلبك من ${input.storeName}: ${code}\nصالح ${TTL_MINUTES} دقايق. لو مش إنت اللي طلبت، تجاهل الرسالة.`,
+      { event: 'order_otp' },
+    )
+    if (wa.ok) return { ok: true, channel: 'whatsapp', maskedTarget: maskPhone(input.phone) }
+  }
+
+  if (canEmail && input.email) {
+    const sent = await sendEmail({
+      sender: { name: input.storeName, slug: input.storeSlug },
+      log: { storeId: input.storeId, event: 'order_otp' },
+      to: input.email,
+      subject: `رمز تأكيد طلبك من ${input.storeName}`,
+      html: `<div style="font-family:'Segoe UI',Tahoma,Arial,sans-serif;direction:rtl;text-align:right;max-width:420px;margin:0 auto;padding:24px;">
       <p style="font-size:15px;color:#222540;">رمز تأكيد طلبك من <strong>${input.storeName}</strong>:</p>
       <p style="font-size:30px;font-weight:bold;letter-spacing:6px;text-align:center;color:#222540;margin:24px 0;">${code}</p>
       <p style="font-size:13px;color:#5c6890;">الرمز صالح لمدة ${TTL_MINUTES} دقايق. لو مش إنت اللي طلبت، تجاهل الرسالة.</p>
     </div>`,
-    text: `رمز تأكيد طلبك من ${input.storeName}: ${code}\nصالح ${TTL_MINUTES} دقايق.`,
-  })
+      text: `رمز تأكيد طلبك من ${input.storeName}: ${code}\nصالح ${TTL_MINUTES} دقايق.`,
+    })
+    if (sent.ok) return { ok: true, channel: 'email', maskedTarget: maskEmail(input.email) }
+  }
 
-  return { ok: true, channel: 'email', maskedTarget: maskEmail(input.email) }
+  /*
+    الوسيلة كانت متاحة والإرسال نفسه وقع (جلسة واتساب اتفصلت، مزوّد
+    بريد رفض). الفشل بيرجع للعميل بدل ما يفضل قدام خانة رمز عمره ما
+    هييجي — والسبب متسجّل في سجل الرسايل للتاجر.
+  */
+  return { ok: false, error: 'ما قدرناش نبعت الرمز دلوقتي. جرّب تاني بعد شوية.' }
 }
 
 export type VerifyOtpResult = { ok: true } | { ok: false; error: string }
@@ -127,6 +168,12 @@ export async function isPhoneVerifiedForOrder(storeId: string, phone: string): P
     .limit(1)
 
   return Boolean(row?.verifiedAt)
+}
+
+/** يخفي وسط الرقم — بيأكّد للعميل إنه الصح من غير ما نكشفه كامل */
+function maskPhone(phone: string) {
+  const digits = phone.replace(/\D/g, '')
+  return `${digits.slice(0, 4)}${'*'.repeat(Math.max(0, digits.length - 7))}${digits.slice(-3)}`
 }
 
 function maskEmail(email: string) {
