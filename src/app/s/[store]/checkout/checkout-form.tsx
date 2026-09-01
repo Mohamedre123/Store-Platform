@@ -9,7 +9,7 @@ import { CartLineOptions } from '@/components/storefront/cart-line-options'
 import { useStoreHref } from '@/components/storefront/store-link'
 import { OtpDialog } from '@/components/storefront/otp-dialog'
 import { applyCouponAction, captureIncompleteOrder, placeOrderAction } from './actions'
-import { formatMoney, isValidEmail, isValidPhone } from '@/lib/utils'
+import { formatCount, formatMoney, isValidEmail, isValidPhone } from '@/lib/utils'
 import type { Region } from '@/lib/regions'
 /* الأنواع مشتركة مع الدفع السريع — نسخة تانية منها كانت هتفترق عند أول إضافة */
 import type { FieldMode, PaymentOption } from '@/lib/checkout-ui'
@@ -572,13 +572,24 @@ export function CheckoutForm({
             {items.map((i) => (
               <li key={`${i.productId}-${i.variantId ?? ''}`} className="flex flex-col gap-2">
                 <div className="flex items-center gap-3">
+                  {/*
+                    الكمية **جنب الصورة مش فوقها**.
+
+                    كانت شارة لازقة في ركن الصورة، فبتقع على المنتج نفسه
+                    وبتتلخبط مع تفاصيله — والعميل مش قادر يقرا كام قطعة
+                    طالب. وهي أهم رقم في الملخّص بعد السعر: اللي طلب ٤
+                    غلط وشاف ١ بيكتشفها لما توصله.
+                  */}
                   <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[var(--sf-radius)] bg-[var(--sf-text)]/6">
                     {i.image && <Image src={i.image} alt="" fill sizes="56px" className="object-cover" />}
-                    <span className="absolute -end-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--sf-primary)] px-1 text-[10px] font-bold text-white tabular-nums">
-                      {i.quantity}
+                  </span>
+                  <span className="min-w-0 flex-1 text-sm leading-snug">
+                    {i.name}
+                    <span className="mt-1 flex items-center gap-1 text-xs opacity-70">
+                      الكمية
+                      <bdi className="tabular font-semibold opacity-100">{formatCount(i.quantity)}</bdi>
                     </span>
                   </span>
-                  <span className="min-w-0 flex-1 text-sm leading-snug">{i.name}</span>
                   <span className="tabular shrink-0 text-sm font-medium">
                     {formatMoney(i.price * i.quantity, currency)}
                   </span>

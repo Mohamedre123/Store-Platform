@@ -43,6 +43,46 @@ export function fromMinorUnits(minorUnits: number): number {
 }
 
 /** نقاط الأساس → نسبة مئوية للعرض (1400 → "14%") */
+/**
+ * لون hex + شفافية → `rgba`.
+ *
+ * منتقي الألوان بيدّي hex، والشفافية بتتظبّط لوحدها — فمحتاجين نركّبهم.
+ * المدخل الغلط بيرجّع أسود شفاف بدل ما يرمي: لون متخزّن من نسخة قديمة
+ * أو مكتوب بإيد ما يصحّش يوقّع البانر كله.
+ */
+export function hexToRgba(hex: string, opacity: number): string {
+  const clean = hex.replace('#', '').trim()
+  const full =
+    clean.length === 3
+      ? clean.split('').map((c) => c + c).join('')
+      : clean.length === 6
+        ? clean
+        : '000000'
+
+  const int = Number.parseInt(full, 16)
+  if (Number.isNaN(int)) return `rgba(0,0,0,${Math.min(1, Math.max(0, opacity / 100))})`
+
+  const r = (int >> 16) & 255
+  const g = (int >> 8) & 255
+  const b = int & 255
+  return `rgba(${r},${g},${b},${Math.min(1, Math.max(0, opacity / 100))})`
+}
+
+/**
+ * رقم عادي بأرقام اللغة.
+ *
+ * الكميات كانت بتتكتب خام (`4`) جنب أسعار بأرقام عربية (`٢٠٠ ج.م.`)،
+ * فالسطر الواحد بيخرج بخطّين مختلفين. `formatMoney` بتعمل ده للأسعار،
+ * ودي بتعمله لأي عدد تاني.
+ */
+export function formatCount(value: number, locale = 'ar-EG') {
+  try {
+    return new Intl.NumberFormat(locale).format(value)
+  } catch {
+    return String(value)
+  }
+}
+
 export function formatBps(bps: number, locale = 'ar-EG') {
   const pct = bps / 100
   try {

@@ -369,11 +369,28 @@ export function Panel({
 
                   {slide.ctaLabel.trim() && (
                     <>
-                      <ColorField
-                        label="لون الزر"
-                        value={slide.ctaBg ?? '#ffffff'}
-                        onChange={(v) => setSlide(slide.id, { ctaBg: v })}
+                      <Choice
+                        label="شكل الزر"
+                        hint="الزجاجي شفاف بضبابية وحدّ فاتح — بيبان فوق الصورة من غير ما يغطّيها. على الفون والكمبيوتر."
+                        value={slide.ctaStyle ?? 'solid'}
+                        options={[
+                          { value: 'solid', label: 'مصمت' },
+                          { value: 'glass', label: 'زجاجي' },
+                        ]}
+                        onChange={(v) => setSlide(slide.id, { ctaStyle: v })}
                       />
+                      {/*
+                        لون الخلفية بيختفي مع الزجاجي: شفافيته هي اللي
+                        بتحدّد لونه. خانة بتغيّر حاجة مش بتتغيّر أسوأ من
+                        خانة مش موجودة.
+                      */}
+                      {(slide.ctaStyle ?? 'solid') === 'solid' && (
+                        <ColorField
+                          label="لون الزر"
+                          value={slide.ctaBg ?? '#ffffff'}
+                          onChange={(v) => setSlide(slide.id, { ctaBg: v })}
+                        />
+                      )}
                       <ColorField
                         label="لون الكلام جوّه الزر"
                         value={slide.ctaColor ?? value.identity.primary}
@@ -401,12 +418,58 @@ export function Panel({
                     suffix="%"
                   />
 
+                  <Choice
+                    label="حجم العنوان"
+                    hint="العنوان القصير بيستحمل خط كبير، والطويل بيتكسر سطرين ووحش — ظبّطه على كلامك إنت."
+                    value={slide.titleSize ?? 'md'}
+                    options={[
+                      { value: 'sm', label: 'صغير' },
+                      { value: 'md', label: 'متوسط' },
+                      { value: 'lg', label: 'كبير' },
+                      { value: 'xl', label: 'ضخم' },
+                    ]}
+                    onChange={(v) => setSlide(slide.id, { titleSize: v })}
+                    columns={4}
+                  />
+
+                  <Choice
+                    label="خط العنوان"
+                    hint="خط العناوين أو خط النص — الاتنين من هوية متجرك."
+                    value={slide.titleFont ?? 'heading'}
+                    options={[
+                      { value: 'heading', label: 'خط العناوين' },
+                      { value: 'body', label: 'خط النص' },
+                    ]}
+                    onChange={(v) => setSlide(slide.id, { titleFont: v })}
+                    columns={2}
+                  />
+
                   <ColorField
-                    label="لون العنوان والوصف"
-                    hint="بيتطبّق على الكلام اللي إنت كاتبه فوق الصورة."
+                    label="لون العنوان"
                     value={slide.textColor ?? '#ffffff'}
                     onChange={(v) => setSlide(slide.id, { textColor: v })}
                   />
+
+                  {slide.subtitle.trim() && (
+                    <>
+                      <Choice
+                        label="حجم الوصف"
+                        value={slide.subtitleSize ?? 'md'}
+                        options={[
+                          { value: 'sm', label: 'صغير' },
+                          { value: 'md', label: 'متوسط' },
+                          { value: 'lg', label: 'كبير' },
+                        ]}
+                        onChange={(v) => setSlide(slide.id, { subtitleSize: v })}
+                      />
+                      <ColorField
+                        label="لون الوصف"
+                        hint="سيبه زي العنوان أو هدّيه شوية عشان العنوان يبان أكتر."
+                        value={slide.subtitleColor ?? slide.textColor ?? '#ffffff'}
+                        onChange={(v) => setSlide(slide.id, { subtitleColor: v })}
+                      />
+                    </>
+                  )}
 
                   <Toggle
                     label="خلفية ضبابية ورا الكلام"
@@ -422,14 +485,31 @@ export function Panel({
                   />
 
                   {(slide.blurEnabled ?? (slide.blur ?? 0) > 0) && (
-                    <NumberField
-                      label="شدّة الضبابية"
-                      value={slide.blur ?? 18}
-                      onChange={(v) => setSlide(slide.id, { blur: Math.min(40, Math.max(2, v)) })}
-                      min={2}
-                      max={40}
-                      suffix="px"
-                    />
+                    <>
+                      <NumberField
+                        label="شدّة الضبابية"
+                        value={slide.blur ?? 18}
+                        onChange={(v) => setSlide(slide.id, { blur: Math.min(40, Math.max(2, v)) })}
+                        min={2}
+                        max={40}
+                        suffix="px"
+                      />
+                      <ColorField
+                        label="لون اللوح"
+                        hint="أسود بيهدّي الصورة تحت الكلام، وأبيض بيدّي لوحًا فاتح. جرّب لون من صورتك نفسها."
+                        value={slide.panelTint ?? '#000000'}
+                        onChange={(v) => setSlide(slide.id, { panelTint: v })}
+                      />
+                      <NumberField
+                        label="شفافية اللوح"
+                        hint="أقل = اللوح أخفّ والصورة أوضح. أعلى = الكلام أوضح."
+                        value={slide.panelOpacity ?? 28}
+                        onChange={(v) => setSlide(slide.id, { panelOpacity: Math.min(90, Math.max(0, v)) })}
+                        min={0}
+                        max={90}
+                        suffix="%"
+                      />
+                    </>
                   )}
                 </div>
               ))}

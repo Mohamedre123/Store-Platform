@@ -8,7 +8,7 @@ import { useCart } from './cart'
 import { useStoreHref } from './store-link'
 import { OtpDialog } from './otp-dialog'
 import { placeOrderAction } from '@/app/s/[store]/checkout/actions'
-import { formatMoney, isValidEmail, isValidPhone } from '@/lib/utils'
+import { formatCount, formatMoney, isValidEmail, isValidPhone } from '@/lib/utils'
 import { shippingFor, type AddressMode, type FieldMode, type PaymentOption, type ShippingRates } from '@/lib/checkout-ui'
 import type { Region } from '@/lib/regions'
 
@@ -298,13 +298,17 @@ function QuickForm({
 
       {settings.showItems && (
         <div className="flex items-center gap-3 rounded-[var(--sf-radius)] bg-[var(--sf-text)]/5 p-3">
+          {/* الكمية جنب الصورة مش فوقها — نفس قاعدة ملخّص الشيك أوت */}
           <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-[var(--sf-radius)] bg-[var(--sf-text)]/8">
             {item.image && <Image src={item.image} alt="" fill sizes="56px" className="object-cover" />}
-            <span className="absolute -end-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--sf-primary)] px-1 text-[10px] font-bold text-white tabular-nums">
-              {quantity}
+          </span>
+          <span className="min-w-0 flex-1 text-sm leading-snug">
+            {item.name}
+            <span className="mt-1 flex items-center gap-1 text-xs opacity-70">
+              الكمية
+              <bdi className="tabular font-semibold opacity-100">{formatCount(quantity)}</bdi>
             </span>
           </span>
-          <span className="min-w-0 flex-1 text-sm leading-snug">{item.name}</span>
           <span className="tabular shrink-0 text-sm font-medium">
             {formatMoney(subtotal, settings.currency)}
           </span>
