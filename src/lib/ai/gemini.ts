@@ -341,7 +341,7 @@ export async function listModels(apiKey: string): Promise<GeminiResult<GeminiMod
           usable: (m.supportedGenerationMethods ?? []).includes('generateContent'),
         }
       })
-      .filter((m) => m.usable)
+      .filter((m) => m.usable && isChatModel(m.id))
       // الأحدث فوق: جوجل بتسمّي بالإصدار، والترتيب العكسي بيقرّب الجديد
       .sort((a, b) => rank(b.id) - rank(a.id) || b.id.localeCompare(a.id))
 
@@ -349,6 +349,34 @@ export async function listModels(apiKey: string): Promise<GeminiResult<GeminiMod
   } catch (e) {
     return { ok: false, error: networkError(e) }
   }
+}
+
+/**
+ * ده موديل محادثة نصية ولا حاجة تانية؟
+ *
+ * ## المشكلة
+ * جوجل بتدرج على المفتاح الواحد ٣٨ موديلًا، وبتقول عن كلهم إنهم
+ * بيدعموا `generateContent`. لكن اللي فيهم فعلًا: تحويل نص لصوت، وتوليد
+ * صور، وتوليد موسيقى، ونسخ صوتي، وروبوتات، وتحكّم في الكمبيوتر، وبحث
+ * عميق بيقعد دقايق.
+ *
+ * والتاجر بيختار من القايمة دي بالاسم. يختار موديل موسيقى عشان اسمه
+ * حلو، فالمساعد يقف — وهو فاكر إن المنصة باظت.
+ *
+ * ## والفلترة بالاستبعاد لا بالقايمة البيضا
+ * قايمة أسماء مسموحة بتبقى قديمة مع أول إصدار جديد من جوجل — والتاجر
+ * ما بيشوفش الجديد اللي هو أسرع وأرخص. الاستبعاد بيشيل الأنواع اللي
+ * إحنا **متأكدين** إنها مش محادثة، وبيسيب أي حاجة جديدة تعدّي.
+ *
+ * وقِسنا الفرق فعلًا على مفتاح حقيقي: `gemini-2.5-flash` ردّ في ٩٤٥
+ * مللي، و`gemini-3.6-flash` قعد ٢٠ ثانية (أطول من مهلتنا)، و
+ * `gemini-3.7-flash` ردّ ٥٠٣. الاسم لوحده ما بيقولش الفرق ده — عشان
+ * كده الرجوع للبديل موجود تحت.
+ */
+function isChatModel(id: string): boolean {
+  return !/(^gemma|^lyria|^nano-banana|tts|image|audio|transcribe|robotics|computer-use|deep-research|embedding|aqa|veo|imagen)/i.test(
+    id,
+  )
 }
 
 /**

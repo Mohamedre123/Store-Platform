@@ -132,6 +132,8 @@ function TelegramChannel({
   const [pending, start] = useTransition()
 
   /* معرّفات المحادثات اللي كلّمت البوت — بتتجاب بضغطة */
+  /* اسم بوت التاجر — بييجي من ردّ تيليجرام وقت الحفظ، وبيه بنفتحله محادثته */
+  const [botName, setBotName] = useState<string | null>(null)
   const [chats, setChats] = useState<Array<{ id: string; name: string }> | null>(null)
   const [chatMsg, setChatMsg] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
@@ -166,10 +168,62 @@ function TelegramChannel({
           <strong>٣.</strong> الصق التوكن هنا تحت واحفظ.
         </li>
         <li>
-          <strong>٤.</strong> ابعت أي رسالة للبوت بتاعك من حسابك (كلمة «هاي» تكفي)، وبعدها
-          دوس «هات معرّف المحادثة» تحت — هنجيبهولك من غير ما تدوّر.
+          {/*
+            **أهم سطر في الشاشة دي.**
+
+            الخطوة كانت مكتوبة «ابعت أي رسالة للبوت بتاعك» — والتاجر
+            بيبقى لسه فاتح محادثة BotFather، فبيبعتله «هاي» هناك ويرجع
+            يدوس ويلاقي «مفيش محادثات». وهو عمل الصح من وجهة نظره:
+            ده «البوت» اللي قدامه.
+
+            BotFather بوت تاني خالص بيصنع البوتات. المحادثة اللي إحنا
+            بنقرا منها هي محادثة **بوتك إنت** — ودي محادثة تانية لازم
+            يفتحها بنفسه.
+
+            الزرار تحت بيفتحها له بالاسم بعد الحفظ، فالخطوة بتبقى ضغطة
+            بدل شرح.
+          */}
+          <strong>٤.</strong> افتح محادثة <strong>بوتك إنت</strong> — مش BotFather — واضغط{' '}
+          <bdi dir="ltr" className="font-mono font-semibold">
+            Start
+          </bdi>{' '}
+          أو ابعت أي كلمة.
+        </li>
+        <li>
+          <strong>٥.</strong> ارجع هنا ودوس «هات معرّف المحادثة».
         </li>
       </ol>
+
+      {/*
+        تيليجرام هنا **إشعارات ليك**، مش محادثة عملاء.
+
+        الاسم لوحده مالوش معنى: التاجر بيشوف «تيليجرام» في صفحة الأتمتة
+        ويفتكرها قناة بيكلّم بيها زبونه — وهي في الحقيقة الطريق اللي
+        بيوصلك إشعار الطلب على موبايلك وإنت برّه اللوحة.
+      */}
+      <p className="mt-3 rounded-lg bg-[var(--surface-2)] px-3 py-2 text-xs leading-relaxed text-[var(--fg-muted)]">
+        <strong className="text-[var(--fg)]">تيليجرام هنا بيعمل إيه؟</strong> بيوصّلك{' '}
+        <strong>إشعار فوري بكل طلب جديد</strong> على موبايلك — إنت وفريقك — من غير ما تفتح
+        اللوحة. مالوش أي علاقة بمحادثة عملائك: العميل عمره ما هيشوف البوت ده.
+      </p>
+
+      {/*
+        رابط بوت التاجر — بيشيل الخطوة الملخبطة كلها.
+
+        الاسم بييجي من ردّ تيليجرام وقت الحفظ، فبنقدر نفتحله محادثته
+        بالظبط بدل ما يدوّر عليها ويقع في محادثة BotFather.
+      */}
+      {botName && (
+        <a
+          href={`https://t.me/${botName}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-lg bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-fg)] transition-opacity hover:opacity-90"
+        >
+          <Send className="h-4 w-4" aria-hidden="true" />
+          افتح محادثة <bdi dir="ltr">@{botName}</bdi> واضغط Start
+        </a>
+      )}
 
       <div className="mt-3 flex flex-wrap items-end gap-2">
         <div className="min-w-0 flex-1">
@@ -195,6 +249,7 @@ function TelegramChannel({
               if (res?.error) setMsg({ ok: false, text: res.error })
               else {
                 setToken('')
+                if (res?.botName) setBotName(res.botName)
                 setMsg({
                   ok: true,
                   text: res?.botName ? `اتربط بالبوت @${res.botName}` : 'اتحفظ',
@@ -244,7 +299,7 @@ function TelegramChannel({
                 const res = await listTelegramChatsAction()
                 if (!res.ok) setChatMsg(res.error)
                 else if (res.chats.length === 0)
-                  setChatMsg('مالقيناش أي محادثة. ابعت رسالة لبوتك من تيليجرام الأول وبعدين دوس تاني.')
+                  setChatMsg(`مالقيناش أي محادثة. ${botName ? `افتح @${botName}` : 'افتح محادثة بوتك إنت (مش BotFather)'} واضغط Start، وبعدين دوس تاني.`)
                 else setChats(res.chats)
               })
             }}
