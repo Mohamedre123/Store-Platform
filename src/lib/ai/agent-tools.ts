@@ -1,7 +1,15 @@
 import 'server-only'
 import { and, desc, eq, ilike, isNull, sql } from 'drizzle-orm'
 import { db } from '@/db'
-import { categories, coupons, orders, products, stores } from '@/db/schema'
+import {
+  categories,
+  coupons,
+  orders,
+  products,
+  shippingRates,
+  shippingZones,
+  stores,
+} from '@/db/schema'
 import { formatMoney, suggestStoreSlug } from '@/lib/utils'
 import type { ToolDef } from './gemini'
 
@@ -163,6 +171,58 @@ export const AGENT_TOOLS: AgentTool[] = [
       const t = a.type === 'percent' ? `${num(a.value)}٪` : a.type === 'fixed' ? `${num(a.value)} ج` : 'شحن مجاني'
       return `كوبون «${str(a.code)}» — ${t}`
     },
+  },
+  {
+    kind: 'write',
+    name: 'set_shipping_prices',
+    description:
+      'تظبيط أسعار الشحن. تقدر تحدّد سعرًا موحّدًا لكل المحافظات، أو سعرًا لمحافظة بعينها، أو الاتنين. السعر بالجنيه.',
+    parameters: {
+      type: 'object',
+      properties: {
+        defaultPrice: {
+          type: 'number',
+          description: 'السعر الموحّد لكل المحافظات اللي مالهاش سعر خاص، بالجنيه',
+        },
+        cities: {
+          type: 'array',
+          description: 'أسعار محافظات بعينها',
+          items: {
+            type: 'object',
+            properties: {
+              city: { type: 'string', description: 'اسم المحافظة زي ما هو مكتوب في المتجر' },
+              price: { type: 'number', description: 'السعر بالجنيه' },
+            },
+            required: ['city', 'price'],
+          },
+        },
+        freeOver: {
+          type: 'number',
+          description: 'الشحن يبقى مجاني فوق المبلغ ده بالجنيه. صفر معناه إلغاء الشحن المجاني.',
+        },
+      },
+    },
+    describe: (a) => {
+      const parts: string[] = []
+      if (a.defaultPrice !== undefined) parts.push(`سعر موحّد ${num(a.defaultPrice)} ج`)
+      const cities = Array.isArray(a.cities) ? a.cities.length : 0
+      if (cities) parts.push(`${cities} محافظة`)
+      if (a.freeOver !== undefined) {
+        parts.push(
+          num(a.freeOver) > 0
+            ? `شحن مجاني فوق ${num(a.freeOver)} ج`
+            : 'إلغاء الشحن المجاني',
+        )
+      }
+      return `تظبيط الشحن — ${parts.join('، ') || 'من غير تغيير'}`
+    },
+  },
+  {
+    kind: 'read',
+    name: 'get_shipping',
+    description: 'قراءة إعدادات الشحن الحالية: السعر الموحّد، أسعار المحافظات، وحد الشحن المجاني.',
+    parameters: { type: 'object', properties: {} },
+    describe: () => 'قراءة إعدادات الشحن',
   },
   {
     kind: 'write',
@@ -541,6 +601,122 @@ export async function executeTool(
 
       await db.update(stores).set(values).where(eq(stores.id, storeId))
       return { ok: true, summary: 'بيانات المتجر اتحدّثت' }
+    }
+
+    case 'get_shipping': {
+      const [zone] = await db
+        .select()
+        .from(shippingZones)
+        .where(eq(shippingZones.storeId, storeId))
+        .limit(1)
+
+      if (!zone) return { ok: true, summary: 'مفيش إعدادات شحن متظبّطة لسه.' }
+
+      const rates = await db
+        .select({ city: shippingRates.city, price: shippingRates.price })
+        .from(shippingRates)
+        .where(eq(shippingRates.zoneId, zone.id))
+        .orderBy(shippingRates.city)
+
+      const lines = [
+        `السعر الموحّد: ${zone.defaultPrice / 100} ج`,
+        zone.freeShippingEnabled && zone.freeOverAmount > 0
+          ? `شحن مجاني فوق ${zone.freeOverAmount / 100} ج`
+          : 'مفيش شحن مجاني',
+        rates.length
+          ? `أسعار خاصة: ${rates.map((r) => `${r.city} ${r.price / 100} ج`).join('، ')}`
+          : 'مفيش أسعار خاصة بمحافظات',
+      ]
+
+      return { ok: true, summary: lines.join('\n') }
+    }
+
+    /**
+     * تظبيط الشحن.
+     *
+     * ## ليه الأداة دي لازمة
+     * المساعد كان بيقدر يعمل كوبونات ومنتجات وأقسام، وبيقول «ما عنديش
+     * صلاحية أعدّل أسعار الشحن» — والتاجر بيسأله سؤالًا طبيعيًا («سعّر
+     * شحن كل المحافظات ٩٠») ويتردّ عليه بالرفض.
+     *
+     * ## المنطقة بتتعمل لو مش موجودة
+     * المتجر الجديد مالوش منطقة شحن. الرفض بـ«ظبّط الشحن الأول» بيرجّع
+     * التاجر لنفس المكان اللي هرب منه — فبنعملها بدولة المتجر ونكمّل.
+     *
+     * ## والأسعار بالقرش زي كل مبالغ المشروع
+     * التاجر بيقول «٩٠ جنيه»، والتخزين بالقرش. الضرب هنا مرة واحدة —
+     * ولو اتنسي، كل شحنة بتتحسب بجنيه واحد بدل تسعين.
+     */
+    case 'set_shipping_prices': {
+      const [existing] = await db
+        .select()
+        .from(shippingZones)
+        .where(eq(shippingZones.storeId, storeId))
+        .limit(1)
+
+      const [store] = await db
+        .select({ country: stores.country })
+        .from(stores)
+        .where(eq(stores.id, storeId))
+        .limit(1)
+
+      let zone = existing
+      if (!zone) {
+        const [created] = await db
+          .insert(shippingZones)
+          .values({ storeId, country: store?.country ?? 'EG', name: 'الشحن', enabled: true })
+          .returning()
+        zone = created
+      }
+
+      const done: string[] = []
+
+      const toMinor = (v: unknown) => Math.round((Number(v) || 0) * 100)
+
+      if (a.defaultPrice !== undefined) {
+        await db
+          .update(shippingZones)
+          .set({ defaultPrice: toMinor(a.defaultPrice) })
+          .where(eq(shippingZones.id, zone.id))
+        done.push(`السعر الموحّد بقى ${num(a.defaultPrice)} ج`)
+      }
+
+      if (a.freeOver !== undefined) {
+        const amount = toMinor(a.freeOver)
+        await db
+          .update(shippingZones)
+          .set({ freeOverAmount: amount, freeShippingEnabled: amount > 0 })
+          .where(eq(shippingZones.id, zone.id))
+        done.push(amount > 0 ? `شحن مجاني فوق ${num(a.freeOver)} ج` : 'الشحن المجاني اتلغى')
+      }
+
+      const cities = Array.isArray(a.cities) ? a.cities : []
+      let touched = 0
+      for (const raw of cities) {
+        const row = raw as Record<string, unknown>
+        const city = str(row.city).trim()
+        if (!city) continue
+        const price = toMinor(row.price)
+
+        /*
+          `onConflictDoUpdate` لا حذف وإضافة: الفهرس الفريد على
+          (المنطقة، المحافظة)، والحذف كان هيضيّع مواعيد التوصيل
+          المتخزّنة على الصف.
+        */
+        await db
+          .insert(shippingRates)
+          .values({ zoneId: zone.id, storeId, city, price, enabled: true })
+          .onConflictDoUpdate({
+            target: [shippingRates.zoneId, shippingRates.city],
+            set: { price, enabled: true },
+          })
+        touched++
+      }
+      if (touched) done.push(`${touched} محافظة اتسعّرت`)
+
+      return done.length
+        ? { ok: true, summary: done.join('، ') }
+        : { ok: false, error: 'ما حددتش أي سعر أغيّره' }
     }
 
     default:

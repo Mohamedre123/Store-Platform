@@ -540,7 +540,31 @@ export type ToolDef = {
   description: string
   parameters: {
     type: 'object'
-    properties: Record<string, { type: string; description: string; enum?: string[] }>
+    properties: Record<string, ToolParam>
+    required?: string[]
+  }
+}
+
+/**
+ * وصف بارامتر أداة.
+ *
+ * ## ليه بيدعم القوائم
+ * كان نصًا أو رقمًا وبس، فأي أداة محتاجة **مجموعة** كانت مستحيلة —
+ * زي «سعّر المحافظات دي كلها» اللي محتاجة قايمة {محافظة، سعر}.
+ * والبديل كان نص واحد يتفكّ بالتخمين، وده بيغلط في أول اسم فيه فاصلة.
+ *
+ * `items` بشكلها المتداخل هي اللي بتخلّي الموديل يبعت بيانات منظّمة
+ * إحنا واثقين في شكلها.
+ */
+type ToolParam = {
+  type: string
+  description?: string
+  enum?: string[]
+  /** شكل عنصر القايمة لما `type` تكون `array` */
+  items?: {
+    type: string
+    description?: string
+    properties?: Record<string, { type: string; description?: string }>
     required?: string[]
   }
 }
