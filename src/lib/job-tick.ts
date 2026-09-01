@@ -72,7 +72,6 @@ export async function drainDueJobs(): Promise<void> {
   try {
     const { drainJobs } = await import('./jobs')
     const summary = await drainJobs(5)
-    await trace('job_drain', `سحب ${summary.picked} · نجح ${summary.done} · فشل ${summary.failed}`)
 
     /*
       بنسجّل لما نسحب فعلًا.
@@ -83,8 +82,9 @@ export async function drainDueJobs(): Promise<void> {
       فالسؤال «العامل بيجري؟» مكانش ليه إجابة غير التخمين.
     */
     if (summary.picked > 0) {
-      console.log(
-        `طابور: سحب ${summary.picked} · نجح ${summary.done} · فشل ${summary.failed}`,
+      await trace(
+        'job_drain',
+        `سحب ${summary.picked} · نجح ${summary.done} · فشل ${summary.failed}`,
       )
     }
   } catch (e) {

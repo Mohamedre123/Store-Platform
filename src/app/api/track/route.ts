@@ -5,8 +5,6 @@ import { drainDueJobs } from '@/lib/job-tick'
 
 export const dynamic = 'force-dynamic'
 
-/** علامة النسخة — بتتغيّر مع كل نشر فيه تعديل هنا */
-const BUILD_MARK = 'drain-v3'
 
 /**
  * استقبال أحداث المتجر.
@@ -76,12 +74,5 @@ export async function POST(req: NextRequest) {
   */
   await drainDueJobs()
 
-  /*
-    ترويسة بتقول أي نسخة شغّالة.
-
-    قعدنا ندوّر على «التصليح وصل الاستضافة ولا لأ» ومفيش أي طريقة نعرف:
-    التغييرات كلها في الخادم، والصفحة شكلها واحد قبل وبعد. الترويسة دي
-    بتخلّي السؤال ده ضغطة واحدة.
-  */
-  return new NextResponse(null, { status: 204, headers: { 'x-zawya-build': BUILD_MARK } })
+  return new NextResponse(null, { status: 204 })
 }
