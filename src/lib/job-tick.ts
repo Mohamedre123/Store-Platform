@@ -37,9 +37,42 @@ export async function drainDueJobs(): Promise<void> {
   if (now - lastDrain < EVERY_MS) return
   lastDrain = now
 
+  /**
+   * أثر السحب في قاعدة البيانات لا في سجل الخادم وبس.
+   *
+   * قعدنا ندوّر على «العامل بيجري ولا لأ» على الاستضافة ومفيش أي طريقة
+   * نعرف: `console.log` بيروح لسجل مش قدامنا، والطابور اللي ما بيتحرّكش
+   * ما بيفرّقش بين «ما اتنادتش» و«اتنادت ورمت».
+   *
+   * السطر ده بيخلّي السؤال له إجابة: صف في سجل الرسايل بيقول السحب
+   * اشتغل ولقى كام مهمة، أو وقع وليه.
+   */
+  const trace = async (event: string, body: string, failed = false) => {
+    try {
+      const { db } = await import('@/db')
+      const { messageLog } = await import('@/db/schema')
+      const { stores } = await import('@/db/schema')
+      const { sql } = await import('drizzle-orm')
+      const [anyStore] = await db.select({ id: stores.id }).from(stores).limit(1)
+      if (!anyStore) return
+      await db.insert(messageLog).values({
+        storeId: anyStore.id,
+        channel: 'system',
+        event,
+        recipient: '-',
+        body: body.slice(0, 400),
+        status: failed ? 'failed' : 'sent',
+        sentAt: sql`now()`,
+      })
+    } catch {
+      /* التتبّع نفسه ما يصحّش يوقّع السحب */
+    }
+  }
+
   try {
     const { drainJobs } = await import('./jobs')
     const summary = await drainJobs(5)
+    await trace('job_drain', `سحب ${summary.picked} · نجح ${summary.done} · فشل ${summary.failed}`)
 
     /*
       بنسجّل لما نسحب فعلًا.
@@ -55,6 +88,8 @@ export async function drainDueJobs(): Promise<void> {
       )
     }
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
     console.error('فشل سحب الطابور:', e)
+    await trace('job_drain_error', msg, true)
   }
 }
