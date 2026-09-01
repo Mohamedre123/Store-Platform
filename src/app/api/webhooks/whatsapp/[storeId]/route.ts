@@ -1,11 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { eq } from 'drizzle-orm'
 import { db } from '@/db'
-import { stores } from '@/db/schema'
-import { normalizePhone } from '@/lib/utils'
+import { messageLog, stores } from '@/db/schema'
 import { sendWhatsapp } from '@/lib/whatsapp'
-import { applyReply, findPendingOrder, readReply } from '@/lib/order-confirm'
-import { messageLog } from '@/db/schema'
+import { applyReply, findPendingOrder, findSolePendingOrder, readReply } from '@/lib/order-confirm'
+import { extractInbound, phoneForLid, rememberLid } from '@/lib/whatsapp-inbound'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -44,27 +43,52 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ storeId: s
     return NextResponse.json({ ok: true })
   }
 
-  const msg = extract(body)
+  const msg = extractInbound(body)
   if (!msg) return NextResponse.json({ ok: true })
+
+  /**
+   * ترجمة المعرّف الداخلي بتتعلّم من أي رسالة فيها الاتنين.
+   *
+   * **قبل فحص `fromMe`**: صدى رسالة التأكيد اللي بعتناها إحنا بيحمل
+   * المعرّف والرقم مع بعض، فالترجمة بتتعلّم من رسالتنا قبل ما العميل
+   * يرد أصلًا — وردّه بيلاقي طريقه من أول مرة.
+   */
+  if (msg.lid && msg.phone) {
+    await rememberLid(store.id, msg.lid, msg.phone)
+  }
 
   /*
     كل رسالة واردة بتتسجّل — حتى اللي بنتجاهلها.
 
-    قعدنا تلات جولات مش عارفين الرد وصل ولا لأ، لأن المسار كان
-    بيرد 200 ويسكت. السطر ده بيخلّي السؤال «البوابة بتبعتلنا؟»
-    له إجابة في سجل الرسايل بدل تخمين.
+    قعدنا تلات جولات مش عارفين الرد وصل ولا لأ، لأن المسار كان بيرد
+    200 ويسكت. السطر ده بيخلّي السؤال «البوابة بتبعتلنا؟» له إجابة في
+    سجل الرسايل بدل تخمين.
+
+    ومعرّف الرسالة معاه مفتاح تفرّد: البوابة بتبعت نفس الرسالة أكتر من
+    مرة، وبدونه كنا بنقرا الرد مرتين ونرد عليه مرتين.
   */
-  await db
+  const logged = await db
     .insert(messageLog)
     .values({
       storeId: store.id,
       channel: 'whatsapp',
       event: 'inbound',
-      recipient: msg.phone,
-      body: msg.text.slice(0, 400),
+      recipient: msg.phone ?? (msg.lid ? `lid:${msg.lid}` : '-'),
+      body: `${msg.fromMe ? '↩︎ منّا: ' : ''}${msg.text}`.slice(0, 400),
       status: 'sent',
+      provider: 'whatsapp',
+      providerRef: msg.messageId,
+      sentAt: new Date(),
     })
-    .catch(() => undefined)
+    .onConflictDoNothing()
+    .returning({ id: messageLog.id })
+    .catch(() => [{ id: 'unknown' }])
+
+  /*
+    مفيش صف اتكتب = الرسالة دي عدّت من هنا قبل كده. الخروج هنا هو اللي
+    بيمنع الرد المكرّر وتحريك حالة الطلب مرتين.
+  */
+  if (msg.messageId && logged.length === 0) return NextResponse.json({ ok: true })
 
   /*
     رسايلنا إحنا بترجع في الويب هوك كمان.
@@ -77,15 +101,35 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ storeId: s
   const reply = readReply(msg.text)
   if (!reply) return NextResponse.json({ ok: true })
 
-  /*
-    البحث جوّه متجر الويب هوك وبس.
+  /**
+   * الوصول للطلب — بالرقم، وإلا بالترجمة، وإلا بالوحدانية.
+   *
+   * البحث دايمًا **جوّه متجر الويب هوك**: الرقم الواحد ممكن يكون طالب
+   * من كذا متجر، والفلترة جوّه الاستعلام لا بعده بتخلّي رد عميل في
+   * متجر ما يقدرش يلمس طلب متجر تاني مهما حصل.
+   */
+  const phone = msg.phone ?? (msg.lid ? await phoneForLid(store.id, msg.lid) : null)
 
-    الرقم الواحد ممكن يكون طالب من كذا متجر. الفلترة جوّه الاستعلام
-    لا بعده: كده الرد ما يقدرش يلمس طلب متجر تاني مهما حصل.
-  */
-  const phone = normalizePhone(msg.phone)
-  const order = await findPendingOrder(store.id, phone)
+  const order = phone
+    ? await findPendingOrder(store.id, phone)
+    : /*
+        العميل ردّ ومعانا معرّفه الداخلي بس. لو فيه طلب مستني واحد
+        بالظبط، هو ده — ولو أكتر من واحد بنسيبها للتاجر بدل ما نأكّد
+        طلب حد تاني.
+      */
+      await findSolePendingOrder(store.id)
+
   if (!order) return NextResponse.json({ ok: true })
+
+  /*
+    الترجمة بتتعلّم من الطلب اللي لقيناه.
+
+    الرد اللي بعده بيوصل برقمه مباشرةً من غير أي استنتاج — فالوحدانية
+    فوق بتلزم أول رد بس.
+  */
+  if (msg.lid && !msg.phone && order.phone) {
+    await rememberLid(store.id, msg.lid, order.phone)
+  }
 
   const answer = await applyReply({
     orderId: order.id,
@@ -94,46 +138,10 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ storeId: s
     customerName: order.name,
   })
 
-  await sendWhatsapp(order.storeId, phone, answer, {
+  await sendWhatsapp(order.storeId, order.phone ?? phone ?? '', answer, {
     event: 'order_confirm_reply',
     orderId: order.id,
   }).catch(() => undefined)
 
   return NextResponse.json({ ok: true })
-}
-
-/**
- * بيطلّع الرسالة من شكل البوابة.
- *
- * الأشكال بتختلف بين نسخ البوابة وبين مزوّد وآخر، فبنجرّب المسارات
- * المعروفة بدل ما نتمسّك بواحد ونفضل صامتين لو اتغيّر.
- */
-function extract(body: unknown): { phone: string; text: string; fromMe: boolean } | null {
-  const b = body as Record<string, unknown>
-  const data = (b?.data ?? b) as Record<string, unknown>
-  const messages = (data?.messages ?? data?.message ?? data) as Record<string, unknown>
-
-  const key = (messages?.key ?? {}) as Record<string, unknown>
-  const remote = String(key.remoteJid ?? messages?.from ?? data?.from ?? '')
-
-  /* الجروبات مش عملاء — الرد عليها ضجيج */
-  if (!remote || remote.includes('@g.us')) return null
-
-  const phone = remote.split('@')[0].replace(/\D/g, '')
-  if (phone.length < 8) return null
-
-  const inner = (messages?.message ?? {}) as Record<string, unknown>
-  const extended = (inner?.extendedTextMessage ?? {}) as Record<string, unknown>
-  const text = String(
-    inner?.conversation ??
-      extended?.text ??
-      messages?.text ??
-      messages?.body ??
-      data?.text ??
-      '',
-  )
-
-  if (!text.trim()) return null
-
-  return { phone, text, fromMe: Boolean(key.fromMe ?? messages?.fromMe) }
 }

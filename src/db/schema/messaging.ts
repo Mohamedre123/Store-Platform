@@ -1,4 +1,5 @@
 import { pgTable, uuid, text, boolean, integer, jsonb, timestamp, index, uniqueIndex } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
 import { stores } from './tenancy'
 import { createdAt, updatedAt, money } from './_shared'
 
@@ -156,7 +157,56 @@ export const messageLog = pgTable(
   (t) => [
     index('message_log_store_idx').on(t.storeId, t.createdAt),
     index('message_log_order_idx').on(t.orderId),
+    /*
+      الرسالة الواردة الواحدة تتسجّل مرة واحدة.
+
+      البوابة بتبعت نفس الرسالة أكتر من مرة: مرة لأن الحدث كان مسجّل
+      باسمين، ومرة لأنها بتعيد المحاولة لو ردّنا اتأخّر. من غير الفهرس
+      ده كنا بنقرا نفس رد العميل مرتين — فنرد عليه مرتين ونحرّك حالة
+      الطلب مرتين.
+
+      وجزئي عن قصد: باقي الرسايل (اللي إحنا بعتناها) مالهاش
+      `provider_ref`، وقيد تفرّد عليها كان هيمنع أكتر من رسالة صادرة.
+    */
+    uniqueIndex('message_log_inbound_ref_idx')
+      .on(t.storeId, t.providerRef)
+      .where(sql`${t.event} = 'inbound' and ${t.providerRef} is not null`),
   ],
+)
+
+/**
+ * ربط المعرّف الداخلي لواتساب (`@lid`) برقم العميل.
+ *
+ * ## المشكلة
+ * واتساب بقى بيبعت في الرسايل الواردة معرّفًا داخليًا بدل الرقم —
+ * `129446489145533@lid` مش `201012345678@s.whatsapp.net`. المعرّف ده
+ * ثابت للعميل لكنه ما بيدلّش على رقمه، فالبحث عن الطلب بيه ما بيلاقيش
+ * حاجة: العميل بيرد «١» وما بيحصلش أي حاجة.
+ *
+ * ## الحل
+ * أول ما تيجي رسالة فيها الاتنين مع بعض — وده بيحصل في صدى رسايلنا
+ * إحنا وفي أشكال تانية من نفس البوابة — بنحفظ الربط هنا. وأي رسالة
+ * بعد كده جاية بالمعرّف لوحده بتترجم لرقم من الجدول ده.
+ *
+ * **جوّه المتجر لا على مستوى المنصة**: العميل الواحد ممكن يكون طالب
+ * من كذا تاجر، وربط مشترك بين المتاجر كان بيخلّي رد في متجر يلمس
+ * طلبًا في متجر تاني.
+ */
+export const whatsappContacts = pgTable(
+  'whatsapp_contacts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    storeId: uuid('store_id')
+      .notNull()
+      .references(() => stores.id, { onDelete: 'cascade' }),
+    /** المعرّف الداخلي من غير اللاحقة `@lid` */
+    lid: text('lid').notNull(),
+    /** الرقم بصيغة دولية بعلامة زائد — زي ما هو متخزّن على الطلب */
+    phone: text('phone').notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [uniqueIndex('whatsapp_contacts_unique').on(t.storeId, t.lid)],
 )
 
 /** رموز التحقق */

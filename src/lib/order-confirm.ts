@@ -147,29 +147,60 @@ export async function requestConfirmation(input: {
  * هتأكّد طلبًا قديم منسي — والتاجر يشحنه.
  */
 export async function findPendingOrder(storeId: string, phone: string) {
-  const cutoff = new Date(Date.now() - 48 * 3600_000)
-
   const [row] = await db
-    .select({
-      id: orders.id,
-      storeId: orders.storeId,
-      number: orders.orderNumber,
-      name: orders.customerName,
-    })
+    .select(PENDING_FIELDS)
     .from(orders)
-    .where(
-      and(
-        eq(orders.storeId, storeId),
-        eq(orders.customerPhone, phone),
-        isNotNull(orders.confirmSentAt),
-        isNull(orders.customerConfirm),
-        gt(orders.confirmSentAt, cutoff),
-      ),
-    )
+    .where(and(eq(orders.customerPhone, phone), pendingWhere(storeId)))
     .orderBy(desc(orders.confirmSentAt))
     .limit(1)
 
   return row ?? null
+}
+
+/** الأعمدة اللي الرد محتاجها — الرقم منها عشان نتعلّم منه ترجمة المعرّف */
+const PENDING_FIELDS = {
+  id: orders.id,
+  storeId: orders.storeId,
+  number: orders.orderNumber,
+  name: orders.customerName,
+  phone: orders.customerPhone,
+} as const
+
+function pendingWhere(storeId: string) {
+  return and(
+    eq(orders.storeId, storeId),
+    isNotNull(orders.confirmSentAt),
+    isNull(orders.customerConfirm),
+    gt(orders.confirmSentAt, new Date(Date.now() - 48 * 3600_000)),
+  )
+}
+
+/**
+ * الطلب المستني الوحيد في المتجر — لو كان **وحيد فعلًا**.
+ *
+ * ## ليه دي موجودة
+ * واتساب بقى بيبعت معرّفًا داخليًا بدل الرقم في بعض الرسايل. غالبًا
+ * بنترجمه من `whatsapp_contacts`، لكن أول رد من عميل ما شفناش معرّفه
+ * قبل كده بييجي بلا رقم نعرفه — والسكوت ساعتها معناه إن العميل ردّ
+ * وما حصلش حاجة، وهي بالظبط المشكلة اللي بنصلّحها.
+ *
+ * ## وليه بشرط الوحدانية
+ * لو فيه طلبين مستنيين، مفيش أي طريقة نعرف الرد ده بتاع مين — والتخمين
+ * هنا معناه إننا نأكّد طلب حد تاني ونشحنه. فبنرجّع `null` ونسيب التاجر
+ * يتصرّف، وبيلاقي الرسالة نفسها في سجل الرسايل.
+ *
+ * والطلب الوحيد بيتعلّم منه الترجمة، فالرد اللي بعده بيبقى بالرقم
+ * مباشرةً من غير أي تخمين.
+ */
+export async function findSolePendingOrder(storeId: string) {
+  const rows = await db
+    .select(PENDING_FIELDS)
+    .from(orders)
+    .where(pendingWhere(storeId))
+    .orderBy(desc(orders.confirmSentAt))
+    .limit(2)
+
+  return rows.length === 1 ? rows[0] : null
 }
 
 /**
