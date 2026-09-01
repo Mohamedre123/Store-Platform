@@ -7,6 +7,7 @@ import { db } from '@/db'
 import { notificationRecipients } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { normalizePhone } from '@/lib/utils'
+import { sendTestNotification } from '@/lib/notify-team'
 import type { AutomationEvent, Channel } from '@/db/schema'
 
 export type RecipientState = { ok?: boolean; error?: string } | null
@@ -137,3 +138,54 @@ export async function toggleRecipientAction(
 
   وكانوا متصدّرين من غير ما حد يستوردهم أصلًا.
 */
+
+/**
+ * إشعار تجريبي لمستقبِل بعينه.
+ *
+ * ## ليه ده لازم يكون موجود
+ * التاجر بيربط البوت، وياخد معرّف المحادثة، ويضيف المستقبِل — وبعدها
+ * **مفيش أي طريقة يعرف إن ده كله شغّال**. بيستنّى أول طلب حقيقي عشان
+ * يكتشف إن الإشعار جه ولا لأ، ولو ما جاش ما يعرفش الغلط فين: التوكن؟
+ * المعرّف؟ الأحداث المختارة؟
+ *
+ * والأسوأ إنه ممكن يفتكر إنه خلّص وهو ناسي خطوة — زي ما حصل فعلًا: توكن
+ * محفوظ، ومعرّف اتنسخ، وولا مستقبِل اتسجّل. الشاشة كانت ساكتة تمامًا.
+ *
+ * ## وبيمشي في نفس المسار الحقيقي
+ * بيستخدم نفس القناة ونفس التوكن ونفس الدالة اللي بتبعت إشعار الطلب.
+ * تجربة بمسار تاني بتثبت إن المسار التاني شغّال — وهو مش اللي هيشتغل
+ * وقت الطلب.
+ */
+export async function testRecipientAction(id: string): Promise<RecipientState> {
+  try {
+    const { store } = await getDashboardContext()
+
+    const [target] = await db
+      .select({
+        name: notificationRecipients.name,
+        channel: notificationRecipients.channel,
+        chatId: notificationRecipients.chatId,
+        phone: notificationRecipients.phone,
+      })
+      .from(notificationRecipients)
+      .where(
+        and(eq(notificationRecipients.id, id), eq(notificationRecipients.storeId, store.id)),
+      )
+      .limit(1)
+
+    if (!target) return { error: 'المستقبِل مش موجود' }
+
+    const res = await sendTestNotification({
+      storeId: store.id,
+      storeName: store.name,
+      channel: target.channel,
+      chatId: target.chatId,
+      phone: target.phone,
+    })
+
+    return res.ok ? { ok: true } : { error: res.error }
+  } catch (e) {
+    console.error('فشل الإشعار التجريبي:', e)
+    return { error: 'حصلت مشكلة عندنا. جرّب تاني.' }
+  }
+}

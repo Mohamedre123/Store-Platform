@@ -5,6 +5,7 @@ import { BellRing, Mail, MessageCircle, Plus, Send, Smartphone, Trash2, X } from
 import { Alert, Card } from '@/components/ui'
 import {
   deleteRecipientAction,
+  testRecipientAction,
   saveRecipientAction,
   toggleRecipientAction,
 } from './recipient-actions'
@@ -193,9 +194,47 @@ function RecipientCard({
         >
           تعديل
         </button>
+        <TestRecipient id={row.id} onError={onError} />
         <DeleteRecipient id={row.id} onError={onError} />
       </div>
     </Card>
+  )
+}
+
+/**
+ * زرار تجربة الإشعار.
+ *
+ * التاجر كان بيضيف مستقبِل و**يستنّى أول طلب حقيقي** عشان يعرف إن ده
+ * شغّال. ولو ما وصلش، ما يعرفش الغلط فين — فبيقعد يغيّر بالعمى.
+ *
+ * الضغطة دي بتبعت رسالة حقيقية بنفس المسار بتاع إشعار الطلب، فالنتيجة
+ * قاطعة: وصلت يبقى شغّال، وما وصلتش يبقى الرسالة بتقول السبب.
+ */
+function TestRecipient({ id, onError }: { id: string; onError: (t: string) => void }) {
+  const [pending, start] = useTransition()
+  const [sent, setSent] = useState(false)
+
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      onClick={() =>
+        start(async () => {
+          const res = await testRecipientAction(id)
+          if (res?.error) onError(res.error)
+          else {
+            setSent(true)
+            setTimeout(() => setSent(false), 4000)
+          }
+        })
+      }
+      title="ابعت إشعار تجريبي"
+      aria-label="ابعت إشعار تجريبي"
+      className="flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-[var(--fg-subtle)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--fg)] disabled:opacity-60"
+    >
+      <Send className="h-4 w-4" aria-hidden="true" />
+      {pending ? 'بنبعت…' : sent ? 'اتبعت ✓' : 'جرّب'}
+    </button>
   )
 }
 

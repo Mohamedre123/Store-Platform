@@ -189,3 +189,72 @@ async function deliver(event: TeamEvent, ctx: TeamContext): Promise<void> {
     void store
   }
 }
+
+/**
+ * إشعار تجريبي — بنفس المسار اللي الطلب الحقيقي بيمشي فيه.
+ *
+ * التاجر كان بيربط ويضيف مستقبِل وبعدها **مستنّي أول طلب حقيقي** عشان
+ * يعرف إن ده كله شغّال. ولو ما وصلش، ما يعرفش الغلط فين: التوكن؟
+ * المعرّف؟ الأحداث؟ فبيقعد يغيّر بالعمى.
+ *
+ * وبنستخدم نفس التوكن ونفس `sendTelegram` بتاعة الإشعار الحقيقي عن
+ * قصد: تجربة بمسار تاني بتثبت إن المسار التاني شغّال — وهو مش اللي
+ * هيشتغل وقت الطلب.
+ */
+export async function sendTestNotification(input: {
+  storeId: string
+  storeName: string
+  channel: string
+  chatId: string | null
+  phone: string | null
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const text = `✅ تجربة من ${input.storeName}\n\nالإشعارات شغّالة — أول ما ييجي طلب جديد هتلاقيه هنا.`
+
+  if (input.channel === 'telegram') {
+    if (!input.chatId) return { ok: false, error: 'المستقبِل ده مالوش معرّف محادثة.' }
+
+    const [settings] = await db
+      .select({ telegramBotToken: messagingSettings.telegramBotToken })
+      .from(messagingSettings)
+      .where(eq(messagingSettings.storeId, input.storeId))
+      .limit(1)
+
+    let botToken: string | null = settings?.telegramBotToken ?? null
+    if (!botToken) return { ok: false, error: 'احفظ توكن بوت تيليجرام الأول.' }
+
+    /* متخزّن مشفّرًا، والقديم ممكن يكون خامًا — نفس قاعدة الإرسال الحقيقي */
+    if (botToken.includes('.')) {
+      try {
+        botToken = decrypt(botToken)
+      } catch {
+        /* خام — نستخدمه زي ما هو */
+      }
+    }
+
+    const sent = await sendTelegram(botToken, input.chatId, text)
+    return sent
+      ? { ok: true }
+      : {
+          ok: false,
+          error:
+            'تيليجرام رفض الإرسال. اتأكد إنك ضغطت Start في محادثة بوتك، وإن معرّف المحادثة صح.',
+        }
+  }
+
+  if (input.channel === 'email') {
+    if (!input.phone) return { ok: false, error: 'المستقبِل ده مالوش بريد.' }
+    const sent = await sendEmail({
+      to: input.phone,
+      subject: `تجربة إشعارات ${input.storeName}`,
+      html: `<p style="font-family:sans-serif;direction:rtl">${text.replace(/\n/g, '<br>')}</p>`,
+      text,
+      log: { storeId: input.storeId, event: 'team_test' },
+    })
+    return sent.ok ? { ok: true } : { ok: false, error: 'مقدرناش نبعت البريد دلوقتي.' }
+  }
+
+  return {
+    ok: false,
+    error: 'القناة دي لسه مش بتبعت إشعارات فريق — استخدم تيليجرام أو البريد.',
+  }
+}
