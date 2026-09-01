@@ -34,6 +34,14 @@ export type CartItem = {
   price: number
   quantity: number
   maxStock?: number
+  /**
+   * نوع المنتج — الشيك أوت الذكي بيقرا منه.
+   *
+   * سلة كلها منتجات رقمية مالهاش عنوان توصيل. اختياري عشان السلال
+   * المتخزّنة في متصفحات العملاء من قبل التغيير ما تكسرش — الغايب
+   * بيتعامل كمنتج مادي، وده السلوك اللي كان شغّال.
+   */
+  type?: 'physical' | 'digital' | 'service'
 }
 
 type CartContext = {

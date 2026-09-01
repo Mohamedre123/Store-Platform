@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Check, Minus, Plus, ShoppingBag } from 'lucide-react'
 import { useCart, type CartItem } from './cart'
 import { QuickCheckout, type QuickCheckoutSettings } from './quick-checkout'
+import { WhatsappIcon } from './whatsapp-icon'
 
 /**
  * زر الإضافة للسلة.
@@ -20,12 +21,18 @@ export function AddToCart({
   item,
   soldOut,
   whatsapp,
+  whatsappOrder,
+  productUrl,
   productName,
   quick,
 }: {
   item: Omit<CartItem, 'quantity'>
   soldOut: boolean
   whatsapp?: string | null
+  /** رقم الطلب على واتساب — فاضي لما التاجر قافل الميزة أو مالوش رقم */
+  whatsappOrder?: string | null
+  /** رابط المنتج — بيتحط في الرسالة عشان التاجر يعرفه من غير ما يسأل */
+  productUrl?: string | null
   productName: string
   /** إعدادات الدفع السريع — `null` لما التاجر قافله */
   quick?: QuickCheckoutSettings | null
@@ -111,6 +118,43 @@ export function AddToCart({
           soldOut={soldOut}
           settings={quick}
         />
+      )}
+
+      {/*
+        الطلب على واتساب — مسار كامل لا سؤال.
+
+        ## ليه ده مختلف عن «اسأل على واتساب»
+        السؤال بيفتح محادثة فاضية والعميل بيكتب هو. والطلب بيفتحها
+        **بالمنتج والكمية والرابط جاهزين** — التاجر بيرد بسعر الشحن
+        ويتفقوا، وخلاص.
+
+        ## وليه بيستاهل يبقى موجود
+        فيه تجّار سوقهم كله بيشتري بالمحادثة: بيسأل عن المقاس، وبيتفاوض،
+        وبيطمّن على الشحن قبل ما يدفع. الشيك أوت عندهم بيقف قدام البيعة
+        بدل ما يسهّلها. ده مش بديل للشيك أوت — ده الطريق التاني جنبه.
+
+        الرسالة بتتكتب بالرابط عشان التاجر يعرف المنتج من غير ما يسأل،
+        والكمية معاها لأن «عايز ٣» و«عايز واحد» طلبين مختلفين.
+      */}
+      {whatsappOrder && (
+        <a
+          href={`https://wa.me/${whatsappOrder.replace(/[^\d]/g, '')}?text=${encodeURIComponent(
+            [
+              `السلام عليكم، عايز أطلب:`,
+              `• ${item.name}`,
+              `• الكمية: ${quantity}`,
+              productUrl ? `\n${productUrl}` : '',
+            ]
+              .filter(Boolean)
+              .join('\n'),
+          )}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-[var(--sf-radius)] bg-[#25D366] px-6 font-semibold text-white transition-opacity hover:opacity-90"
+        >
+          <WhatsappIcon className="h-5 w-5" />
+          اطلب على واتساب
+        </a>
       )}
 
       {whatsapp && (

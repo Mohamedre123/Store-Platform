@@ -4,6 +4,7 @@ import { getCurrentCustomer } from '@/lib/customer-auth'
 import { CustomerLoginForm } from '../account/login-form'
 import { getCheckoutSettings, getDisplayShipping, listPaymentOptions } from '@/lib/checkout'
 import { regionsFor } from '@/lib/regions'
+import { listBranches } from '@/lib/branches'
 import { otpDeliverable } from '@/lib/order-otp'
 import { CheckoutForm } from './checkout-form'
 import { EmptyCart } from './empty-cart'
@@ -85,6 +86,19 @@ export default async function CheckoutPage({
   */
   const options = await listPaymentOptions(store.id, ship.codEnabled)
 
+  /**
+   * فروع الاستلام — بتتجاب لما الاستلام متاح بس.
+   *
+   * استعلام على كل شيك أوت مالوش لازمة عند التاجر اللي بيوصّل وخلاص،
+   * وهو الوضع الافتراضي.
+   */
+  const pickupBranches =
+    settings?.deliveryMode === 'pickup' || settings?.deliveryMode === 'delivery_pickup'
+      ? (await listBranches(store.id))
+          .filter((b) => b.isActive)
+          .map((b) => ({ id: b.id, name: b.name, city: b.city, address: b.address }))
+      : []
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
       <h1 className="mb-8 text-2xl font-bold tracking-tight sm:text-3xl">إتمام الطلب</h1>
@@ -110,9 +124,16 @@ export default async function CheckoutPage({
               fieldArea: settings?.fieldArea ?? 'optional',
               fieldStreet: settings?.fieldStreet ?? 'required',
               fieldBuilding: settings?.fieldBuilding ?? 'optional',
+              fieldPostalCode: settings?.fieldPostalCode ?? 'hidden',
+              fieldCountry: settings?.fieldCountry ?? 'hidden',
               fieldNotes: settings?.fieldNotes ?? 'optional',
               addressMode: settings?.addressMode ?? 'structured',
               showCouponField: settings?.showCouponField ?? true,
+              showPaymentSelector: settings?.showPaymentSelector ?? true,
+              showCountryCodePicker: settings?.showCountryCodePicker ?? false,
+              smartMode: settings?.smartMode ?? true,
+              deliveryMode: settings?.deliveryMode ?? 'delivery',
+              branches: pickupBranches,
               otpEnabled: (settings?.otpEnabled ?? true) && (await otpDeliverable(store.id)),
               minOrderEnabled: settings?.minOrderEnabled ?? false,
               minOrderAmount: settings?.minOrderAmount ?? 0,

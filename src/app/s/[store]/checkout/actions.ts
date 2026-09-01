@@ -100,6 +100,16 @@ const orderSchema = z.object({
   area: z.string().trim().optional(),
   street: z.string().trim().optional(),
   building: z.string().trim().optional(),
+  postalCode: z.string().trim().max(20).optional(),
+  /**
+   * توصيل ولا استلام من الفرع.
+   *
+   * **بيتفحص على الخادم لا بيتصدّق من المتصفح**: التاجر اللي مقفّل
+   * الاستلام ما يصحّش حد يبعتله طلب استلام ويوفّر الشحن. الفحص تحت
+   * بيرجّعه لـ«توصيل» لو الإعداد ما بيسمحش.
+   */
+  fulfillment: z.enum(['delivery', 'pickup']).default('delivery'),
+  branchId: z.string().uuid().optional(),
   notes: z.string().trim().max(500).optional(),
   paymentGateway: z.string().trim().default('cod'),
   couponCode: z.string().trim().max(32).optional(),
@@ -580,6 +590,25 @@ async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
   const offerDiscount = computeOfferDiscount(lines, activeOffers)
 
   const settings = await getCheckoutSettings(store.id)
+
+  /**
+   * الاستلام من الفرع — **الإعداد بيحكم لا المتصفح**.
+   *
+   * الاستلام بيصفّر الشحن. فلو صدّقنا اللي جاي من المتصفح، أي حد يبعت
+   * `fulfillment: 'pickup'` على متجر بيوصّل بس ويوفّر مصاريف الشحن —
+   * والتاجر يشحنله وهو خسران الفرق.
+   *
+   * والعكس كمان: المتجر اللي بيستلم بس، الطلب بيتسجّل استلامًا حتى لو
+   * جه من شاشة قديمة مكتوب فيها توصيل.
+   */
+  const mode = settings?.deliveryMode ?? 'delivery'
+  const fulfillment: 'delivery' | 'pickup' =
+    mode === 'pickup'
+      ? 'pickup'
+      : mode === 'delivery'
+        ? 'delivery'
+        : input.fulfillment
+
   const totals = await computeTotals({
     storeId: store.id,
     lines,
@@ -588,6 +617,8 @@ async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
     paymentGateway: input.paymentGateway,
     discount: (coupon?.discount ?? 0) + (offerDiscount?.amount ?? 0),
     couponFreeShipping: coupon?.freeShipping ?? false,
+    /* الاستلام مالوش شحن — والحساب هنا هو الحساب اللي بيتحصّل */
+    pickup: fulfillment === 'pickup',
   })
 
   if (settings?.minOrderEnabled && totals.subtotal < settings.minOrderAmount) {
@@ -728,6 +759,15 @@ async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
         area: input.area,
         street: input.street,
         building: input.building,
+        postalCode: input.postalCode,
+        /*
+          فرع الاستلام جوّه العنوان لا في عمود جديد.
+
+          العنوان jsonb أصلًا، والفرع جزء من «الطلب ده يتسلّم منين» —
+          فمكانه معاه. عمود جديد كان هيطلب هجرة على جدول الطلبات عشان
+          حقل بيتقرا في شاشة واحدة.
+        */
+        pickupBranchId: fulfillment === 'pickup' ? (input.branchId ?? null) : null,
         notes: input.notes,
       },
       subtotal: totals.subtotal,
@@ -746,7 +786,7 @@ async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
       status: 'pending' as const,
       isIncomplete: false,
       notes: input.notes || null,
-      shippingMethod: 'delivery',
+      shippingMethod: fulfillment,
       recoveredAt: input.draftToken ? new Date() : null,
       confirmedAt: null,
     }

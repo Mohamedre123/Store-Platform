@@ -38,6 +38,8 @@ export function VariantPicker({
   fallback,
   currency,
   whatsapp,
+  whatsappOrder,
+  productUrl,
   showStockCounter,
   quick,
 }: {
@@ -47,6 +49,9 @@ export function VariantPicker({
   fallback: { productId: string; name: string; slug: string; image?: string; price: number }
   currency: string
   whatsapp?: string | null
+  /** رقم الطلب على واتساب ورابط المنتج — بيتمرّروا لزرار الإضافة */
+  whatsappOrder?: string | null
+  productUrl?: string | null
   showStockCounter: boolean
   /** إعدادات الدفع السريع — بتتمرّر لزرار الإضافة عشان ياخد المتغيّر المختار */
   quick?: QuickCheckoutSettings | null
@@ -186,6 +191,8 @@ export function VariantPicker({
         }}
         soldOut={soldOut}
         whatsapp={whatsapp}
+        whatsappOrder={whatsappOrder}
+        productUrl={productUrl}
         productName={fallback.name}
         quick={quick}
       />

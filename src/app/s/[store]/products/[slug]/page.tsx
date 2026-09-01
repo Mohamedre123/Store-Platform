@@ -35,6 +35,7 @@ import type { QuickCheckoutSettings } from '@/components/storefront/quick-checko
 import { getCheckoutSettings, getDisplayShipping, listPaymentOptions } from '@/lib/checkout'
 import { regionsFor } from '@/lib/regions'
 import { otpDeliverable } from '@/lib/order-otp'
+import { publicStoreUrl } from '@/lib/domain'
 
 export const dynamic = 'force-dynamic'
 
@@ -224,6 +225,21 @@ export default async function ProductPage({
    * بيفتحها كل زائر، والمتجر اللي قافل الميزة ما يصحّش يدفع تمنها.
    */
   const quickSettings = await getCheckoutSettings(store.id)
+
+  /**
+   * الطلب على واتساب — إعداد التاجر ورقمه مع بعض.
+   *
+   * الاتنين شرط: الإعداد مفتوح **و** فيه رقم واتساب على المتجر. زرار
+   * بيفتح محادثة على رقم فاضي أسوأ من زرار مش موجود.
+   */
+  const whatsappOrderNumber =
+    (quickSettings?.whatsappOrderEnabled ?? false) && store.whatsapp ? store.whatsapp : null
+
+  /* رابط المنتج للرسالة — بنطاق التاجر لو ربطه */
+  const productUrl = whatsappOrderNumber
+    ? `${await publicStoreUrl(store)}/products/${encodeURIComponent(product.slug)}`
+    : null
+
   const quick =
     (quickSettings?.quickCheckoutEnabled ?? true) && store.isPublished
       ? await (async () => {
@@ -393,6 +409,8 @@ export default async function ProductPage({
                   }}
                   currency={store.currency}
                   whatsapp={productPage.showWhatsappAsk ? store.whatsapp : null}
+                  whatsappOrder={whatsappOrderNumber}
+                  productUrl={productUrl}
                   showStockCounter={productPage.showStockCounter}
                   quick={quick}
                 />
@@ -438,6 +456,8 @@ export default async function ProductPage({
                     }}
                     soldOut={soldOut}
                     whatsapp={productPage.showWhatsappAsk ? store.whatsapp : null}
+                  whatsappOrder={whatsappOrderNumber}
+                  productUrl={productUrl}
                     productName={product.name}
                     quick={quick}
                   />

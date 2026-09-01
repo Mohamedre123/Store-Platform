@@ -3,14 +3,14 @@
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { Banknote, CheckCircle2, Loader2, Lock, Tag, Truck } from 'lucide-react'
+import { Banknote, CheckCircle2, Loader2, Lock, Store, Tag, Truck } from 'lucide-react'
 import { useCart } from '@/components/storefront/cart'
 import { CartLineOptions } from '@/components/storefront/cart-line-options'
 import { useStoreHref } from '@/components/storefront/store-link'
 import { OtpDialog } from '@/components/storefront/otp-dialog'
 import { applyCouponAction, captureIncompleteOrder, placeOrderAction } from './actions'
 import { formatCount, formatMoney, isValidEmail, isValidPhone } from '@/lib/utils'
-import type { Region } from '@/lib/regions'
+import { COUNTRIES, type Region } from '@/lib/regions'
 /* الأنواع مشتركة مع الدفع السريع — نسخة تانية منها كانت هتفترق عند أول إضافة */
 import type { FieldMode, PaymentOption } from '@/lib/checkout-ui'
 export type { PaymentOption }
@@ -23,9 +23,33 @@ export type CheckoutConfig = {
   fieldArea: FieldMode
   fieldStreet: FieldMode
   fieldBuilding: FieldMode
+  fieldPostalCode: FieldMode
+  fieldCountry: FieldMode
   fieldNotes: FieldMode
   addressMode: 'structured' | 'simple' | 'hidden'
   showCouponField: boolean
+  /**
+   * قايمة طرق الدفع تبان ولا لأ.
+   *
+   * التاجر اللي عنده طريقة واحدة (دفع عند الاستلام مثلًا) قايمة من
+   * سطر واحد عنده مالهاش أي معنى — بتزوّد خطوة بصرية على شاشة كل
+   * عنصر زيادة فيها بيقلّل اللي بيكمّلوا.
+   */
+  showPaymentSelector: boolean
+  /** منتقي كود الدولة جنب الرقم — للمتاجر اللي بتبيع لأكتر من بلد */
+  showCountryCodePicker: boolean
+  /**
+   * الشيك أوت بيتكيّف مع محتوى السلة.
+   *
+   * سلة كلها منتجات رقمية مالهاش عنوان توصيل. وخانات العنوان فيها
+   * خطوات فاضية العميل بيملاها من غير سبب — وكل خانة زيادة بتقلّل
+   * اللي بيكمّلوا الطلب.
+   */
+  smartMode: boolean
+  /** توصيل، استلام من الفرع، أو الاتنين والعميل يختار */
+  deliveryMode: 'delivery_pickup' | 'delivery' | 'pickup'
+  /** فروع الاستلام — بتتعرض لما الاستلام متاح */
+  branches: Array<{ id: string; name: string; city: string | null; address: string | null }>
   otpEnabled: boolean
   minOrderEnabled: boolean
   minOrderAmount: number
@@ -78,7 +102,52 @@ export function CheckoutForm({
   const [area, setArea] = useState('')
   const [street, setStreet] = useState('')
   const [building, setBuilding] = useState('')
+  const [postalCode, setPostalCode] = useState('')
   const [notes, setNotes] = useState('')
+
+  /**
+   * التوصيل ولا الاستلام من الفرع.
+   *
+   * لما التاجر مفعّل الاتنين، الافتراضي التوصيل: هو الطلب الأغلب،
+   * والعميل اللي جاي يستلم بنفسه بيدوّر على الخيار ده أصلًا.
+   */
+  const [fulfillment, setFulfillment] = useState<'delivery' | 'pickup'>(
+    config.deliveryMode === 'pickup' ? 'pickup' : 'delivery',
+  )
+  const [branchId, setBranchId] = useState(config.branches[0]?.id ?? '')
+
+  /* الدولة — بتبان لما التاجر يفعّل الخانة، وإلا دولة المتجر */
+  const [orderCountry, setOrderCountry] = useState(country)
+
+  /* كود الدولة للرقم — بيبدأ بكود بلد المتجر */
+  const [dialCode, setDialCode] = useState(
+    COUNTRIES.find((c) => c.code === country)?.dial ?? '20',
+  )
+
+  /**
+   * الرقم كامل زي ما هيتبعت.
+   *
+   * لما المنتقي شغّال، الكود بيتلزق هنا — والعميل بيكتب رقمه المحلي زي
+   * ما هو حافظه. ومن غير المنتقي، الرقم بيروح زي ما هو والخادم بيطبّع
+   * على بلد المتجر زي الأول بالظبط.
+   */
+  const fullPhone = config.showCountryCodePicker
+    ? `+${dialCode}${phone.replace(/\D/g, '').replace(new RegExp(`^0+|^${dialCode}`), '')}`
+    : phone
+
+  const pickup = fulfillment === 'pickup'
+
+  /**
+   * السلة دي محتاجة عنوان أصلًا؟
+   *
+   * المنتج الرقمي بيتبعت على البريد، والخدمة بتتحجز بمعاد. سلة مالهاش
+   * ولا منتج مادي مالهاش عنوان توصيل — والوضع الذكي بيشيل الخانات
+   * دي بدل ما العميل يملاها من غير سبب.
+   */
+  const needsAddress =
+    !pickup &&
+    config.addressMode !== 'hidden' &&
+    (!config.smartMode || items.some((i) => (i.type ?? 'physical') === 'physical'))
 
   /**
    * الملاحظة اللي كتبها العميل في درج السلة بتتنقل هنا.
@@ -136,7 +205,8 @@ export function CheckoutForm({
   }, [draftKey])
 
   const baseShipping = freeOver !== null && subtotal >= freeOver ? 0 : (shippingByCity[city] ?? defaultShipping)
-  const shipping = coupon?.freeShipping ? 0 : baseShipping
+  /* الاستلام من الفرع مالوش شحن — والخادم بيحسبها بنفس الشرط */
+  const shipping = pickup || coupon?.freeShipping ? 0 : baseShipping
   const discount = coupon?.discount ?? 0
   const total = Math.max(0, subtotal - discount) + shipping
   const remainingForFree = freeOver !== null && subtotal < freeOver ? freeOver - subtotal : null
@@ -149,7 +219,7 @@ export function CheckoutForm({
       const res = await applyCouponAction({
         storeIdentifier,
         code,
-        phone: isValidPhone(phone) ? phone : undefined,
+        phone: isValidPhone(fullPhone) ? fullPhone : undefined,
         lines: items.map((i) => ({ productId: i.productId, quantity: i.quantity, variantId: i.variantId })),
       })
       if (res.ok) {
@@ -254,7 +324,7 @@ export function CheckoutForm({
       return
     }
 
-    if (!isValidPhone(phone)) {
+    if (!isValidPhone(fullPhone)) {
       setError('اكتب رقم تليفون صحيح')
       return
     }
@@ -292,13 +362,17 @@ export function CheckoutForm({
       const result = await placeOrderAction({
         storeIdentifier,
         name: name || undefined,
-        phone,
+        phone: fullPhone,
         email: email.trim(),
-        country,
-        city: city || undefined,
-        area: area || undefined,
-        street: street || undefined,
-        building: building || undefined,
+        country: orderCountry,
+        /* عنوان الاستلام مالوش لازمة — العميل جاي بنفسه */
+        city: pickup ? undefined : city || undefined,
+        area: pickup ? undefined : area || undefined,
+        street: pickup ? undefined : street || undefined,
+        building: pickup ? undefined : building || undefined,
+        postalCode: pickup ? undefined : postalCode || undefined,
+        fulfillment,
+        branchId: pickup ? branchId || undefined : undefined,
         notes: notes || undefined,
         paymentGateway: gateway,
         couponCode: coupon?.code || undefined,
@@ -392,14 +466,51 @@ export function CheckoutForm({
             <span className="text-sm font-medium">
               رقم التليفون <span className="text-red-500">*</span>
             </span>
-            <input
-              value={phone}
-              onChange={(e) => { setPhone(e.target.value); setTouchedContact(true) }}
-              inputMode="tel"
-              dir="ltr"
-              className={`${input} text-start`}
-              placeholder="01012345678"
-            />
+            {/*
+              منتقي كود الدولة.
+
+              مقفول افتراضيًا: التاجر اللي بيبيع في بلد واحدة، الكود
+              معروف والقايمة خطوة زيادة. واللي بيبيع لأكتر من بلد،
+              العميل من غيرها بيكتب رقمه بصيغة محلية والرقم بيتخزّن
+              غلط — فما نقدرش نكلّمه.
+
+              الكود بيتلزق قدام الرقم عند الإرسال لا في الخانة: العميل
+              بيكتب رقمه زي ما هو حافظه.
+            */}
+            {config.showCountryCodePicker ? (
+              <div className="flex gap-2">
+                <select
+                  value={dialCode}
+                  onChange={(e) => setDialCode(e.target.value)}
+                  aria-label="كود الدولة"
+                  dir="ltr"
+                  className={`${input} w-28 shrink-0 text-start`}
+                >
+                  {COUNTRIES.map((c) => (
+                    <option key={c.code} value={c.dial}>
+                      +{c.dial} {c.code}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  value={phone}
+                  onChange={(e) => { setPhone(e.target.value); setTouchedContact(true) }}
+                  inputMode="tel"
+                  dir="ltr"
+                  className={`${input} min-w-0 flex-1 text-start`}
+                  placeholder="1012345678"
+                />
+              </div>
+            ) : (
+              <input
+                value={phone}
+                onChange={(e) => { setPhone(e.target.value); setTouchedContact(true) }}
+                inputMode="tel"
+                dir="ltr"
+                className={`${input} text-start`}
+                placeholder="01012345678"
+              />
+            )}
             <span className="text-xs opacity-60">هنكلّمك عليه لتأكيد الطلب</span>
           </label>
 
@@ -427,9 +538,101 @@ export function CheckoutForm({
           </label>
         </section>
 
-        {config.addressMode !== 'hidden' && (
+        {/*
+          التوصيل ولا الاستلام.
+
+          بيبان لما التاجر مفعّل الاتنين بس. المتجر اللي بيوصّل وخلاص
+          ما يصحّش يشوف عميله سؤالًا مالوش غير إجابة واحدة.
+        */}
+        {config.deliveryMode === 'delivery_pickup' && (
+          <section className="flex flex-col gap-3">
+            <h2 className="font-bold">طريقة الاستلام</h2>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {(['delivery', 'pickup'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setFulfillment(mode)}
+                  aria-pressed={fulfillment === mode}
+                  className={`flex min-h-16 items-start gap-3 rounded-[var(--sf-radius)] border p-4 text-start transition-colors ${
+                    fulfillment === mode
+                      ? 'border-[var(--sf-primary)] bg-[var(--sf-primary)]/6'
+                      : 'border-[var(--sf-text)]/15'
+                  }`}
+                >
+                  {mode === 'delivery' ? (
+                    <Truck className="mt-0.5 h-5 w-5 shrink-0 text-[var(--sf-primary)]" aria-hidden="true" />
+                  ) : (
+                    <Store className="mt-0.5 h-5 w-5 shrink-0 text-[var(--sf-primary)]" aria-hidden="true" />
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-medium">
+                      {mode === 'delivery' ? 'توصيل لعندك' : 'أستلم من الفرع'}
+                    </span>
+                    <span className="mt-0.5 block text-sm opacity-65">
+                      {mode === 'delivery' ? 'بنوصّله للعنوان اللي تكتبه' : 'من غير مصاريف شحن'}
+                    </span>
+                  </span>
+                  {fulfillment === mode && (
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[var(--sf-primary)]" aria-hidden="true" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* الفرع اللي هيستلم منه — بيبان مع الاستلام بس */}
+        {pickup && config.branches.length > 0 && (
+          <section className="flex flex-col gap-3">
+            <h2 className="font-bold">تستلم من فين</h2>
+            {config.branches.length === 1 ? (
+              <p className="rounded-[var(--sf-radius)] border border-[var(--sf-text)]/15 p-4 text-sm leading-relaxed">
+                <span className="block font-medium">{config.branches[0].name}</span>
+                <span className="opacity-65">
+                  {[config.branches[0].city, config.branches[0].address].filter(Boolean).join(' — ')}
+                </span>
+              </p>
+            ) : (
+              <select value={branchId} onChange={(e) => setBranchId(e.target.value)} className={input}>
+                {config.branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {[b.name, b.city].filter(Boolean).join(' — ')}
+                  </option>
+                ))}
+              </select>
+            )}
+          </section>
+        )}
+
+        {needsAddress && (
           <section className="flex flex-col gap-4">
             <h2 className="font-bold">عنوان التوصيل</h2>
+
+            {/*
+              الدولة — للمتاجر اللي بتبيع لبرّه بلدها.
+
+              مقفولة افتراضيًا: أغلب التجّار بيبيعوا في بلد واحدة،
+              وقايمة دول على شاشة الطلب خطوة زيادة مالهاش لازمة.
+            */}
+            {show(config.fieldCountry) && (
+              <label className="flex flex-col gap-1.5">
+                <span className="text-sm font-medium">
+                  الدولة {req(config.fieldCountry) && <span className="text-red-500">*</span>}
+                </span>
+                <select
+                  value={orderCountry}
+                  onChange={(e) => setOrderCountry(e.target.value)}
+                  className={input}
+                >
+                  {COUNTRIES.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
 
             {config.addressMode === 'structured' && show(config.fieldCity) && (
               <label className="flex flex-col gap-1.5">
@@ -476,9 +679,39 @@ export function CheckoutForm({
                 <input value={building} onChange={(e) => setBuilding(e.target.value)} className={input} />
               </label>
             )}
+
+            {/*
+              الرمز البريدي — مقفول افتراضيًا.
+
+              شركات الشحن المحلية هنا بتمشي بالمحافظة والعنوان، والرمز
+              البريدي خانة أغلب العملاء ما بيحفظوهاش. التاجر اللي بيشحن
+              لبرّه بيحتاجها، وغيره لأ.
+            */}
+            {show(config.fieldPostalCode) && (
+              <label className="flex flex-col gap-1.5">
+                <span className="text-sm font-medium">
+                  الرمز البريدي {req(config.fieldPostalCode) && <span className="text-red-500">*</span>}
+                </span>
+                <input
+                  value={postalCode}
+                  onChange={(e) => setPostalCode(e.target.value)}
+                  inputMode="numeric"
+                  dir="ltr"
+                  className={`${input} text-start`}
+                  placeholder="11511"
+                />
+              </label>
+            )}
           </section>
         )}
 
+        {/*
+          قايمة طرق الدفع بتتخفي لما التاجر يقفلها.
+
+          الطريقة المختارة بتفضل أول واحدة في القايمة — الإخفاء بيشيل
+          الاختيار من قدام العميل، مش بيشيل الدفع نفسه.
+        */}
+        {config.showPaymentSelector && (
         <section className="flex flex-col gap-3">
           <h2 className="font-bold">طريقة الدفع</h2>
           {payments.map((p) => (
@@ -540,6 +773,7 @@ export function CheckoutForm({
             </button>
           ))}
         </section>
+        )}
 
         {show(config.fieldNotes) && (
           <label className="flex flex-col gap-1.5">

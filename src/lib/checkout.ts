@@ -3,6 +3,7 @@ import { and, eq, inArray } from 'drizzle-orm'
 import { db } from '@/db'
 import { carrierAccounts, checkoutSettings, paymentMethods, productOptions, productOptionValues, products, productVariants, shippingRates, shippingZones, stores } from '@/db/schema'
 import { applyBps } from './utils'
+import type { ProductType } from '@/db/schema'
 import { assignBucket, getRunningPriceExperiments, variantValue } from './experiments'
 import { paymentProvider } from './providers'
 import type { PaymentOption } from './checkout-ui'
@@ -41,6 +42,13 @@ export type PricedLine = {
   quantity: number
   total: number
   available: number | null
+  /**
+   * نوع المنتج — بيقرّر السلة دي محتاجة عنوان ولا لأ.
+   *
+   * الشيك أوت الذكي بيقرا منه: سلة كلها منتجات رقمية مالهاش عنوان
+   * توصيل، وخانات عنوان فاضية في نُصّها بتضيّع طلبات.
+   */
+  type: ProductType
 }
 
 export type Totals = {
@@ -129,6 +137,7 @@ export async function priceCart(
       stock: products.stock,
       trackInventory: products.trackInventory,
       status: products.status,
+      type: products.type,
     })
     .from(products)
     .where(and(eq(products.storeId, storeId), inArray(products.id, ids)))
@@ -271,6 +280,7 @@ export async function priceCart(
 
     priced.push({
       productId: p.id,
+      type: p.type,
       variantId: useVariant ? variant.id : null,
       name,
       productName: p.name,
@@ -417,8 +427,16 @@ export async function computeTotals(options: {
   discount?: number
   /** كوبون «شحن مجاني» بيصفّر الشحن بغض النظر عن حد الشحن المجاني */
   couponFreeShipping?: boolean
+  /**
+   * العميل هيستلم بنفسه من الفرع.
+   *
+   * الشحن بيبقى صفرًا **هنا** لا في الواجهة: الشاشة بتخفي الرقم،
+   * والخادم هو اللي بيحاسب. لو خفيناه فوق وبس، العميل يشوف «استلام من
+   * الفرع» ويتحاسب على شحن ما حصلش.
+   */
+  pickup?: boolean
 }): Promise<Totals> {
-  const { storeId, lines, country, city, paymentGateway, discount = 0, couponFreeShipping = false } = options
+  const { storeId, lines, country, city, paymentGateway, discount = 0, couponFreeShipping = false, pickup = false } = options
 
   const subtotal = lines.reduce((n, l) => n + l.total, 0)
   const costTotal = lines.reduce((n, l) => n + (l.costPrice ?? 0) * l.quantity, 0)
@@ -426,7 +444,7 @@ export async function computeTotals(options: {
   const ship = await shippingFor(storeId, country, city)
 
   const freeThreshold = ship.freeOver
-  const freeShippingApplied = couponFreeShipping || Boolean(freeThreshold && subtotal - discount >= freeThreshold)
+  const freeShippingApplied = pickup || couponFreeShipping || Boolean(freeThreshold && subtotal - discount >= freeThreshold)
   const shipping = freeShippingApplied ? 0 : ship.price
 
   // رسوم أو خصم طريقة الدفع
