@@ -10,10 +10,24 @@ import { Toaster } from '@/components/dashboard/toast'
 import { aiAllowed, getAiConfig, isAssistantReady, GEMINI_PRO_SLUG, GEMINI_SLUG } from '@/lib/ai/settings'
 import { publicStoreUrl } from '@/lib/domain'
 import { logoutAction } from '@/app/(auth)/actions'
+import { drainDueJobs } from '@/lib/job-tick'
 import { ExternalLink, LogOut } from 'lucide-react'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, store } = await getDashboardContext()
+
+  /*
+    سحب الطابور من حركة اللوحة كمان — **منتظَر مش مؤجّل**.
+
+    السحب كان معلّقًا على زيارات واجهة المتجر وحدها. والعميل اللي بيطلب
+    بيسيب الصفحة بعد الطلب على طول، فلما ييجي ميعاد المهمة (بعد دقيقة
+    أو اتنين) مبيبقاش فيه حد على المتجر يسحبها — والرسالة بتفضل واقفة
+    لحد ما زائر تاني يفتح صفحة.
+
+    والتاجر هو أكتر واحد بيفتح لوحته. فحركته بتغطّي الفجوة دي، وبتخلّي
+    الطلبات اللي اتعملت والمتجر ساكت تلاقي مين يسحبها.
+  */
+  await drainDueJobs()
 
 
 /*
