@@ -56,6 +56,24 @@ export async function verifyGeminiKeyAction(apiKey: string): Promise<VerifyState
   const key = apiKey.trim()
   if (!key) return { ok: false, error: 'الصق المفتاح الأول' }
 
+  /*
+    شكل المفتاح بيتفحص قبل ما نكلّم جوجل.
+
+    مفاتيح Google AI Studio كلها بتبدأ بـ`AIza`. واللي بيبدأ بـ`AQ.`
+    توكن OAuth من واجهة تانية خالص — جوجل بترفضه، بس بشكل بيتقرا عندنا
+    «مش مستجيبة» بعد تلات محاولات ومهلة كاملة.
+
+    فالتاجر بيقعد يجرّب ويستنّى ويقول «المفتاح تمام» — وهو فعلًا نسخ
+    حاجة من مكان غلط. السطر ده بيقولهاله في ثانية بدل ما يدوّر.
+  */
+  if (!key.startsWith('AIza')) {
+    return {
+      ok: false,
+      error:
+        'ده مش مفتاح Google AI Studio — مفاتيحه بتبدأ بـ AIza. خُش aistudio.google.com ← Get API key وانسخ اللي هناك.',
+    }
+  }
+
   const res = await verifyKey(key)
   if (!res.ok) return { ok: false, error: res.error.message }
 

@@ -306,4 +306,12 @@ export async function exportThemePlanAction(messageId: string): Promise<string |
   return JSON.stringify(call.args, null, 2)
 }
 
-export { checkContrast }
+/*
+  نفس قاعدة `recipient-actions`: الملف ده `'use server'`، وأي تصدير منه
+  مش دالة غير متزامنة بيسقّط **الوحدة كلها** — يعني كل أفعال الصفحة
+  بتموت قبل ما ينفّذ منها سطر واحد.
+
+  و`checkContrast` دالة عادية مكانها `lib/ai/theme-schema`، وكل اللي
+  محتاجها بيستوردها من هناك أصلًا. التصدير ده كان بيكرّرها ويكسر
+  الصفحة معاها.
+*/
