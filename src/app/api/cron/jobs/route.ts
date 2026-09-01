@@ -1,4 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
+import { eq } from 'drizzle-orm'
+import { db } from '@/db'
+import { platformSettings } from '@/db/schema'
 import { drainJobs, pruneJobs } from '@/lib/jobs'
 
 export const dynamic = 'force-dynamic'
@@ -17,16 +20,49 @@ export const maxDuration = 60
  * ورده بيقول بالظبط إيه اللي حصل (اتسحب كام، نجح كام، فشل كام) —
  * الرد الفاضي بيخلّي تشخيص «ليه التذكير ما اتبعتش» تخمينًا.
  */
+/**
+ * توكن المنبّه المتخزّن في قاعدة البيانات.
+ *
+ * ## ليه فيه توكن تاني غير `CRON_SECRET`
+ * المنبّه الزمني بيعيش **جوّه قاعدة البيانات** (`pg_cron`)، لأن الجدولة
+ * كل دقيقة مش متاحة على خطة الاستضافة. والمنبّه ده ما بيشوفش متغيّرات
+ * بيئة الاستضافة — فما يقدرش يبعت `CRON_SECRET`.
+ *
+ * فبيقرا توكنه من نفس القاعدة اللي هو عايش فيها. والمسار بيقبل الاتنين،
+ * فمنبّه الاستضافة ومنبّه القاعدة الاتنين يشتغلوا.
+ */
+async function dbToken(): Promise<string | null> {
+  try {
+    const [row] = await db
+      .select({ value: platformSettings.value })
+      .from(platformSettings)
+      .where(eq(platformSettings.key, 'jobs_cron_token'))
+      .limit(1)
+    return row?.value ?? null
+  } catch {
+    return null
+  }
+}
+
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET
+  const auth = req.headers.get('authorization')
 
-  if (secret) {
-    const auth = req.headers.get('authorization')
-    if (auth !== `Bearer ${secret}`) {
+  const fromHost = Boolean(secret) && auth === `Bearer ${secret}`
+  const token = await dbToken()
+  const fromDb = Boolean(token) && auth === `Bearer ${token}`
+
+  if (!fromHost && !fromDb) {
+    /*
+      مفيش سرّ ولا توكن أصلًا؟ ده إعداد ناقص لا محاولة دخول — بنقولها
+      بوضوح بدل «غير مصرّح» اللي بيخلّي التشخيص تخمينًا.
+    */
+    if (!secret && !token && process.env.NODE_ENV === 'production') {
+      return NextResponse.json({ error: 'مفيش سرّ للعامل — لا CRON_SECRET ولا توكن في القاعدة' }, { status: 503 })
+    }
+    if (secret || token) {
       return NextResponse.json({ error: 'غير مصرّح' }, { status: 401 })
     }
-  } else if (process.env.NODE_ENV === 'production') {
-    return NextResponse.json({ error: 'CRON_SECRET غير مضبوط' }, { status: 503 })
   }
 
   const summary = await drainJobs(40)

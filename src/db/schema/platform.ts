@@ -1,5 +1,5 @@
 import { pgTable, uuid, text, timestamp, index } from 'drizzle-orm/pg-core'
-import { createdAt, money } from './_shared'
+import { createdAt, money, updatedAt } from './_shared'
 import { stores, users, type PlanKey } from './tenancy'
 
 export type RequestStatus = 'pending' | 'approved' | 'rejected'
@@ -53,3 +53,16 @@ export const subscriptionRequests = pgTable(
     index('subscription_requests_store_idx').on(t.storeId, t.createdAt),
   ],
 )
+
+/**
+ * إعدادات على مستوى المنصة — مش لمتجر بعينه.
+ *
+ * أول ساكن فيها توكن تشغيل عامل الطابور. المنبّه الزمني بيعيش جوّه
+ * قاعدة البيانات (`pg_cron`)، وما بيشوفش متغيّرات بيئة الاستضافة —
+ * فالتوكن لازم يكون في مكان يقدر يقراه، وده هو.
+ */
+export const platformSettings = pgTable('platform_settings', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+  updatedAt: updatedAt(),
+})
