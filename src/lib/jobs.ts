@@ -1,5 +1,5 @@
 import 'server-only'
-import { and, asc, eq, lte, or, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, lte, or, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { jobQueue } from '@/db/schema'
 
@@ -99,7 +99,22 @@ async function claim(limit: number) {
     .set({ status: 'running', lockedAt: new Date(), attempts: sql`${jobQueue.attempts} + 1` })
     .where(
       and(
-        sql`${jobQueue.id} = any(${ids})`,
+        /*
+          `inArray` لا `any(${ids})` — **ودي كانت بتوقّع الطابور كله**.
+
+          الشكل القديم بيحطّ عناصر المصفوفة كبارامترات منفصلة، فبيتولّد
+          `any(($3, $4, $5))`. وده تعبير صف عند بوستجرس مش مصفوفة،
+          فبيرفض الاستعلام:
+
+              op ANY/ALL (array) requires array on right side  (42809)
+
+          يعني `claim` كانت **بترمي في كل نداء**، والطابور ما اتسحبش ولا
+          مرة من يوم ما اتكتب. والمهام كانت بتفضل `pending` بـ
+          `attempts: 0` — أثر بيقول «محدّش لمسني» لا «حاولت وفشلت».
+
+          والخطأ كان بيتبلع في `.catch` بتاعة النبضة، فمفيش حد شافه.
+        */
+        inArray(jobQueue.id, ids),
         // الشرط ده هو القفل: الصف اللي حد سبقنا عليه مش هيتحدّث
         or(eq(jobQueue.status, 'pending'), and(eq(jobQueue.status, 'running'), lte(jobQueue.lockedAt, deadLock))),
       ),
