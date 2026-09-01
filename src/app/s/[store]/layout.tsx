@@ -150,10 +150,25 @@ export default async function StorefrontLayout({
    */
   const storeLogo = custom.identity.logoLight ?? store.logoLight
 
+  /**
+   * روابط الهيدر.
+   *
+   * ## الأقسام مرة واحدة بس
+   * شريط الأقسام لما بيبقى شغّال بيعرض الأقسام كلها في سطر تحت
+   * الهيدر. وقايمة الهيدر كانت بتضيف أول أربعة كمان — فالقسم بيتكتب
+   * مرتين فوق بعض، والعميل بيشوف نفس الكلمة في سطرين ورا بعض.
+   *
+   * فالأقسام بتدخل القايمة **لما ما يكونش فيه شريط** بس: الشريط
+   * موجود عشانها، ووجوده بيغني عنها.
+   */
+  const showCategoriesBar = custom.header.showCategoriesBar && cats.length > 0
+
   const nav = [
     { label: 'الرئيسية', href: '/' },
     { label: 'كل المنتجات', href: '/products' },
-    ...cats.slice(0, 4).map((c) => ({ label: c.name, href: `/category/${c.slug}` })),
+    ...(showCategoriesBar
+      ? []
+      : cats.slice(0, 4).map((c) => ({ label: c.name, href: `/category/${c.slug}` }))),
   ]
 
   /**
@@ -245,6 +260,7 @@ export default async function StorefrontLayout({
 
           <StoreToolbar
             toolbar={custom.toolbar}
+            storeWhatsapp={store.whatsapp}
             bot={
               botReady
                 ? {

@@ -16,9 +16,21 @@ import { normalizePhone } from '@/lib/utils'
  */
 export function StoreToolbar({
   toolbar,
+  storeWhatsapp,
   bot,
 }: {
   toolbar: ToolbarSettings
+  /**
+   * رقم واتساب المتجر — **المصدر الأساسي للزر**.
+   *
+   * كان فيه رقمان لنفس الحاجة: واحد في بيانات المتجر وواحد في شريط
+   * الأدوات. التاجر بيمسح اللي في بيانات المتجر ويلاقي الزر لسه ظاهر،
+   * وما يعرفش إن فيه رقم تاني في شاشة تانية.
+   *
+   * دلوقتي رقم المتجر هو الأصل، ورقم الشريط بقى **تجاوز اختياري** لمن
+   * عايز الزر العائم يودّي على رقم غير رقم المتجر.
+   */
+  storeWhatsapp?: string | null
   /** مساعد المتجر — بيتحط فوق الواتساب لو مفعّل */
   bot?: { storeIdentifier: string; greeting: string; accent: string } | null
 }) {
@@ -43,8 +55,8 @@ export function StoreToolbar({
   const tgUser = (toolbar.telegramUsername || '').trim().replace(/^@+/, '')
   const tgHref = toolbar.telegramEnabled && tgUser ? `https://t.me/${tgUser}` : null
   const waHref =
-    toolbar.whatsappEnabled && toolbar.whatsappNumber
-      ? `https://wa.me/${normalizePhone(toolbar.whatsappNumber).replace(/[^\d]/g, '')}?text=${encodeURIComponent(
+    toolbar.whatsappEnabled && (toolbar.whatsappNumber || storeWhatsapp)
+      ? `https://wa.me/${normalizePhone(toolbar.whatsappNumber || storeWhatsapp || '').replace(/[^\d]/g, '')}?text=${encodeURIComponent(
           toolbar.whatsappMessage || '',
         )}`
       : null
@@ -67,7 +79,7 @@ export function StoreToolbar({
       }`}
       style={{
         display:
-          toolbar.whatsappEnabled || tgHref || toolbar.backToTop || bot ? undefined : 'none',
+          waHref || tgHref || toolbar.backToTop || bot ? undefined : 'none',
       }}
     >
       {toolbar.backToTop && (

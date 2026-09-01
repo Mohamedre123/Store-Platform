@@ -931,6 +931,17 @@ export function Panel({
                 value={s.background}
                 onChange={(v) => patch('preloader', { background: v })}
               />
+              <NumberField
+                label="عتامة الخلفية"
+                hint="أقل من ١٠٠ بتخلّي الصفحة تبان من ورا الشاشة بضبابية خفيفة — الانتقال بيبقى متّصل بدل ما يبقى حجب. الشكل والألوان زي ما هي."
+                value={s.backgroundOpacity ?? 92}
+                onChange={(v) =>
+                  patch('preloader', { backgroundOpacity: Math.min(100, Math.max(0, v)) })
+                }
+                min={0}
+                max={100}
+                suffix="%"
+              />
               <ColorField
                 label="لون الحركة"
                 hint="لون الحلقة أو النقاط. الشعار بيظهر بصورته."
@@ -1020,13 +1031,13 @@ export function Panel({
   const s = value.toolbar
   return (
     <>
-      <Group title="زر واتساب العائم">
+      <Group title="أزرار التواصل العائمة · واتساب وتيليجرام">
         <Toggle label="تشغيل الزر" checked={s.whatsappEnabled} onChange={(v) => patch('toolbar', { whatsappEnabled: v })} />
         {s.whatsappEnabled && (
           <>
             <TextField
-              label="رقم واتساب"
-              hint="بالصيغة الدولية بدون + وبدون مسافات. مثال: 201012345678"
+              label="رقم مختلف للزر (اختياري)"
+              hint="الزر بياخد رقم متجرك من إعدادات ← بيانات المتجر. سيب الخانة دي فاضية إلا لو عايز الزر يودّي على رقم تاني."
               value={s.whatsappNumber}
               onChange={(v) => patch('toolbar', { whatsappNumber: v })}
               placeholder="201012345678"

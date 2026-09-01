@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import type { PreloaderSettings } from '@/lib/customization'
+import { hexToRgba } from '@/lib/utils'
 
 /**
  * شاشة تحميل المتجر.
@@ -61,7 +62,20 @@ export function StorePreloader({
     <div
       aria-hidden="true"
       className="fixed inset-0 z-[100] flex items-center justify-center transition-opacity duration-400"
-      style={{ background: settings.background, opacity: hiding ? 0 : 1, pointerEvents: hiding ? 'none' : 'auto' }}
+      /*
+        الخلفية بشفافيتها، والضبابية معاها.
+
+        الشفافية لوحدها بتوري الصفحة وراها بوضوح كامل فالكلام بيتلخبط
+        مع الحلقة. الضبابية الخفيفة بتخلّي اللي ورا موجودًا كإحساس مش
+        كتفاصيل — وده اللي بيخلّي الانتقال متّصل بدل ما يبقى حجب.
+      */
+      style={{
+        background: hexToRgba(settings.background, settings.backgroundOpacity ?? 100),
+        backdropFilter: (settings.backgroundOpacity ?? 100) < 100 ? 'blur(6px)' : undefined,
+        WebkitBackdropFilter: (settings.backgroundOpacity ?? 100) < 100 ? 'blur(6px)' : undefined,
+        opacity: hiding ? 0 : 1,
+        pointerEvents: hiding ? 'none' : 'auto',
+      }}
     >
       {settings.style === 'logo' && logo ? (
         <div className="zawya-pulse relative h-20 w-20">

@@ -262,6 +262,15 @@ export type PreloaderSettings = {
   style: 'logo' | 'ring' | 'dots'
   background: string
   color: string
+  /**
+   * شفافية الخلفية — ٠ شفافة تمامًا و١٠٠ مصمتة.
+   *
+   * الخلفية المصمتة بتحجب الصفحة بالكامل، فالعميل بيقعد قدام لون
+   * واحد وحلقة بتلف من غير أي إحساس إن فيه حاجة بتتحمّل وراها.
+   * والشفافية بتخلّي الصفحة تبان من ورا اللوح، فالانتقال بيبقى
+   * متّصل — والشكل والألوان اللي التاجر اختارها زي ما هي.
+   */
+  backgroundOpacity?: number
 }
 
 /* ────────────────────────── الحركة ────────────────────────── */
@@ -437,6 +446,8 @@ export function defaultCustomization(theme: {
       style: 'logo',
       background: theme.palette.background,
       color: theme.palette.primary,
+      /* ٩٢٪ — بيحجب الزحمة وبيسيب إحساس إن الصفحة موجودة وراه */
+      backgroundOpacity: 92,
     },
     effects: {
       scroll: 'rise',

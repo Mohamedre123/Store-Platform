@@ -24,7 +24,30 @@ export type TelegramState = { ok?: boolean; error?: string; botName?: string } |
  * بدل ما يتحفظ ويفضل ساكت — والرد بيدّينا اسم البوت، فالتاجر يشوف
  * إنه ربط البوت الصح مش بوت تاني عنده.
  */
+/**
+ * أي انهيار جوّه بيرجع **رسالة** لا صفحة خطأ.
+ *
+ * الفعل اللي بيرمي بيوصل لحدود الخطأ في Next، والتاجر بيشوف «حصلت
+ * مشكلة مؤقتة» على صفحة كاملة — وبيفقد اللي كان بيكتبه ومش عارف كان
+ * غلط في التوكن ولا عطل عندنا.
+ *
+ * والسبب الحقيقي بيتسجّل على الخادم: الرسالة العامة للتاجر، والتفصيلة
+ * لينا.
+ */
+async function guard(fn: () => Promise<TelegramState>): Promise<TelegramState> {
+  try {
+    return await fn()
+  } catch (e) {
+    console.error('انهيار في ربط تيليجرام:', e)
+    return { error: 'حصلت مشكلة عندنا وإحنا بنحفظ. جرّب تاني، ولو تكرر كلّمنا.' }
+  }
+}
+
 export async function saveTelegramTokenAction(raw: unknown): Promise<TelegramState> {
+  return guard(() => saveTelegramToken(raw))
+}
+
+async function saveTelegramToken(raw: unknown): Promise<TelegramState> {
   const parsed = z.object({ token: z.string().trim().max(200) }).safeParse(raw)
   if (!parsed.success) return { error: 'بيانات ناقصة' }
 
@@ -92,6 +115,15 @@ export type ChatsState =
  * الأول بدل ما تقول «مفيش نتايج» وهو مش عارف يعمل إيه.
  */
 export async function listTelegramChatsAction(): Promise<ChatsState> {
+  try {
+    return await listTelegramChats()
+  } catch (e) {
+    console.error('انهيار في قراءة محادثات تيليجرام:', e)
+    return { ok: false, error: 'حصلت مشكلة عندنا. جرّب تاني.' }
+  }
+}
+
+async function listTelegramChats(): Promise<ChatsState> {
   const { store } = await getDashboardContext()
 
   const [row] = await db

@@ -172,6 +172,8 @@ async function withModelFallback<T>(
   apiKey: string,
   model: string,
   run: (model: string) => Promise<GeminiResult<T>>,
+  /** بيتنادى لما بديل ينجح — عشان يتحفظ ويبقى هو الأصل */
+  onWorkingModel?: (model: string) => void | Promise<void>,
 ): Promise<GeminiResult<T>> {
   /* موديل ثبت موته في الاستدعاء ده — ما نضيّعش عليه ١٥ ثانية تانية */
   const skipFirst = deadModels.has(model)
@@ -202,7 +204,21 @@ async function withModelFallback<T>(
     tried++
 
     const res = await run(candidate.id)
-    if (res.ok) return res
+    if (res.ok) {
+      /*
+        الموديل اللي اشتغل بيتسجّل على المتجر.
+
+        من غير كده كل رسالة بتدفع تمن الاكتشاف من الأول: الموديل الميت
+        بياخد ١٥ ثانية تعليق، وبعدها البديل. وذاكرة `deadModels` في
+        الاستدعاء بس — وعلى استضافة بلا خادم الاستدعاء بيموت بعد دقايق،
+        فكل عميل جديد بيبدأ من الصفر.
+
+        وبيتكتب هنا لا في الواجهة: البديل اتجرّب على الحقيقي ونجح فعلًا،
+        وده أقوى دليل من أي قايمة.
+      */
+      void onWorkingModel?.(candidate.id)
+      return res
+    }
     if (!isDeadModel(res.error)) return res
     deadModels.add(candidate.id)
   }
@@ -365,6 +381,8 @@ export type ChatMessage = { role: 'user' | 'model'; text: string }
 type GenerateInput = {
   apiKey: string
   model: string
+  /** بيتنادى لما بديل ينجح — عشان الموديل الشغّال يتحفظ على المتجر */
+  onWorkingModel?: (model: string) => void | Promise<void>
   system?: string
   messages: ChatMessage[]
   maxTokens?: number
@@ -372,7 +390,7 @@ type GenerateInput = {
 }
 
 export function generate(input: GenerateInput): Promise<GeminiResult<string>> {
-  return withModelFallback(input.apiKey, input.model, (model) => generateWith({ ...input, model }))
+  return withModelFallback(input.apiKey, input.model, (model) => generateWith({ ...input, model }), input.onWorkingModel)
 }
 
 async function generateWith(input: GenerateInput): Promise<GeminiResult<string>> {
@@ -607,6 +625,8 @@ function cleanHistory(messages: AgentMessage[]): Array<{ role: 'user' | 'model';
 type AgentTurnInput = {
   apiKey: string
   model: string
+  /** بيتنادى لما بديل ينجح — عشان الموديل الشغّال يتحفظ على المتجر */
+  onWorkingModel?: (model: string) => void | Promise<void>
   system: string
   messages: AgentMessage[]
   tools: ToolDef[]
@@ -614,7 +634,7 @@ type AgentTurnInput = {
 }
 
 export function agentTurn(input: AgentTurnInput): Promise<GeminiResult<AgentTurn>> {
-  return withModelFallback(input.apiKey, input.model, (model) => agentTurnWith({ ...input, model }))
+  return withModelFallback(input.apiKey, input.model, (model) => agentTurnWith({ ...input, model }), input.onWorkingModel)
 }
 
 async function agentTurnWith(input: AgentTurnInput): Promise<GeminiResult<AgentTurn>> {
