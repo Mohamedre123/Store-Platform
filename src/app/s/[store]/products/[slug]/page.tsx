@@ -34,6 +34,7 @@ import { SlotPicker } from '@/components/storefront/slot-picker'
 import type { QuickCheckoutSettings } from '@/components/storefront/quick-checkout'
 import { getCheckoutSettings, getDisplayShipping, listPaymentOptions } from '@/lib/checkout'
 import { regionsFor } from '@/lib/regions'
+import { otpDeliverable } from '@/lib/order-otp'
 
 export const dynamic = 'force-dynamic'
 
@@ -251,7 +252,8 @@ export default async function ProductPage({
             fieldArea: quickSettings?.fieldArea ?? 'optional',
             fieldStreet: quickSettings?.fieldStreet ?? 'required',
             fieldBuilding: quickSettings?.fieldBuilding ?? 'optional',
-            otpEnabled: quickSettings?.otpEnabled ?? false,
+            otpEnabled: quickSettings?.otpEnabled ?? true,
+            otpDeliverable: await otpDeliverable(store.id),
             minOrderEnabled: quickSettings?.minOrderEnabled ?? false,
             minOrderAmount: quickSettings?.minOrderAmount ?? 0,
             /*

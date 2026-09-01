@@ -58,7 +58,7 @@ export default async function CheckoutSettingsPage() {
     cartUpsellEnabled: row?.cartUpsellEnabled ?? true,
     minOrderEnabled: row?.minOrderEnabled ?? false,
     minOrderAmount: row?.minOrderAmount ?? 0,
-    otpEnabled: row?.otpEnabled ?? false,
+    otpEnabled: row?.otpEnabled ?? true,
     captureIncompleteOrders: row?.captureIncompleteOrders ?? true,
     autoConfirmEnabled: row?.autoConfirmEnabled ?? true,
     autoConfirmDelay: row?.autoConfirmDelay ?? 5,

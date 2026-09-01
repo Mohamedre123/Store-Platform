@@ -4,6 +4,7 @@ import { getCurrentCustomer } from '@/lib/customer-auth'
 import { CustomerLoginForm } from '../account/login-form'
 import { getCheckoutSettings, getDisplayShipping, listPaymentOptions } from '@/lib/checkout'
 import { regionsFor } from '@/lib/regions'
+import { otpDeliverable } from '@/lib/order-otp'
 import { CheckoutForm } from './checkout-form'
 import { EmptyCart } from './empty-cart'
 import { ResumeCart } from './resume-cart'
@@ -112,7 +113,7 @@ export default async function CheckoutPage({
               fieldNotes: settings?.fieldNotes ?? 'optional',
               addressMode: settings?.addressMode ?? 'structured',
               showCouponField: settings?.showCouponField ?? true,
-              otpEnabled: settings?.otpEnabled ?? false,
+              otpEnabled: (settings?.otpEnabled ?? true) && (await otpDeliverable(store.id)),
               minOrderEnabled: settings?.minOrderEnabled ?? false,
               minOrderAmount: settings?.minOrderAmount ?? 0,
               captureIncomplete: settings?.captureIncompleteOrders ?? true,

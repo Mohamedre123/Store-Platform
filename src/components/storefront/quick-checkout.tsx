@@ -31,10 +31,14 @@ import type { Region } from '@/lib/regions'
  * `inline` بيفتح لوحة تحت الزرار، و`drawer` بيفتح درجًا من الجنب،
  * و«عرض المنتجات» بيقرّر يبان ملخّص الطلب ولا لأ.
  *
- * ## والضيف بيتحوّل للشيك أوت
- * الطلب لازم يكون ليه صاحب مسجّل — الخادم بيرفض غير كده أصلًا. فبدل
- * ما نوريه نموذجًا هيترفض في آخره، بنضيف المنتج لسلّته ونوصّله لشاشة
- * الدخول على طول.
+ * ## من غير تسجيل دخول
+ * الضيف بيكمّل من هنا على طول — ده نص الفايدة. شاشة دخول في نُصّ
+ * مسار اتعمل عشان يقصّر الطريق بتلغي السبب اللي اتعمل عشانه.
+ *
+ * واللي الدخول كان بيحميه، **رمز التحقق بيحميه**: الاتنين بيثبتوا إن
+ * اللي بيطلب بيملك الرقم أو البريد. عشان كده الرمز إجباري على الضيف
+ * هنا مهما كان إعداد التاجر — والخادم بيفرضه بنفس الشرط، فمفيش زرار
+ * يعدّي حاجة الخادم رافضها.
  */
 
 export type QuickItem = {
@@ -63,7 +67,16 @@ export type QuickCheckoutSettings = {
   fieldArea: FieldMode
   fieldStreet: FieldMode
   fieldBuilding: FieldMode
+  /** التاجر مشغّل التحقق؟ — الضيف بياخده على أي حال */
   otpEnabled: boolean
+  /**
+   * فيه أصلًا طريق يوصّل الرمز؟
+   *
+   * المتجر اللي مالوش واتساب والبريد عنده مش مضبوط ما ينفعش يتطلب
+   * رمزًا — الشاشة هتفتح نافذة على رمز عمره ما هييجي، والعميل يقف.
+   * الخادم بيسأل نفس السؤال، فالاتنين بيقرّروا نفس الحاجة.
+   */
+  otpDeliverable: boolean
   minOrderEnabled: boolean
   minOrderAmount: number
   /** بيانات الحساب الداخل — `null` معناها ضيف */
@@ -81,33 +94,15 @@ export function QuickCheckout({
   soldOut: boolean
   settings: QuickCheckoutSettings
 }) {
-  const { add } = useCart()
-  const router = useRouter()
-  const href = useStoreHref()
   const [open, setOpen] = useState(false)
 
   if (soldOut) return null
-
-  function start() {
-    /*
-      الضيف بياخد المنتج معاه لشاشة الدخول.
-
-      `silent` عشان الدرج ما يفتحش فوق التحويل — العميل رايح يسجّل
-      دخوله، ودرج سلة بيقع في وشّه في اللحظة دي بيلغّبه.
-    */
-    if (!settings.account) {
-      add(item, quantity, true)
-      router.push(href('/checkout'))
-      return
-    }
-    setOpen(true)
-  }
 
   return (
     <>
       <button
         type="button"
-        onClick={start}
+        onClick={() => setOpen(true)}
         className="flex min-h-13 w-full items-center justify-center gap-2 rounded-[var(--sf-radius)] border-2 border-[var(--sf-primary)] px-6 font-semibold text-[var(--sf-primary)] transition-colors hover:bg-[var(--sf-primary)]/8"
       >
         <Zap className="h-5 w-5" aria-hidden="true" />
@@ -214,6 +209,9 @@ function QuickForm({
   const selectedOnline = settings.payments.find((p) => p.gateway === gateway)?.online ?? false
   const structured = settings.addressMode === 'structured'
 
+  /* نفس شرط الخادم بالحرف — الاختلاف بينهم معناه زرار بيوعد بحاجة مرفوضة */
+  const needsOtp = settings.otpDeliverable && (settings.otpEnabled || !account)
+
   function submit() {
     setError(null)
 
@@ -238,8 +236,13 @@ function QuickForm({
       return
     }
 
-    /* نفس قاعدة الشيك أوت: التحقق جوّه التأكيد لا خطوة جنبه */
-    if (settings.otpEnabled && !otpVerified) {
+    /*
+      التحقق جوّه التأكيد لا خطوة جنبه — ونفس شرط الخادم بالحرف.
+
+      الضيف بياخده مهما كان إعداد التاجر: هو الوحيد اللي ما عدّاش على
+      شاشة دخول، والرمز هو اللي بيثبت إنه بيملك الرقم اللي بيطلب بيه.
+    */
+    if (needsOtp && !otpVerified) {
       setOtpOpen(true)
       return
     }

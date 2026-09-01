@@ -28,7 +28,7 @@ import {
 } from '@/lib/store-emails'
 import { dashboardUrl, publicStoreUrl } from '@/lib/domain'
 import { validateCoupon, recordCouponUse } from '@/lib/coupons'
-import { issueOrderOtp, isPhoneVerifiedForOrder, verifyOrderOtp } from '@/lib/order-otp'
+import { issueOrderOtp, isPhoneVerifiedForOrder, otpDeliverable, verifyOrderOtp } from '@/lib/order-otp'
 import { computeOfferDiscount, getActiveOffers } from '@/lib/offers'
 import { findAffiliateByCode, recordAffiliateConversion } from '@/lib/affiliates'
 import { dispatchWebhook } from '@/lib/webhooks'
@@ -423,6 +423,62 @@ export async function placeOrderAction(raw: unknown): Promise<PlaceOrderState> {
   }
 }
 
+/**
+ * صف العميل بتاع الضيف — بيتلاقى أو بيتعمل.
+ *
+ * ## الترتيب: الرقم، وبعدين البريد، وبعدين واحد جديد
+ * الرقم هو هوية الطلب — بيه بيتكلّم التاجر وبيه بيوصل التأكيد. والبريد
+ * بعده لأن العميل ممكن يكون طلب قبل كده وسجّل بريده بس.
+ *
+ * ## والإدراج برقمه بس
+ * الجدول عليه فهرسان فريدان — `(store_id, phone)` و`(store_id, email)`.
+ * لو كتبنا الاتنين مع بعض، بريد مسجّل على عميل تاني (بريد العيلة، أو
+ * حساب قديم) كان بيرمي ٢٣٥٠٥ ويسقّط الطلب كله. البريد بيتربط بعدين في
+ * `rememberContact` — وهي بتتأكد إنه فاضي قبل ما تكتبه وبتسكت لو لأ.
+ *
+ * ## والقراية تاني بعد التعارض
+ * طلبين من نفس الرقم في نفس اللحظة: واحد بيدرج والتاني بيقع على
+ * التعارض ويرجع بلا صف. القراية بعده بتجيب اللي الأول عمله.
+ */
+async function ensureGuestCustomer(
+  storeId: string,
+  phone: string,
+  email: string,
+  name?: string,
+): Promise<string> {
+  const byPhone = await db
+    .select({ id: customers.id })
+    .from(customers)
+    .where(and(eq(customers.storeId, storeId), eq(customers.phone, phone)))
+    .limit(1)
+  if (byPhone[0]) return byPhone[0].id
+
+  if (email) {
+    const byEmail = await db
+      .select({ id: customers.id })
+      .from(customers)
+      .where(and(eq(customers.storeId, storeId), eq(customers.email, email)))
+      .limit(1)
+    if (byEmail[0]) return byEmail[0].id
+  }
+
+  const created = await db
+    .insert(customers)
+    .values({ storeId, phone, name: name || null })
+    .onConflictDoNothing()
+    .returning({ id: customers.id })
+  if (created[0]) return created[0].id
+
+  const again = await db
+    .select({ id: customers.id })
+    .from(customers)
+    .where(and(eq(customers.storeId, storeId), eq(customers.phone, phone)))
+    .limit(1)
+  if (again[0]) return again[0].id
+
+  throw new Error('ما قدرناش نجهّز صف العميل للطلب')
+}
+
 async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
   const parsed = orderSchema.safeParse(raw)
   if (!parsed.success) {
@@ -461,7 +517,25 @@ async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
    * ده حد يقدر يعمل طلبات باسم أرقام مش بتاعته.
    */
   const account = await getCurrentCustomer(store.id)
-  if (!account) {
+
+  /**
+   * الدفع السريع بيمشي من غير تسجيل دخول.
+   *
+   * ## ليه الفرق بينه وبين الشيك أوت الكامل
+   * الدفع السريع سبب وجوده إنه يقصّر الطريق: العميل جه على منتج واحد
+   * من إعلان، وكل شاشة زيادة بينزل منها ناس. شاشة دخول في نُصّه بتلغي
+   * الفايدة اللي اتعمل عشانها.
+   *
+   * والشيك أوت الكامل بيفضل بالدخول: العميل اللي ملا سلّة ووصل هناك
+   * قطع الطريق خلاص، والحساب بيخلّيه يتابع طلبه ويشوف اللي فات.
+   *
+   * ## واللي الدخول كان بيحميه، الرمز بيحميه
+   * الدخول كان بيتأكّد إن اللي بيطلب بيملك الرقم أو البريد — رمز
+   * التحقق بيعمل نفس الحاجة بالظبط وبخطوة أقل. عشان كده الرمز
+   * **إجباري على الضيف** تحت، مهما كان إعداد التاجر.
+   */
+  const guest = !account && input.source === 'quick_checkout'
+  if (!account && !guest) {
     return { ok: false, error: 'لازم تسجّل دخول الأول عشان طلبك يتحفظ في حسابك' }
   }
 
@@ -527,12 +601,44 @@ async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
    * ويتخطّى الخطوة كلها. هنا بنسأل قاعدة البيانات: الرقم ده اتحقّق
    * منه فعلًا خلال آخر نص ساعة ولا لأ.
    */
-  if (settings?.otpEnabled) {
+  /*
+    الضيف لازم يتحقّق مهما كان إعداد التاجر.
+
+    هو الوحيد اللي ما عدّاش على شاشة دخول، فالرمز هو الحاجة الوحيدة
+    اللي بتثبت إنه بيملك الرقم أو البريد اللي بيطلب بيهم. تاجر قافل
+    التحقق ما يصحّش يفتح الباب لطلبات وهمية من غير أي إثبات.
+
+    والفحص كله بيتخطّى لما مفيش طريق يوصّل الرمز أصلًا: المتجر اللي
+    مالوش واتساب والبريد عنده مش مضبوط كان هيقف عن البيع تمامًا.
+    `otpDeliverable` هي نفسها اللي الواجهة بتسألها، فالشاشة والخادم
+    بيقرّروا نفس الحاجة.
+  */
+  /*
+    `?? true` لا `?.otpEnabled` وبس: المتجر اللي اتعمل قبل ما جدول
+    الإعدادات يتضاف مالوش صف، فالقيمة بترجع `undefined` — والخادم كان
+    هيقراها «مقفول» والواجهة «مفتوح». العميل ساعتها بياخد نافذة رمز
+    والخادم مش طالبه، وأي فرق زي ده بيبان للعميل عطلًا.
+  */
+  if (((settings?.otpEnabled ?? true) || guest) && (await otpDeliverable(store.id))) {
     const verified = await isPhoneVerifiedForOrder(store.id, phone)
     if (!verified) {
       return { ok: false, error: 'لازم تتحقق من رقمك الأول' }
     }
   }
+
+  /**
+   * صاحب الطلب.
+   *
+   * الحساب اللي داخل لو فيه واحد. والضيف بياخد صف عميل بيتلاقى برقمه
+   * أو بيتعمل له — عشان الطلب يبقى ليه صاحب في كل الحالات: الولاء
+   * والإحصاءات وصفحة العملاء كلهم بيقروا `customer_id`، ولو سيبناه
+   * فاضي كان الضيف هيختفي من نص اللوحة.
+   *
+   * **بره المعاملة عن قصد**: لو الطلب وقع بعدها، بيفضل صف عميل بلا
+   * طلبات — وده مالوش أي ضرر. أما لو عملناه جوّه، أي رجوع للمعاملة
+   * كان هيمسحه ويخلّي `rememberContact` بعدها تكتب على العدم.
+   */
+  const buyerId = account?.id ?? (await ensureGuestCustomer(store.id, phone, input.email, input.name))
 
   const result = await db.transaction(async (tx) => {
     /**
@@ -556,12 +662,22 @@ async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
     await tx
       .update(customers)
       .set({
-        name: input.name || undefined,
+        /*
+          الضيف بيملا الاسم الفاضي بس، ما بيكتبش فوق اسم موجود.
+
+          صف العميل بيتلاقى بالرقم، والضيف ما عدّاش على شاشة دخول —
+          فاللي بيكتب رقم حد تاني كان يقدر يغيّر اسمه في لوحة التاجر.
+          الحساب اللي داخل غير كده: هو صاحب الصف فعلًا، وتعديل اسمه
+          حقّه.
+        */
+        name: guest
+          ? sql`coalesce(${customers.name}, ${input.name || null})`
+          : input.name || undefined,
         lastOrderAt: new Date(),
       })
-      .where(and(eq(customers.id, account.id), eq(customers.storeId, store.id)))
+      .where(and(eq(customers.id, buyerId), eq(customers.storeId, store.id)))
 
-    const customer = { id: account.id }
+    const customer = { id: buyerId }
 
     /**
      * لو العميل كان بيكتب واتحفظله طلب ناقص، بنكمّله بدل ما ننشئ
@@ -951,7 +1067,7 @@ async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
       يكون فيه بريد. تجاهله معناه إننا عندنا عنوان العميل وبنمتنع
       عن إرسال فاتورته.
     */
-    fallbackEmail: account.email,
+    fallbackEmail: account?.email ?? input.email,
     invoiceUrl,
     }).catch((e) => console.error('فشل إرسال بريد الطلب:', e)),
   )
