@@ -28,3 +28,43 @@ CREATE TABLE IF NOT EXISTS "platform_settings" (
   "value" text NOT NULL,
   "updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
+
+/*
+  ── المنبّه الزمني جوّه قاعدة البيانات ──
+
+  التوكن نفسه بيتولّد مرة واحدة وبيتخزّن في الجدول فوق (مش مكتوب هنا
+  عشان ما يتسرّبش في المستودع):
+
+      insert into platform_settings (key, value)
+      values ('jobs_cron_token', <توكن عشوائي ٣٢ بايت>)
+      on conflict (key) do update set value = excluded.value;
+
+  وبعدها الامتدادات والجدولة. `pg_net` بيقرا التوكن من الجدول وقت
+  التنفيذ، فتغييره بيسري على طول من غير إعادة جدولة.
+*/
+
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+--> statement-breakpoint
+CREATE EXTENSION IF NOT EXISTS pg_net;
+--> statement-breakpoint
+
+/*
+  كل دقيقة. لو المهمة موجودة بنفس الاسم، `cron.schedule` بتستبدلها —
+  فتنفيذه تاني ما بيعملش نسخة تانية.
+
+  والعنوان لازم يكون المضيف اللي **مش بيحوّل**: التحويل بيسقّط ترويسة
+  التصريح، والعامل بيرد ٤٠١ من غير ما ينفّذ حاجة.
+*/
+SELECT cron.schedule(
+  'zawya_jobs_worker',
+  '* * * * *',
+  $CRON$
+    select net.http_get(
+      url := 'https://www.zawyaeg.site/api/cron/jobs',
+      headers := jsonb_build_object(
+        'Authorization',
+        'Bearer ' || (select value from platform_settings where key = 'jobs_cron_token')
+      )
+    )
+  $CRON$
+);
