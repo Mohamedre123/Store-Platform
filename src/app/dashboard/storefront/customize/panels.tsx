@@ -271,14 +271,16 @@ export function Panel({
             <Choice
               label="الارتفاع"
               value={s.height}
+              hint="«على مقاس الصورة» بيخلّي البانر ياخد أبعاد الصورة زي ما هي من غير أي قص — استعمله لو رافع بانرًا جاهزًا مش متصمّم على مقاسنا."
               options={[
                 { value: 'sm', label: 'قصير' },
                 { value: 'md', label: 'متوسط' },
                 { value: 'lg', label: 'طويل' },
                 { value: 'full', label: 'ملء الشاشة' },
+                { value: 'auto', label: 'على مقاس الصورة' },
               ]}
               onChange={(v) => patch('hero', { height: v })}
-              columns={4}
+              columns={3}
             />
           )}
         </Group>
@@ -378,6 +380,17 @@ export function Panel({
                           { value: 'glass', label: 'زجاجي' },
                         ]}
                         onChange={(v) => setSlide(slide.id, { ctaStyle: v })}
+                        columns={2}
+                      />
+                      <Choice
+                        label="زوايا الزر"
+                        value={slide.ctaShape ?? 'default'}
+                        options={[
+                          { value: 'default', label: 'زوايا المتجر' },
+                          { value: 'pill', label: 'كبسولة' },
+                        ]}
+                        onChange={(v) => setSlide(slide.id, { ctaShape: v })}
+                        columns={2}
                       />
                       {/*
                         لون الخلفية بيختفي مع الزجاجي: شفافيته هي اللي
@@ -417,6 +430,22 @@ export function Panel({
                     max={80}
                     suffix="%"
                   />
+
+                  <TextField
+                    label="سطر فوق العنوان"
+                    hint="اسم متجرك، تصنيف، موسم — أي حاجة. بيتكتب صغير ومتباعد فوق العنوان. سيبه فاضي لو مش عايزه."
+                    value={slide.eyebrow ?? ''}
+                    onChange={(v) => setSlide(slide.id, { eyebrow: v })}
+                    placeholder="ATLAS STORE"
+                  />
+
+                  {(slide.eyebrow ?? '').trim() && (
+                    <ColorField
+                      label="لون السطر ده"
+                      value={slide.eyebrowColor ?? slide.textColor ?? '#ffffff'}
+                      onChange={(v) => setSlide(slide.id, { eyebrowColor: v })}
+                    />
+                  )}
 
                   <Choice
                     label="حجم العنوان"
@@ -508,6 +537,17 @@ export function Panel({
                         min={0}
                         max={90}
                         suffix="%"
+                      />
+                      <Choice
+                        label="اللوح يشتغل فين"
+                        hint="اللوح المظبوط على شاشة عريضة بيبقى مربّعًا تقيلًا على الفون بيغطّي نص الصورة — والعكس. شغّله على اللي يناسبه."
+                        value={slide.panelScope ?? 'both'}
+                        options={[
+                          { value: 'both', label: 'الاتنين' },
+                          { value: 'mobile', label: 'الفون بس' },
+                          { value: 'desktop', label: 'الكمبيوتر بس' },
+                        ]}
+                        onChange={(v) => setSlide(slide.id, { panelScope: v })}
                       />
                     </>
                   )}

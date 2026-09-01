@@ -9,6 +9,7 @@ import {
   mergeCustomization,
   type Customization,
   type HeroSlide,
+  type HeroSettings,
   type PanelKey,
 } from './customization'
 import type { SortKey } from './sort-options'
@@ -109,8 +110,8 @@ export const getStore = cache(async (identifier: string): Promise<StorefrontStor
  * الواحدة بتمنع الفرق ده من الأساس.
  */
 export type HeroDraft = {
-  style?: 'fullbleed' | 'boxed' | 'split' | 'stacked' | 'none'
-  height?: 'sm' | 'md' | 'lg' | 'full'
+  style?: HeroSettings['style']
+  height?: HeroSettings['height']
   autoplay?: boolean
   intervalSeconds?: number
   slides?: HeroSlide[]

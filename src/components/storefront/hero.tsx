@@ -68,7 +68,8 @@ export function Hero({
 
   if (style === 'none') return null
 
-  const height = HEIGHTS[hero?.height ?? 'md']
+  /* `auto` مالهاش ارتفاع ثابت — الصورة هي اللي بتحدّده */
+  const height = HEIGHTS[(hero?.height ?? 'md') as keyof typeof HEIGHTS] ?? HEIGHTS.md
   const active = slides[index]
   const hasImage = Boolean(active?.imageDesktop || active?.imageMobile)
 
@@ -137,6 +138,49 @@ export function Hero({
   const titleFamily =
     active?.titleFont === 'body' ? 'var(--sf-font-body)' : 'var(--sf-font-heading)'
 
+  /**
+   * اللوح الزجاجي — بـCSS مولّد لا بأنماط مكتوبة على العنصر.
+   *
+   * ## ليه
+   * التاجر بيقدر يشغّل اللوح على الفون بس أو الكمبيوتر بس. والأنماط
+   * المكتوبة على العنصر مالهاش استعلام وسائط — يعني الفصل ده مستحيل
+   * بيها. البديل كان نرسم العنصر مرتين (واحد للفون وواحد للكمبيوتر)،
+   * وساعتها العنوان بيتكرر في الصفحة مرتين ومحرّكات البحث بتقراه كده.
+   *
+   * فبنولّد قاعدة CSS باسم فريد للشريحة، ونلفّها في استعلام الوسائط
+   * المناسب. عنصر واحد، وسلوك مختلف لكل شاشة.
+   *
+   * ## والقيم آمنة
+   * كلها مولّدة عندنا: `hexToRgba` بترجّع أرقامًا، والضبابية رقم
+   * محصور، والباقي ثوابت مكتوبة هنا. واسم الصنف بيتنضّف من أي حرف
+   * برّه الحروف والأرقام — فمفيش أي نص من التاجر بيوصل للـCSS زي ما هو.
+   */
+  const panelId = (active?.id ?? 'x').replace(/[^a-zA-Z0-9_-]/g, '') || 'x'
+  const panelClass = `zw-hero-panel-${panelId}`
+
+  const panelRules = [
+    `backdrop-filter:blur(${blur}px)`,
+    `-webkit-backdrop-filter:blur(${blur}px)`,
+    `background:${hexToRgba(active?.panelTint || '#000000', active?.panelOpacity ?? 28)}`,
+    /* حدّ فاتح وظل — بيخلّوه يبان لوحًا قاعد فوق الصورة مش بقعة فيها */
+    'border:1px solid rgba(255,255,255,0.16)',
+    'box-shadow:0 8px 32px rgba(0,0,0,0.18)',
+    /* مساحة أوسع جوّه اللوح — الكلام المزنوق في حوافه بيبان مضغوطًا */
+    'padding:1.75rem 2rem',
+  ].join(';')
+
+  const scope = active?.panelScope ?? 'both'
+  const panelCss =
+    blur > 0
+      ? scope === 'mobile'
+        ? `@media (max-width:639.98px){.${panelClass}{${panelRules}}}`
+        : scope === 'desktop'
+          ? `@media (min-width:640px){.${panelClass}{${panelRules}}}`
+          : `.${panelClass}{${panelRules}}`
+      : ''
+
+  const eyebrow = active?.eyebrow?.trim() ?? ''
+
   const align =
     active?.textPosition === 'center'
       ? 'items-center text-center'
@@ -156,10 +200,13 @@ export function Hero({
    */
   const glassCta = active?.ctaStyle === 'glass'
 
+  /* الكبسولة شكل الأزرار في البانرات الجاهزة — وبتبان أنضف فوق صورة */
+  const ctaRadius = active?.ctaShape === 'pill' ? 'rounded-full' : 'rounded-[var(--sf-radius)]'
+
   const cta = (
     <Link
       href={ctaUrl}
-      className="mt-2 inline-flex min-h-12 items-center gap-2 rounded-[var(--sf-radius)] px-6 font-semibold shadow-sm transition-opacity hover:opacity-90"
+      className={`inline-flex min-h-12 items-center gap-2 ${ctaRadius} px-7 font-semibold shadow-sm transition-opacity hover:opacity-90`}
       style={
         glassCta
           ? {
@@ -226,13 +273,46 @@ export function Hero({
     )
   }
 
-  const inner = (
-    <div
-      className={`relative flex ${height} flex-col justify-center gap-4 overflow-hidden px-6 py-14 sm:px-10 ${align} ${
-        style === 'boxed' || style === 'stacked' ? 'rounded-[var(--sf-radius)]' : ''
-      }`}
-      style={{ background: 'var(--sf-primary)' }}
-    >
+  /**
+   * وضع «على مقاس الصورة».
+   *
+   * الصورة بتتعرض في مجرى الصفحة (`h-auto`) لا كطبقة مالية للكادر،
+   * فارتفاع البانر بيطلع من الصورة نفسها ومفيش أي قص. والكلام بيتحط
+   * فوقها بالمطلق بدل ما يزقّها.
+   *
+   * `width={0} height={0}` مع `sizes` هي الطريقة اللي Next بيوفّرها
+   * للصورة اللي مقاسها مش معروف وقت البناء — بيسيب المتصفح يحسبه من
+   * الصورة نفسها بعد ما تنزل.
+   */
+  const autoSize = hero?.height === 'auto'
+
+  const media = autoSize ? (
+    <>
+      {active?.imageDesktop && (
+        <Image
+          src={active.imageDesktop}
+          alt=""
+          width={0}
+          height={0}
+          priority
+          sizes="100vw"
+          className="hidden h-auto w-full sm:block"
+        />
+      )}
+      {(active?.imageMobile || active?.imageDesktop) && (
+        <Image
+          src={active.imageMobile || active.imageDesktop!}
+          alt=""
+          width={0}
+          height={0}
+          priority
+          sizes="100vw"
+          className="h-auto w-full sm:hidden"
+        />
+      )}
+    </>
+  ) : (
+    <>
       {active?.imageDesktop && (
         <Image
           src={active.imageDesktop}
@@ -253,6 +333,20 @@ export function Hero({
           className="object-cover sm:hidden"
         />
       )}
+    </>
+  )
+
+  const inner = (
+    <div
+      className={`relative overflow-hidden ${
+        autoSize
+          ? ''
+          : `flex ${height} flex-col justify-center px-6 py-14 sm:px-10 ${align}`
+      } ${style === 'boxed' || style === 'stacked' ? 'rounded-[var(--sf-radius)]' : ''}`}
+      style={{ background: 'var(--sf-primary)' }}
+    >
+      {panelCss && <style dangerouslySetInnerHTML={{ __html: panelCss }} />}
+      {media}
 
       {/* التعتيم بيشتغل للزر زي النص — الزر الأبيض على صورة فاتحة بيختفي */}
       {hasImage && (showText || showCta) && (
@@ -264,53 +358,49 @@ export function Hero({
       )}
 
       {(showText || showCta) && (
-        <div className={`relative z-10 mx-auto flex w-full max-w-6xl flex-col gap-4 ${align}`}>
+        <div
+          className={`z-10 mx-auto flex w-full max-w-6xl flex-col ${align} ${
+            autoSize
+              ? 'absolute inset-0 justify-center px-6 py-10 sm:px-10'
+              : 'relative'
+          }`}
+        >
           {/*
             حدّ العرض على الكلام في الحالتين — باللوح ومن غيره.
 
             كان على الوصف وحده (`max-w-lg`)، فالعنوان الطويل بيمتد على
             عرض البانر كله والوصف تحته نُصّه — وشكلهم مايوصلش لبعض.
           */}
-          <div
-            className={`flex max-w-[34rem] flex-col gap-4 rounded-[var(--sf-radius)] ${align}`}
-            style={
-              blur > 0
-                ? {
-                    /*
-                      الضبابية خلف النص والزر بس، مش على الصورة كلها:
-                      كده الزر يبان والصورة تفضل واضحة — الضبابية على
-                      الصورة كلها بتضيّع اللي التاجر رفعها عشانه.
-                    */
-                    backdropFilter: `blur(${blur}px)`,
-                    WebkitBackdropFilter: `blur(${blur}px)`,
-                    /*
-                      طبقة خفيفة مع الضبابية.
-                      الضبابية وحدها بتبان باهتة فوق صورة هادية —
-                      الطبقة بتدّي النص أرضية يقف عليها.
-                    */
-                    background: hexToRgba(active?.panelTint || '#000000', active?.panelOpacity ?? 28),
-                    /*
-                      حدّ فاتح وظل — دول اللي بيخلّوا اللوح يبان **لوحًا**
-                      قاعد فوق الصورة، مش بقعة غامقة متغسّلة فيها. الحدّ
-                      بيرسم الحافة والظل بيفصلها عن اللي وراها.
-                    */
-                    border: '1px solid rgba(255,255,255,0.16)',
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-                    padding: '1.5rem 1.75rem',
-                    /*
-                      اللوح ما ياخدش عرض البانر كله.
+          {/*
+            عرض اللوح محدود دايمًا — باللوح أو من غيره.
 
-                      السطر اللي بيمتد على عرض الشاشة صعب تتبعه بالعين،
-                      والقياس المتعارف عليه حوالي ٦٥ حرفًا. من غير الحد
-                      ده اللوح كان بيبقى شريطًا عريضًا فيه سطر واحد.
-                    */
-                    maxWidth: 'min(100%, 34rem)',
-                  }
-                : undefined
-            }
-          >
+            السطر اللي بيمتد على عرض الشاشة صعب تتبعه بالعين، والقياس
+            المتعارف عليه حوالي ٦٥ حرفًا. من غير الحد ده اللوح بيبقى
+            شريطًا عريضًا فيه سطر واحد.
+          */}
+          <div className={`flex max-w-[38rem] flex-col rounded-[var(--sf-radius)] ${align} ${panelClass}`}>
+            {/*
+              سطر التعريف فوق العنوان.
+
+              صغير ومتباعد الحروف — بيدّي الكلام تسلسلًا: سطر يعرّف،
+              وعنوان يقول، ووصف يشرح. من غيره العنوان بيبقى معلّقًا
+              لوحده في نص الصورة.
+            */}
+            {eyebrow && (
+              <span
+                className="mb-2 text-[11px] font-semibold uppercase tracking-[0.22em] sm:text-xs" dir="auto"
+                style={{
+                  color: active?.eyebrowColor || textColor,
+                  opacity: 0.9,
+                  textShadow: '0 1px 8px rgba(0,0,0,0.3)',
+                }}
+              >
+                {eyebrow}
+              </span>
+            )}
             {title && (
               <h1
+                dir="auto"
                 className={`text-balance font-bold tracking-tight ${titleClass}`}
                 style={{
                   color: textColor,
@@ -331,7 +421,8 @@ export function Hero({
             )}
             {subtitle && (
               <p
-                className={`text-pretty leading-relaxed ${subtitleClass}`}
+                dir="auto"
+                className={`mt-3 text-pretty leading-relaxed ${subtitleClass}`}
                 style={{
                   color: subtitleColor,
                   opacity: 0.92,
@@ -341,7 +432,7 @@ export function Hero({
                 {subtitle}
               </p>
             )}
-            {showCta && cta}
+            {showCta && <span className="mt-6">{cta}</span>}
           </div>
         </div>
       )}
