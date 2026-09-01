@@ -23,10 +23,16 @@ const MAX_DEPTH = 8
 
 export type InboundMessage = {
   /**
-   * رقم العميل بصيغة دولية بعلامة زائد — أو `null` لو البوابة بعتت
-   * المعرّف الداخلي بس.
+   * أرقام مرشّحة بصيغة دولية بعلامة زائد، مرتّبة من الأوثق للأضعف.
+   *
+   * **قايمة لا قيمة واحدة**: البوابة بتحط رقم العميل في حقل اسمه
+   * بيختلف من نسخة لنسخة، وأحيانًا بتحط رقمنا إحنا في الحمولة كمان.
+   * اللي بينادي بيجرّب واحد واحد لحد ما يلاقي طلب مستني — فالرقم
+   * الغلط بيعدّي من غير ضرر، والصح ما بيضيعش عشان اسم حقل اتغيّر.
+   *
+   * وبتبقى فاضية لما البوابة تبعت المعرّف الداخلي بس.
    */
-  phone: string | null
+  phones: string[]
   /** المعرّف الداخلي (`@lid`) من غير اللاحقة */
   lid: string | null
   text: string
@@ -285,12 +291,14 @@ export function extractInbound(body: unknown): InboundMessage | null {
     remote,
   ]
 
-  let phoneDigits: string | null = null
+  const phones: string[] = []
+  const push = (digits: string) => {
+    const value = `+${digits}`
+    if (digits.length >= 8 && !phones.includes(value)) phones.push(value)
+  }
+
   for (const candidate of phoneCandidates) {
-    if (isPhoneJid(candidate)) {
-      phoneDigits = parseJid(candidate)!.digits
-      break
-    }
+    if (isPhoneJid(candidate)) push(parseJid(candidate)!.digits)
   }
 
   const lidCandidates: unknown[] = [remote, key?.senderLid, key?.participantLid, node?.senderLid]
@@ -302,22 +310,28 @@ export function extractInbound(body: unknown): InboundMessage | null {
     }
   }
 
-  /*
-    مفيش ولا واحد فيهم؟ نمسح الحمولة كلها.
-
-    الشكل اللي ما نعرفوش لسه ممكن يكون فيه المعرّفين في مكان تاني،
-    والسكوت هنا معناه رد عميل بيضيع.
-  */
-  if (!phoneDigits && !lidDigits) {
+  /**
+   * المسح العام — بيجري طول ما مفيش رقم، حتى لو معانا معرّف داخلي.
+   *
+   * كان بيجري لما الاتنين يغيبوا بس، وده كان بيسيب أسوأ حالة من غير
+   * تغطية: رسالة جاية بـ`@lid` والرقم موجود فيها تحت اسم حقل ما
+   * نعرفوش. المعرّف الداخلي بيتلاقى، فالمسح ما بيجريش، والرقم اللي
+   * كان قدامنا بيضيع.
+   *
+   * ولأن المسح ممكن يلقط رقمنا إحنا (بيظهر في بعض الحمولات)، الناتج
+   * بيتحط في **قايمة مرشّحين** لا في قيمة واحدة: اللي بينادي بيجرّب
+   * واحد واحد لحد ما يلاقي طلب مستني. الرقم الغلط ما بيلاقيش حاجة
+   * وبيعدّي من غير ما يعمل ضرر.
+   */
+  if (phones.length === 0) {
     for (const jid of collectJids(body)) {
       const parsed = parseJid(jid)!
-      if (parsed.domain === 'g.us') continue
-      if (!phoneDigits && parsed.domain !== 'lid') phoneDigits = parsed.digits
-      if (!lidDigits && parsed.domain === 'lid') lidDigits = parsed.digits
+      if (parsed.domain === 'lid' || parsed.domain === 'g.us') continue
+      push(parsed.digits)
     }
   }
 
-  if (!phoneDigits && !lidDigits) return null
+  if (phones.length === 0 && !lidDigits) return null
 
   const text = readText(node, body)
   if (!text.trim()) return null
@@ -338,7 +352,7 @@ export function extractInbound(body: unknown): InboundMessage | null {
         : null
 
   return {
-    phone: phoneDigits && phoneDigits.length >= 8 ? `+${phoneDigits}` : null,
+    phones,
     lid: lidDigits,
     text,
     /* الغياب مش دليل على إن الرسالة مش منّا — ساعتها بنمسح الحمولة */

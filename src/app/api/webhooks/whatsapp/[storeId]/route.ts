@@ -53,8 +53,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ storeId: s
    * المعرّف والرقم مع بعض، فالترجمة بتتعلّم من رسالتنا قبل ما العميل
    * يرد أصلًا — وردّه بيلاقي طريقه من أول مرة.
    */
-  if (msg.lid && msg.phone) {
-    await rememberLid(store.id, msg.lid, msg.phone)
+  if (msg.lid && msg.phones.length === 1) {
+    await rememberLid(store.id, msg.lid, msg.phones[0])
   }
 
   /*
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ storeId: s
       storeId: store.id,
       channel: 'whatsapp',
       event: 'inbound',
-      recipient: msg.phone ?? (msg.lid ? `lid:${msg.lid}` : '-'),
+      recipient: msg.phones[0] ?? (msg.lid ? `lid:${msg.lid}` : '-'),
       body: `${msg.fromMe ? '↩︎ منّا: ' : ''}${msg.text}`.slice(0, 400),
       status: 'sent',
       provider: 'whatsapp',
@@ -102,32 +102,67 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ storeId: s
   if (!reply) return NextResponse.json({ ok: true })
 
   /**
-   * الوصول للطلب — بالرقم، وإلا بالترجمة، وإلا بالوحدانية.
+   * الوصول للطلب — بالأرقام المرشّحة، وإلا بالترجمة، وإلا بالوحدانية.
    *
    * البحث دايمًا **جوّه متجر الويب هوك**: الرقم الواحد ممكن يكون طالب
    * من كذا متجر، والفلترة جوّه الاستعلام لا بعده بتخلّي رد عميل في
    * متجر ما يقدرش يلمس طلب متجر تاني مهما حصل.
+   *
+   * والتجربة واحد واحد لا اختيار واحد: البوابة بتحط الرقم في حقل اسمه
+   * بيتغيّر، وبتحط رقمنا إحنا في الحمولة أحيانًا. الرقم اللي مالوش
+   * طلب مستني بيعدّي بلا أثر، فالتجربة أرخص من الرهان.
    */
-  const phone = msg.phone ?? (msg.lid ? await phoneForLid(store.id, msg.lid) : null)
+  const tried = [
+    ...msg.phones,
+    ...(msg.lid ? [await phoneForLid(store.id, msg.lid)] : []),
+  ].filter((p): p is string => Boolean(p))
 
-  const order = phone
-    ? await findPendingOrder(store.id, phone)
-    : /*
-        العميل ردّ ومعانا معرّفه الداخلي بس. لو فيه طلب مستني واحد
-        بالظبط، هو ده — ولو أكتر من واحد بنسيبها للتاجر بدل ما نأكّد
-        طلب حد تاني.
-      */
-      await findSolePendingOrder(store.id)
+  let order: Awaited<ReturnType<typeof findPendingOrder>> | null = null
+  for (const candidate of tried) {
+    order = await findPendingOrder(store.id, candidate)
+    if (order) break
+  }
 
-  if (!order) return NextResponse.json({ ok: true })
+  /*
+    ولا واحد فيهم لقى حاجة، ومعانا معرّف داخلي بس.
+
+    لو فيه طلب مستني واحد بالظبط، هو ده. ولو أكتر من واحد، مفيش أي
+    طريقة نعرف الرد بتاع مين — والتخمين معناه إننا نأكّد طلب حد تاني
+    ونشحنه، فبنسيبها للتاجر.
+  */
+  if (!order && msg.lid) order = await findSolePendingOrder(store.id)
+
+  if (!order) {
+    /*
+      رد وصل وما عرفناش نربطه.
+
+      من غير السطر ده، التاجر بيشوف «١» في سجل الرسايل وحالة الطلب
+      ما اتغيّرتش، وما عندوش أي طريقة يعرف السبب — وده بالظبط الوضع
+      اللي قعدنا فيه تلات جولات.
+    */
+    if (msg.lid && tried.length === 0) {
+      await db
+        .insert(messageLog)
+        .values({
+          storeId: store.id,
+          channel: 'system',
+          event: 'inbound_unmatched',
+          recipient: `lid:${msg.lid}`,
+          body: `رد «${msg.text.slice(0, 40)}» جه بمعرّف داخلي من غير رقم، وفيه أكتر من طلب مستني تأكيد — ما قدرناش نحدّد صاحبه.`,
+          status: 'failed',
+        })
+        .catch(() => undefined)
+    }
+    return NextResponse.json({ ok: true })
+  }
 
   /*
     الترجمة بتتعلّم من الطلب اللي لقيناه.
 
-    الرد اللي بعده بيوصل برقمه مباشرةً من غير أي استنتاج — فالوحدانية
-    فوق بتلزم أول رد بس.
+    الرد اللي بعده بيوصل برقمه مباشرةً من غير أي استنتاج — فالاستنتاج
+    فوق بيلزم أول رد بس.
   */
-  if (msg.lid && !msg.phone && order.phone) {
+  if (msg.lid && msg.phones.length === 0 && order.phone) {
     await rememberLid(store.id, msg.lid, order.phone)
   }
 
@@ -138,7 +173,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ storeId: s
     customerName: order.name,
   })
 
-  await sendWhatsapp(order.storeId, order.phone ?? phone ?? '', answer, {
+  await sendWhatsapp(order.storeId, order.phone ?? tried[0] ?? '', answer, {
     event: 'order_confirm_reply',
     orderId: order.id,
   }).catch(() => undefined)
