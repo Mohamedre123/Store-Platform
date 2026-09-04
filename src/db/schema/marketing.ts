@@ -186,3 +186,56 @@ export const experiments = pgTable(
   },
   (t) => [index('experiments_store_idx').on(t.storeId, t.status)],
 )
+
+export type CampaignStatus = 'draft' | 'sending' | 'sent' | 'failed'
+/** مين بيستقبل الحملة */
+export type CampaignAudience = 'all' | 'buyers' | 'non_buyers' | 'abandoned'
+
+/**
+ * حملة بريدية.
+ *
+ * ## ليه الإرسال على دفعات مش مرة واحدة
+ * متجر بعشرة آلاف مشترك معناه عشرة آلاف نداء لمزوّد البريد. النداء
+ * ده لو اتعمل في طلب واحد بيتقطع عند مهلة الدالة، وبيسيب نص العملاء
+ * اتبعتلهم والنص التاني لأ — ومحدّش يعرف فين وقف. الحملة بتتقسّم
+ * على مهام في الطابور، وكل مهمة بتاخد دفعة وبتحجز اللي بعدها.
+ *
+ * ## والعدّاد بيتقدّم مع الدفعة
+ * `sentCount` بيتحدّث بعد كل دفعة. لو الطابور وقف، التاجر بيشوف
+ * «اتبعت ٤٠٠ من ١٢٠٠» — بدل شريط تقدّم واقف مالوش معنى.
+ */
+export const campaigns = pgTable(
+  'campaigns',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    storeId: uuid('store_id').notNull().references(() => stores.id, { onDelete: 'cascade' }),
+
+    name: text('name').notNull(),
+    subject: text('subject').notNull(),
+    /** نص الرسالة كما كتبه التاجر — بيتحوّل لقالب المتجر وقت الإرسال */
+    body: text('body').notNull(),
+    /** زر الدعوة — اختياري، وبيتحطّ في نص الرسالة */
+    ctaLabel: text('cta_label'),
+    ctaUrl: text('cta_url'),
+
+    audience: text('audience').$type<CampaignAudience>().notNull().default('all'),
+    status: text('status').$type<CampaignStatus>().notNull().default('draft'),
+
+    /**
+     * حجم الجمهور وقت الإرسال — **لقطة لا حساب لحظي**.
+     *
+     * لو حسبناه كل مرة، التقرير بيتغيّر بعد الحملة كل ما عميل جديد
+     * يشترك — والتاجر بيشوف «اتبعت ٤٠٠ من ٥٠٠» على حملة خلصت.
+     */
+    audienceCount: integer('audience_count').notNull().default(0),
+    sentCount: integer('sent_count').notNull().default(0),
+    failedCount: integer('failed_count').notNull().default(0),
+
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+    createdBy: uuid('created_by'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index('campaigns_store_idx').on(t.storeId, t.createdAt)],
+)

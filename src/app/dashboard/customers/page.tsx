@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import { MessageCircle, Phone, Users } from 'lucide-react'
 import { db } from '@/db'
 import { customers } from '@/db/schema'
@@ -19,9 +19,36 @@ const TIERS: Record<string, { label: string; bg: string; fg: string }> = {
   platinum: { label: 'بلاتيني', bg: 'var(--primary-soft)', fg: 'var(--primary)' },
 }
 
-export default async function CustomersPage() {
+export default async function CustomersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ filter?: string }>
+}) {
   const { store, actor } = await getDashboardContext()
   guard(actor, 'customers.view')
+
+  const { filter } = await searchParams
+
+  /**
+   * المشتركون = عملاء موافقين ومعاهم بريد.
+   *
+   * ## ليه فلتر مش صفحة لوحدها
+   * اشتراك النشرة عندنا بيكتب في **جدول عملاء التاجر** لا في قايمة
+   * منفصلة، عشان اللي سجّل بريده وبعدين طلب يبقى شخصًا واحدًا. قايمة
+   * منفصلة كانت هتخلّي التاجر يبعت نفس الحملة لنفس الشخص مرتين
+   * ويحسبه اتنين في أرقامه.
+   *
+   * فالمشتركون مش كيان تاني — هم نفس العملاء بعدسة تانية.
+   */
+  const subscribersOnly = filter === 'subscribers'
+
+  const where = subscribersOnly
+    ? and(
+        eq(customers.storeId, store.id),
+        eq(customers.acceptsMarketing, true),
+        sql`${customers.email} is not null and ${customers.email} <> ''`,
+      )
+    : eq(customers.storeId, store.id)
 
   const rows = await db
     .select({
@@ -36,7 +63,7 @@ export default async function CustomersPage() {
       createdAt: customers.createdAt,
     })
     .from(customers)
-    .where(eq(customers.storeId, store.id))
+    .where(where)
     .orderBy(desc(customers.totalSpent), desc(customers.createdAt))
     .limit(200)
 
@@ -45,6 +72,12 @@ export default async function CustomersPage() {
       count: sql<number>`count(*)::int`,
       revenue: sql<number>`coalesce(sum(${customers.totalSpent}), 0)::int`,
       repeat: sql<number>`count(*) filter (where ${customers.ordersCount} > 1)::int`,
+      /* المشتركون بنفس شرط الحملات بالحرف — رقمين مختلفين بيضيّعوا الثقة */
+      subscribers: sql<number>`count(*) filter (
+        where ${customers.acceptsMarketing} = true
+          and ${customers.email} is not null
+          and ${customers.email} <> ''
+      )::int`,
     })
     .from(customers)
     .where(eq(customers.storeId, store.id))
@@ -64,7 +97,40 @@ export default async function CustomersPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="العملاء" description={`${totals.count} عميل سجّلوا طلبات في متجرك`} />
+      <PageHeader
+        title={subscribersOnly ? 'المشتركون' : 'العملاء'}
+        description={
+          subscribersOnly
+            ? `${totals.subscribers} عميل موافق يستقبل رسايلك التسويقية`
+            : `${totals.count} عميل سجّلوا طلبات في متجرك`
+        }
+      />
+
+      {/* تبويبان لا صفحتان — نفس البيانات بعدستين */}
+      <Reveal>
+        <div className="flex gap-2">
+          {[
+            { key: 'all', label: 'كل العملاء', n: totals.count },
+            { key: 'subscribers', label: 'المشتركون', n: totals.subscribers },
+          ].map((t) => {
+            const active = t.key === 'subscribers' ? subscribersOnly : !subscribersOnly
+            return (
+              <Link
+                key={t.key}
+                href={t.key === 'all' ? '/dashboard/customers' : '/dashboard/customers?filter=subscribers'}
+                className={`shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                  active
+                    ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]'
+                    : 'border-[var(--border-strong)] text-[var(--fg-muted)] hover:bg-[var(--surface-2)]'
+                }`}
+              >
+                {t.label}
+                <span className="tabular ms-1.5 opacity-60">{t.n}</span>
+              </Link>
+            )
+          })}
+        </div>
+      </Reveal>
 
       {rows.length === 0 ? (
         <Reveal>

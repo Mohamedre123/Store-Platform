@@ -33,6 +33,7 @@ export type JobType =
   | 'webhook.retry'
   | 'catalog.sync'
   | 'order.confirm_request'
+  | 'campaign.send'
 
 /** يحجز مهمة للتنفيذ بعد مدة */
 export async function enqueue(input: {
@@ -217,6 +218,34 @@ const HANDLERS: Record<string, Handler> = {
     if (res.ok) return { ok: true }
     if (/ردّ|رقم تليفون|مش موجود|ناقص|مش مربوط/.test(res.error)) return { ok: true }
     return { ok: false, error: res.error }
+  },
+
+  /*
+    دفعة من حملة بريدية — وبتحجز اللي بعدها بنفسها.
+
+    التقسيم ده هو اللي بيخلّي متجرًا بعشرة آلاف مشترك ينفع: النداء
+    الواحد لمزوّد البريد بعشرة آلاف رسالة بيتقطع عند مهلة الدالة
+    ويسيب نص العملاء اتبعتلهم والنص التاني لأ — ومحدّش يعرف فين وقف.
+
+    والتباعد دقيقة بين الدفعات مقصود: الإرسال المتلاحق بيتقرا من
+    مزوّدين البريد على إنه سبام حتى لو المحتوى سليم.
+  */
+  'campaign.send': async (payload, storeId) => {
+    if (!storeId || typeof payload.campaignId !== 'string') {
+      return { ok: false, error: 'حمولة ناقصة' }
+    }
+    const { sendCampaignBatch } = await import('./campaigns')
+    const res = await sendCampaignBatch(payload.campaignId)
+
+    if (!res.done) {
+      await enqueue({
+        storeId,
+        type: 'campaign.send',
+        payload: { campaignId: payload.campaignId },
+        delayMinutes: 1,
+      })
+    }
+    return { ok: true }
   },
 
   'catalog.sync': async (payload, storeId) => {

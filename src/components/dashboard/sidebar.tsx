@@ -101,6 +101,7 @@ export const NAV: NavSection[] = [
     permission: 'customers.view',
     children: [
       { href: '/dashboard/customers', label: 'كل العملاء' },
+      { href: '/dashboard/customers?filter=subscribers', label: 'المشتركون' },
       { href: '/dashboard/loyalty', label: 'الولاء والنقاط' },
       { href: '/dashboard/reviews', label: 'المراجعات' },
       { href: '/dashboard/customers/blocked', label: 'الحظر', permission: 'orders.manage' },
@@ -115,6 +116,7 @@ export const NAV: NavSection[] = [
       { href: '/dashboard/marketing', label: 'الكوبونات والعروض' },
       { href: '/dashboard/landing', label: 'صفحات الهبوط' },
       { href: '/dashboard/affiliates', label: 'المسوّقون' },
+      { href: '/dashboard/marketing/campaigns', label: 'حملات البريد' },
       { href: '/dashboard/automations', label: 'الأتمتة' },
       { href: '/dashboard/analytics', label: 'التحليلات', permission: 'reports.view' },
       { href: '/dashboard/analytics/reports', label: 'تقارير مفصّلة', permission: 'reports.view' },
