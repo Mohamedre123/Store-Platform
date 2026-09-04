@@ -1,124 +1,94 @@
-import Link from "next/link";
-import Image from "next/image";
-import { and, count, desc, eq, gte, sum } from "drizzle-orm";
+import Link from 'next/link'
+import Image from 'next/image'
+import { and, count, desc, eq, gte, sum } from 'drizzle-orm'
 import {
   ArrowLeft,
-  Check,
   CreditCard,
+  ImageIcon,
   Package,
   Palette,
+  Plus,
   ShoppingBag,
   Truck,
   Users,
-  Wallet,
-} from "lucide-react";
-import { db } from "@/db";
+} from 'lucide-react'
+import { db } from '@/db'
 import {
-  orders,
-  orderItems,
-  products,
   customers,
+  orderItems,
+  orders,
   paymentMethods,
+  products,
   shippingZones,
-} from "@/db/schema";
-import { getDashboardContext } from "@/lib/store-context";
-import { publicStoreUrl } from "@/lib/domain";
-import { formatMoney } from "@/lib/utils";
-import { ORDER_STATUSES } from "@/lib/order-status";
-import { Card } from "@/components/ui";
-import { Rail } from "@/components/rail";
-import { Reveal, SpotlightCard } from "@/components/motion";
-import { PublishBanner } from "./publish-banner";
-import { getEntitlements, getOrderQuota } from "@/lib/entitlements";
-import { QuotaBanner } from "./quota-banner";
+} from '@/db/schema'
+import { getDashboardContext } from '@/lib/store-context'
+import { publicStoreUrl } from '@/lib/domain'
+import { formatMoney, formatBps } from '@/lib/utils'
+import { ORDER_STATUSES } from '@/lib/order-status'
+import { getEntitlements, getOrderQuota } from '@/lib/entitlements'
+import { loadDashboardStats, pctChange } from '@/lib/dashboard-stats'
+import { formatOrderNumber } from '@/lib/order-number'
+import { getPlan } from '@/lib/plans'
+import { Card } from '@/components/ui'
+import { Rail } from '@/components/rail'
+import { Reveal } from '@/components/motion'
+import { PublishBanner } from './publish-banner'
+import { QuotaBanner } from './quota-banner'
+import { Greeting } from './greeting'
+import { SetupGuide, type SetupStep } from './setup-guide'
+import { PlanCard } from './plan-card'
+import { StatTiles, type StatTile } from './stat-tiles'
+import { OverviewChart, type OverviewSeries } from './overview-chart'
 
-export const metadata = { title: "لوحة التحكم" };
-
-const startOfToday = () => {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-};
+export const metadata = { title: 'لوحة التحكم' }
 
 export default async function DashboardHome() {
-  const { store } = await getDashboardContext();
-  const today = startOfToday();
+  const { store } = await getDashboardContext()
   /* آخر تلاتين يوم — نافذة «الأكتر مبيعًا» */
-  const last30 = new Date(Date.now() - 30 * 24 * 3600_000);
+  const last30 = new Date(Date.now() - 30 * 24 * 3600_000)
 
   /*
-    حالة الاشتراك في أول الصفحة الرئيسية.
+    حالة الاشتراك في أول الصفحة.
 
     الحد اللي بيوقف الطلبات لازم يوصل للتاجر **قبل** ما يقف — لو
     اكتشفه لما عميل قاله «مش عارف أطلب»، الرسالة وصلت متأخرة يوم
     كامل من البيع.
   */
-  const ent = await getEntitlements(store);
-  const quota = await getOrderQuota(store);
+  const ent = await getEntitlements(store)
+  const quota = await getOrderQuota(store)
 
-  // كل الأرقام في دفعة واحدة متوازية بدل ٧ رحلات متتالية للخادم — ده اللي
-  // كان بيخلي الصفحة الرئيسية تقيلة على مابتفتح.
-  const [
-    [todayStats],
-    [pending],
-    [incomplete],
-    [productCount],
-    [customerCount],
-    [hasPayment],
-    [hasShipping],
-  ] = await Promise.all([
-    db
-      .select({ orders: count(), revenue: sum(orders.total) })
-      .from(orders)
-      .where(
-        and(
-          eq(orders.storeId, store.id),
-          eq(orders.isIncomplete, false),
-          gte(orders.createdAt, today),
-        ),
-      ),
-    db
-      .select({ n: count() })
-      .from(orders)
-      .where(and(eq(orders.storeId, store.id), eq(orders.status, "pending"))),
-    db
-      .select({ n: count() })
-      .from(orders)
-      .where(and(eq(orders.storeId, store.id), eq(orders.isIncomplete, true))),
-    db
-      .select({ n: count() })
-      .from(products)
-      .where(and(eq(products.storeId, store.id), eq(products.status, "active"))),
-    db
-      .select({ n: count() })
-      .from(customers)
-      .where(eq(customers.storeId, store.id)),
-    db
-      .select({ n: count() })
-      .from(paymentMethods)
-      .where(and(eq(paymentMethods.storeId, store.id), eq(paymentMethods.enabled, true))),
-    db
-      .select({ n: count() })
-      .from(shippingZones)
-      .where(and(eq(shippingZones.storeId, store.id), eq(shippingZones.enabled, true))),
-  ]);
+  /*
+    كل حاجة في دفعة واحدة متوازية.
 
-  /**
-   * آخر الطلبات وأكتر المنتجات مبيعًا.
-   *
-   * ## ليه اتضافوا
-   * الصفحة كانت أربع أرقام وسطر. وخطوات التجهيز بتختفي أول ما التاجر
-   * يخلّصها — فالمتجر الشغّال، وهو اللي بيفتح اللوحة كل يوم، بيلاقي
-   * الصفحة **أفضى** من المتجر الجديد.
-   *
-   * والرقم لوحده ما بيتعملش بيه حاجة: «٤ طلبات النهاردة» سؤال مش
-   * إجابة — التاجر عايز يعرف **مين** طلب عشان يجهّز ويكلّم. والأكتر
-   * مبيعًا بيقول له يزوّد مخزون إيه ويعلن على إيه.
-   *
-   * ## وبيتجابوا مع الباقي
-   * جوّه نفس `Promise.all` عشان ما يزوّدوش رحلة للخادم على صفحة
-   * بتتفتح كل يوم.
-   */
+    الصفحة دي بيفتحها التاجر كل صباح، وأي استعلام متتالي بيتحوّل
+    لثانية إضافية بيقعد يبصّ فيها على شاشة فاضية.
+  */
+  const [stats, [pending], [incomplete], [productCount], [customerCount], [hasPayment], [hasShipping]] =
+    await Promise.all([
+      loadDashboardStats(store.id),
+      db
+        .select({ n: count() })
+        .from(orders)
+        .where(and(eq(orders.storeId, store.id), eq(orders.status, 'pending'))),
+      db
+        .select({ n: count() })
+        .from(orders)
+        .where(and(eq(orders.storeId, store.id), eq(orders.isIncomplete, true))),
+      db
+        .select({ n: count() })
+        .from(products)
+        .where(and(eq(products.storeId, store.id), eq(products.status, 'active'))),
+      db.select({ n: count() }).from(customers).where(eq(customers.storeId, store.id)),
+      db
+        .select({ n: count() })
+        .from(paymentMethods)
+        .where(and(eq(paymentMethods.storeId, store.id), eq(paymentMethods.enabled, true))),
+      db
+        .select({ n: count() })
+        .from(shippingZones)
+        .where(and(eq(shippingZones.storeId, store.id), eq(shippingZones.enabled, true))),
+    ])
+
   const [latestOrders, topProducts] = await Promise.all([
     db
       .select({
@@ -127,7 +97,6 @@ export default async function DashboardHome() {
         name: orders.customerName,
         total: orders.total,
         status: orders.status,
-        createdAt: orders.createdAt,
       })
       .from(orders)
       .where(and(eq(orders.storeId, store.id), eq(orders.isIncomplete, false)))
@@ -152,69 +121,100 @@ export default async function DashboardHome() {
       .groupBy(orderItems.productId, orderItems.name, orderItems.image)
       .orderBy(desc(sum(orderItems.quantity)))
       .limit(5),
-  ]);
+  ])
 
-  const stats = [
-    {
-      label: "إيرادات اليوم",
-      value: formatMoney(Number(todayStats?.revenue ?? 0), store.currency),
-      icon: Wallet,
-    },
-    {
-      label: "طلبات اليوم",
-      value: String(todayStats?.orders ?? 0),
-      icon: ShoppingBag,
-    },
-    {
-      label: "طلبات مستنية",
-      value: String(pending?.n ?? 0),
-      icon: Package,
-      href: "/dashboard/orders",
-    },
-    {
-      label: "سلات متروكة",
-      value: String(incomplete?.n ?? 0),
-      icon: Users,
-      href: "/dashboard/orders?filter=incomplete",
-      highlight: (incomplete?.n ?? 0) > 0,
-    },
-  ];
+  const { current, previous, series } = stats
 
-  // خطوات التجهيز — تظهر لحد ما المتجر يبقى جاهز للبيع
-  const setup = [
+  const tiles: StatTile[] = [
     {
+      label: 'الزيارات · ١٤ يوم',
+      value: String(current.sessions),
+      change: pctChange(current.sessions, previous.sessions),
+      spark: series.map((d) => d.sessions),
+      href: '/dashboard/analytics',
+    },
+    {
+      label: 'المبيعات · ١٤ يوم',
+      value: formatMoney(current.revenue, store.currency),
+      change: pctChange(current.revenue, previous.revenue),
+      spark: series.map((d) => d.revenue),
+      href: '/dashboard/analytics',
+    },
+    {
+      label: 'الطلبات · ١٤ يوم',
+      value: String(current.orders),
+      change: pctChange(current.orders, previous.orders),
+      spark: series.map((d) => d.orders),
+      href: '/dashboard/orders',
+    },
+    {
+      label: 'معدل التحويل',
+      value: formatBps(current.conversionBps),
+      change: pctChange(current.conversionBps, previous.conversionBps),
+      spark: series.map((d) => d.conversion),
+      href: '/dashboard/analytics',
+    },
+  ]
+
+  /**
+   * خطوات التجهيز — بترتيب الاحتياج لا بترتيب الشاشات.
+   *
+   * من غير منتج مفيش حاجة تتشحن، ومن غير شحن مفيش سعر يتحسب،
+   * ومن غير دفع الطلب ما بيقفلش. والنشر آخر خطوة لأنه بيفتح الباب
+   * للعملاء — وفتحه قبل ما الباقي يجهز بيوصّل زائرًا لمتجر ناقص.
+   */
+  const setup: SetupStep[] = [
+    {
+      key: 'product',
+      label: 'ضيف أول منتج',
+      hint: 'من غير منتج مفيش حاجة تتباع',
+      href: '/dashboard/products/new',
       done: (productCount?.n ?? 0) > 0,
-      label: "ضيف أول منتج",
-      href: "/dashboard/products",
       icon: Package,
     },
     {
-      done: (hasShipping?.n ?? 0) > 0,
-      label: "ظبّط الشحن",
-      href: "/dashboard/shipping",
-      icon: Truck,
-    },
-    {
-      done: (hasPayment?.n ?? 0) > 0,
-      label: "فعّل طريقة دفع",
-      href: "/dashboard/payments",
-      icon: CreditCard,
-    },
-    {
-      done: !!store.logoLight,
-      label: "ارفع شعار متجرك",
-      href: "/dashboard/storefront",
+      key: 'logo',
+      label: 'ارفع شعار متجرك',
+      hint: 'بيظهر في الهيدر والفاتورة ورسايل العملاء',
+      href: '/dashboard/settings',
+      done: Boolean(store.logoLight),
       icon: Palette,
     },
     {
+      key: 'shipping',
+      label: 'ظبّط مناطق الشحن',
+      hint: 'السعر اللي العميل بيشوفه في الشيك أوت',
+      href: '/dashboard/shipping',
+      done: (hasShipping?.n ?? 0) > 0,
+      icon: Truck,
+    },
+    {
+      key: 'payment',
+      label: 'فعّل طريقة دفع',
+      hint: 'الدفع عند الاستلام أو بوابة بمفاتيحك',
+      href: '/dashboard/payments',
+      done: (hasPayment?.n ?? 0) > 0,
+      icon: CreditCard,
+    },
+    {
+      key: 'theme',
+      label: 'اختار شكل متجرك',
+      hint: 'الألوان والخطوط والصفحة الرئيسية',
+      href: '/dashboard/storefront',
+      done: Boolean(store.logoLight) && (productCount?.n ?? 0) > 0,
+      icon: ImageIcon,
+    },
+    {
+      key: 'publish',
+      label: 'انشر المتجر',
+      hint: 'آخر خطوة — بعدها العملاء يقدروا يطلبوا',
+      href: '/dashboard/settings',
       done: store.isPublished,
-      label: "انشر المتجر",
-      href: "/dashboard/settings",
       icon: ShoppingBag,
     },
-  ];
+  ]
 
-  const remaining = setup.filter((s) => !s.done);
+  const plan = ent.plan ?? getPlan(store.plan)
 
   return (
     <div className="flex flex-col gap-8">
@@ -240,117 +240,106 @@ export default async function DashboardHome() {
       </Reveal>
 
       <Reveal>
-        <h1 className="text-2xl font-bold tracking-tight">
-          أهلًا، {store.name}
-        </h1>
-        <p className="mt-1 text-sm text-[var(--fg-muted)]">
-          {remaining.length > 0
-            ? `فاضل ${remaining.length} خطوة عشان متجرك يبقى جاهز للبيع.`
-            : "متجرك جاهز. بالتوفيق في مبيعاتك."}
-        </p>
+        <Greeting storeName={store.name} storeUrl={publicStoreUrl(store)} />
       </Reveal>
 
-      {/* الأرقام */}
-      <Rail desktop="sm:grid sm:grid-cols-2 lg:grid-cols-4" itemWidth="basis-[46%]">
-        {stats.map(({ label, value, icon: Icon, href, highlight }, i) => {
-          const body = (
-            <SpotlightCard className="flex h-full flex-col gap-2 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-4">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-[var(--fg-muted)]">{label}</span>
-                <Icon
-                  className={`h-4 w-4 shrink-0 ${
-                    highlight
-                      ? "text-[var(--color-warning)]"
-                      : "text-[var(--fg-subtle)]"
-                  }`}
-                  aria-hidden="true"
-                />
-              </div>
-              <span className="tabular text-xl font-bold tracking-tight sm:text-2xl">
-                {value}
-              </span>
-            </SpotlightCard>
-          );
-          return (
-            <Reveal key={label} delay={i * 70} className="h-full">
-              {href ? (
-                <Link href={href} className="block h-full">
-                  {body}
-                </Link>
-              ) : (
-                body
+      {/* دليل الإعداد — بيختفي بالكامل لما يخلص */}
+      <Reveal delay={60}>
+        <SetupGuide steps={setup} />
+      </Reveal>
+
+      {/*
+        الاشتراك والرسم جنب بعض على الشاشة الكبيرة.
+
+        الاتنين بيتقروا مع بعض: «فاضلي كام يوم» و«ماشي إزاي». وعلى
+        الموبايل بيبقوا فوق بعض والاشتراك الأول — لأنه اللي ليه
+        ميعاد.
+      */}
+      <div className="grid gap-5 lg:grid-cols-[20rem_1fr] lg:items-start">
+        <Reveal delay={100}>
+          <PlanCard
+            planLabel={plan?.name ?? (ent.isAdmin ? 'إدارة المنصة' : 'مجانية')}
+            onTrial={ent.onTrial}
+            daysLeft={ent.daysLeft}
+            startedAt={store.activatedAt ?? store.createdAt}
+            endsAt={ent.until}
+            periodDays={plan?.days ?? 30}
+            expired={ent.expired}
+            isAdmin={ent.isAdmin}
+          />
+        </Reveal>
+
+        <Reveal delay={140}>
+          <Card className="p-5">
+            <OverviewChart
+              currency={store.currency}
+              data={series.map(
+                (d): OverviewSeries => ({
+                  label: d.label,
+                  sessions: d.sessions,
+                  revenue: d.revenue,
+                  orders: d.orders,
+                  conversion: d.conversion,
+                }),
               )}
-            </Reveal>
-          );
-        })}
-      </Rail>
+            />
+          </Card>
+        </Reveal>
+      </div>
 
-      {/* خطوات التجهيز */}
-      {remaining.length > 0 && (
-        <Reveal delay={120}>
-          <div className="flex flex-col gap-3">
-            <h2 className="font-semibold">جهّز متجرك</h2>
+      {/* الأرقام */}
+      <Reveal delay={180}>
+        <Rail desktop="sm:grid sm:grid-cols-2 lg:grid-cols-4" itemWidth="basis-[70%]">
+          <StatTiles tiles={tiles} />
+        </Rail>
+      </Reveal>
 
-            {/*
-              الخطوات جنب بعض على الموبايل بتمرير بالإصبع.
-              فوق بعض كانت بتاخد نص الشاشة وتزقّ باقي اللوحة تحت،
-              والتاجر اللي خلّص خطوتين بيفضل يمرّر عليهم كل مرة.
-            */}
-            <Rail
-              as="ul"
-              desktop="sm:grid sm:grid-cols-2 lg:grid-cols-4"
-              itemWidth="basis-[70%]"
-            >
-              {setup.map(({ done, label, href, icon: Icon }) => (
-                <li key={label} className="h-full">
-                  <Link
-                    href={href}
-                    className="flex h-full items-center gap-3 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-4 transition-colors hover:bg-[var(--surface-2)]"
-                  >
-                    <span
-                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                        done
-                          ? "bg-[var(--color-success-soft)] text-[var(--color-success)]"
-                          : "bg-[var(--surface-2)] text-[var(--fg-subtle)]"
-                      }`}
-                    >
-                      {done ? (
-                        <Check className="h-4 w-4" aria-hidden="true" />
-                      ) : (
-                        <Icon className="h-4 w-4" aria-hidden="true" />
-                      )}
-                    </span>
-                    <span
-                      className={`min-w-0 flex-1 text-sm ${
-                        done
-                          ? "text-[var(--fg-subtle)] line-through"
-                          : "font-medium"
-                      }`}
-                    >
-                      {label}
-                    </span>
-                    {!done && (
-                      <ArrowLeft
-                        className="h-4 w-4 shrink-0 text-[var(--fg-subtle)]"
-                        aria-hidden="true"
-                      />
-                    )}
-                  </Link>
-                </li>
-              ))}
-            </Rail>
+      {/*
+        اللي محتاج شغل دلوقتي.
+
+        الطلب المستني والسلة المتروكة مش أرقام للعرض — دول شغل قدام
+        التاجر بالظبط دلوقتي. عشان كده بيبانوا كأفعال لا كمربّعات،
+        وبيختفوا لما يبقوا صفر.
+      */}
+      {((pending?.n ?? 0) > 0 || (incomplete?.n ?? 0) > 0) && (
+        <Reveal delay={200}>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {(pending?.n ?? 0) > 0 && (
+              <ActionCard
+                href="/dashboard/orders?filter=pending"
+                icon={Package}
+                title={`${pending.n} طلب مستني تأكيدك`}
+                hint="أكّدهم عشان يتشحنوا"
+              />
+            )}
+            {(incomplete?.n ?? 0) > 0 && (
+              <ActionCard
+                href="/dashboard/orders?filter=incomplete"
+                icon={Users}
+                title={`${incomplete.n} سلة متروكة`}
+                hint="كلّمهم على واتساب — أسرع فلوس ترجّعها"
+                tone="warning"
+              />
+            )}
           </div>
         </Reveal>
       )}
 
-      {/*
-        آخر الطلبات — الأول لأنها الحاجة اللي بيتعمل بيها شغل.
+      {/* اختصارات */}
+      <Reveal delay={220}>
+        <Rail desktop="sm:grid sm:grid-cols-3" itemWidth="basis-[70%]">
+          <QuickLink href="/dashboard/products/new" icon={Plus} label="ضيف منتج" />
+          <QuickLink href="/dashboard/orders/new" icon={ShoppingBag} label="سجّل طلب" />
+          <QuickLink href="/dashboard/storefront" icon={Palette} label="عدّل شكل المتجر" />
+        </Rail>
+      </Reveal>
 
-        الرقم بيقول «فيه ٤ طلبات»، والقايمة بتقول **مين** — والتاجر
-        بيفتح اللوحة الصبح عشان ده بالظبط.
+      {/*
+        آخر الطلبات — الرقم بيقول «فيه ٤»، والقايمة بتقول **مين**،
+        والتاجر بيفتح اللوحة الصبح عشان ده بالظبط.
       */}
       {latestOrders.length > 0 && (
-        <Reveal delay={180}>
+        <Reveal delay={260}>
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-3">
               <h2 className="font-semibold">آخر الطلبات</h2>
@@ -372,7 +361,7 @@ export default async function DashboardHome() {
                     className="flex items-center gap-3 p-3.5 transition-colors hover:bg-[var(--surface-2)] sm:p-4"
                   >
                     <span className="tabular shrink-0 text-sm font-semibold text-[var(--fg-muted)]">
-                      #{o.number}
+                      #{formatOrderNumber(store, o.number)}
                     </span>
                     <span className="min-w-0 flex-1 truncate text-sm font-medium">
                       {o.name || 'بلا اسم'}
@@ -397,13 +386,11 @@ export default async function DashboardHome() {
       )}
 
       {/*
-        الأكتر مبيعًا في آخر ٣٠ يوم.
-
-        بيجاوب على «أزوّد مخزون إيه وأعلن على إيه» — وده قرار التاجر
-        بياخده كل أسبوع، ومكانه الطبيعي قدامه مش جوّه تقرير.
+        الأكتر مبيعًا — بيجاوب على «أزوّد مخزون إيه وأعلن على إيه»،
+        وده قرار التاجر بياخده كل أسبوع.
       */}
       {topProducts.length > 0 && (
-        <Reveal delay={220}>
+        <Reveal delay={300}>
           <div className="flex flex-col gap-3">
             <h2 className="font-semibold">الأكتر مبيعًا · آخر ٣٠ يوم</h2>
             <Card className="divide-y divide-[var(--border)] p-0">
@@ -425,12 +412,78 @@ export default async function DashboardHome() {
         </Reveal>
       )}
 
-      <Reveal delay={260}>
+      <Reveal delay={340}>
         <p className="text-sm text-[var(--fg-subtle)]">
-          عندك {productCount?.n ?? 0} منتج نشط و{customerCount?.n ?? 0} عميل
-          مسجّل.
+          عندك {productCount?.n ?? 0} منتج نشط و{customerCount?.n ?? 0} عميل مسجّل.
         </p>
       </Reveal>
     </div>
-  );
+  )
+}
+
+function ActionCard({
+  href,
+  icon: Icon,
+  title,
+  hint,
+  tone,
+}: {
+  href: string
+  icon: typeof Package
+  title: string
+  hint: string
+  tone?: 'warning'
+}) {
+  const warn = tone === 'warning'
+  return (
+    <Link
+      href={href}
+      className="group flex items-center gap-3 rounded-[var(--radius-card)] border p-4 transition-colors"
+      style={{
+        borderColor: warn ? 'var(--color-warning)' : 'var(--border)',
+        background: warn ? 'var(--color-warning-soft)' : 'var(--surface)',
+      }}
+    >
+      <span
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+        style={{
+          background: warn ? 'var(--surface)' : 'var(--primary-soft)',
+          color: warn ? 'var(--color-warning)' : 'var(--primary)',
+        }}
+      >
+        <Icon className="h-5 w-5" aria-hidden="true" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold">{title}</span>
+        <span className="mt-0.5 block text-xs text-[var(--fg-muted)]">{hint}</span>
+      </span>
+      <ArrowLeft
+        className="h-4 w-4 shrink-0 text-[var(--fg-subtle)] transition-transform group-hover:-translate-x-0.5 motion-reduce:transition-none"
+        aria-hidden="true"
+      />
+    </Link>
+  )
+}
+
+function QuickLink({
+  href,
+  icon: Icon,
+  label,
+}: {
+  href: string
+  icon: typeof Package
+  label: string
+}) {
+  return (
+    <Link
+      href={href}
+      className="flex h-full items-center gap-3 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-4 transition-colors hover:bg-[var(--surface-2)]"
+    >
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
+        <Icon className="h-4 w-4" aria-hidden="true" />
+      </span>
+      <span className="min-w-0 flex-1 truncate text-sm font-medium">{label}</span>
+      <ArrowLeft className="h-4 w-4 shrink-0 text-[var(--fg-subtle)]" aria-hidden="true" />
+    </Link>
+  )
 }

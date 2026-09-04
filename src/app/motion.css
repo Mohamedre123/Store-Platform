@@ -729,3 +729,34 @@
     transform: none !important;
   }
 }
+
+/*
+  رسم خط الأداء بيتكتب من أوله لآخره أول ما الصفحة تفتح.
+
+  `pathLength` مالوش قيمة معروفة قبل الرسم، فالحيلة إن الشرطة والفجوة
+  الاتنين بقيمة أكبر من أي مسار متوقّع — والإزاحة بتتحرّك من الطول ده
+  للصفر. النتيجة: الخط بيتكتب زي ما حد بيرسمه.
+
+  ثانية واحدة بالظبط: أطول من كده بيبقى التاجر مستني رسمًا، وأقصر
+  بيبان اهتزازًا مش حركة.
+*/
+@keyframes zw-draw {
+  from {
+    stroke-dashoffset: 1200;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.chart-line {
+  stroke-dasharray: 1200;
+  animation: zw-draw 1s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chart-line {
+    animation: none;
+    stroke-dasharray: none;
+  }
+}
