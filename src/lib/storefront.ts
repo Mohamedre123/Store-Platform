@@ -31,6 +31,22 @@ export type StorefrontStore = {
   slug: string
   name: string
   nameEn: string | null
+  /**
+   * حالة توفّر المتجر — صيانة أو «قريبًا».
+   *
+   * بتترسم في التخطيط قبل أي محتوى: أي صفحة جوّه المتجر بتتحجب،
+   * وصفحات الطلب والفاتورة بتفضل شغّالة لأن العميل اللي دافع
+   * مالوش دعوة بإن التاجر بيجهّز.
+   */
+  maintenanceMode: boolean
+  maintenanceMessage: string | null
+  comingSoon: boolean
+  comingSoonMessage: string | null
+  seoTitle: string | null
+  seoDescription: string | null
+  seoKeywords: string | null
+  ogImage: string | null
+  allowIndexing: boolean
   tagline: string | null
   logoLight: string | null
   logoDark: string | null
@@ -99,6 +115,15 @@ export const getStore = cache(async (identifier: string): Promise<StorefrontStor
       /** تنسيق رقم الطلب — الفاتورة وصفحة الطلب بيعرضوه زي ما التاجر ظبّطه */
       orderPrefix: stores.orderPrefix,
       orderSuffix: stores.orderSuffix,
+      maintenanceMode: stores.maintenanceMode,
+      maintenanceMessage: stores.maintenanceMessage,
+      comingSoon: stores.comingSoon,
+      comingSoonMessage: stores.comingSoonMessage,
+      seoTitle: stores.seoTitle,
+      seoDescription: stores.seoDescription,
+      seoKeywords: stores.seoKeywords,
+      ogImage: stores.ogImage,
+      allowIndexing: stores.allowIndexing,
       deletedAt: stores.deletedAt,
     })
     .from(stores)

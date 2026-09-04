@@ -8,6 +8,7 @@ import { CartProvider } from '@/components/storefront/cart'
 import { StoreHeader } from '@/components/storefront/chrome'
 import { PreviewBridge } from '@/components/storefront/preview-bridge'
 import { StorePreloader } from '@/components/storefront/preloader'
+import { StoreClosed } from '@/components/storefront/store-closed'
 import { StoreFooter } from '@/components/storefront/footer'
 import { StoreToolbar } from '@/components/storefront/store-toolbar'
 import { MobileNav } from '@/components/storefront/mobile-nav'
@@ -30,11 +31,32 @@ export async function generateMetadata({
   const store = await getStore(identifier)
   if (!store) return { title: 'المتجر مش موجود' }
 
+  /**
+   * سيو التاجر بيغلب الافتراضي.
+   *
+   * الافتراضي «اسم المتجر» و«تسوّق من …» بيخلّي كل متاجر المنصة
+   * نتايجها متشابهة في جوجل — ومفيش واحد فيهم بيوصف بضاعته. اللي
+   * التاجر بيكتبه هنا هو اللي بيفرّقه.
+   *
+   * والعنوان بيفضل `absolute` عشان قالب المنصة ما يلزقش اسمنا على
+   * علامة التاجر.
+   */
+  const seoTitle = store.seoTitle?.trim() || store.name
+  const seoDescription =
+    store.seoDescription?.trim() || store.tagline || `تسوّق من ${store.name}`
+  const shareImage = store.ogImage ?? store.logoLight ?? undefined
+
   return {
-    // absolute يمنع قالب المنصة («… | زاوية») من إضافة اسمها لعنوان
-    // متجر التاجر — المتجر علامة مستقلة مش صفحة تابعة لنا
-    title: { absolute: store.name, template: `%s | ${store.name}` },
-    description: store.tagline ?? `تسوّق من ${store.name}`,
+    title: { absolute: seoTitle, template: `%s | ${store.name}` },
+    description: seoDescription,
+    keywords: store.seoKeywords?.trim() || undefined,
+    /*
+      الفهرسة بتتقفل وقت التجهيز.
+
+      الصفحة الفاضية اللي اتفهرست بتفضل في نتايج جوجل شهور بعد ما
+      تمتلي — والتاجر بيشتكي إن اسمه بيطلع بصفحة قديمة ومش عارف ليه.
+    */
+    robots: store.allowIndexing ? undefined : { index: false, follow: false },
     /*
       أيقونة التبويب: الأيقونة المخصّصة الأول، وبعدها الشعار.
 
@@ -54,7 +76,23 @@ export async function generateMetadata({
       const mark = store.favicon ?? store.logoLight
       return mark ? { icon: mark, shortcut: mark, apple: mark } : { icon: [] }
     })(),
-    openGraph: { title: store.name, description: store.tagline ?? undefined, type: 'website' },
+    /*
+      صورة المشاركة أهم من العنوان على واتساب.
+
+      الرابط اللي بيتبعت في محادثة بيتحوّل لبطاقة، والصورة هي أكبر
+      حاجة فيها. من غيرها الرابط بيبان سطر نص باهت — وده الفرق بين
+      إن حد يدوس عليه ولا يعدّيه.
+    */
+    openGraph: {
+      title: seoTitle,
+      description: seoDescription,
+      type: 'website',
+      siteName: store.name,
+      images: shareImage ? [shareImage] : undefined,
+    },
+    twitter: shareImage
+      ? { card: 'summary_large_image', title: seoTitle, description: seoDescription, images: [shareImage] }
+      : undefined,
   }
 }
 
@@ -82,6 +120,68 @@ export default async function StorefrontLayout({
   const path = h.get('x-zawya-path') ?? ''
   if (path.includes('/lp/')) {
     return <>{children}</>
+  }
+
+  /**
+   * المتجر مقفول — صيانة أو «قريبًا».
+   *
+   * ## المسارات اللي بتعدّي
+   * صفحة تتبّع الطلب والفاتورة بيفضلوا شغّالين. العميل اللي دفع
+   * ومستني شحنته مالوش دعوة بإن التاجر بيغيّر شكل متجره — وحجب
+   * فاتورته عنه بيخلّيه يفتكر إن فلوسه ضاعت ويتصل يشتكي.
+   *
+   * وحساب العميل معاهم: هو الباب اللي بيوصل منه لطلباته.
+   *
+   * ## والمعاينة بتشوف المتجر عادي
+   * التاجر اللي قافل متجره للصيانة لازم يفضل قادر يشوف شغله وهو
+   * بيظبّطه — وإلا بيفتح ويقفل مع كل تعديل.
+   */
+  const closed = store.maintenanceMode
+    ? ('maintenance' as const)
+    : store.comingSoon
+      ? ('coming_soon' as const)
+      : null
+
+  const alwaysOpen = /\/(order|account|invoice)(\/|$)/.test(path)
+
+  if (closed && !isPreview && !alwaysOpen) {
+    /*
+      الثيم بس — من غير الأقسام والبكسل والعجلة والمساعد.
+
+      الشاشة دي فيها شعار ورسالة وخانة بريد. تحميل باقي بيانات
+      المتجر معناه خمس استعلامات على كل زيارة لصفحة مقفولة، والمتجر
+      اللي بيعلن قبل ما يفتح ممكن يكون عليه ضغط أعلى من المفتوح.
+    */
+    const closedTheme = await getStoreTheme(store.id)
+    const id = closedTheme.custom.identity
+
+    return (
+      <div
+        style={
+          {
+            '--sf-primary': id.primary,
+            '--sf-accent': id.accent,
+            '--sf-bg': id.background,
+            '--sf-surface': id.surface,
+            '--sf-text': id.text,
+            '--sf-radius': RADIUS_PX[id.radius],
+            '--sf-font-heading': FONT_STACKS[id.fontHeading],
+            '--sf-font-body': FONT_STACKS[id.fontBody],
+            fontFamily: 'var(--sf-font-body)',
+            background: id.background,
+            color: id.text,
+          } as React.CSSProperties
+        }
+      >
+        <StoreClosed
+          kind={closed}
+          storeName={store.name}
+          storeSlug={store.slug}
+          logo={id.logoLight ?? store.logoLight}
+          message={closed === 'maintenance' ? store.maintenanceMessage : store.comingSoonMessage}
+        />
+      </div>
+    )
   }
 
   const [theme, cats, pixels, policyPages, wheel] = await Promise.all([
