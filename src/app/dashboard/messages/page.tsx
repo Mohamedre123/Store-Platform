@@ -3,6 +3,7 @@ import { AlertCircle, Mail } from 'lucide-react'
 import { db } from '@/db'
 import { messageLog } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { isEmailConfigured } from '@/lib/email'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
@@ -13,7 +14,8 @@ export const metadata = { title: 'سجل الرسايل' }
 export const dynamic = 'force-dynamic'
 
 export default async function MessagesPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'orders.view')
 
   const rows = (await db
     .select({

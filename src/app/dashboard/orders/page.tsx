@@ -4,6 +4,7 @@ import { Mail, MessageCircle, Package, Phone, Plus, ShoppingBag } from 'lucide-r
 import { db } from '@/db'
 import { orders } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { formatMoney, formatDateTime } from '@/lib/utils'
 import { ORDER_STATUSES, statusMeta } from '@/lib/order-status'
 import { formatOrderNumber } from '@/lib/order-number'
@@ -21,7 +22,8 @@ export default async function OrdersPage({
 }: {
   searchParams: Promise<{ filter?: string }>
 }) {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'orders.view')
   const { filter } = await searchParams
 
   const isIncomplete = filter === 'incomplete'

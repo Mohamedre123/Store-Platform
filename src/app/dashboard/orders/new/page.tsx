@@ -5,6 +5,7 @@ import { ArrowRight } from 'lucide-react'
 import { db } from '@/db'
 import { shippingRates, shippingZones } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { getOrderQuota } from '@/lib/entitlements'
 import { regionsFor } from '@/lib/regions'
 import { getCheckoutSettings } from '@/lib/checkout'
@@ -23,7 +24,8 @@ export const metadata = { title: 'طلب جديد' }
  * يفتكر إن فيه عطل.
  */
 export default async function NewOrderPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'orders.manage')
   if (!store.manualOrdersEnabled) notFound()
 
   const [quota, settings, zone] = await Promise.all([

@@ -2,6 +2,7 @@ import { desc, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { products, reviews } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { ReviewsManager, type ReviewRow } from './reviews-manager'
@@ -9,7 +10,8 @@ import { ReviewsManager, type ReviewRow } from './reviews-manager'
 export const metadata = { title: 'المراجعات' }
 
 export default async function ReviewsPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'customers.view')
 
   const rows = await db
     .select({

@@ -223,6 +223,21 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
     password: formData.get('password'),
   })
 
+  /**
+   * الوجهة بعد الدخول.
+   *
+   * بتيجي من رابط زي دعوة انضمام لفريق: الموظف بيفتح الرابط، بنوديه
+   * يسجّل، وبيرجع لنفس الرابط. من غيرها بيلاقي نفسه على لوحة فاضية
+   * ومش فاهم راح فين الرابط.
+   *
+   * **مسارات داخلية بس.** أي قيمة ما بتبدأش بـ`/` أو بتبدأ بـ`//`
+   * بتتجاهل — وإلا الخانة دي بتبقى تحويلًا مفتوحًا: حد يبعت رابط
+   * دخول لموقعنا وبعد ما التاجر يسجّل يلاقي نفسه على موقع تاني
+   * شبهنا بيطلب منه كلمة سره تاني.
+   */
+  const rawNext = String(formData.get('next') ?? '')
+  const next = /^\/(?!\/)[\w\-/?=&%.]*$/.test(rawNext) ? rawNext : null
+
   if (!parsed.success) return { fieldErrors: fieldErrorsFrom(parsed.error) }
 
   const { email, password } = parsed.data
@@ -267,7 +282,7 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
     if (!(otp.ok && otp.autoVerified)) redirect('/verify')
   }
 
-  redirect('/dashboard')
+  redirect(next ?? '/dashboard')
 }
 
 export async function logoutAction() {

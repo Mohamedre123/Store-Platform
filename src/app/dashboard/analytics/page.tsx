@@ -4,6 +4,7 @@ import { ArrowDownRight, ArrowUpRight, BarChart3, TrendingUp, Wallet } from 'luc
 import { db } from '@/db'
 import { expenses, orders, products } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { formatMoney } from '@/lib/utils'
 import { statusMeta } from '@/lib/order-status'
 import { PageHeader } from '@/components/dashboard/page-shell'
@@ -24,7 +25,8 @@ function pctChange(cur: number, prev: number): number | null {
 }
 
 export default async function AnalyticsPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'reports.view')
   const sid = store.id
 
   const [[kpi], daily, statusRows, topProducts, funnel] = await Promise.all([

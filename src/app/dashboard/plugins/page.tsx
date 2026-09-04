@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { storePlugins } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { aiAllowed, getAiConfig, getClaudeConfig, GEMINI_PRO_SLUG, GEMINI_SLUG } from '@/lib/ai/settings'
@@ -12,7 +13,8 @@ import { PluginsManager, type PluginRow } from './plugins-manager'
 export const metadata = { title: 'الإضافات' }
 
 export default async function PluginsPage() {
-  const { store, user } = await getDashboardContext()
+  const { store, user, actor } = await getDashboardContext()
+  guard(actor, 'settings.manage')
 
   const rows = await db
     .select({

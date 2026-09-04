@@ -5,14 +5,23 @@ import { cache } from 'react'
 import { notFound } from 'next/navigation'
 import { getCurrentUser, getMemberStoresFull, type SessionUser } from './auth'
 import { stores } from '@/db/schema'
+import type { Actor } from './permissions'
 
 const ACTIVE_STORE_COOKIE = 'zawya_store'
 
-export type ActiveStore = typeof stores.$inferSelect & { role: string }
+export type ActiveStore = typeof stores.$inferSelect & { role: string; permissions: string[] }
 
 export type DashboardContext = {
   user: SessionUser
   store: ActiveStore
+  /**
+   * صلاحيات المستخدم في المتجر ده.
+   *
+   * مطلعة من السياق لا محسوبة في كل شاشة: الصفحة بتنادي `guard()`
+   * والفعل بينادي `assertCan()` وكلاهما بياخد نفس الكائن — فمفيش
+   * شاشة بتقول «مفتوح» وفعل بيقول «مقفول».
+   */
+  actor: Actor
 }
 
 /**
@@ -37,7 +46,11 @@ export const getDashboardContext = cache(async (): Promise<DashboardContext> => 
   const requested = jar.get(ACTIVE_STORE_COOKIE)?.value
   const chosen = memberships.find((m) => m.id === requested) ?? memberships[0]
 
-  return { user, store: chosen }
+  return {
+    user,
+    store: chosen,
+    actor: { role: chosen.role, permissions: chosen.permissions },
+  }
 })
 
 /** المتجر النشط فقط — اختصار للصفحات اللي مش محتاجة بيانات المستخدم */

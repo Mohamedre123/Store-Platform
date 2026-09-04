@@ -1,4 +1,5 @@
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { eligibleCount, readConnections } from '@/lib/marketplace'
 import { platformOrigin } from '@/lib/domain'
 import { PageHeader } from '@/components/dashboard/page-shell'
@@ -8,7 +9,8 @@ import { MarketplaceManager } from './marketplace-manager'
 export const metadata = { title: 'ربط الكتالوج' }
 
 export default async function MarketplacePage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'marketing.manage')
 
   const [connections, counts] = await Promise.all([
     readConnections(store.id),

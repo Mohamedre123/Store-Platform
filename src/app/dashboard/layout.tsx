@@ -65,6 +65,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
         userName={user.name}
         userEmail={user.email}
         isPlatformAdmin={user.isPlatformAdmin}
+        role={store.role}
+        permissions={store.permissions}
         onLogout={logoutAction}
       />
 
@@ -101,7 +103,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
           {/* تبويبات القسم — بتظهر لوحدها في الصفحات اللي ليها إخوان */}
           <div className="mb-6 empty:mb-0">
-            <SectionTabs />
+            <SectionTabs role={store.role} permissions={store.permissions} />
           </div>
           {children}
           {assistantReady && <AssistantPanel />}

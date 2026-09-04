@@ -164,13 +164,15 @@ export type MemberStore = {
  * ده بيشيل رحلة كاملة للخادم من كل تنقّل في اللوحة.
  */
 export const getMemberStoresFull = cache(
-  async (userId: string): Promise<Array<typeof stores.$inferSelect & { role: string }>> => {
+  async (
+    userId: string,
+  ): Promise<Array<typeof stores.$inferSelect & { role: string; permissions: string[] }>> => {
     const rows = await db
-      .select({ store: stores, role: storeMembers.role })
+      .select({ store: stores, role: storeMembers.role, permissions: storeMembers.permissions })
       .from(storeMembers)
       .innerJoin(stores, eq(stores.id, storeMembers.storeId))
-      .where(eq(storeMembers.userId, userId))
-    return rows.map((r) => ({ ...r.store, role: r.role }))
+      .where(and(eq(storeMembers.userId, userId), eq(storeMembers.isBlocked, false)))
+    return rows.map((r) => ({ ...r.store, role: r.role, permissions: r.permissions ?? [] }))
   },
 )
 

@@ -2,6 +2,7 @@ import { asc, desc, eq, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { customers, loyaltyTransactions, rewards, wheelPrizes, wheelSettings } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { getLoyaltySettings } from '@/lib/loyalty'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
@@ -13,7 +14,8 @@ import { RewardsForm, type RewardItem } from './rewards-form'
 export const metadata = { title: 'الولاء والنقاط' }
 
 export default async function LoyaltyPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'customers.view')
 
   const [settings, [stats], recent, [wheelCfg], wheelPrizeRows, rewardRows] = await Promise.all([
     getLoyaltySettings(store.id),

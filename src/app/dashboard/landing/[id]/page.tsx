@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { funnels, products } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { publicStoreUrl } from '@/lib/domain'
 import type { Block } from '@/lib/landing'
 import { LandingEditor } from './editor'
@@ -15,7 +16,8 @@ export default async function LandingEditorPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'marketing.manage')
 
   const [funnel] = await db
     .select()

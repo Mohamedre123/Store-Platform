@@ -2,6 +2,7 @@ import { desc, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { apiKeys, webhooks } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { ROOT_DOMAIN } from '@/lib/domain'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
@@ -10,7 +11,8 @@ import { DevelopersManager, type HookRow, type KeyRow } from './developers-manag
 export const metadata = { title: 'المطوّرون' }
 
 export default async function DevelopersPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'settings.manage')
 
   const [keys, hooks] = await Promise.all([
     db

@@ -2,6 +2,7 @@ import { and, asc, eq, isNull, lte, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { products, suppliers } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { SuppliersManager, type ReorderRow, type SupplierRow } from './suppliers-manager'
@@ -9,7 +10,8 @@ import { SuppliersManager, type ReorderRow, type SupplierRow } from './suppliers
 export const metadata = { title: 'الموردون' }
 
 export default async function SuppliersPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'inventory.manage')
 
   const rows = (await db
     .select({

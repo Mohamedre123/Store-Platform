@@ -238,9 +238,24 @@ export const storeMembers = pgTable(
     storeId: uuid('store_id').notNull().references(() => stores.id, { onDelete: 'cascade' }),
     userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
     role: text('role').$type<MemberRole>().notNull().default('staff'),
+    /**
+     * الصلاحيات المفتوحة للعضو ده بالتحديد.
+     *
+     * فاضية = خُد افتراضيات دورك. ده مش «مفيش صلاحيات»: الحسابات
+     * اللي اتعملت قبل نظام الصلاحيات كلها صفوفها فاضية، ولو قرأناها
+     * كمنع، كل تاجر عنده شريك كان هيلاقيه اتقفل عليه فجأة.
+     */
     permissions: jsonb('permissions').$type<string[]>().notNull().default([]),
     invitedBy: uuid('invited_by'),
     acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+    /**
+     * موظف موقوف — بيفضل في القايمة وما بيدخلش.
+     *
+     * الحذف كان بيشيل الصف كله، ومعاه العلاقة اللي سجل التدقيق
+     * بيوصل بيها الأفعال القديمة لصاحبها. الموظف اللي مشي النهارده
+     * لازم يفضل مربوطًا باللي عمله إمبارح.
+     */
+    isBlocked: boolean('is_blocked').notNull().default(false),
     createdAt: createdAt(),
   },
   (t) => [

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { loginAction, type FormState } from '../actions'
 import { Alert, Button, Field, Input } from '@/components/ui'
 
-export function LoginForm() {
+export function LoginForm({ next }: { next: string | null }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(loginAction, null)
 
   return (
@@ -18,6 +18,22 @@ export function LoginForm() {
       {state?.error && <Alert>{state.error}</Alert>}
 
       <form action={formAction} className="flex flex-col gap-5" noValidate>
+        {/*
+          الوجهة بتتمرّر مع النموذج لا في الرابط بس.
+
+          الفعل بيقرا من بيانات النموذج لا من الـURL، فالخانة المخفية
+          دي هي الطريق الوحيد اللي بيوصّل «رجّعني للدعوة» للخادم.
+        */}
+        {next && <input type="hidden" name="next" value={next} />}
+
+        {/*
+          الوجهة بتتمرّر مع النموذج لا في الرابط بس.
+
+          الفعل بيقرا من  لا من الـURL، فالخانة المخفية دي
+          هي الطريق الوحيد اللي بيوصّل «رجّعني للدعوة» للخادم.
+        */}
+        {next && <input type="hidden" name="next" value={next} />}
+
         <Field label="البريد الإلكتروني" required htmlFor="email" error={state?.fieldErrors?.email}>
           <Input
             id="email"

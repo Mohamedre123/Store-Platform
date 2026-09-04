@@ -3,6 +3,7 @@ import { RotateCcw } from 'lucide-react'
 import { db } from '@/db'
 import { orders, returns } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { Card } from '@/components/ui'
@@ -11,7 +12,8 @@ import { ReturnsManager, type ReturnRow } from './returns-manager'
 export const metadata = { title: 'المرتجعات' }
 
 export default async function ReturnsPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'orders.view')
 
   const rows = await db
     .select({

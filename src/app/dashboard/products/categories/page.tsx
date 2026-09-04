@@ -4,6 +4,7 @@ import { ArrowRight } from 'lucide-react'
 import { db } from '@/db'
 import { categories, products } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { CategoriesManager } from './categories-manager'
@@ -11,7 +12,8 @@ import { CategoriesManager } from './categories-manager'
 export const metadata = { title: 'الأقسام' }
 
 export default async function CategoriesPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'products.view')
 
   const rows = await db
     .select({

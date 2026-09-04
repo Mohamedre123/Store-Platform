@@ -4,6 +4,7 @@ import { ExternalLink, Paintbrush } from 'lucide-react'
 import { db } from '@/db'
 import { storeThemes, type Section } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { getTheme } from '@/lib/themes'
 import { publicStoreUrl } from '@/lib/domain'
 import { PageHeader } from '@/components/dashboard/page-shell'
@@ -19,7 +20,8 @@ import { aiAllowed, getClaudeConfig, isClaudeReady } from '@/lib/ai/settings'
 export const metadata = { title: 'المتجر' }
 
 export default async function StorefrontPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'storefront.manage')
 
   const [theme] = await db
     .select()

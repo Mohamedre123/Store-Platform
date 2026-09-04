@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { shippingRates, shippingZones } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { regionsFor } from '@/lib/regions'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
@@ -16,7 +17,8 @@ import { platformOrigin } from '@/lib/domain'
 export const metadata = { title: 'الشحن' }
 
 export default async function ShippingPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'settings.manage')
 
   const [zone] = await db
     .select()

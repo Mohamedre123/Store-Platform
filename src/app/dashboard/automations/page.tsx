@@ -2,6 +2,7 @@ import { desc, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { automationRules, notificationRecipients } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { RuleBuilder, type RuleRow } from './rule-builder'
@@ -14,7 +15,8 @@ import { readWhatsapp } from '@/lib/whatsapp'
 export const metadata = { title: 'الأتمتة' }
 
 export default async function AutomationsPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'marketing.manage')
 
   const rows = await db
     .select()

@@ -3,6 +3,7 @@ import { and, asc, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { categories, products } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { ProductForm } from '../product-form'
 import { DeleteProduct } from '../delete-product'
@@ -12,7 +13,8 @@ export const metadata = { title: 'تعديل المنتج' }
 
 export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'products.view')
 
   const [product] = await db
     .select()

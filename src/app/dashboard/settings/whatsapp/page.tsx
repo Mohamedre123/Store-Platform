@@ -1,4 +1,5 @@
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { readTemplates, readWhatsapp } from '@/lib/whatsapp'
 import { platformToken } from '@/lib/whatsapp-onboard'
 import { PageHeader } from '@/components/dashboard/page-shell'
@@ -9,7 +10,8 @@ import { TemplatesEditor } from './templates-editor'
 export const metadata = { title: 'واتساب' }
 
 export default async function WhatsappPage() {
-  const { store, user } = await getDashboardContext()
+  const { store, user, actor } = await getDashboardContext()
+  guard(actor, 'settings.manage')
   const settings = await readWhatsapp(store.id)
   const templates = await readTemplates(store.id)
 

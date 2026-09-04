@@ -2,6 +2,7 @@ import { and, asc, desc, eq, isNull } from 'drizzle-orm'
 import { db } from '@/db'
 import { experiments, products } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { ExperimentsManager, type ExperimentRow } from './experiments-manager'
@@ -10,7 +11,8 @@ export const metadata = { title: 'تجارب A/B' }
 export const dynamic = 'force-dynamic'
 
 export default async function ExperimentsPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'marketing.manage')
 
   const [rows, productList] = await Promise.all([
     db

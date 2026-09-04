@@ -2,6 +2,7 @@ import { asc, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { bookings, orders, products } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { DEFAULT_HOURS } from '@/lib/bookings'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
@@ -10,7 +11,8 @@ import { BookingsManager, type BookingRow } from './bookings-manager'
 export const metadata = { title: 'الحجوزات' }
 
 export default async function BookingsPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'orders.view')
 
   const rows = await db
     .select({

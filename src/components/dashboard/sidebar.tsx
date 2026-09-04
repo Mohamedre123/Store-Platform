@@ -48,11 +48,19 @@ import { brand } from '@/lib/brand'
  * نفس القائمة بتتحوّل لتبويبات جوّه الصفحات — فلو دخل من رابط مباشر
  * يشوف إخوان الصفحة قدامه برضه.
  */
-export type NavChild = { href: string; label: string }
+/**
+ * الصلاحية اللي البند محتاجها عشان يبان.
+ *
+ * الإخفاء هنا **راحة مش حماية**: الصفحة نفسها بتنادي `guard()`
+ * وبترجّع ٤٠٤، والفعل بينادي `assertCan()`. الفايدة إن الموظف
+ * ما يقعدش يبص على أقسام هيلاقي بابها مقفول.
+ */
+export type NavChild = { href: string; label: string; permission?: string }
 export type NavSection = {
   href: string
   label: string
   icon: typeof LayoutDashboard
+  permission?: string
   children?: NavChild[]
 }
 
@@ -62,9 +70,10 @@ export const NAV: NavSection[] = [
     href: '/dashboard/orders',
     label: 'الطلبات',
     icon: ShoppingBag,
+    permission: 'orders.view',
     children: [
       { href: '/dashboard/orders', label: 'كل الطلبات' },
-      { href: '/dashboard/orders/new', label: 'طلب جديد' },
+      { href: '/dashboard/orders/new', label: 'طلب جديد', permission: 'orders.manage' },
       { href: '/dashboard/orders?filter=incomplete', label: 'السلات المتروكة' },
       { href: '/dashboard/shipments', label: 'الشحنات' },
       { href: '/dashboard/returns', label: 'المرتجعات' },
@@ -75,18 +84,20 @@ export const NAV: NavSection[] = [
     href: '/dashboard/products',
     label: 'المنتجات',
     icon: Package,
+    permission: 'products.view',
     children: [
       { href: '/dashboard/products', label: 'كل المنتجات' },
       { href: '/dashboard/products/categories', label: 'الأقسام' },
-      { href: '/dashboard/inventory', label: 'المخزون' },
-      { href: '/dashboard/inventory/branches', label: 'الفروع والمخازن' },
-      { href: '/dashboard/suppliers', label: 'الموردون' },
+      { href: '/dashboard/inventory', label: 'المخزون', permission: 'inventory.manage' },
+      { href: '/dashboard/inventory/branches', label: 'الفروع والمخازن', permission: 'inventory.manage' },
+      { href: '/dashboard/suppliers', label: 'الموردون', permission: 'inventory.manage' },
     ],
   },
   {
     href: '/dashboard/customers',
     label: 'العملاء',
     icon: Users,
+    permission: 'customers.view',
     children: [
       { href: '/dashboard/customers', label: 'كل العملاء' },
       { href: '/dashboard/loyalty', label: 'الولاء والنقاط' },
@@ -97,13 +108,14 @@ export const NAV: NavSection[] = [
     href: '/dashboard/marketing',
     label: 'التسويق',
     icon: Megaphone,
+    permission: 'marketing.manage',
     children: [
       { href: '/dashboard/marketing', label: 'الكوبونات والعروض' },
       { href: '/dashboard/landing', label: 'صفحات الهبوط' },
       { href: '/dashboard/affiliates', label: 'المسوّقون' },
       { href: '/dashboard/automations', label: 'الأتمتة' },
-      { href: '/dashboard/analytics', label: 'التحليلات' },
-      { href: '/dashboard/expenses', label: 'المصروفات والأرباح' },
+      { href: '/dashboard/analytics', label: 'التحليلات', permission: 'reports.view' },
+      { href: '/dashboard/expenses', label: 'المصروفات والأرباح', permission: 'finance.view' },
       { href: '/dashboard/experiments', label: 'تجارب A/B' },
       { href: '/dashboard/marketplace', label: 'ربط الكتالوج' },
     ],
@@ -112,11 +124,12 @@ export const NAV: NavSection[] = [
     href: '/dashboard/storefront',
     label: 'المتجر',
     icon: Store,
+    permission: 'storefront.manage',
     children: [
       { href: '/dashboard/storefront', label: 'الثيم والتصميم' },
       { href: '/dashboard/storefront/banners', label: 'البانرات' },
-      { href: '/dashboard/blog', label: 'المدوّنة' },
-      { href: '/dashboard/settings/pages', label: 'صفحات المتجر' },
+      { href: '/dashboard/blog', label: 'المدوّنة', permission: 'storefront.manage' },
+      { href: '/dashboard/settings/pages', label: 'صفحات المتجر', permission: 'storefront.manage' },
       /*
         صفحات الهبوط هنا كمان لا في التسويق بس.
 
@@ -133,21 +146,23 @@ export const NAV: NavSection[] = [
     مش «إعداد بيتظبّط مرة». ودفنهم جوّه قائمة منسدلة كان بيخلّي
     ربط بوابة الدفع يبان خطوة إدارية، وهي أهم خطوة في المتجر كله.
   */
-  { href: '/dashboard/payments', label: 'الدفع', icon: CreditCard },
-  { href: '/dashboard/shipping', label: 'الشحن', icon: Truck },
-  { href: '/dashboard/plugins', label: 'الإضافات', icon: Plug },
+  { href: '/dashboard/payments', label: 'الدفع', icon: CreditCard, permission: 'settings.manage' },
+  { href: '/dashboard/shipping', label: 'الشحن', icon: Truck, permission: 'settings.manage' },
+  { href: '/dashboard/plugins', label: 'الإضافات', icon: Plug, permission: 'settings.manage' },
   {
     href: '/dashboard/settings',
     label: 'الإعدادات',
     icon: Settings,
+    permission: 'settings.manage',
     children: [
       { href: '/dashboard/settings', label: 'بيانات المتجر' },
       { href: '/dashboard/settings/checkout', label: 'الشيك أوت' },
       { href: '/dashboard/settings/orders', label: 'الطلبات والترقيم' },
       { href: '/dashboard/settings/domain', label: 'النطاق' },
       { href: '/dashboard/settings/email', label: 'بريد المتجر' },
-      { href: '/dashboard/messages', label: 'سجل الرسايل' },
+      { href: '/dashboard/messages', label: 'سجل الرسايل', permission: 'orders.view' },
       { href: '/dashboard/settings/activity', label: 'سجل النشاط' },
+      { href: '/dashboard/settings/team', label: 'الفريق', permission: 'orders.view' },
       { href: '/dashboard/developers', label: 'المطوّرون' },
     ],
   },
@@ -177,6 +192,8 @@ export function Sidebar({
   userName,
   userEmail,
   isPlatformAdmin,
+  role,
+  permissions,
   onLogout,
 }: {
   storeName: string
@@ -200,6 +217,14 @@ export function Sidebar({
    * بيرجّع 404 وكل فعل جوّاه بيعيد فحص الصلاحية.
    */
   isPlatformAdmin: boolean
+  /**
+   * دور المستخدم وصلاحياته في المتجر ده.
+   *
+   * بتيجي من الخادم مع التخطيط: القايمة بتترسم بالصلاحيات من أول
+   * رسمة، فالموظف ما بيشوفش بندًا وبعدين يختفي منه.
+   */
+  role: string
+  permissions: string[]
   onLogout: () => void
 }) {
   const pathname = usePathname()
@@ -208,9 +233,29 @@ export function Sidebar({
   // الأقسام اللي التاجر فتحها أو طواها بإيده — بتغلب الفتح التلقائي
   const [manual, setManual] = useState<Record<string, boolean>>({})
 
+  /**
+   * البند ده مسموح؟
+   *
+   * نسخة خفيفة من `can()` بتاعة الخادم: المالك عنده كل حاجة،
+   * والقايمة الفاضية معناها «افتراضيات دورك» — والافتراضيات دي
+   * أوسع من الفاضي، فبنسيب البند ظاهر والصفحة هي اللي بتحسم.
+   * الحسم النهائي على الخادم في كل الحالات.
+   */
+  const allowed = (permission?: string) => {
+    if (!permission) return true
+    if (role === 'owner' || role === 'admin') return true
+    if (permissions.length === 0) return true
+    return permissions.includes(permission)
+  }
+
+  const sections = NAV.filter((s) => allowed(s.permission)).map((s) => ({
+    ...s,
+    children: s.children?.filter((c) => allowed(c.permission)),
+  }))
+
   const nav = (
     <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
-      {NAV.map((section) => {
+      {sections.map((section) => {
         const Icon = section.icon
         const inSection = sectionActive(pathname, section)
         // القسم مفتوح لو إحنا جوّاه، أو لو التاجر فتحه بنفسه

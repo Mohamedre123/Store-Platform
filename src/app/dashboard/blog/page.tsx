@@ -2,6 +2,7 @@ import { desc, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { blogPosts } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { BlogManager, type PostRow } from './blog-manager'
@@ -9,7 +10,8 @@ import { BlogManager, type PostRow } from './blog-manager'
 export const metadata = { title: 'المدوّنة' }
 
 export default async function BlogPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'storefront.manage')
 
   const rows = await db
     .select({

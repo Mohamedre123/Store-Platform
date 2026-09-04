@@ -3,6 +3,7 @@ import { Truck } from 'lucide-react'
 import { db } from '@/db'
 import { orders, shipments } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { Card } from '@/components/ui'
@@ -14,7 +15,8 @@ import { ShipmentsManager, type PendingOrder, type ShipmentRow } from './shipmen
 export const metadata = { title: 'الشحنات' }
 
 export default async function ShipmentsPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'orders.view')
 
   /*
     الشركة المربوطة بربط تلقائي — اللي التاجر يقدر يبعتلها بضغطة.

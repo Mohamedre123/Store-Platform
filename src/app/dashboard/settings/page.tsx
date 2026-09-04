@@ -5,6 +5,7 @@ import { db } from '@/db'
 import { storeThemes } from '@/db/schema'
 import { getTheme } from '@/lib/themes'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { ensureAccountId } from '@/lib/account-id'
 import { AccountBadge } from '@/components/dashboard/account-badge'
 import { readWhatsapp } from '@/lib/whatsapp'
@@ -18,7 +19,8 @@ import { SettingsForm } from './settings-form'
 export const metadata = { title: 'الإعدادات' }
 
 export default async function SettingsPage() {
-  const { store, user } = await getDashboardContext()
+  const { store, user, actor } = await getDashboardContext()
+  guard(actor, 'settings.manage')
 
   /*
     معرّف الحساب هنا كمان لا في صفحة الاشتراك بس.

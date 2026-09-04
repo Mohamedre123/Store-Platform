@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { pages } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { PagesEditor, type PageRow } from './pages-editor'
@@ -9,7 +10,8 @@ import { PagesEditor, type PageRow } from './pages-editor'
 export const metadata = { title: 'صفحات المتجر' }
 
 export default async function StorePagesPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'storefront.manage')
 
   const rows = await db
     .select({

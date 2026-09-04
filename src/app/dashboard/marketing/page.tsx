@@ -2,6 +2,7 @@ import { and, desc, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { categories, coupons, offers, products } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { Card } from '@/components/ui'
@@ -11,7 +12,8 @@ import { OffersManager, type OfferRow } from './offers-manager'
 export const metadata = { title: 'التسويق' }
 
 export default async function MarketingPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'marketing.manage')
 
   const [couponRows, productRows, categoryRows, offerRows] = await Promise.all([
     db

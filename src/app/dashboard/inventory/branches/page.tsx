@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { products } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { defaultBranch, levelsForProducts, listBranches } from '@/lib/branches'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
@@ -10,7 +11,8 @@ import { BranchesManager, type BranchProduct } from '../branches-manager'
 export const metadata = { title: 'الفروع والمخازن' }
 
 export default async function BranchesPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'inventory.manage')
 
   /*
     الفرع الافتراضي بيتعمل لوحده في أول زيارة.

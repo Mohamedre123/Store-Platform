@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { storeThemes } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { getTheme } from '@/lib/themes'
 import { defaultCustomization, mergeCustomization, type PanelKey } from '@/lib/customization'
 import { Customizer } from './customizer'
@@ -9,7 +10,8 @@ import { Customizer } from './customizer'
 export const metadata = { title: 'تخصيص المتجر' }
 
 export default async function CustomizePage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'storefront.manage')
 
   const [row] = await db.select().from(storeThemes).where(eq(storeThemes.storeId, store.id)).limit(1)
   const theme = getTheme(row?.themeSlug ?? 'zawya')

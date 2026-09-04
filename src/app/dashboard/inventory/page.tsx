@@ -5,6 +5,7 @@ import { Boxes, ImageOff } from 'lucide-react'
 import { db } from '@/db'
 import { inventoryMovements, products, productVariants } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { formatDateTime, formatMoney } from '@/lib/utils'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
@@ -36,7 +37,8 @@ export default async function InventoryPage({
 }: {
   searchParams: Promise<{ filter?: string }>
 }) {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'inventory.manage')
   const params = await searchParams
   const filter: Filter = params.filter === 'low' || params.filter === 'out' ? params.filter : 'all'
 

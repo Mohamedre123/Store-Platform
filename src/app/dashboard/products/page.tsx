@@ -5,6 +5,7 @@ import { ImageOff, Layers, Package, Plus } from 'lucide-react'
 import { db } from '@/db'
 import { products, categories } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { formatMoney } from '@/lib/utils'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal, SpotlightCard } from '@/components/motion'
@@ -13,7 +14,8 @@ import { Card } from '@/components/ui'
 export const metadata = { title: 'المنتجات' }
 
 export default async function ProductsPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'products.view')
 
   const rows = await db
     .select({

@@ -2,6 +2,7 @@ import { and, desc, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { funnels, products } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { publicStoreUrl } from '@/lib/domain'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
@@ -14,7 +15,8 @@ import { Locked } from '@/components/dashboard/locked'
 export const metadata = { title: 'صفحات الهبوط' }
 
 export default async function LandingPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'marketing.manage')
 
   const claude = await getClaudeConfig(store.id)
   const ent = await getEntitlements(store)

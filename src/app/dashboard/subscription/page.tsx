@@ -3,6 +3,7 @@ import { Crown, Package, Receipt, ShieldCheck } from 'lucide-react'
 import { db } from '@/db'
 import { subscriptionRequests, subscriptions } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { getEntitlements, getOrderQuota } from '@/lib/entitlements'
 import { ensureAccountId } from '@/lib/account-id'
 import { PLANS, PAID_PLANS, STATUS_LABEL, getPlan, daysLeft } from '@/lib/plans'
@@ -31,7 +32,8 @@ const REQUEST_STATUS: Record<string, { label: string; bg: string; fg: string }> 
 }
 
 export default async function SubscriptionPage() {
-  const { store, user } = await getDashboardContext()
+  const { store, user, actor } = await getDashboardContext()
+  guard(actor, 'team.manage')
 
   const [ent, quota, accountId] = await Promise.all([
     getEntitlements(store),

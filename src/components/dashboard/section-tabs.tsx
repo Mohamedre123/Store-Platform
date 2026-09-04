@@ -14,7 +14,20 @@ import { cn } from '@/lib/utils'
  *
  * ما بتظهرش لو الصفحة مالهاش إخوان — تبويب واحد مش تبويبات.
  */
-export function SectionTabs() {
+export function SectionTabs({
+  role,
+  permissions,
+}: {
+  /**
+   * نفس فلترة القايمة الجانبية بالظبط.
+   *
+   * من غيرها، الموظف بيشوف تبويبات إخوان الصفحة اللي هو جوّاها
+   * ويدوس على واحد بيرجّعله ٤٠٤ — فيفتكر إن فيه عطل مش إن البند
+   * مش من حقّه.
+   */
+  role: string
+  permissions: string[]
+}) {
   const pathname = usePathname()
   const search = useSearchParams()
 
@@ -26,13 +39,21 @@ export function SectionTabs() {
       }),
   )
 
-  if (!section?.children || section.children.length < 2) return null
+  const allowed = (permission?: string) => {
+    if (!permission) return true
+    if (role === 'owner' || role === 'admin') return true
+    if (permissions.length === 0) return true
+    return permissions.includes(permission)
+  }
+
+  const children = section?.children?.filter((c) => allowed(c.permission)) ?? []
+  if (children.length < 2) return null
 
   const query = search.toString()
 
   return (
     <div className="scroll-x -mx-1 flex gap-1 border-b border-[var(--border)] px-1 pb-px">
-      {section.children.map((child) => {
+      {children.map((child) => {
         const [childPath, childQuery] = child.href.split('?')
         const active =
           pathname === childPath

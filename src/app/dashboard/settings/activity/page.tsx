@@ -3,6 +3,7 @@ import { ShieldCheck } from 'lucide-react'
 import { db } from '@/db'
 import { auditLog, users } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { auditLabel } from '@/lib/audit'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
@@ -13,7 +14,8 @@ export const metadata = { title: 'سجل النشاط' }
 export const dynamic = 'force-dynamic'
 
 export default async function ActivityPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'settings.manage')
 
   const rows = await db
     .select({

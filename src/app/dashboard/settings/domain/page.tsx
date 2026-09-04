@@ -1,4 +1,5 @@
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { getEntitlements } from '@/lib/entitlements'
 import { Locked } from '@/components/dashboard/locked'
 import { dnsRecordsFor } from '@/lib/custom-domain'
@@ -11,7 +12,8 @@ import { DomainForm } from './domain-form'
 export const metadata = { title: 'النطاق المخصص' }
 
 export default async function DomainPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'settings.manage')
 
   const ent = await getEntitlements(store)
   const token = 'zawya-verify-' + store.id.replace(/-/g, '').slice(0, 24)

@@ -6,6 +6,7 @@ import { AlertTriangle, ArrowRight, Mail, MapPin, MessageCircle, Phone, StickyNo
 import { db } from '@/db'
 import { categories, orderEvents, orderItems, orders, productOptions, products, productVariants } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { formatMoney, formatDateTime } from '@/lib/utils'
 import { statusMeta } from '@/lib/order-status'
 import { formatOrderNumber } from '@/lib/order-number'
@@ -26,7 +27,8 @@ export const metadata = { title: 'تفاصيل الطلب' }
 
 export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'orders.view')
 
   const [order] = await db
     .select()

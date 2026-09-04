@@ -2,13 +2,15 @@ import { asc, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { categories } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { ProductForm } from '../product-form'
 
 export const metadata = { title: 'منتج جديد' }
 
 export default async function NewProductPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'products.manage')
 
   const cats = await db
     .select({ id: categories.id, name: categories.name })

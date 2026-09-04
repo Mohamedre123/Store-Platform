@@ -4,6 +4,7 @@ import { MessageCircle, Phone, Users } from 'lucide-react'
 import { db } from '@/db'
 import { customers } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { formatMoney, formatDate } from '@/lib/utils'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal, SpotlightCard } from '@/components/motion'
@@ -19,7 +20,8 @@ const TIERS: Record<string, { label: string; bg: string; fg: string }> = {
 }
 
 export default async function CustomersPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'customers.view')
 
   const rows = await db
     .select({

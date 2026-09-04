@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { checkoutSettings } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { readWhatsapp } from '@/lib/whatsapp'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
@@ -18,7 +19,8 @@ export const metadata = { title: 'إعدادات الشيك أوت' }
  * التحقّق عشان يقلّل الطلبات الوهمية، مكانش قدامه أي طريق.
  */
 export default async function CheckoutSettingsPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'settings.manage')
 
   const [row] = await db
     .select()

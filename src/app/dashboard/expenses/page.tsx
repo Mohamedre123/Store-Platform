@@ -2,6 +2,7 @@ import { and, desc, eq, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { expenses, orders } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { guard } from '@/lib/permissions'
 import { computeProfit } from '@/lib/expenses'
 import { formatBps, formatMoney } from '@/lib/utils'
 import { PageHeader } from '@/components/dashboard/page-shell'
@@ -15,7 +16,8 @@ export const metadata = { title: 'المصروفات' }
 const realOrder = sql`is_incomplete = false and status not in ('cancelled','returned')`
 
 export default async function ExpensesPage() {
-  const { store } = await getDashboardContext()
+  const { store, actor } = await getDashboardContext()
+  guard(actor, 'finance.view')
 
   const [rows, totals, [sales], [monthSpend]] = await Promise.all([
     db
