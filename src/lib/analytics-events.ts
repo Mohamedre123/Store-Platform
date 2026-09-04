@@ -31,6 +31,15 @@ export async function recordEvent(input: {
   path?: string
   referrer?: string
   device?: 'mobile' | 'tablet' | 'desktop'
+  /**
+   * من فين جه الزائر — من كوكي الإسناد اللي الوكيل كتبها.
+   *
+   * عمود `utm` كان موجودًا في المخطط ومحدّش بيكتب فيه، فتقرير
+   * «الزيارات حسب المصدر» مكانش ممكن أصلًا. بيتكتب على كل حدث لأن
+   * الجلسة الواحدة ممكن تمتد لأكتر من يوم، وربط الجلسة بمصدرها
+   * بأثر رجعي بيحتاج قراءة تانية.
+   */
+  utm?: Record<string, string> | null
 }): Promise<void> {
   await db.insert(storeEvents).values({
     storeId: input.storeId,
@@ -40,6 +49,7 @@ export async function recordEvent(input: {
     path: input.path?.slice(0, 300) ?? null,
     referrer: input.referrer?.slice(0, 300) ?? null,
     device: input.device ?? null,
+    utm: input.utm ?? null,
   })
 }
 

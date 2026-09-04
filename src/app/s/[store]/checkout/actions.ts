@@ -38,6 +38,7 @@ import { trackExperimentConversions } from '@/lib/experiments'
 import { generateToken } from '@/lib/crypto'
 import { enqueue } from '@/lib/jobs'
 import { normalizePhone } from '@/lib/utils'
+import { ATTRIBUTION_COOKIE, parseAttribution, type Attribution } from '@/lib/attribution'
 import { checkBlocked } from '@/lib/blocklist'
 import { getCurrentCustomer } from '@/lib/customer-auth'
 import { orderQuotaForStore } from '@/lib/entitlements'
@@ -59,6 +60,16 @@ import { renderInvoicePdf } from '@/lib/invoice-pdf'
  */
 async function visitorId(): Promise<string | null> {
   return (await cookies()).get('zw_v')?.value ?? null
+}
+
+/**
+ * إسناد الزيارة من الكوكي اللي الوكيل كتبها.
+ *
+ * الوسوم اتقريت من رابط أول زيارة — مش من الرابط الحالي، لأن العميل
+ * بيطلب بعد عشر دقايق من صفحة تانية والوسوم بتكون راحت.
+ */
+async function orderAttribution(): Promise<Attribution | null> {
+  return parseAttribution((await cookies()).get(ATTRIBUTION_COOKIE)?.value)
 }
 
 export type PlaceOrderState =
@@ -563,6 +574,7 @@ async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
   }
 
   const phone = normalizePhone(input.phone, store.country === 'EG' ? '20' : '966')
+/* الإسناد بيتقرا مرة واحدة هنا — قبل المعاملة عشان ما يفتحش قراءة جوّاها */  const attribution = await orderAttribution()
 
   /**
    * الحظر — **قبل أي كتابة، وقبل خصم المخزون**.
@@ -845,6 +857,15 @@ async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
           orderNumber,
           recoveryToken: input.draftToken || generateToken(16),
           source: input.source,
+          /*
+            الإسناد على الطلب نفسه لا على العميل.
+
+            العميل الواحد بيرجع من مصادر مختلفة، والتاجر بيسأل «الطلب
+            ده جه من فين» مش «العميل ده عرفنا منين أول مرة». وحفظه على
+            الطلب بيخلّي تقرير الشهر اللي فات يفضل صحيحًا حتى لو العميل
+            رجع بعدين من مكان تاني.
+          */
+          utm: attribution ?? undefined,
         })
         .returning({ id: orders.id })
       orderId = created.id

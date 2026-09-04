@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { resolveHost } from '@/lib/domain'
+import { ATTRIBUTION_COOKIE, readAttribution, serializeAttribution } from '@/lib/attribution'
 
 export const config = {
   matcher: [
@@ -61,6 +62,21 @@ export default function proxy(req: NextRequest) {
       ? Math.random().toString(36).slice(2) + Date.now().toString(36)
       : null)
 
+  /**
+   * إسناد الزيارة — من فين جه العميل.
+   *
+   * **أول لمسة بتغلب.** لو الكوكي موجودة، ما بنكتبش فوقها: العميل
+   * اللي جه من إعلان ورجع بعدين من بحث باسم المتجر، الإعلان هو
+   * اللي عرّفه — والكتابة فوقه بتخلّي كل إعلان ناجح ينسب نجاحه
+   * لجوجل.
+   *
+   * والقراءة هنا في الوكيل لأن العميل بيطلب بعد عشر دقايق من صفحة
+   * تانية، والوسوم بتكون راحت من الرابط من زمان.
+   */
+  const attribution = req.cookies.get(ATTRIBUTION_COOKIE)?.value
+    ? null
+    : readAttribution(url.searchParams, req.headers.get('referer'), host)
+
   /** يلحق كوكي المسوّق بأي استجابة قبل ما ترجع */
   const finish = (res: NextResponse) => {
     if (ref) {
@@ -85,6 +101,16 @@ export default function proxy(req: NextRequest) {
         maxAge: 30 * 24 * 60 * 60,
         sameSite: 'lax',
         httpOnly: false,
+      })
+    }
+    if (attribution) {
+      res.cookies.set(ATTRIBUTION_COOKIE, serializeAttribution(attribution), {
+        path: '/',
+        /* ٣٠ يوم — نافذة الإسناد المعتادة، ونفس عمر كوكي المسوّق */
+        maxAge: 30 * 24 * 60 * 60,
+        sameSite: 'lax',
+        /* الخادم بس بيقراها — المتصفح مالوش دعوة بإسناد الطلب */
+        httpOnly: true,
       })
     }
     return res

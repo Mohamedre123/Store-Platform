@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { getStore } from '@/lib/storefront'
 import { isTrackable, recordEvent } from '@/lib/analytics-events'
 import { drainDueJobs } from '@/lib/job-tick'
+import { ATTRIBUTION_COOKIE, parseAttribution } from '@/lib/attribution'
 
 export const dynamic = 'force-dynamic'
 
@@ -56,6 +57,16 @@ export async function POST(req: NextRequest) {
       path: body.path,
       referrer: body.referrer,
       device,
+      /*
+        الإسناد من الكوكي لا من جسم الطلب.
+
+        اللي جاي من المتصفح مُدخل غير موثوق — حد يقدر يبعت
+        `utm_source: 'facebook'` على أحداث مش بتاعته ويزوّر تقرير
+        التاجر. الكوكي كتبها الوكيل من رابط الزيارة الفعلي.
+      */
+      utm: parseAttribution(req.cookies.get(ATTRIBUTION_COOKIE)?.value) as
+        | Record<string, string>
+        | null,
     })
   } catch {
     // جسم تالف أو قاعدة بيانات مشغولة — الحدث بيضيع والتصفّح بيكمّل
