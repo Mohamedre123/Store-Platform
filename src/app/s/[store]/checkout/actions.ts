@@ -38,6 +38,7 @@ import { trackExperimentConversions } from '@/lib/experiments'
 import { generateToken } from '@/lib/crypto'
 import { enqueue } from '@/lib/jobs'
 import { normalizePhone } from '@/lib/utils'
+import { checkBlocked } from '@/lib/blocklist'
 import { getCurrentCustomer } from '@/lib/customer-auth'
 import { orderQuotaForStore } from '@/lib/entitlements'
 import { startPayment } from '@/lib/payment-dispatch'
@@ -564,17 +565,59 @@ async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
   const phone = normalizePhone(input.phone, store.country === 'EG' ? '20' : '966')
 
   /**
+   * الحظر — **قبل أي كتابة، وقبل خصم المخزون**.
+   *
+   * الدفع عند الاستلام معناه إن التاجر بيشحن على أمل، واللي بيطلب
+   * بأرقام وهمية بيكلّفه شحن رايح وجاي في كل مرة. الفحص هنا بيقف
+   * قدام الطلب قبل ما يتحوّل لبضاعة محجوزة وشحنة مسجّلة.
+   *
+   * والرسالة للعميل عامة عن قصد: «مش قادرين نكمّل الطلب» لا «إنت
+   * محظور». اللي اتحظر بالغلط بيكلّم التاجر ويتصلّح، واللي اتحظر
+   * بحق ما ياخدش خريطة يلفّ بيها حوالين الحظر بأرقام جديدة.
+   */
+  const block = await checkBlocked({
+    storeId: store.id,
+    country: store.country,
+    phone,
+    email: input.email || null,
+    name: input.name || null,
+  })
+  if (block.blocked) {
+    return {
+      ok: false,
+      error: 'مش قادرين نكمّل الطلب ده. كلّم المتجر مباشرة وهو هيساعدك.',
+    }
+  }
+
+  /**
    * عدد طلبات العميل *قبل* الطلب ده.
    *
    * لازم نقراه قبل المعاملة: بعدها بيبقى العدّاد اتزوّد، وقاعدة زي
    * «رحّب بالعميل الجديد» مش هتشتغل أبدًا لأن العدد بقى ١ مش ٠.
    */
   const [priorCustomer] = await db
-    .select({ ordersCount: customers.ordersCount })
+    .select({
+      ordersCount: customers.ordersCount,
+      isBlocked: customers.isBlocked,
+    })
     .from(customers)
     .where(and(eq(customers.storeId, store.id), eq(customers.phone, phone)))
     .limit(1)
   const customerOrdersBefore = priorCustomer?.ordersCount ?? 0
+
+  /**
+   * العميل المحظور بعينه.
+   *
+   * `customers.isBlocked` كان موجودًا في المخطط من غير أي فحص في أي
+   * مكان — التاجر بيدوس «احظر» ويلاقي نفس العميل بيطلب تاني في نفس
+   * اليوم. نفس الرسالة العامة، ونفس السبب.
+   */
+  if (priorCustomer?.isBlocked) {
+    return {
+      ok: false,
+      error: 'مش قادرين نكمّل الطلب ده. كلّم المتجر مباشرة وهو هيساعدك.',
+    }
+  }
 
   // الكوبون بيتحقّق على الخادم — الخصم بيتحسب هنا مش من المتصفح. لو الكود
   // بقى غير صالح بين ما العميل طبّقه واتأكد، بنكمّل الطلب من غير خصم بدل

@@ -126,3 +126,54 @@ export const wishlists = pgTable(
   },
   (t) => [uniqueIndex('wishlists_unique').on(t.customerId, t.productId)],
 )
+
+/** نوع البيانات اللي الحظر بيتطابق عليه */
+export type BlockMatch = 'phone' | 'email' | 'ip' | 'name'
+
+/**
+ * قايمة الحظر — منع الطلبات الوهمية قبل ما تتحوّل لشحنة.
+ *
+ * ## ليه دي غير `customers.isBlocked`
+ * العلم اللي على العميل بيمنع **حساب موجود**. لكن أغلب الطلبات
+ * الوهمية بتيجي من ضيف أول مرة يطلب: رقم جديد، بلا حساب، وبيرفض
+ * الاستلام. الصف هنا بيمسك القيمة نفسها — الرقم أو البريد أو
+ * العنوان — قبل ما يتعمل له صف عميل أصلًا.
+ *
+ * ## ليه الحظر ملهوش «رفض صامت» بس
+ * التاجر بيختار: يرفض الطلب من أوله، أو يقبله ويعلّم عليه ويراجعه
+ * بإيده. التاني ده مهم في السوق ده: رقم واحد ممكن يكون العيلة كلها
+ * بتطلب منه، ورفضه بيخسّر التاجر بيع حقيقي — فبيسيبه يعدّي ويبص
+ * عليه هو.
+ */
+export const blocklist = pgTable(
+  'blocklist',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    storeId: uuid('store_id').notNull().references(() => stores.id, { onDelete: 'cascade' }),
+
+    match: text('match').$type<BlockMatch>().notNull().default('phone'),
+    /**
+     * القيمة — مخزّنة **مطبّعة** (حروف صغيرة، والرقم بصيغة موحّدة).
+     *
+     * من غير التطبيع، التاجر بيحظر «01001234567» والعميل بيكتب
+     * «+201001234567» ويعدّي — ويفضل التاجر شايف الحظر مسجّل ومش
+     * فاهم ليه مش شغّال.
+     */
+    value: text('value').notNull(),
+
+    /** يرفض الطلب، ولا يقبله ويعلّم عليه للمراجعة */
+    action: text('action').$type<'reject' | 'flag'>().notNull().default('reject'),
+    reason: text('reason'),
+
+    /** عدد المرات اللي الصف ده منع فيها طلبًا — بيقول للتاجر إن له لازمة */
+    hits: integer('hits').notNull().default(0),
+    lastHitAt: timestamp('last_hit_at', { withTimezone: true }),
+
+    createdBy: uuid('created_by'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex('blocklist_store_value_unique').on(t.storeId, t.match, t.value),
+    index('blocklist_store_idx').on(t.storeId),
+  ],
+)
