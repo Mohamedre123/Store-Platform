@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { ShippingForm } from './shipping-form'
 import { CarriersManager } from './carriers-manager'
+import { AutoShipCard } from './auto-ship-card'
 import { readCarrierProviders, activeCarrier } from '@/lib/provider-store'
 import { zonesFor } from '@/lib/shipping-zones'
 import { supportsTariff } from '@/lib/integrations/shipping-tariff'
@@ -58,6 +59,18 @@ export default async function ShippingPage() {
           origin={platformOrigin()}
           storeId={store.id}
           currency={store.currency}
+        />
+      </Reveal>
+
+      {/*
+        مفتاح التسجيل التلقائي جنب الشركات لا في صفحة إعدادات تانية:
+        هو بيتكلّم عن الشركة اللي فوقه بالظبط، والتاجر بيقرّره وهو
+        شايفها مربوطة.
+      */}
+      <Reveal delay={40}>
+        <AutoShipCard
+          initial={store.autoShipOnConfirm}
+          carrierName={linked ? (linked.displayName ?? linked.slug) : null}
         />
       </Reveal>
 

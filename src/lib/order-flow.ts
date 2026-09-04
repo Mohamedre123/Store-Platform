@@ -83,6 +83,13 @@ type FlowStore = {
    */
   customDomain?: string | null
   customDomainVerifiedAt?: Date | null
+  /**
+   * تسجيل الشحنة تلقائيًا عند التأكيد.
+   *
+   * اختياري في النوع عشان أي نداء بيبني الكائن بإيده ما يتكسرش —
+   * والغياب بيتقرا «مفتوح»، وهو السلوك اللي كان شغّال قبل المفتاح.
+   */
+  autoShipOnConfirm?: boolean
 }
 
 /** بيانات المتجر اللي التحوّلات محتاجاها — للمسارات اللي مالهاش سياق لوحة */
@@ -96,6 +103,7 @@ export async function loadFlowStore(storeId: string): Promise<FlowStore | null> 
       email: stores.email,
       customDomain: stores.customDomain,
       customDomainVerifiedAt: stores.customDomainVerifiedAt,
+      autoShipOnConfirm: stores.autoShipOnConfirm,
     })
     .from(stores)
     .where(eq(stores.id, storeId))
@@ -269,7 +277,7 @@ export async function applyOrderStatus(
    *
    * بغير await: الشيك أوت واللوحة ما يصحّش يستنّوا API شركة شحن.
    */
-  if (status === 'confirmed') {
+  if (status === 'confirmed' && (store.autoShipOnConfirm ?? true)) {
     void queueShipmentForOrder(store.id, order.id).catch((e) =>
       console.error('فشل تسجيل الشحنة تلقائيًا:', e),
     )

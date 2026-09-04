@@ -266,6 +266,19 @@ export const stores = pgTable(
     /** تحصيل عربون مقدّم على الطلب اليدوي، والباقي عند الاستلام */
     manualDepositEnabled: boolean('manual_deposit_enabled').notNull().default(false),
 
+    /**
+     * تسجيل الشحنة تلقائيًا لما الطلب يتأكّد.
+     *
+     * **مفتوح افتراضيًا لأنه السلوك اللي كان شغّال.** لو قفلناه
+     * افتراضيًا، كل تاجر ربط شركة شحن بيلاقي الشحنات وقفت فجأة من
+     * غير ما يغيّر حاجة — وده أسوأ من غياب المفتاح أصلًا.
+     *
+     * وبيتقفل للي عايز يراجع قبل ما يشحن: بوليصة بتتعمل لحظة
+     * التأكيد وإلغاؤها بيكلّف عند بعض الشركات، والتاجر اللي بيطبع
+     * بوليصاته دفعة واحدة آخر اليوم مالوش لازمة بيها دلوقتي.
+     */
+    autoShipOnConfirm: boolean('auto_ship_on_confirm').notNull().default(true),
+
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     deletedAt: deletedAt(),

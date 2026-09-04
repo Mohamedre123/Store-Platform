@@ -3,8 +3,10 @@
 import { revalidatePath } from 'next/cache'
 import { and, eq, inArray } from 'drizzle-orm'
 import { db } from '@/db'
-import { shippingRates, shippingZones } from '@/db/schema'
+import { shippingRates, shippingZones, stores } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { assertCan } from '@/lib/permissions'
+import { recordAudit } from '@/lib/audit'
 import { COUNTRIES, regionsFor } from '@/lib/regions'
 import { fromMinorUnits, toMinorUnits } from '@/lib/utils'
 import { spreadZonePrices, zonesFor, type ZoneKey } from '@/lib/shipping-zones'
@@ -298,4 +300,34 @@ export async function fetchCarrierRatesAction(
     zones: tariff.rows.length,
     applied: res.applied,
   }
+}
+
+/**
+ * مفتاح تسجيل الشحنة تلقائيًا عند تأكيد الطلب.
+ *
+ * ## مفتوح افتراضيًا لأنه السلوك اللي كان شغّال
+ * لو قفلناه، كل تاجر ربط شركة شحن بيلاقي الشحنات وقفت فجأة من غير
+ * ما يغيّر حاجة. المفتاح بيدّي الاختيار للي محتاجه — مش بيغيّر
+ * على اللي شغّال.
+ */
+export async function saveAutoShipAction(enabled: boolean): Promise<ShippingState> {
+  const { store, user, actor } = await getDashboardContext()
+  assertCan(actor, 'settings.manage')
+
+  await db
+    .update(stores)
+    .set({ autoShipOnConfirm: enabled })
+    .where(eq(stores.id, store.id))
+
+  await recordAudit({
+    storeId: store.id,
+    userId: user.id,
+    action: 'settings.update',
+    resource: 'auto_ship',
+    before: { autoShipOnConfirm: store.autoShipOnConfirm },
+    after: { autoShipOnConfirm: enabled },
+  })
+
+  revalidatePath('/dashboard/shipping')
+  return { ok: true }
 }
