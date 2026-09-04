@@ -2,10 +2,10 @@ import { SLink as Link } from '@/components/storefront/store-link'
 import Image from 'next/image'
 import { notFound } from 'next/navigation'
 import { and, eq } from 'drizzle-orm'
-import { CheckCircle2, Clock, FileText, MessageCircle, Package, Truck } from 'lucide-react'
+import { CheckCircle2, Clock, FileText, MessageCircle, Package, Send, Truck } from 'lucide-react'
 import { db } from '@/db'
 import { orderItems, orders, returns, thankYouSettings } from '@/db/schema'
-import { getStore } from '@/lib/storefront'
+import { getStore, getStoreTheme } from '@/lib/storefront'
 import { formatOrderNumber } from '@/lib/order-number'
 import { getCurrentCustomer } from '@/lib/customer-auth'
 import { CustomerLoginForm } from '../../account/login-form'
@@ -96,6 +96,18 @@ export default async function OrderPage({
     .from(thankYouSettings)
     .where(eq(thankYouSettings.storeId, store.id))
     .limit(1)
+
+  /*
+    اسم تيليجرام من إعدادات شريط الأدوات — مصدر واحد.
+
+    التاجر كاتبه هناك عشان زرار المتجر العائم. تكراره في إعدادات
+    الإيصال كان هيخلّي زرارين لنفس الحساب، وأول ما يغيّر واحد
+    يفضل التاني على القديم.
+  */
+  const orderTheme = await getStoreTheme(store.id)
+  const telegramUsername = orderTheme.custom.toolbar.telegramEnabled
+    ? orderTheme.custom.toolbar.telegramUsername?.trim().replace(/^@/, '')
+    : null
 
   // طلب إرجاع قائم — نعرض حالته بدل نموذج جديد
   const [existingReturn] = await db
@@ -265,13 +277,15 @@ export default async function OrderPage({
         اللي بيدوّر على فاتورته بيفتح صفحة طلبه — فلازم يلاقيها هنا
         من غير ما يسأل التاجر.
       */}
-      <Link
-        href={`/order/${order.orderNumber}/invoice?t=${encodeURIComponent(t)}`}
-        className="mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-[var(--sf-radius)] border border-[var(--sf-text)]/15 px-5 font-medium transition-colors hover:bg-[var(--sf-text)]/5"
-      >
-        <FileText className="h-4 w-4" aria-hidden="true" />
-        اعرض الفاتورة
-      </Link>
+      {(settings?.allowDownloadReceipt ?? true) && (
+        <Link
+          href={`/order/${order.orderNumber}/invoice?t=${encodeURIComponent(t)}`}
+          className="mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-[var(--sf-radius)] border border-[var(--sf-text)]/15 px-5 font-medium transition-colors hover:bg-[var(--sf-text)]/5"
+        >
+          <FileText className="h-4 w-4" aria-hidden="true" />
+          اعرض الفاتورة
+        </Link>
+      )}
 
       <div className="mt-3 flex flex-col gap-3 sm:flex-row">
         {(settings?.showWhatsappButton ?? true) && store.whatsapp && (
@@ -285,6 +299,23 @@ export default async function OrderPage({
           >
             <MessageCircle className="h-4 w-4" aria-hidden="true" />
             تواصل معنا
+          </a>
+        )}
+        {/*
+          تيليجرام — المفتاح كان في الجدول من غير أي زرار يقرأه.
+
+          قناة تواصل حقيقية عند شريحة من التجّار، واسم المستخدم
+          موجود أصلًا في إعدادات شريط الأدوات.
+        */}
+        {settings?.showTelegramButton && telegramUsername && (
+          <a
+            href={`https://t.me/${telegramUsername}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-[var(--sf-radius)] border border-[var(--sf-text)]/15 px-5 font-medium"
+          >
+            <Send className="h-4 w-4" aria-hidden="true" />
+            تيليجرام
           </a>
         )}
         <Link
