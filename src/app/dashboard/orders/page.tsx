@@ -1,11 +1,12 @@
 import Link from 'next/link'
 import { and, count, desc, eq, ne } from 'drizzle-orm'
-import { Mail, MessageCircle, Package, Phone, ShoppingBag } from 'lucide-react'
+import { Mail, MessageCircle, Package, Phone, Plus, ShoppingBag } from 'lucide-react'
 import { db } from '@/db'
 import { orders } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { formatMoney, formatDateTime } from '@/lib/utils'
 import { ORDER_STATUSES, statusMeta } from '@/lib/order-status'
+import { formatOrderNumber } from '@/lib/order-number'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal, SpotlightCard } from '@/components/motion'
 import { TrustBadge } from '@/components/dashboard/trust-badge'
@@ -85,6 +86,17 @@ export default async function OrdersPage({
       <PageHeader
         title="الطلبات"
         description={`${totalCount} طلب${incompleteCount ? ` · ${incompleteCount} سلة متروكة` : ''}`}
+        action={
+          store.manualOrdersEnabled ? (
+            <Link
+              href="/dashboard/orders/new"
+              className="inline-flex h-11 items-center gap-2 rounded-lg bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-fg)] shadow-sm transition-opacity hover:opacity-90"
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              طلب جديد
+            </Link>
+          ) : undefined
+        }
       />
 
       {/* السلات المتروكة — أول حاجة تشوفها لأنها فلوس على وشك تضيع */}
@@ -168,7 +180,7 @@ export default async function OrdersPage({
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2 p-4">
                     <Link href={`/dashboard/orders/${o.id}`} className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-center gap-2">
-                        <span className="tabular font-bold">#{o.orderNumber}</span>
+                        <span className="tabular font-bold">#{formatOrderNumber(store, o.orderNumber)}</span>
                         <span
                           className="rounded-md px-2 py-0.5 text-xs font-medium"
                           style={{ background: meta.bg, color: meta.fg }}
@@ -235,7 +247,7 @@ export default async function OrdersPage({
                           href={`https://wa.me/${o.customerPhone.replace(/[^\d]/g, '')}?text=${encodeURIComponent(
                             o.isIncomplete
                               ? `مرحبًا${o.customerName ? ' ' + o.customerName : ''}، شفنا إنك كنت بتطلب من ${store.name} وما كمّلتش. تحب نساعدك؟`
-                              : `مرحبًا${o.customerName ? ' ' + o.customerName : ''}، بخصوص طلبك رقم ${o.orderNumber} من ${store.name}`,
+                              : `مرحبًا${o.customerName ? ' ' + o.customerName : ''}، بخصوص طلبك رقم ${formatOrderNumber(store, o.orderNumber)} من ${store.name}`,
                           )}`}
                           target="_blank"
                           rel="noopener noreferrer"

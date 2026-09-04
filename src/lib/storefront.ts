@@ -59,6 +59,15 @@ export type StorefrontStore = {
    */
   customDomain: string | null
   customDomainVerifiedAt: Date | null
+  /**
+   * تنسيق رقم الطلب زي ما التاجر ظبّطه.
+   *
+   * العميل بيشوف نفس الرقم اللي التاجر بيشوفه في لوحته وبيقوله عليه
+   * في المحادثة. رقمين مختلفين لنفس الطلب بيخلّي كل استفسار محتاج
+   * ترجمة.
+   */
+  orderPrefix: string | null
+  orderSuffix: string | null
 }
 
 /** يحلّ المتجر من النطاق الفرعي أو النطاق المخصّص */
@@ -87,6 +96,9 @@ export const getStore = cache(async (identifier: string): Promise<StorefrontStor
       vatIncludedInPrice: stores.vatIncludedInPrice,
       customDomain: stores.customDomain,
       customDomainVerifiedAt: stores.customDomainVerifiedAt,
+      /** تنسيق رقم الطلب — الفاتورة وصفحة الطلب بيعرضوه زي ما التاجر ظبّطه */
+      orderPrefix: stores.orderPrefix,
+      orderSuffix: stores.orderSuffix,
       deletedAt: stores.deletedAt,
     })
     .from(stores)

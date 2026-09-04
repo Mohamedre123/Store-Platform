@@ -6,6 +6,7 @@ import { CheckCircle2, Clock, FileText, MessageCircle, Package, Truck } from 'lu
 import { db } from '@/db'
 import { orderItems, orders, returns, thankYouSettings } from '@/db/schema'
 import { getStore } from '@/lib/storefront'
+import { formatOrderNumber } from '@/lib/order-number'
 import { getCurrentCustomer } from '@/lib/customer-auth'
 import { CustomerLoginForm } from '../../account/login-form'
 import { returnStatusMeta } from '@/lib/returns-meta'
@@ -125,7 +126,7 @@ export default async function OrderPage({
         </span>
         <h1 className="text-2xl font-bold tracking-tight">وصلنا طلبك</h1>
         <p className="opacity-70">
-          طلب رقم <span className="tabular font-bold">#{order.orderNumber}</span> — هنكلّمك على{' '}
+          طلب رقم <span className="tabular font-bold">#{formatOrderNumber(store, order.orderNumber)}</span> — هنكلّمك على{' '}
           <bdi dir="ltr" className="font-medium">
             {order.customerPhone}
           </bdi>{' '}
@@ -276,7 +277,7 @@ export default async function OrderPage({
         {(settings?.showWhatsappButton ?? true) && store.whatsapp && (
           <a
             href={`https://wa.me/${store.whatsapp.replace(/[^\d]/g, '')}?text=${encodeURIComponent(
-              `استفسار عن الطلب رقم ${order.orderNumber}`,
+              `استفسار عن الطلب رقم ${formatOrderNumber(store, order.orderNumber)}`,
             )}`}
             target="_blank"
             rel="noopener noreferrer"

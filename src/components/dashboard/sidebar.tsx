@@ -64,6 +64,7 @@ export const NAV: NavSection[] = [
     icon: ShoppingBag,
     children: [
       { href: '/dashboard/orders', label: 'كل الطلبات' },
+      { href: '/dashboard/orders/new', label: 'طلب جديد' },
       { href: '/dashboard/orders?filter=incomplete', label: 'السلات المتروكة' },
       { href: '/dashboard/shipments', label: 'الشحنات' },
       { href: '/dashboard/returns', label: 'المرتجعات' },
@@ -141,6 +142,7 @@ export const NAV: NavSection[] = [
     children: [
       { href: '/dashboard/settings', label: 'بيانات المتجر' },
       { href: '/dashboard/settings/checkout', label: 'الشيك أوت' },
+      { href: '/dashboard/settings/orders', label: 'الطلبات والترقيم' },
       { href: '/dashboard/settings/domain', label: 'النطاق' },
       { href: '/dashboard/settings/email', label: 'بريد المتجر' },
       { href: '/dashboard/messages', label: 'سجل الرسايل' },

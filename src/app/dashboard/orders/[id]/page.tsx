@@ -8,6 +8,7 @@ import { categories, orderEvents, orderItems, orders, productOptions, products, 
 import { getDashboardContext } from '@/lib/store-context'
 import { formatMoney, formatDateTime } from '@/lib/utils'
 import { statusMeta } from '@/lib/order-status'
+import { formatOrderNumber } from '@/lib/order-number'
 import { stageMeta } from '@/lib/checkout-stage'
 import { inferStoreKind, type StoreKind } from '@/lib/store-kind'
 import { publicStoreUrl } from '@/lib/domain'
@@ -123,7 +124,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const contactName = order.customerName ? ' ' + order.customerName : ''
   const whatsappText = order.isIncomplete
     ? `مرحبًا${contactName}، شفنا إنك كنت بتطلب من ${store.name} وما كمّلتش الطلب. تحب نساعدك؟`
-    : `مرحبًا${contactName}، بخصوص طلبك رقم ${order.orderNumber} من ${store.name}`
+    : `مرحبًا${contactName}، بخصوص طلبك رقم ${formatOrderNumber(store, order.orderNumber)} من ${store.name}`
 
   return (
     <div className="flex flex-col gap-6">
@@ -136,7 +137,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           >
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
-          <h1 className="tabular text-2xl font-bold tracking-tight">#{order.orderNumber}</h1>
+          <h1 className="tabular text-2xl font-bold tracking-tight">#{formatOrderNumber(store, order.orderNumber)}</h1>
           <span
             className="rounded-md px-2.5 py-1 text-sm font-medium"
             style={{ background: meta.bg, color: meta.fg }}

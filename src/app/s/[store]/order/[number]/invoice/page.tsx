@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { orderItems, orders } from '@/db/schema'
 import { getStore, getStoreTheme } from '@/lib/storefront'
+import { formatOrderNumber } from '@/lib/order-number'
 import { getCurrentCustomer } from '@/lib/customer-auth'
 import { CustomerLoginForm } from '../../../account/login-form'
 import { formatMoney, formatDateTime } from '@/lib/utils'
@@ -137,7 +138,7 @@ export default async function InvoicePage({
           <div className="text-end">
             <p className="text-xs opacity-60">فاتورة رقم</p>
             <p className="tabular text-xl font-bold" style={{ color: theme.custom.identity.primary }}>
-              #{order.orderNumber}
+              #{formatOrderNumber(store, order.orderNumber)}
             </p>
             <p className="mt-0.5 text-xs opacity-60">{formatDateTime(order.createdAt)}</p>
           </div>

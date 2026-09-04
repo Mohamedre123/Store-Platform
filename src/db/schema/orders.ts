@@ -70,6 +70,15 @@ export const orders = pgTable(
     total: money('total'),
     /** تكلفة البضاعة وقت البيع — أساس حساب الربح الحقيقي */
     costTotal: money('cost_total'),
+    /**
+     * العربون المحصَّل مقدّمًا — والباقي بيتحصّل عند الاستلام.
+     *
+     * منفصل عن `paymentStatus` عن قصد: الطلب اللي اتدفع فيه عربون
+     * **مش مدفوع** ومش «غير مدفوع» — التاجر محتاج يعرف إنه هيحصّل
+     * الباقي بس. لو حطّيناه في الحالة، هيبقى إما بيشحن على إنه
+     * مدفوع بالكامل ويخسر الباقي، أو بيطلب المبلغ كله تاني.
+     */
+    depositPaid: money('deposit_paid'),
     currency: text('currency').notNull().default('EGP'),
 
     couponCode: text('coupon_code'),
