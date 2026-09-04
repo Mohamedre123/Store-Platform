@@ -88,3 +88,66 @@ export async function deleteImage(storeId: string, urlOrPath: string): Promise<b
   })
   return res.ok
 }
+
+export type StoredObject = { path: string; name: string; size: number; createdAt: string | null }
+
+/**
+ * قايمة الملفات المرفوعة تحت مجلد متجر.
+ *
+ * ## ليه محتاجينها مع إن عندنا جدول
+ * جدول `media` بيتكتب مع كل رفعة **من دلوقتي**. الملفات اللي اترفعت
+ * قبل ما الجدول يتعمل مالهاش صف — وهي بالظبط صور منتجات التاجر
+ * اللي شغّال من شهور. من غير القراءة دي، معرض الوسائط بيفتح فاضي
+ * لأنشط التجّار، وهو أسوأ انطباع أول ممكن.
+ *
+ * بتقرا مجلدًا واحدًا في النداء: واجهة التخزين بترجّع محتوى مستوى
+ * واحد بس، والمجلدات عندنا معروفة ومحدودة.
+ */
+export async function listStoredObjects(
+  storeId: string,
+  folder: UploadFolder,
+  limit = 100,
+): Promise<StoredObject[]> {
+  const { url, key } = config()
+
+  const res = await fetch(`${url}/storage/v1/object/list/${BUCKET}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${key}`,
+      apikey: key,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      prefix: `${storeId}/${folder}`,
+      limit,
+      sortBy: { column: 'created_at', order: 'desc' },
+    }),
+    cache: 'no-store',
+  })
+
+  if (!res.ok) return []
+
+  const rows = (await res.json()) as Array<{
+    name: string
+    created_at?: string
+    metadata?: { size?: number } | null
+  }>
+
+  return rows
+    /* المجلدات بترجع بلا metadata — مش ملفات */
+    .filter((r) => r.metadata)
+    .map((r) => ({
+      path: `${storeId}/${folder}/${r.name}`,
+      name: r.name,
+      size: r.metadata?.size ?? 0,
+      createdAt: r.created_at ?? null,
+    }))
+}
+
+/** الرابط العام لمسار مخزّن */
+export function publicUrl(path: string): string {
+  const { url } = config()
+  return `${url}/storage/v1/object/public/${BUCKET}/${path}`
+}
+
+export const UPLOAD_FOLDERS: UploadFolder[] = ['products', 'categories', 'banners', 'logos', 'misc']

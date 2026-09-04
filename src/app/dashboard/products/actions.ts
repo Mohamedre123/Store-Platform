@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { db } from '@/db'
 import { categories, products, inventoryMovements } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { assertCan } from '@/lib/permissions'
 import { recordAudit } from '@/lib/audit'
 import { deleteImage } from '@/lib/storage'
 import { slugify, toMinorUnits } from '@/lib/utils'
@@ -403,7 +404,26 @@ export async function deleteProductAction(id: string) {
 
   if (!product) return
 
-  await db.delete(products).where(and(eq(products.id, id), eq(products.storeId, store.id)))
+  /**
+   * حذف ناعم — الصف بيفضل والعمود بيتختم.
+   *
+   * ## ليه اتغيّر من حذف فعلي
+   * عمود `deleted_at` كان موجود من أول يوم وكل استعلام بيفلتر بيه،
+   * لكن الحذف كان بيمسح الصف نهائيًا ويمسح صوره معاه. يعني التاجر
+   * اللي دوس غلط على منتج بيبيع كان بيخسره هو وصوره وسيوه ورابطه،
+   * ومفيش أي طريق يرجّعه.
+   *
+   * دلوقتي بيروح لسلة المهملات: يرجّعه بضغطة، أو يمسحه نهائيًا وهو
+   * عارف إنه بيمسحه.
+   *
+   * ## والصور بتفضل
+   * مسحها هنا كان بيخلّي «استرجاع» يرجّع منتجًا بمربعات فاضية —
+   * وده أسوأ من إنه ما يرجعش. بتتمسح مع الحذف النهائي بس.
+   */
+  await db
+    .update(products)
+    .set({ deletedAt: new Date(), status: 'archived' })
+    .where(and(eq(products.id, id), eq(products.storeId, store.id)))
 
   await recordAudit({
     storeId: store.id,
@@ -414,12 +434,70 @@ export async function deleteProductAction(id: string) {
     before: { name: product.name, price: product.price },
   })
 
+  revalidatePath('/dashboard/products')
+  revalidatePath('/dashboard/products/trash')
+}
+
+/**
+ * استرجاع منتج من سلة المهملات.
+ *
+ * بيرجع **مسوّدة لا نشط**. المنتج اللي اتحذف من شهر ممكن يكون سعره
+ * اتغيّر أو مخزونه خلص، ورجوعه للمتجر فورًا بيخلّي عميلًا يشتري حاجة
+ * التاجر مش مستعد يبيعها. المسوّدة بتخلّيه يراجع وينشر بإيده.
+ */
+export async function restoreProductAction(id: string) {
+  const { store, actor } = await getDashboardContext()
+  assertCan(actor, 'products.manage')
+
+  await db
+    .update(products)
+    .set({ deletedAt: null, status: 'draft' })
+    .where(and(eq(products.id, id), eq(products.storeId, store.id)))
+
+  revalidatePath('/dashboard/products')
+  revalidatePath('/dashboard/products/trash')
+}
+
+/**
+ * حذف نهائي — الصف والصور.
+ *
+ * ## الطلبات القديمة ما بتتأثرش
+ * بند الطلب بيحمل **لقطة** من المنتج وقت الشرا (الاسم والسعر والصورة
+ * والمقاس)، و`order_items.product_id` من غير مفتاح أجنبي. فالفاتورة
+ * القديمة بتفضل مقروءة بالكامل بعد الحذف — وده كان تصميمًا مقصودًا
+ * من أول يوم عشان بالظبط اللحظة دي.
+ */
+export async function purgeProductAction(id: string) {
+  const { store, user, actor } = await getDashboardContext()
+  assertCan(actor, 'products.manage')
+
+  const [product] = await db
+    .select({ images: products.images, name: products.name, deletedAt: products.deletedAt })
+    .from(products)
+    .where(and(eq(products.id, id), eq(products.storeId, store.id)))
+    .limit(1)
+
+  if (!product) return
+  /* المسح النهائي من السلة بس — مش طريق مختصر حوالين الحذف الناعم */
+  if (!product.deletedAt) return
+
+  await db.delete(products).where(and(eq(products.id, id), eq(products.storeId, store.id)))
+
+  await recordAudit({
+    storeId: store.id,
+    userId: user.id,
+    action: 'product.delete',
+    resource: 'product_purge',
+    resourceId: id,
+    before: { name: product.name },
+  })
+
   // تنظيف الصور بعد حذف الصف — لو فشل الحذف ما نبقاش مسحنا صور منتج موجود
   for (const url of product.images) {
     await deleteImage(store.id, url).catch(() => undefined)
   }
 
-  revalidatePath('/dashboard/products')
+  revalidatePath('/dashboard/products/trash')
 }
 
 export async function toggleProductStatusAction(id: string) {

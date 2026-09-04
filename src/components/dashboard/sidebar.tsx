@@ -91,6 +91,7 @@ export const NAV: NavSection[] = [
       { href: '/dashboard/inventory', label: 'المخزون', permission: 'inventory.manage' },
       { href: '/dashboard/inventory/branches', label: 'الفروع والمخازن', permission: 'inventory.manage' },
       { href: '/dashboard/suppliers', label: 'الموردون', permission: 'inventory.manage' },
+      { href: '/dashboard/products/trash', label: 'سلة المهملات', permission: 'products.manage' },
     ],
   },
   {
@@ -129,6 +130,7 @@ export const NAV: NavSection[] = [
     children: [
       { href: '/dashboard/storefront', label: 'الثيم والتصميم' },
       { href: '/dashboard/storefront/banners', label: 'البانرات' },
+      { href: '/dashboard/media', label: 'معرض الوسائط' },
       { href: '/dashboard/blog', label: 'المدوّنة', permission: 'storefront.manage' },
       { href: '/dashboard/settings/pages', label: 'صفحات المتجر', permission: 'storefront.manage' },
       /*

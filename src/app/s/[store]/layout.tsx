@@ -253,13 +253,30 @@ export default async function StorefrontLayout({
    */
   const showCategoriesBar = custom.header.showCategoriesBar && cats.length > 0
 
-  const nav = [
-    { label: 'الرئيسية', href: '/' },
-    { label: 'كل المنتجات', href: '/products' },
-    ...(showCategoriesBar
-      ? []
-      : cats.slice(0, 4).map((c) => ({ label: c.name, href: `/category/${c.slug}` }))),
-  ]
+  /**
+   * قايمة التاجر بتغلب التلقائية بالكامل.
+   *
+   * مش بتتدمج معاها: قايمة نُصّها كتبه التاجر ونُصّها إحنا حطّيناه
+   * بتبقى مالهاش منطق ظاهر له — بيشيل رابط ويلاقيه رجع، أو بيرتّب
+   * وبيلاقي حاجة اتحشرت في النص. أول ما يضيف رابط واحد، هو صاحب
+   * القايمة.
+   *
+   * والروابط الفاضية بتتشال: الصف اللي التاجر ضافه ومكمّلش بيرسم
+   * زرارًا بلا اسم بيودّي على الرئيسية.
+   */
+  const customLinks = (custom.header.links ?? []).filter(
+    (l) => l.label.trim() && l.url.trim(),
+  )
+
+  const nav = customLinks.length
+    ? customLinks.map((l) => ({ label: l.label.trim(), href: l.url.trim() }))
+    : [
+        { label: 'الرئيسية', href: '/' },
+        { label: 'كل المنتجات', href: '/products' },
+        ...(showCategoriesBar
+          ? []
+          : cats.slice(0, 4).map((c) => ({ label: c.name, href: `/category/${c.slug}` }))),
+      ]
 
   /**
    * ألوان المتجر تُحقن كمتغيّرات CSS على الحاوية.

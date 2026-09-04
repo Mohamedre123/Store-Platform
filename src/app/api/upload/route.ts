@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getDashboardContext } from '@/lib/store-context'
 import { uploadImage, type UploadFolder } from '@/lib/storage'
+import { recordUpload } from '@/lib/media'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
@@ -15,7 +16,7 @@ const FOLDERS: UploadFolder[] = ['products', 'categories', 'banners', 'logos', '
  * حتى لو عدّل الطلب.
  */
 export async function POST(request: Request) {
-  const { store } = await getDashboardContext()
+  const { store, user } = await getDashboardContext()
 
   const form = await request.formData()
   const file = form.get('file')
@@ -30,6 +31,24 @@ export async function POST(request: Request) {
 
   const result = await uploadImage(store.id, folder, file)
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 })
+
+  /*
+    التسجيل في المكتبة بعد نجاح الرفع، وبيبتلع أخطاءه بنفسه.
+
+    الملف موجود على التخزين خلاص. لو الصف فشل، التاجر ما يصحّش يشوف
+    «فشل الرفع» على صورة هو شايفها قدامه — والمزامنة هتلاقيها بعدين.
+  */
+  await recordUpload({
+    storeId: store.id,
+    path: result.path,
+    url: result.url,
+    /* الاسم اللي التاجر سمّاه بيه — اسم التخزين طابع زمني مالوش معنى له */
+    name: file.name,
+    folder,
+    sizeBytes: file.size,
+    mimeType: file.type,
+    uploadedBy: user.id,
+  })
 
   return NextResponse.json({ url: result.url, path: result.path })
 }

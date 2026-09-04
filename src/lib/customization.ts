@@ -45,6 +45,9 @@ export type AnnouncementSettings = {
 
 /* ────────────────────────── الهيدر ────────────────────────── */
 
+/** رابط في قايمة الهيدر — نفس شكل رابط الفوتر عشان محرّر واحد يخدم الاتنين */
+export type NavLink = { id: string; label: string; url: string }
+
 export type HeaderSettings = {
   layout: 'top' | 'centered' | 'split'
   sticky: boolean
@@ -54,6 +57,21 @@ export type HeaderSettings = {
   showWishlist: boolean
   showCategoriesBar: boolean
   logoHeight: number
+  /**
+   * روابط قايمة الهيدر — والفاضي معناه «التلقائي».
+   *
+   * ## ليه هنا مش في صفحة «قوائم» لوحدها
+   * التاجر بيظبّط شكل الهيدر (تخطيط، بحث، سلة) في اللوحة دي. لو
+   * روابطه في صفحة تانية، بيغيّر التخطيط وبيروح يدوّر على القايمة
+   * في مكان مالوش علاقة — وأغلب التجّار ما بيلاقوهاش أصلًا.
+   *
+   * ## والفاضي بيرجع للتلقائي
+   * «الرئيسية» و«كل المنتجات» وأول أربع أقسام — وده بيشتغل من أول
+   * يوم من غير أي إعداد. أول ما التاجر يضيف رابط واحد، قايمته
+   * بتغلب بالكامل: القايمة نُصّها بتاعه ونُصّها بتاعنا بتبقى
+   * مالهاش منطق ظاهر له.
+   */
+  links: NavLink[]
 }
 
 /* ────────────────────────── البانر الرئيسي ────────────────────────── */
@@ -379,6 +397,8 @@ export function defaultCustomization(theme: {
       showWishlist: false,
       showCategoriesBar: theme.layout.showCategoryStrip,
       logoHeight: 40,
+      /* فاضية = التلقائي (الرئيسية + كل المنتجات + أول أربع أقسام) */
+      links: [],
     },
     hero: {
       style: theme.layout.hero,

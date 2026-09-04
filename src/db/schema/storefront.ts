@@ -169,3 +169,49 @@ export const banners = pgTable(
   },
   (t) => [index('banners_store_placement_idx').on(t.storeId, t.placement, t.isActive)],
 )
+
+/**
+ * مكتبة وسائط المتجر.
+ *
+ * ## ليه جدول أصلًا والملفات على التخزين
+ * التخزين بيعرف إن فيه ملف اسمه `1738...jpg` وحجمه كذا — وبس. مش
+ * بيعرف التاجر رفعه لإيه، ولا لو لسه مستعمَل في منتج. والتاجر اللي
+ * بيدوّر على صورة رفعها الشهر اللي فات بين ٤٠٠ ملف بأسماء أرقام
+ * مش هيلاقيها.
+ *
+ * الصف هنا بيدّي الملف اسمًا يقراه التاجر ومكانًا معروفًا، وبيخلّي
+ * الحذف قرارًا مبنيًا على معلومة بدل تخمين.
+ *
+ * ## والملفات القديمة
+ * الجدول بيتكتب مع كل رفعة من دلوقتي. اللي اترفع قبله بيتقرا من
+ * التخزين مباشرةً ويتسجّل أول ما التاجر يفتح المعرض — فما يفتحش
+ * فاضيًا على تاجر شغّال من شهور.
+ */
+export const mediaAssets = pgTable(
+  'media_assets',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    storeId: uuid('store_id').notNull().references(() => stores.id, { onDelete: 'cascade' }),
+
+    /** المسار جوّه دلو التخزين — `<storeId>/<folder>/<file>` */
+    path: text('path').notNull(),
+    url: text('url').notNull(),
+    /**
+     * اسم يقراه التاجر — اسم الملف الأصلي زي ما رفعه.
+     *
+     * اسم التخزين طابع زمني وحروف عشوائية عشان يفضل فريد. التاجر
+     * رفع «تيشيرت-أحمر.jpg» وبيدوّر عليه بالاسم ده لا بـ`1738…`.
+     */
+    name: text('name').notNull(),
+    folder: text('folder').notNull().default('misc'),
+    sizeBytes: integer('size_bytes').notNull().default(0),
+    mimeType: text('mime_type'),
+
+    uploadedBy: uuid('uploaded_by'),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex('media_assets_store_path_unique').on(t.storeId, t.path),
+    index('media_assets_store_idx').on(t.storeId, t.createdAt),
+  ],
+)

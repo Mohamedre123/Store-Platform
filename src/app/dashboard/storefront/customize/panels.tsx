@@ -241,6 +241,73 @@ export function Panel({
             onChange={(v) => patch('header', { showCategoriesBar: v })}
           />
         </Group>
+
+        {/*
+          قايمة الهيدر — والفاضية معناها التلقائي.
+
+          محرّر الروابط هنا لا في صفحة «قوائم» لوحدها: التاجر بيظبّط
+          شكل الهيدر في اللوحة دي، ولو روابطه في مكان تاني بيغيّر
+          التخطيط ويروح يدوّر عليها — وأغلبهم ما بيلاقوهاش أصلًا.
+        */}
+        <Group title="روابط القايمة">
+          <p className="text-xs leading-relaxed text-[var(--fg-subtle)]">
+            سيبها فاضية والمتجر بيعرض «الرئيسية» و«كل المنتجات» وأول أقسامك. أول ما تضيف رابط
+            واحد، قايمتك بتغلب بالكامل.
+          </p>
+
+          {(s.links ?? []).map((l, i) => (
+            <div key={l.id} className="flex items-end gap-2">
+              <div className="flex-1">
+                <TextField
+                  label={`الرابط ${i + 1}`}
+                  value={l.label}
+                  onChange={(v) =>
+                    patch('header', {
+                      links: (s.links ?? []).map((x) => (x.id === l.id ? { ...x, label: v } : x)),
+                    })
+                  }
+                  placeholder="عروض"
+                />
+              </div>
+              <div className="flex-1">
+                <TextField
+                  label="العنوان"
+                  value={l.url}
+                  onChange={(v) =>
+                    patch('header', {
+                      links: (s.links ?? []).map((x) => (x.id === l.id ? { ...x, url: v } : x)),
+                    })
+                  }
+                  placeholder="/category/offers"
+                  ltr
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  patch('header', { links: (s.links ?? []).filter((x) => x.id !== l.id) })
+                }
+                aria-label="حذف الرابط"
+                className="mb-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[var(--fg-muted)] hover:bg-[var(--color-danger-soft)] hover:text-[var(--color-danger)]"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={() =>
+              patch('header', {
+                links: [...(s.links ?? []), { id: nanoid(8), label: '', url: '' }],
+              })
+            }
+            className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-dashed border-[var(--border-strong)] text-sm font-medium text-[var(--fg-muted)] hover:border-[var(--primary)] hover:text-[var(--primary)]"
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            إضافة رابط
+          </button>
+        </Group>
       </>
     )
   }
