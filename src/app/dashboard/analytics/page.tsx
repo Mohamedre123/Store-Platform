@@ -1,7 +1,8 @@
+import Link from 'next/link'
 import { and, desc, eq, gt, sql } from 'drizzle-orm'
-import { ArrowDownRight, ArrowUpRight, BarChart3, TrendingUp } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, BarChart3, TrendingUp, Wallet } from 'lucide-react'
 import { db } from '@/db'
-import { orders, products } from '@/db/schema'
+import { expenses, orders, products } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { formatMoney } from '@/lib/utils'
 import { statusMeta } from '@/lib/order-status'
@@ -68,17 +69,60 @@ export default async function AnalyticsPage() {
     getFunnel(sid, 30),
   ])
 
+  /**
+   * المصروفات — الفرق بين «ربح تقديري» و«صافي الربح».
+   *
+   * الرقم اللي فوق (`profitCur`) بيطرح تكلفة البضاعة بس. التاجر
+   * اللي بيصرف على إعلانات بيبص عليه ويفتكر نفسه رابح، وآخر الشهر
+   * يلاقي الفلوس مش موجودة. الاستعلام ده بيقفل الفجوة دي.
+   *
+   * استعلامين منفصلين لا `join`: المصروف مالوش أي علاقة بالطلب،
+   * والضم كان هيضرب الصفوف في بعض ويطلّع مجموعًا مضاعفًا.
+   */
+  const [[spend], [spendPrev]] = await Promise.all([
+    db
+      .select({ total: sql<number>`coalesce(sum(${expenses.amount}), 0)::bigint` })
+      .from(expenses)
+      .where(and(eq(expenses.storeId, sid), sql`${expenses.spentAt} >= now() - interval '30 days'`)),
+    db
+      .select({ total: sql<number>`coalesce(sum(${expenses.amount}), 0)::bigint` })
+      .from(expenses)
+      .where(
+        and(
+          eq(expenses.storeId, sid),
+          sql`${expenses.spentAt} >= now() - interval '60 days'`,
+          sql`${expenses.spentAt} < now() - interval '30 days'`,
+        ),
+      ),
+  ])
+
   const revCur = Number(kpi?.revCur ?? 0)
   const ordCur = Number(kpi?.ordCur ?? 0)
   const profitCur = Number(kpi?.profitCur ?? 0)
   const aovCur = ordCur > 0 ? Math.round(revCur / ordCur) : 0
   const aovPrev = Number(kpi?.ordPrev ?? 0) > 0 ? Math.round(Number(kpi.revPrev) / Number(kpi.ordPrev)) : 0
 
+  const spendCur = Number(spend?.total ?? 0)
+  const netCur = profitCur - spendCur
+  const netPrev = Number(kpi?.profitPrev ?? 0) - Number(spendPrev?.total ?? 0)
+
   const kpis = [
     { label: 'إيرادات ٣٠ يوم', value: formatMoney(revCur, store.currency), change: pctChange(revCur, Number(kpi?.revPrev ?? 0)) },
     { label: 'الطلبات', value: String(ordCur), change: pctChange(ordCur, Number(kpi?.ordPrev ?? 0)) },
     { label: 'متوسط قيمة الطلب', value: formatMoney(aovCur, store.currency), change: pctChange(aovCur, aovPrev) },
-    { label: 'ربح تقديري', value: formatMoney(profitCur, store.currency), change: pctChange(profitCur, Number(kpi?.profitPrev ?? 0)) },
+    /*
+      «صافي الربح» لا «ربح تقديري».
+
+      الاسم القديم كان بيوصف رقمًا ناقصًا: مجمل ربح بعد تكلفة البضاعة
+      وبس. دلوقتي المصروفات المسجّلة داخلة فيه، فبقى الرقم اللي التاجر
+      بيقرّر بيه — ولو مسجّلش مصروفات، السطر تحته بيقوله ليه الرقم
+      ده متفائل.
+    */
+    {
+      label: 'صافي الربح',
+      value: formatMoney(netCur, store.currency),
+      change: pctChange(netCur, netPrev),
+    },
   ]
 
   // نبني ١٤ خانة يوم ونملا القيم — الأيام الفاضية تبقى صفر بدل ما تختفي
@@ -97,6 +141,34 @@ export default async function AnalyticsPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="التحليلات" description="أداء متجرك في آخر ٣٠ يوم." />
+
+      {/*
+        التنبيه ده بيظهر لما مفيش مصروفات مسجّلة خالص.
+
+        من غيره، «صافي الربح» بيساوي مجمل الربح والتاجر بيصدّقه —
+        وهو ده بالظبط الرقم اللي بيخلّي تاجر يفضل يصرف على إعلانات
+        خاسرة وهو فاكر نفسه رابح.
+      */}
+      {spendCur === 0 && revCur > 0 && (
+        <Reveal>
+          <Link href="/dashboard/expenses" className="block">
+            <Card className="flex items-center gap-3 border-[var(--color-warning)] bg-[var(--color-warning-soft)] p-4 transition-opacity hover:opacity-90">
+              <Wallet
+                className="h-5 w-5 shrink-0 text-[var(--color-warning)]"
+                aria-hidden="true"
+              />
+              <span className="flex-1 text-sm">
+                <span className="font-semibold text-[var(--color-warning)]">
+                  «صافي الربح» تحت لسه ما فيهوش إعلاناتك ولا إيجارك
+                </span>
+                <span className="mt-0.5 block text-[var(--fg-muted)]">
+                  سجّل مصروفاتك عشان الرقم يبقى حقيقي
+                </span>
+              </span>
+            </Card>
+          </Link>
+        </Reveal>
+      )}
 
       <Reveal>
         <Funnel data={funnel} />

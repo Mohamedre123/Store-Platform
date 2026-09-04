@@ -103,6 +103,7 @@ export const NAV: NavSection[] = [
       { href: '/dashboard/affiliates', label: 'المسوّقون' },
       { href: '/dashboard/automations', label: 'الأتمتة' },
       { href: '/dashboard/analytics', label: 'التحليلات' },
+      { href: '/dashboard/expenses', label: 'المصروفات والأرباح' },
       { href: '/dashboard/experiments', label: 'تجارب A/B' },
       { href: '/dashboard/marketplace', label: 'ربط الكتالوج' },
     ],

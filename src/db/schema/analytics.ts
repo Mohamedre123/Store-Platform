@@ -1,6 +1,6 @@
 import { pgTable, uuid, text, integer, jsonb, timestamp, index, date, uniqueIndex, boolean } from 'drizzle-orm/pg-core'
 import { stores } from './tenancy'
-import { createdAt, money } from './_shared'
+import { createdAt, money, updatedAt } from './_shared'
 
 export type StoreEventType =
   | 'page_view'
@@ -168,4 +168,82 @@ export const subscriptions = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index('subscriptions_store_idx').on(t.storeId, t.status)],
+)
+
+/**
+ * تصنيفات المصروفات — **قايمة ثابتة لا يبنيها التاجر**.
+ *
+ * السبب مش تبسيط: التاجر اللي بيبدأ متجره ما عندوش وقت يصمّم شجرة
+ * حسابات، ولو سبناها له كل واحد هيكتب «إعلانات» و«اعلانات» و«ads»
+ * وتقاريره تطلع مقسّمة على تلاتة. القايمة الثابتة معناها إن التقرير
+ * بيشتغل من أول مصروف من غير أي إعداد — واسم المصروف نفسه حرّ
+ * فالتفصيلة اللي عايزها بتتكتب فيه.
+ *
+ * والتصنيفات دي مختارة من مصاريف السوق المصري الفعلية: الإعلانات
+ * أكبر بند عند أغلب التجّار، ومرتجعات الشحن بند ما بيبانش في أي
+ * مكان تاني وبياكل الربح بهدوء.
+ */
+export type ExpenseCategory =
+  | 'ads'        // إعلانات — أكبر بند وأول ما التاجر يدوّر عليه
+  | 'shipping'   // شحن ومرتجعات مدفوعة للشركة
+  | 'goods'      // شراء بضاعة من الموردين
+  | 'salaries'   // مرتبات وعمولات
+  | 'rent'       // إيجار ومرافق
+  | 'packaging'  // تغليف ومطبوعات
+  | 'fees'       // رسوم بوابات واشتراكات
+  | 'other'
+
+/**
+ * مصروفات المتجر.
+ *
+ * ## ليه دي مش «ميزة محاسبة»
+ * الطلب عندنا شايل تكلفة بضاعته (`orders.costTotal`)، يعني مجمل
+ * الربح محسوب صح من غير أي إدخال. اللي ناقص هو المصروف اللي مالوش
+ * علاقة بطلب معيّن — الإعلانات والإيجار والمرتبات — وده اللي بيخلّي
+ * تاجر «رابح» على الورق يقفل آخر الشهر وهو خسران.
+ *
+ * فالجدول ده بند واحد بسيط: كام، امتى، على إيه. ومن غيره رقم
+ * «صافي الربح» في التحليلات بيبقى كذبة مريحة.
+ */
+export const expenses = pgTable(
+  'expenses',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    storeId: uuid('store_id').notNull().references(() => stores.id, { onDelete: 'cascade' }),
+
+    title: text('title').notNull(),
+    category: text('category').$type<ExpenseCategory>().notNull().default('other'),
+    amount: money('amount'),
+
+    /**
+     * تاريخ الصرف لا تاريخ التسجيل.
+     *
+     * التاجر بيسجّل مصاريف الأسبوع يوم الخميس. لو حسبناها بتاريخ
+     * الإدخال، كل مصاريفه بتقع في يوم واحد وتقرير الربح اليومي
+     * بيطلع سنّة منشار مالهاش معنى.
+     */
+    spentAt: timestamp('spent_at', { withTimezone: true }).notNull().defaultNow(),
+
+    note: text('note'),
+    /** صورة الإيصال — بترفع على نفس التخزين بتاع صور المنتجات */
+    receiptUrl: text('receipt_url'),
+
+    /**
+     * مصروف بيتكرر كل شهر (إيجار، اشتراك، مرتب).
+     *
+     * العلامة دي **ما بتولّدش صفوفًا لوحدها**: بتخلّي الشاشة تفكّر
+     * التاجر بيه أول كل شهر. التوليد التلقائي كان هيسجّل مصاريف
+     * محصلتش — والتاجر اللي وقّف الاشتراك بيلاقي فلوسه ناقصة في
+     * تقرير مالوش يد فيه.
+     */
+    isRecurring: boolean('is_recurring').notNull().default(false),
+
+    createdBy: uuid('created_by'),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    index('expenses_store_date_idx').on(t.storeId, t.spentAt),
+    index('expenses_store_category_idx').on(t.storeId, t.category),
+  ],
 )
