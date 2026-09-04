@@ -355,6 +355,17 @@ export const checkoutSettings = pgTable('checkout_settings', {
 
   // السلة
   cartUpsellEnabled: boolean('cart_upsell_enabled').notNull().default(true),
+  /**
+   * منتجات التاجر بيختارها تظهر في السلة.
+   *
+   * فاضية = الأكثر مبيعًا (السلوك اللي كان شغّال). الاختيار بيفيد لما
+   * التاجر عنده حاجة صغيرة مربحة عايز يدفعها مع كل طلب — الشاحن، أو
+   * الجراب، أو التغليف الهدية. الأكثر مبيعًا مش بالضرورة هو ده.
+   */
+  cartUpsellProductIds: jsonb('cart_upsell_product_ids')
+    .$type<string[]>()
+    .notNull()
+    .default([]),
   minOrderEnabled: boolean('min_order_enabled').notNull().default(false),
   minOrderAmount: integer('min_order_amount').notNull().default(0),
 

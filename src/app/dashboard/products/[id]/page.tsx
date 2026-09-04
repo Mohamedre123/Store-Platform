@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/dashboard/page-shell'
 import { ProductForm } from '../product-form'
 import { DeleteProduct } from '../delete-product'
 import { loadProductVariants, toEditorVariants } from '@/lib/variants'
+import { listPickerCategories } from '../../storefront/picker-actions'
 
 export const metadata = { title: 'تعديل المنتج' }
 
@@ -24,13 +25,14 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
 
   if (!product) notFound()
 
-  const [cats, saved] = await Promise.all([
+  const [cats, saved, pickerCategories] = await Promise.all([
     db
       .select({ id: categories.id, name: categories.name })
       .from(categories)
       .where(eq(categories.storeId, store.id))
       .orderBy(asc(categories.sortOrder)),
     loadProductVariants(product.id),
+    listPickerCategories(),
   ])
 
   return (
@@ -54,8 +56,11 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
           trackInventory: product.trackInventory,
           status: product.status,
           images: product.images,
+          relatedProductIds: product.relatedProductIds ?? [],
+          upsellProductIds: product.upsellProductIds ?? [],
         }}
         categories={cats}
+        pickerCategories={pickerCategories}
         currency={store.currency}
         storeName={store.name}
         variants={{

@@ -104,6 +104,30 @@ export const products = pgTable(
     isFeatured: boolean('is_featured').notNull().default(false),
     isBestSeller: boolean('is_best_seller').notNull().default(false),
 
+    /**
+     * منتجات التاجر بيختارها تظهر مع المنتج ده.
+     *
+     * ## ليه اختيار مع إن فيه اقتراح تلقائي
+     * الاقتراح التلقائي بياخد من نفس القسم — وده كويس كافتراضي وبيشتغل
+     * من غير أي إعداد. لكنه ما بيعرفش إن الجراب ده بتاع الموبايل ده
+     * بالذات، ولا إن الشاحن ده مش بيركّب على الموديل ده. التاجر عارف،
+     * والاختيار بتاعه بيغلب.
+     *
+     * **فاضي = رجّع للتلقائي.** ده مقصود: المتجر بألف منتج ما ينفعش
+     * يقف عن اقتراح أي حاجة لحد ما التاجر يفتح كل منتج ويختار.
+     */
+    relatedProductIds: jsonb('related_product_ids').$type<string[]>().notNull().default([]),
+
+    /**
+     * الترقية — النسخة الأغلى من نفس الحاجة.
+     *
+     * غير «المرتبطة» في المعنى والمكان: المرتبطة بتتعرض تحت («خد ده
+     * كمان»)، والترقية بتتعرض جنب زرار الشرا («الأفضل منه بـ٥٠ جنيه
+     * زيادة»). خلطهم في قايمة واحدة بيضيّع الاتنين — العميل اللي
+     * بيدوّر على أرخص مش بيدوّر على «مع».
+     */
+    upsellProductIds: jsonb('upsell_product_ids').$type<string[]>().notNull().default([]),
+
     // إشارات ندرة تُعرض للعميل — قابلة للإطفاء لأن بعض التجار لا يريدها
     showStockCounter: boolean('show_stock_counter').notNull().default(false),
     showLiveViewers: boolean('show_live_viewers').notNull().default(false),

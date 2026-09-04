@@ -165,7 +165,24 @@ const productSchema = z.object({
   trackInventory: z.boolean(),
   status: z.enum(['draft', 'active']),
   images: z.array(z.string()).default([]),
+  /**
+   * معرّفات المقترحات — بتيجي كنص مفصول بفواصل من الخانة المخفية.
+   *
+   * الفلترة على uuid صالح بس: المعرّف الغلط بيتشال بدل ما يخلّي
+   * حفظ المنتج كله يفشل. التاجر بيحفظ منتجه، مش بيصلّح مصفوفة.
+   */
+  relatedProductIds: z.array(z.string().uuid()).max(12).default([]),
+  upsellProductIds: z.array(z.string().uuid()).max(12).default([]),
 })
+
+/** «id,id,id» → مصفوفة معرّفات صالحة */
+function idList(raw: FormDataEntryValue | null): string[] {
+  return String(raw ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => /^[0-9a-f-]{36}$/i.test(s))
+    .slice(0, 12)
+}
 
 /**
  * المقاسات والألوان الجاية من المحرّر.
@@ -237,6 +254,8 @@ export async function saveProductAction(_prev: FormState, formData: FormData): P
     trackInventory: formData.get('trackInventory') !== 'false',
     status: formData.get('status') === 'active' ? 'active' : 'draft',
     images: JSON.parse(String(formData.get('images') ?? '[]')) as string[],
+    relatedProductIds: idList(formData.get('relatedProductIds')),
+    upsellProductIds: idList(formData.get('upsellProductIds')),
   })
 
   if (!parsed.success) return { fieldErrors: fieldErrors(parsed.error) }
@@ -293,6 +312,16 @@ export async function saveProductAction(_prev: FormState, formData: FormData): P
     trackInventory: d.trackInventory,
     status: d.status,
     images: d.images,
+    /*
+      المنتج ما بيقترحش نفسه.
+
+      التاجر بيختار من قايمة فيها كل منتجاته وممكن يدوس على اللي هو
+      فيه من غير ما ياخد باله — والنتيجة رابط بيرجّع العميل لنفس
+      الصفحة. الفلترة هنا لأن المعرّف مش معروف وقت الاختيار في
+      المنتج الجديد.
+    */
+    relatedProductIds: d.relatedProductIds.filter((x) => x !== id),
+    upsellProductIds: d.upsellProductIds.filter((x) => x !== id),
     publishedAt: d.status === 'active' ? new Date() : null,
   }
 

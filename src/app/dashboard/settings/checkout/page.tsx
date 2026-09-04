@@ -7,6 +7,7 @@ import { readWhatsapp } from '@/lib/whatsapp'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { CheckoutSettingsForm, type CheckoutSettingsValues } from './checkout-settings-form'
+import { listPickerCategories } from '../../storefront/picker-actions'
 
 export const metadata = { title: 'إعدادات الشيك أوت' }
 
@@ -59,6 +60,7 @@ export default async function CheckoutSettingsPage() {
     quickCheckoutShowItems: row?.quickCheckoutShowItems ?? true,
     whatsappOrderEnabled: row?.whatsappOrderEnabled ?? false,
     cartUpsellEnabled: row?.cartUpsellEnabled ?? true,
+    cartUpsellProductIds: row?.cartUpsellProductIds ?? [],
     minOrderEnabled: row?.minOrderEnabled ?? false,
     minOrderAmount: row?.minOrderAmount ?? 0,
     otpEnabled: row?.otpEnabled ?? true,
@@ -77,6 +79,7 @@ export default async function CheckoutSettingsPage() {
       <Reveal>
         <CheckoutSettingsForm
           initial={initial}
+          pickerCategories={await listPickerCategories()}
           currency={store.currency}
           whatsappReady={whatsapp.provider !== 'off' && whatsapp.hasKey}
           storeWhatsapp={store.whatsapp}

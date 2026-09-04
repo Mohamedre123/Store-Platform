@@ -10,6 +10,7 @@ import {
   getStoreTheme,
   listProductReviews,
   listProducts,
+  listPickedProducts,
 } from '@/lib/storefront'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
@@ -210,9 +211,31 @@ export default async function ProductPage({
     isSaved = Boolean(row)
   }
 
-  const related = (await listProducts(store.id, { categoryId: product.categoryId ?? undefined, limit: 5 }))
-    .filter((p) => p.id !== product.id)
-    .slice(0, 4)
+  /**
+   * المقترحات: اختيار التاجر الأول، والتلقائي احتياطي.
+   *
+   * الاقتراح من نفس القسم بيشتغل من غير أي إعداد — وده اللي بيخلّي
+   * المتجر بألف منتج يبقى فيه اقتراحات من أول يوم. لكنه ما بيعرفش
+   * إن الجراب ده بتاع الموبايل ده بالذات. لما التاجر يختار، اختياره
+   * بيغلب.
+   *
+   * والترقية منفصلة عن المرتبطة: المرتبطة بتتعرض تحت («خد ده كمان»)،
+   * والترقية جنب زرار الشرا («الأفضل منه بكام زيادة»). خلطهم في قايمة
+   * واحدة بيضيّع الاتنين.
+   */
+  const [picked, upsells] = await Promise.all([
+    listPickedProducts(store.id, product.relatedProductIds ?? []),
+    listPickedProducts(store.id, product.upsellProductIds ?? []),
+  ])
+
+  const related = picked.length
+    ? picked.filter((p) => p.id !== product.id).slice(0, 4)
+    : (await listProducts(store.id, { categoryId: product.categoryId ?? undefined, limit: 5 }))
+        .filter((p) => p.id !== product.id)
+        .slice(0, 4)
+
+  /* الترقية اللي أغلى من المنتج بس — «رقّي لأرخص» مالهاش معنى */
+  const upgrades = upsells.filter((p) => p.id !== product.id && p.price > product.price).slice(0, 3)
 
   /**
    * الدفع السريع.
@@ -468,6 +491,51 @@ export default async function ProductPage({
                   initialSaved={isSaved}
                 />
               </div>
+
+              {/*
+                الترقية — جنب زرار الشرا لا في آخر الصفحة.
+
+                العميل بيقرّر هنا. لو حطّينا «فيه أحسن منه» تحت المراجعات،
+                هو خلاص يا اشترى يا مشي — والاقتراح بيوصل بعد القرار.
+
+                والفرق في السعر مكتوب صريح: «بـ٦٠ جنيه زيادة» بتتقرا أسهل
+                من رقمين العميل يطرحهم بنفسه.
+              */}
+              {upgrades.length > 0 && (
+                <div className="flex flex-col gap-2 rounded-[var(--sf-radius)] border border-[var(--sf-primary)]/25 bg-[var(--sf-primary)]/[0.04] p-3">
+                  <span className="text-xs font-semibold text-[var(--sf-primary)]">
+                    فيه أحسن منه
+                  </span>
+                  {upgrades.map((u) => (
+                    <Link
+                      key={u.id}
+                      href={`/products/${u.slug}`}
+                      className="flex items-center gap-3 rounded-[var(--sf-radius)] p-1.5 transition-colors hover:bg-[var(--sf-surface)]"
+                    >
+                      {u.images[0] ? (
+                        <Image
+                          src={u.images[0]}
+                          alt=""
+                          width={44}
+                          height={44}
+                          className="h-11 w-11 shrink-0 rounded-[var(--sf-radius)] object-cover"
+                        />
+                      ) : (
+                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--sf-radius)] bg-[var(--sf-text)]/6">
+                          <ImageOff className="h-4 w-4 opacity-40" aria-hidden="true" />
+                        </span>
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">{u.name}</span>
+                        <span className="tabular text-xs opacity-70">
+                          بـ{formatMoney(u.price - displayPrice, store.currency)} زيادة
+                        </span>
+                      </span>
+                      <ChevronLeft className="h-4 w-4 shrink-0 opacity-40" aria-hidden="true" />
+                    </Link>
+                  ))}
+                </div>
+              )}
             </>
           )}
 

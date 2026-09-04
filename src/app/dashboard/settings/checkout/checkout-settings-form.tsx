@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Check, Loader2, Save } from 'lucide-react'
+import { Check, Loader2, Save, ShoppingBasket } from 'lucide-react'
 import { saveCheckoutSettingsAction } from './actions'
-import { Choice, Group, NumberField, Toggle } from '@/components/dashboard/controls'
+import { Choice, Group, NumberField, Row, Toggle } from '@/components/dashboard/controls'
 import { Alert, Card } from '@/components/ui'
 import { fromMinorUnits, toMinorUnits } from '@/lib/utils'
+import { ProductPicker } from '../../storefront/product-picker'
+import type { PickerCategory } from '../../storefront/picker-actions'
 
 export type CheckoutSettingsValues = {
   fieldName: FieldMode
@@ -29,6 +31,7 @@ export type CheckoutSettingsValues = {
   quickCheckoutShowItems: boolean
   whatsappOrderEnabled: boolean
   cartUpsellEnabled: boolean
+  cartUpsellProductIds: string[]
   minOrderEnabled: boolean
   minOrderAmount: number
   otpEnabled: boolean
@@ -50,11 +53,14 @@ const MODES_LOCKED = MODES.filter((m) => m.value !== 'hidden')
 
 export function CheckoutSettingsForm({
   initial,
+  pickerCategories,
   currency,
   whatsappReady,
   storeWhatsapp,
 }: {
   initial: CheckoutSettingsValues
+  /** أقسام المتجر بعدد منتجاتها — منتقي مقترحات السلة بيقرا منها */
+  pickerCategories: PickerCategory[]
   currency: string
   /** واتساب مربوط؟ التأكيد التلقائي مالوش معنى من غيره */
   whatsappReady: boolean
@@ -67,6 +73,9 @@ export function CheckoutSettingsForm({
 
   /** المبلغ بيتعرض بالجنيه وبيتخزّن بالقرش */
   const [minAmount, setMinAmount] = useState(String(fromMinorUnits(initial.minOrderAmount)))
+
+  /* منتجات مقترحات السلة — الفاضي معناه «الأكثر مبيعًا» زي ما كان */
+  const [upsellPicker, setUpsellPicker] = useState(false)
 
   const set = <K extends keyof CheckoutSettingsValues>(k: K, value: CheckoutSettingsValues[K]) =>
     setV((s) => ({ ...s, [k]: value }))
@@ -279,6 +288,41 @@ export function CheckoutSettingsForm({
             منهم ويفتكر إن الميزة بايظة. فشِلناه من هنا وسبنا اللي
             بيشتغل مكانه.
           */}
+          {/*
+            اختيار المنتجات هنا، والتشغيل في تخصيص المتجر ← السلة.
+
+            المفتاح مش بيتكرر عن قصد (شوف التعليق فوق). اللي هنا
+            **بيانات** لا مفتاح: أنهي منتجات تظهر لما الميزة تكون
+            شغّالة. والفاضي بيرجع للأكثر مبيعًا، فالمتجر الجديد
+            بيشتغل من غير أي اختيار.
+          */}
+          <Row
+            label="منتجات مقترحات السلة"
+            hint="سيبها فاضية والمتجر بيقترح الأكثر مبيعًا. اختار لما يكون عندك حاجة صغيرة مربحة عايز تدفعها مع كل طلب — شاحن، أو تغليف هدية."
+          >
+            <button
+              type="button"
+              onClick={() => setUpsellPicker(true)}
+              className="flex min-h-11 w-full items-center gap-2.5 rounded-lg border border-[var(--border-strong)] px-3 text-sm font-medium transition-colors hover:bg-[var(--surface-2)]"
+            >
+              <ShoppingBasket className="h-4 w-4 shrink-0 text-[var(--fg-subtle)]" aria-hidden="true" />
+              <span className="flex-1 text-start">
+                {v.cartUpsellProductIds.length > 0
+                  ? `${v.cartUpsellProductIds.length} منتج مختار`
+                  : 'الأكثر مبيعًا (تلقائي)'}
+              </span>
+            </button>
+          </Row>
+
+          <ProductPicker
+            open={upsellPicker}
+            value={v.cartUpsellProductIds}
+            categories={pickerCategories}
+            currency={currency}
+            onClose={() => setUpsellPicker(false)}
+            onChange={(ids) => set('cartUpsellProductIds', ids)}
+          />
+
           <Toggle
             label="حد أدنى للطلب"
             checked={v.minOrderEnabled}

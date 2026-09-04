@@ -51,6 +51,8 @@ const schema = z.object({
 
   /* السلة */
   cartUpsellEnabled: z.boolean(),
+  /** منتجات مقترحات السلة — الفاضي بيرجع للأكثر مبيعًا */
+  cartUpsellProductIds: z.array(z.string().uuid()).max(12).default([]),
   minOrderEnabled: z.boolean(),
   /** بالقرش زي كل مبالغ المنصة */
   minOrderAmount: z.coerce.number().int().min(0).max(100_000_000),

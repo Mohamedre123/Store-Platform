@@ -10,6 +10,8 @@ import { formatMoney, fromMinorUnits, toMinorUnits } from '@/lib/utils'
 import { SeoFields } from '@/components/dashboard/seo-fields'
 import { ImproveButton } from '@/components/dashboard/improve-button'
 import { VariantsEditor, type EditorOption, type EditorVariant } from './variants-editor'
+import { SuggestionsEditor } from './suggestions-editor'
+import type { PickerCategory } from '../storefront/picker-actions'
 
 type Product = {
   id: string
@@ -28,6 +30,8 @@ type Product = {
   trackInventory: boolean
   status: string
   images: string[]
+  relatedProductIds: string[]
+  upsellProductIds: string[]
 }
 
 /** يحوّل المبلغ المخزَّن بالقروش لنص يكتبه التاجر */
@@ -36,12 +40,20 @@ const asAmount = (v: number | null | undefined) => (v ? String(fromMinorUnits(v)
 export function ProductForm({
   product,
   categories,
+  pickerCategories,
   currency,
   storeName,
   variants = { options: [], variants: [] },
 }: {
   product?: Product
   categories: Array<{ id: string; name: string }>
+  /**
+   * نفس الأقسام بس بالشكل اللي منتقي المنتجات بيفهمه.
+   *
+   * المنتقي بيعرض عدد منتجات كل قسم عشان التاجر يعرف يفتح فين —
+   * والقايمة البسيطة اللي فوق مالهاش العدد ده.
+   */
+  pickerCategories: PickerCategory[]
   currency: string
   storeName: string
   /** المقاسات والألوان المحفوظة — فاضية للمنتج الجديد */
@@ -257,6 +269,13 @@ export function ProductForm({
             initialVariants={variants.variants}
             basePrice={price}
             currency={currency}
+          />
+
+          <SuggestionsEditor
+            categories={pickerCategories}
+            currency={currency}
+            initialRelated={product?.relatedProductIds ?? []}
+            initialUpsell={product?.upsellProductIds ?? []}
           />
 
           <Card className="p-5">

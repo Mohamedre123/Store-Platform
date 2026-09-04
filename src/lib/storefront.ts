@@ -2,7 +2,7 @@ import 'server-only'
 import { cache } from 'react'
 import { and, desc, eq, gt, ilike, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm'
 import { db } from '@/db'
-import { banners, categories, pages, products, productVariants, reviews, stores, storePlugins, storeThemes } from '@/db/schema'
+import { banners, categories, checkoutSettings, pages, products, productVariants, reviews, stores, storePlugins, storeThemes } from '@/db/schema'
 import { getTheme, type ThemeDefinition } from './themes'
 import {
   defaultCustomization,
@@ -349,6 +349,25 @@ export type UpsellProduct = {
  * كميته مستبعد كمان — اقتراح منتج مش متاح بيضيّع الثقة في الباقي.
  */
 export const listCartUpsell = cache(async (storeId: string, limit = 6): Promise<UpsellProduct[]> => {
+  /**
+   * اختيار التاجر بيغلب الأكثر مبيعًا.
+   *
+   * الأكثر مبيعًا افتراضي كويس — بيشتغل من غير أي إعداد ومن أول
+   * يوم. لكنه بيقترح المنتج الغالي اللي العميل جاي عشانه أصلًا،
+   * مش الحاجة الصغيرة المربحة اللي التاجر عايز يدفعها مع كل طلب.
+   * لما التاجر يختار، اختياره هو اللي بيتعرض.
+   *
+   * والصف ممكن ما يكونش موجود (متاجر اتعملت قبل جدول الإعدادات)،
+   * فالقراءة بتتعامل مع الفاضي زي ما بتتعامل مع غير الموجود.
+   */
+  const [settings] = await db
+    .select({ picked: checkoutSettings.cartUpsellProductIds })
+    .from(checkoutSettings)
+    .where(eq(checkoutSettings.storeId, storeId))
+    .limit(1)
+
+  const picked = (settings?.picked ?? []).slice(0, limit)
+
   const rows = await db
     .select({
       id: products.id,
@@ -363,14 +382,22 @@ export const listCartUpsell = cache(async (storeId: string, limit = 6): Promise<
     .where(
       and(
         visible(storeId),
+        /*
+          نفس شروط الإتاحة على المختار كمان.
+
+          المنتج اللي التاجر اختاره من شهرين وبقى نافد أو اتخفى ما
+          ينفعش يفضل معروض — اقتراح منتج مش متاح بيضيّع الثقة في
+          باقي الاقتراحات.
+        */
         sql`not exists (select 1 from ${productVariants} where ${productVariants.productId} = ${products.id})`,
         or(eq(products.trackInventory, false), gt(products.stock, 0))!,
+        ...(picked.length ? [inArray(products.id, picked)] : []),
       ),
     )
     .orderBy(desc(products.soldCount))
     .limit(limit)
 
-  return rows.map((r) => ({
+  const mapped: UpsellProduct[] = rows.map((r) => ({
     id: r.id,
     name: r.name,
     slug: r.slug,
@@ -378,7 +405,37 @@ export const listCartUpsell = cache(async (storeId: string, limit = 6): Promise<
     image: r.images?.[0] ?? null,
     maxStock: r.trackInventory ? r.stock : null,
   }))
+
+  /* ترتيب التاجر بيتحفظ — قاعدة البيانات بترجّع بترتيبها هي */
+  if (!picked.length) return mapped
+  const byId = new Map(mapped.map((p) => [p.id, p]))
+  return picked.map((id) => byId.get(id)).filter((p): p is UpsellProduct => Boolean(p))
 })
+
+/**
+ * المنتجات اللي التاجر اختارها تظهر مع منتج بعينه.
+ *
+ * بترجّع فاضية لو ما اختارش — والصفحة ساعتها بترجع للاقتراح التلقائي
+ * من نفس القسم. المتجر بألف منتج ما ينفعش يقف عن اقتراح أي حاجة لحد
+ * ما التاجر يفتح كل منتج ويختار.
+ */
+export const listPickedProducts = cache(
+  async (storeId: string, ids: string[]): Promise<StorefrontProduct[]> => {
+    if (ids.length === 0) return []
+
+    const wanted = ids.slice(0, 12)
+
+    const rows = await db
+      .select(productFields)
+      .from(products)
+      .leftJoin(categories, eq(categories.id, products.categoryId))
+      .where(and(visible(storeId), inArray(products.id, wanted)))
+
+    /* ترتيب التاجر بيتحفظ — قاعدة البيانات بترجّع بترتيبها هي */
+    const byId = new Map(rows.map((r) => [r.id, r]))
+    return wanted.map((id) => byId.get(id)).filter((r): r is StorefrontProduct => Boolean(r))
+  },
+)
 
 export const getProductBySlug = cache(async (storeId: string, slug: string) => {
   const [row] = await db
