@@ -87,6 +87,7 @@ export const NAV: NavSection[] = [
     permission: 'products.view',
     children: [
       { href: '/dashboard/products', label: 'كل المنتجات' },
+      { href: '/dashboard/products/import', label: 'استيراد منتجات', permission: 'products.manage' },
       { href: '/dashboard/products/categories', label: 'الأقسام' },
       { href: '/dashboard/inventory', label: 'المخزون', permission: 'inventory.manage' },
       { href: '/dashboard/inventory/branches', label: 'الفروع والمخازن', permission: 'inventory.manage' },
