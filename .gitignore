@@ -44,3 +44,7 @@ drizzle/meta/_journal.json.bak
 
 # ملفات العمل المحلية
 لوجو زاوية/
+
+# ملفات مؤقتة للتصحيح — مش جزء من المشروع
+.patch.mjs
+.scratch/
