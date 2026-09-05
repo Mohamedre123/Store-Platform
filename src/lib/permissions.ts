@@ -90,6 +90,67 @@ export function defaultPermissions(role: MemberRole): Permission[] {
   return [...ROLE_DEFAULTS[role]]
 }
 
+/**
+ * قوالب جاهزة لأدوار شائعة.
+ *
+ * ## ليه قوالب مش أدوار جديدة
+ * دور جديد في القاعدة معناه فرع جديد في كل فحص صلاحية، ومكان تاني
+ * ممكن يختلف عن الصلاحيات نفسها. القالب مجرد **مجموعة صلاحيات
+ * مختارة** بتتحفظ في نفس العمود — فالفحص فاضل زي ما هو، والتاجر
+ * يقدر يعدّل عليها بعدين زي أي حد تاني.
+ *
+ * ## والميديا باير أهمهم
+ * دي حالة حقيقية في السوق: التاجر بيسلّم بيانات إعلاناته لمتخصص
+ * برّه. المتخصص محتاج **الأرقام** — الزيارات والتحويل والمصادر —
+ * ومالوش دعوة بأرقام تليفونات العملاء ولا بعناوينهم ولا بأرباح
+ * التاجر. القالب ده بيرسم الخط ده بالظبط في ضغطة.
+ */
+export type PermissionPreset = {
+  key: string
+  label: string
+  hint: string
+  role: Exclude<MemberRole, 'owner'>
+  permissions: Permission[]
+}
+
+export const PRESETS: PermissionPreset[] = [
+  {
+    key: 'media_buyer',
+    label: 'ميديا باير',
+    hint: 'يشوف أرقام الإعلانات والتحويل — من غير بيانات العملاء ولا أرباحك.',
+    role: 'staff',
+    /*
+      `reports.view` من غير `finance.view` ولا `customers.view`.
+
+      التقارير عندنا بتخفي الأعمدة المالية عن اللي مالوش `finance.view`
+      من غير ما تقفل الصفحة — فالميديا باير بيشوف الزيارات والمصادر
+      ونسبة التحويل، وما بيشوفش الإيراد ولا التكلفة ولا أرقام العملاء.
+    */
+    permissions: ['reports.view', 'marketing.manage'],
+  },
+  {
+    key: 'support',
+    label: 'خدمة عملاء',
+    hint: 'يرد على العملاء ويتابع طلباتهم ويغيّر حالتها.',
+    role: 'staff',
+    permissions: ['orders.view', 'orders.manage', 'customers.view', 'products.view'],
+  },
+  {
+    key: 'warehouse',
+    label: 'مخزن وتجهيز',
+    hint: 'يجهّز الطلبات ويحرّك المخزون — من غير أسعار التكلفة ولا العملاء.',
+    role: 'staff',
+    permissions: ['orders.view', 'orders.manage', 'products.view', 'inventory.manage'],
+  },
+  {
+    key: 'content',
+    label: 'محتوى وتصميم',
+    hint: 'يعدّل المنتجات وشكل المتجر والمدوّنة.',
+    role: 'staff',
+    permissions: ['products.view', 'products.manage', 'storefront.manage'],
+  },
+]
+
 export type Actor = {
   role: string
   permissions: string[]

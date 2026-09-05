@@ -8,7 +8,7 @@ import {
   setMemberBlockedAction,
   updateMemberAction,
 } from './actions'
-import { PERMISSIONS, ROLE_LABELS, type Permission } from '@/lib/permissions'
+import { PERMISSIONS, PRESETS, ROLE_LABELS, type Permission } from '@/lib/permissions'
 import { Alert, Button, Card, Field, Input } from '@/components/ui'
 import { toast } from '@/components/dashboard/toast'
 import { cn, formatDate } from '@/lib/utils'
@@ -267,6 +267,32 @@ function InviteForm({ onDone }: { onDone: (url: string | null) => void }) {
                 {o.label}
               </span>
               <span className="text-xs text-[var(--fg-subtle)]">{o.hint}</span>
+            </button>
+          ))}
+        </div>
+      </Field>
+
+      {/*
+        القوالب فوق الشبكة لا بدالها.
+
+        التاجر بيدوس «ميديا باير» فالصلاحيات بتتحدّد، وبعدين يشوفها
+        قدامه ويعدّل لو حابب. لو القالب خفى التفاصيل، كان بيدّي وصولًا
+        وهو مش شايف هو بيدّي إيه بالظبط.
+      */}
+      <Field label="قوالب جاهزة" hint="اختار الأقرب وبعدين عدّل اللي تحته لو محتاج.">
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+          {PRESETS.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              title={p.hint}
+              onClick={() => {
+                setRole(p.role)
+                setPermissions([...p.permissions])
+              }}
+              className="min-h-10 rounded-lg border border-[var(--border-strong)] px-2 text-xs font-medium text-[var(--fg-muted)] transition-colors hover:border-[var(--primary)] hover:bg-[var(--primary-soft)] hover:text-[var(--primary)]"
+            >
+              {p.label}
             </button>
           ))}
         </div>
