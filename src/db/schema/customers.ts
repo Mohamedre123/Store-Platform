@@ -177,3 +177,95 @@ export const blocklist = pgTable(
     index('blocklist_store_idx').on(t.storeId),
   ],
 )
+
+/* ────────────────────────── الشكاوى ────────────────────────── */
+
+export type TicketStatus = 'open' | 'answered' | 'resolved' | 'closed'
+export type TicketCategory = 'order' | 'product' | 'shipping' | 'payment' | 'other'
+
+/**
+ * شكوى من العميل للتاجر.
+ *
+ * ## المشكلة اللي بيحلّها الجدول ده
+ * شكاوى عملاء التاجر بتيجي على واتساب وسط مية رسالة تانية. اللي
+ * بيرد بيرد من موبايله الشخصي، واللي مبيردّش محدّش بيعرف إنه
+ * موجود أصلًا — العميل بيزعل ويمشي في صمت، والتاجر بيفتكر إن
+ * كل حاجة تمام لأن مفيش حد بيشتكي «رسميًا».
+ *
+ * الشكوى هنا ليها **رقم وحالة ومكان واحد**: التاجر بيفتح شاشة
+ * واحدة ويشوف اللي مستني رد، والموظف بياخدها بصلاحية `orders.view`
+ * من غير ما يشوف أرباح ولا مصروفات.
+ *
+ * ## ومربوطة بالطلب لما تكون عن طلب
+ * `orderId` اختياري: فيه شكاوى عن طلب («وصلني مكسور») وفيه شكاوى
+ * عامة («بتشحنوا لأسوان؟»). لما تكون عن طلب، التاجر بيفتح الطلب
+ * من الشكوى مباشرةً بدل ما يدوّر عليه برقم بيسأل عنه العميل.
+ *
+ * ## واللقطة على الصف زي الطلب بالظبط
+ * الاسم والتليفون والبريد بيتخزّنوا على الشكوى: العميل اللي غيّر
+ * رقمه بعد شهر، سجل الشكوى بيفضل بيقول اتكلّمنا مع مين وعلى أنهي
+ * رقم — وده اللي بيحسم أي خلاف.
+ */
+export const supportTickets = pgTable(
+  'support_tickets',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    storeId: uuid('store_id').notNull().references(() => stores.id, { onDelete: 'cascade' }),
+    /** رقم متسلسل لكل متجر — العميل والتاجر بيتكلّموا بيه */
+    ticketNumber: integer('ticket_number').notNull(),
+
+    customerId: uuid('customer_id').references(() => customers.id, { onDelete: 'set null' }),
+    /** الطلب اللي الشكوى عنه — فاضي لو الشكوى عامة */
+    orderId: uuid('order_id'),
+
+    subject: text('subject').notNull(),
+    category: text('category').$type<TicketCategory>().notNull().default('other'),
+    status: text('status').$type<TicketStatus>().notNull().default('open'),
+
+    // لقطة وقت الفتح — الطلب سجل تاريخي والشكوى زيه
+    customerName: text('customer_name'),
+    customerPhone: text('customer_phone'),
+    customerEmail: text('customer_email'),
+
+    /**
+     * آخر رسالة كانت من مين — **العمود ده هو ترتيب الشاشة**.
+     *
+     * «مستنية رد مني» غير «ردّيت ومستني العميل». من غيره التاجر
+     * بيفتح كل شكوى عشان يعرف دور مين — وشكوى واحدة اتنست معناها
+     * عميل ضاع.
+     */
+    lastMessageBy: text('last_message_by').$type<'customer' | 'merchant'>().notNull().default('customer'),
+    lastMessageAt: timestamp('last_message_at', { withTimezone: true }).notNull().defaultNow(),
+
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('support_tickets_store_number_unique').on(t.storeId, t.ticketNumber),
+    index('support_tickets_store_status_idx').on(t.storeId, t.status, t.lastMessageAt),
+    index('support_tickets_customer_idx').on(t.customerId),
+  ],
+)
+
+/** رسالة جوّه شكوى — من العميل أو من التاجر */
+export const supportMessages = pgTable(
+  'support_messages',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ticketId: uuid('ticket_id').notNull().references(() => supportTickets.id, { onDelete: 'cascade' }),
+    storeId: uuid('store_id').notNull().references(() => stores.id, { onDelete: 'cascade' }),
+
+    body: text('body').notNull(),
+    author: text('author').$type<'customer' | 'merchant'>().notNull(),
+    /** موظف التاجر اللي رد — عشان التاجر يعرف مين رد على مين */
+    authorUserId: uuid('author_user_id'),
+    authorName: text('author_name'),
+
+    /** صور العميل — «وصلني مكسور» بصورة بتوفّر عشر رسايل */
+    images: jsonb('images').$type<string[]>().notNull().default([]),
+
+    createdAt: createdAt(),
+  },
+  (t) => [index('support_messages_ticket_idx').on(t.ticketId, t.createdAt)],
+)

@@ -106,6 +106,7 @@ export const NAV: NavSection[] = [
       { href: '/dashboard/customers?filter=subscribers', label: 'المشتركون' },
       { href: '/dashboard/loyalty', label: 'الولاء والنقاط' },
       { href: '/dashboard/reviews', label: 'المراجعات' },
+      { href: '/dashboard/complaints', label: 'الشكاوى', permission: 'orders.view' },
       { href: '/dashboard/customers/blocked', label: 'الحظر', permission: 'orders.manage' },
     ],
   },

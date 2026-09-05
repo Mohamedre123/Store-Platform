@@ -16,6 +16,8 @@ import { RewardsCatalog, type CatalogReward } from '@/components/storefront/rewa
 import { ReferralCard } from '@/components/storefront/referral-card'
 import { getOrCreateReferralCode, getReferralStats } from '@/lib/referrals'
 import { publicStoreUrl } from '@/lib/domain'
+import { customerTickets } from '@/lib/tickets'
+import { TicketsPanel, type MyTicket, type OrderChoice } from '@/components/storefront/tickets-panel'
 import { CustomerLoginForm } from './login-form'
 import { LogoutButton } from './logout-button'
 
@@ -37,7 +39,7 @@ export default async function AccountPage({ params }: { params: Promise<{ store:
     )
   }
 
-  const [myOrders, saved, addresses] = await Promise.all([
+  const [myOrders, saved, addresses, myTickets] = await Promise.all([
     db
       .select({
         id: orders.id,
@@ -71,6 +73,14 @@ export default async function AccountPage({ params }: { params: Promise<{ store:
       .from(customerAddresses)
       .where(eq(customerAddresses.customerId, customer.id))
       .orderBy(desc(customerAddresses.isDefault)),
+  
+    /*
+      شكاوى العميل — نفس الصفحة اللي بيتابع فيها طلباته.
+
+      لو حطّيناها في مسار لوحده، العميل اللي عنده مشكلة كان لازم
+      يعرف إنه موجود عشان يدوّر عليه — وأغلبهم هيروح لواتساب.
+    */
+    customerTickets(store.id, customer.id),
   ])
 
   /**
@@ -259,6 +269,23 @@ export default async function AccountPage({ params }: { params: Promise<{ store:
           </div>
         )}
       </section>
+
+      <TicketsPanel
+        storeIdentifier={identifier}
+        tickets={myTickets.map(
+          (t): MyTicket => ({
+            id: t.id,
+            ticketNumber: t.ticketNumber,
+            subject: t.subject,
+            category: t.category,
+            status: t.status,
+            orderNumber: t.orderNumber,
+            lastMessageBy: t.lastMessageBy,
+            lastMessageAt: t.lastMessageAt,
+          }),
+        )}
+        orders={myOrders.map((o): OrderChoice => ({ id: o.id, orderNumber: o.orderNumber }))}
+      />
 
       {/* العناوين */}
       <section>
