@@ -170,7 +170,7 @@ export default async function DashboardHome() {
       hint: 'من غير منتج مفيش حاجة تتباع',
       href: '/dashboard/products/new',
       done: (productCount?.n ?? 0) > 0,
-      icon: Package,
+      icon: 'product',
     },
     {
       key: 'logo',
@@ -178,7 +178,7 @@ export default async function DashboardHome() {
       hint: 'بيظهر في الهيدر والفاتورة ورسايل العملاء',
       href: '/dashboard/settings',
       done: Boolean(store.logoLight),
-      icon: Palette,
+      icon: 'logo',
     },
     {
       key: 'shipping',
@@ -186,7 +186,7 @@ export default async function DashboardHome() {
       hint: 'السعر اللي العميل بيشوفه في الشيك أوت',
       href: '/dashboard/shipping',
       done: (hasShipping?.n ?? 0) > 0,
-      icon: Truck,
+      icon: 'shipping',
     },
     {
       key: 'payment',
@@ -194,7 +194,7 @@ export default async function DashboardHome() {
       hint: 'الدفع عند الاستلام أو بوابة بمفاتيحك',
       href: '/dashboard/payments',
       done: (hasPayment?.n ?? 0) > 0,
-      icon: CreditCard,
+      icon: 'payment',
     },
     {
       key: 'theme',
@@ -202,7 +202,7 @@ export default async function DashboardHome() {
       hint: 'الألوان والخطوط والصفحة الرئيسية',
       href: '/dashboard/storefront',
       done: Boolean(store.logoLight) && (productCount?.n ?? 0) > 0,
-      icon: ImageIcon,
+      icon: 'theme',
     },
     {
       key: 'publish',
@@ -210,7 +210,7 @@ export default async function DashboardHome() {
       hint: 'آخر خطوة — بعدها العملاء يقدروا يطلبوا',
       href: '/dashboard/settings',
       done: store.isPublished,
-      icon: ShoppingBag,
+      icon: 'publish',
     },
   ]
 

@@ -1,8 +1,40 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowLeft, Check, Sparkles, type LucideIcon } from 'lucide-react'
+import {
+  ArrowLeft,
+  Check,
+  CreditCard,
+  ImageIcon,
+  Package,
+  Palette,
+  ShoppingBag,
+  Sparkles,
+  Truck,
+  type LucideIcon,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
+
+/**
+ * الأيقونات بمفتاح نصّي لا بالمكوّن نفسه.
+ *
+ * الصفحة مكوّن خادم والكارت ده مكوّن عميل، والحدّ بينهم بيتسلّم
+ * **بيانات بس**. تمرير مكوّن الأيقونة (وهو دالة) بيرمي وقت التشغيل
+ * — «Functions cannot be passed directly to Client Components» —
+ * والبناء ما بيمسكهاش لأنها مش خطأ أنواع.
+ *
+ * المفتاح النصّي بيعدّي الحدّ، والخريطة دي بتحوّله لمكوّن هنا.
+ */
+const ICONS = {
+  product: Package,
+  logo: Palette,
+  shipping: Truck,
+  payment: CreditCard,
+  theme: ImageIcon,
+  publish: ShoppingBag,
+} satisfies Record<string, LucideIcon>
+
+export type SetupIcon = keyof typeof ICONS
 
 export type SetupStep = {
   key: string
@@ -10,7 +42,7 @@ export type SetupStep = {
   hint: string
   href: string
   done: boolean
-  icon: LucideIcon
+  icon: SetupIcon
 }
 
 /**
@@ -38,7 +70,7 @@ export function SetupGuide({ steps }: { steps: SetupStep[] }) {
 
   const rest = steps.filter((s) => !s.done && s.key !== next.key)
   const pct = Math.round((doneCount / steps.length) * 100)
-  const NextIcon = next.icon
+  const NextIcon = ICONS[next.icon] ?? Package
 
   return (
     <section
@@ -125,10 +157,15 @@ export function SetupGuide({ steps }: { steps: SetupStep[] }) {
                   href={s.href}
                   className="flex h-full items-center gap-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-sm transition-colors hover:bg-[var(--surface-2)]"
                 >
-                  <s.icon
-                    className="h-4 w-4 shrink-0 text-[var(--fg-subtle)]"
-                    aria-hidden="true"
-                  />
+                  {(() => {
+                    const Icon = ICONS[s.icon] ?? Package
+                    return (
+                      <Icon
+                        className="h-4 w-4 shrink-0 text-[var(--fg-subtle)]"
+                        aria-hidden="true"
+                      />
+                    )
+                  })()}
                   <span className="min-w-0 flex-1 truncate">{s.label}</span>
                 </Link>
               </li>
