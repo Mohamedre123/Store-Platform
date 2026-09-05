@@ -1,6 +1,6 @@
-import { and, eq } from 'drizzle-orm'
+import { and, asc, eq } from 'drizzle-orm'
 import { db } from '@/db'
-import { shippingRates, shippingZones } from '@/db/schema'
+import { shippingMethods, shippingRates, shippingZones } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { guard } from '@/lib/permissions'
 import { regionsFor } from '@/lib/regions'
@@ -9,6 +9,7 @@ import { Reveal } from '@/components/motion'
 import { ShippingForm } from './shipping-form'
 import { CarriersManager } from './carriers-manager'
 import { AutoShipCard } from './auto-ship-card'
+import { MethodsManager } from './methods-manager'
 import { readCarrierProviders, activeCarrier } from '@/lib/provider-store'
 import { zonesFor } from '@/lib/shipping-zones'
 import { supportsTariff } from '@/lib/integrations/shipping-tariff'
@@ -36,9 +37,14 @@ export default async function ShippingPage() {
 
   const rates = Object.fromEntries(rateRows.map((r) => [r.city, { price: r.price, enabled: r.enabled }]))
 
-  const [carriers, linked] = await Promise.all([
+  const [carriers, linked, methods] = await Promise.all([
     readCarrierProviders(store.id, CARRIER_PROVIDERS),
     activeCarrier(store.id),
+    db
+      .select()
+      .from(shippingMethods)
+      .where(eq(shippingMethods.storeId, store.id))
+      .orderBy(asc(shippingMethods.sortOrder), asc(shippingMethods.createdAt)),
   ])
 
   return (
@@ -98,6 +104,30 @@ export default async function ShippingPage() {
                 }
               : null
           }
+        />
+      </Reveal>
+
+      {/*
+        طرق الشحن بعد التسعير لا قبله.
+
+        الطريقة فرق سعر على سعر المحافظة — فالتاجر لازم يكون سعّر
+        محافظاته الأول عشان الفرق يبقى ليه معنى. والمعاينة تحت بتوريه
+        الناتج برقم حقيقي من تسعيرته هو.
+      */}
+      <Reveal delay={80}>
+        <MethodsManager
+          currency={store.currency}
+          sampleBase={zone?.defaultPrice ?? 5000}
+          rows={methods.map((m) => ({
+            id: m.id,
+            name: m.name,
+            hint: m.hint,
+            priceDelta: m.priceDelta,
+            minDays: m.minDays,
+            maxDays: m.maxDays,
+            enabled: m.enabled,
+            sortOrder: m.sortOrder,
+          }))}
         />
       </Reveal>
     </div>

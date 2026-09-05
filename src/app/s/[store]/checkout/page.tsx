@@ -4,6 +4,7 @@ import { getCurrentCustomer } from '@/lib/customer-auth'
 import { CustomerLoginForm } from '../account/login-form'
 import { getCheckoutSettings, getDisplayShipping, listPaymentOptions } from '@/lib/checkout'
 import { regionsFor } from '@/lib/regions'
+import { listShippingMethods } from '@/lib/shipping-methods'
 import { listBranches } from '@/lib/branches'
 import { otpDeliverable } from '@/lib/order-otp'
 import { CheckoutForm } from './checkout-form'
@@ -111,6 +112,7 @@ export default async function CheckoutPage({
             country={store.country}
             regions={regionsFor(store.country)}
             shippingByCity={ship.byCity}
+            shippingMethods={await listShippingMethods(store.id)}
             defaultShipping={ship.defaultPrice}
             freeOver={ship.freeOver}
             carrierName={ship.carrierName}

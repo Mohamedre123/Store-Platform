@@ -31,9 +31,24 @@ export type ShippingRates = {
   byCity: Record<string, number>
   defaultPrice: number
   freeOver: number | null
+  /**
+   * فرق الطريقة الافتراضية — أول طريقة شحن مفعّلة عند التاجر.
+   *
+   * ## ليه لازم يكون هنا
+   * الدفع السريع مالوش منتقي طرق عن قصد: هو مسار «منتج واحد من
+   * إعلان»، وأي شاشة زيادة بتنزّل التحويل. لكن الخادم بيحاسب بأول
+   * طريقة — فلو الشاشة حسبت من غير الفرق، العميل يشوف ٥٠ ويتحاسب
+   * ٨٠، وده بالظبط اللي قاعدة «السعر المعروض والمحصّل من مصدر
+   * واحد» موجودة عشانه.
+   *
+   * والقيمة دي هي **نفس** اللي `resolveShippingMethod` بيختاره على
+   * الخادم لما ما يجيش معرّف.
+   */
+  methodDelta?: number
 }
 
 export function shippingFor(rates: ShippingRates, city: string, subtotal: number): number {
   if (rates.freeOver !== null && subtotal >= rates.freeOver) return 0
-  return rates.byCity[city] ?? rates.defaultPrice
+  /* الفرق قبل الشحن المجاني — نفس ترتيب الخادم بالحرف */
+  return Math.max(0, (rates.byCity[city] ?? rates.defaultPrice) + (rates.methodDelta ?? 0))
 }

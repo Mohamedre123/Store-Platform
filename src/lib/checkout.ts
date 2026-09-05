@@ -6,6 +6,7 @@ import { applyBps } from './utils'
 import type { ProductType } from '@/db/schema'
 import { assignBucket, getRunningPriceExperiments, variantValue } from './experiments'
 import { paymentProvider } from './providers'
+import { resolveShippingMethod } from './shipping-methods'
 import type { PaymentOption } from './checkout-ui'
 
 /**
@@ -435,6 +436,15 @@ export async function computeTotals(options: {
    * الفرع» ويتحاسب على شحن ما حصلش.
    */
   pickup?: boolean
+  /**
+   * طريقة الشحن اللي العميل اختارها — **معرّف بس**.
+   *
+   * فرق السعر بيتقرا من القاعدة لا من المتصفح: لو صدّقنا اللي جاي
+   * من هناك، أي حد يبعت فرقًا سالبًا ويشحن ببلاش.
+   *
+   * والمتجر اللي مضافش طرق بيتجاهله بالكامل — سعر واحد زي ما كان.
+   */
+  shippingMethodId?: string | null
 }): Promise<Totals> {
   const { storeId, lines, country, city, paymentGateway, discount = 0, couponFreeShipping = false, pickup = false } = options
 
@@ -443,9 +453,20 @@ export async function computeTotals(options: {
 
   const ship = await shippingFor(storeId, country, city)
 
+  /*
+    فرق الطريقة بيتحسب قبل الشحن المجاني.
+
+    العكس كان هيخلّي «سريع +٣٠» يتحسب على طلب شحنه مجاني — والعميل
+    يدفع تلاتين جنيه على شحن التاجر قال إنه مجاني.
+  */
+  const resolved = await resolveShippingMethod(storeId, ship.price, options.shippingMethodId, {
+    minDays: ship.minDays,
+    maxDays: ship.maxDays,
+  })
+
   const freeThreshold = ship.freeOver
   const freeShippingApplied = pickup || couponFreeShipping || Boolean(freeThreshold && subtotal - discount >= freeThreshold)
-  const shipping = freeShippingApplied ? 0 : ship.price
+  const shipping = freeShippingApplied ? 0 : resolved.price
 
   // رسوم أو خصم طريقة الدفع
   let codFee = 0

@@ -278,3 +278,52 @@ export const carrierAccounts = pgTable(
     index('carrier_accounts_store_idx').on(t.storeId, t.enabled),
   ],
 )
+
+/**
+ * طرق شحن متعددة — «عادي» و«سريع» و«نفس اليوم».
+ *
+ * ## ليه فرق سعر لا سعر كامل
+ * التاجر سعّر ٢٧ محافظة مرة واحدة. لو كل طريقة شحن طلبت تسعيرة
+ * كاملة، إضافة «سريع» معناها ٢٧ سطر تاني يتكتبوا بإيد — وأول تغيير
+ * في التعريفة معناه تعديلهم كلهم في مكانين.
+ *
+ * الفرق بيتضاف على سعر المحافظة: «سريع = +٣٠ جنيه» بتشتغل على كل
+ * المحافظات في سطر واحد، وبتفضل صح لما التاجر يغيّر سعر محافظة.
+ *
+ * ## والفرق ممكن يكون بالسالب
+ * «استلام من فرعنا» أو «شحن اقتصادي» بيقلّلوا السعر. الحساب بيقصّ
+ * عند صفر — الشحن السالب معناه إن التاجر بيدفع للعميل عشان يشتري.
+ *
+ * ## ومفيش طرق = السلوك القديم بالحرف
+ * الجدول الفاضي معناه سعر واحد زي ما كان. الميزة بتتفتح لما التاجر
+ * يضيف أول طريقة، ولحد ساعتها مفيش أي تغيير في الشيك أوت.
+ */
+export const shippingMethods = pgTable(
+  'shipping_methods',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    storeId: uuid('store_id').notNull().references(() => stores.id, { onDelete: 'cascade' }),
+
+    name: text('name').notNull(),
+    /** سطر تحت الاسم — «يوصلك خلال ٢٤ ساعة» */
+    hint: text('hint'),
+
+    /** فرق السعر بالقرش — موجب أو سالب أو صفر */
+    priceDelta: integer('price_delta').notNull().default(0),
+
+    /**
+     * مدة التوصيل بالأيام — بتغلب مدة المحافظة لما تتكتب.
+     *
+     * الطريقة السريعة سبب وجودها إنها أسرع؛ لو ورّينا مدة المحافظة
+     * جنبها، العميل بيدفع زيادة وبيقرا نفس الميعاد.
+     */
+    minDays: integer('min_days'),
+    maxDays: integer('max_days'),
+
+    enabled: boolean('enabled').notNull().default(true),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index('shipping_methods_store_idx').on(t.storeId, t.sortOrder)],
+)

@@ -122,6 +122,17 @@ const orderSchema = z.object({
    * بيرجّعه لـ«توصيل» لو الإعداد ما بيسمحش.
    */
   fulfillment: z.enum(['delivery', 'pickup']).default('delivery'),
+  /**
+   * طريقة الشحن — **معرّف بس**.
+   *
+   * فرق السعر بيتقرا من القاعدة في `computeTotals`. لو صدّقنا اللي
+   * جاي من المتصفح، أي حد يبعت فرقًا سالبًا ويشحن ببلاش.
+   *
+   * والمعرّف الغلط بيرجع لأول طريقة بدل ما يرفض الطلب: الطريقة ممكن
+   * تكون اتقفلت بين ما العميل فتح الصفحة وبين ما ضغط «أكّد»، ورفض
+   * البيعة عشان تغيير التاجر عمله دلوقتي مالوش معنى.
+   */
+  shippingMethodId: z.string().uuid().optional(),
   branchId: z.string().uuid().optional(),
   notes: z.string().trim().max(500).optional(),
   paymentGateway: z.string().trim().default('cod'),
@@ -675,6 +686,11 @@ async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
     couponFreeShipping: coupon?.freeShipping ?? false,
     /* الاستلام مالوش شحن — والحساب هنا هو الحساب اللي بيتحصّل */
     pickup: fulfillment === 'pickup',
+    /*
+      طريقة الشحن — المعرّف بيتمرّر والفرق بيتقرا من القاعدة جوّه
+      `computeTotals`. والاستلام بيتجاهلها لأن مفيش شحن أصلًا.
+    */
+    shippingMethodId: fulfillment === 'pickup' ? null : (input.shippingMethodId ?? null),
   })
 
   if (settings?.minOrderEnabled && totals.subtotal < settings.minOrderAmount) {

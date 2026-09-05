@@ -37,6 +37,7 @@ import { getCheckoutSettings, getDisplayShipping, listPaymentOptions } from '@/l
 import { regionsFor } from '@/lib/regions'
 import { otpDeliverable } from '@/lib/order-otp'
 import { publicStoreUrl } from '@/lib/domain'
+import { listShippingMethods } from '@/lib/shipping-methods'
 
 export const dynamic = 'force-dynamic'
 
@@ -284,6 +285,14 @@ export default async function ProductPage({
               byCity: ship.byCity,
               defaultPrice: ship.defaultPrice,
               freeOver: ship.freeOver,
+              /*
+                فرق الطريقة الافتراضية.
+
+                الدفع السريع مالوش منتقي طرق، والخادم بياخد أول طريقة
+                لما ما يجيش معرّف — فالشاشة لازم تحسب بنفسها، وإلا
+                العميل يشوف رقمًا ويتحاسب رقمًا تاني.
+              */
+              methodDelta: (await listShippingMethods(store.id))[0]?.priceDelta ?? 0,
             },
             addressMode: quickSettings?.addressMode ?? 'structured',
             fieldName: quickSettings?.fieldName ?? 'required',

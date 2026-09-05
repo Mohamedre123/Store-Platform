@@ -66,6 +66,7 @@ export function CheckoutForm({
   shippingByCity,
   defaultShipping,
   freeOver,
+  shippingMethods,
   carrierName,
   account,
 }: {
@@ -78,6 +79,21 @@ export function CheckoutForm({
   shippingByCity: Record<string, number>
   defaultShipping: number
   freeOver: number | null
+  /**
+   * طرق الشحن المتاحة — فاضية يعني سعر واحد زي ما كان.
+   *
+   * الفرق بيتعرض هنا عشان الرقم يتحرّك مع اختيار العميل من غير رحلة
+   * للخادم، والخادم بيعيد حسابه من القاعدة عشان اللي شافه هو اللي
+   * بيتحاسب.
+   */
+  shippingMethods: Array<{
+    id: string
+    name: string
+    hint: string | null
+    priceDelta: number
+    minDays: number | null
+    maxDays: number | null
+  }>
   /** اسم شركة الشحن لما سعرها هو اللي بيحكم — بيطمّن العميل مين هيوصّله */
   carrierName?: string | null
   /**
@@ -115,6 +131,8 @@ export function CheckoutForm({
     config.deliveryMode === 'pickup' ? 'pickup' : 'delivery',
   )
   const [branchId, setBranchId] = useState(config.branches[0]?.id ?? '')
+  /* طريقة الشحن — الأولى افتراضيًا زي ما الخادم بيعمل بالظبط */
+  const [shippingMethodId, setShippingMethodId] = useState(shippingMethods[0]?.id ?? "")
 
   /* الدولة — بتبان لما التاجر يفعّل الخانة، وإلا دولة المتجر */
   const [orderCountry, setOrderCountry] = useState(country)
@@ -204,7 +222,17 @@ export function CheckoutForm({
     } catch {}
   }, [draftKey])
 
-  const baseShipping = freeOver !== null && subtotal >= freeOver ? 0 : (shippingByCity[city] ?? defaultShipping)
+  /*
+    فرق الطريقة بيتحسب قبل الشحن المجاني — نفس ترتيب الخادم بالحرف.
+
+    العكس كان هيخلّي «سريع +٣٠» يتحسب على طلب شحنه مجاني، والعميل
+    يدفع تلاتين جنيه على شحن قلنا إنه مجاني.
+  */
+  const cityPrice = shippingByCity[city] ?? defaultShipping
+  const activeMethod = shippingMethods.find((m) => m.id === shippingMethodId) ?? shippingMethods[0] ?? null
+  const withMethod = Math.max(0, cityPrice + (activeMethod?.priceDelta ?? 0))
+
+  const baseShipping = freeOver !== null && subtotal >= freeOver ? 0 : withMethod
   /* الاستلام من الفرع مالوش شحن — والخادم بيحسبها بنفس الشرط */
   const shipping = pickup || coupon?.freeShipping ? 0 : baseShipping
   const discount = coupon?.discount ?? 0
@@ -372,6 +400,8 @@ export function CheckoutForm({
         building: pickup ? undefined : building || undefined,
         postalCode: pickup ? undefined : postalCode || undefined,
         fulfillment,
+        /* المعرّف بس — الخادم بيقرا الفرق من القاعدة */
+        shippingMethodId: pickup ? undefined : (activeMethod?.id ?? undefined),
         branchId: pickup ? branchId || undefined : undefined,
         notes: notes || undefined,
         paymentGateway: gateway,
@@ -721,6 +751,60 @@ export function CheckoutForm({
                 />
               </label>
             )}
+          </section>
+        )}
+
+        {/*
+          طريقة الشحن — بتظهر لما التاجر يحطّ أكتر من واحدة بس.
+
+          المتجر بطريقة واحدة (أو بلا طرق) مالوش اختيار يعرضه، وشاشة
+          فيها خيار واحد بتزوّد خطوة بلا قرار. والاستلام من الفرع
+          بيخفيها كلها — مفيش شحن أصلًا.
+        */}
+        {!pickup && shippingMethods.length > 1 && (
+          <section className="flex flex-col gap-3">
+            <h2 className="font-bold">طريقة الشحن</h2>
+            {shippingMethods.map((m) => {
+              const price = Math.max(0, cityPrice + m.priceDelta)
+              const days =
+                m.minDays !== null && m.maxDays !== null
+                  ? m.minDays === m.maxDays
+                    ? `${m.minDays} يوم`
+                    : `${m.minDays}–${m.maxDays} يوم`
+                  : null
+
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => setShippingMethodId(m.id)}
+                  aria-pressed={activeMethod?.id === m.id}
+                  className={`flex min-h-16 items-center gap-3 rounded-[var(--sf-radius)] border p-4 text-start transition-colors ${
+                    activeMethod?.id === m.id
+                      ? 'border-[var(--sf-primary)] bg-[var(--sf-primary)]/6'
+                      : 'border-[var(--sf-text)]/15'
+                  }`}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-medium">{m.name}</span>
+                    {(m.hint || days) && (
+                      <span className="mt-0.5 block text-sm opacity-65">
+                        {[m.hint, days].filter(Boolean).join(' · ')}
+                      </span>
+                    )}
+                  </span>
+                  {/*
+                    السعر الكامل لا الفرق.
+
+                    «+٣٠» بتخلّي العميل يطرح ويجمع عشان يعرف هيدفع كام.
+                    الرقم الكامل بيتقارن بنظرة.
+                  */}
+                  <span className="tabular shrink-0 text-sm font-semibold">
+                    {price === 0 ? 'مجاني' : formatMoney(price, currency)}
+                  </span>
+                </button>
+              )
+            })}
           </section>
         )}
 
