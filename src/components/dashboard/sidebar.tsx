@@ -294,33 +294,71 @@ export function Sidebar({
                   : 'text-[var(--fg-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)]',
               )}
             >
-              <Link
-                href={section.href}
-                onClick={() => {
-                  // الدوس على القسم بيفتحه ويروح لصفحته الرئيسية معًا
-                  if (section.children) setManual((m) => ({ ...m, [section.href]: true }))
-                  setOpen(false)
-                }}
-                aria-current={isActive(pathname, section.href) ? 'page' : undefined}
-                className="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-sm font-medium"
-              >
-                <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
-                <span className="truncate">{section.label}</span>
-              </Link>
+              {/*
+                القسم اللي تحته بنود: **زرار فتح على الفون، رابط على
+                الديسكتوب**.
 
-              {section.children && (
-                <button
-                  type="button"
-                  onClick={() => setManual((m) => ({ ...m, [section.href]: !expanded }))}
-                  aria-expanded={expanded}
-                  aria-label={`${expanded ? 'اطوِ' : 'افتح'} ${section.label}`}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+                ## ليه الاتنين مختلفين
+                على الديسكتوب الشريط الجانبي ثابت وشايل القايمة كلها.
+                الدوسة الواحدة اللي بتروح للصفحة وبتفتح البنود معاها
+                مكسب — القايمة فاضلة قدامك بعدها.
+
+                على الفون القايمة **شاشة كاملة بتتقفل** لما تروح
+                لصفحة. فالدوسة على «المنتجات» كانت بتودّي لقايمة
+                المنتجات وتقفل اللوحة قبل ما التاجر يشوف إن جوّاها
+                «الأقسام» و«المخزون» و«الفروع» — يعني الأقسام الفرعية
+                كانت شبه مخفية عنه.
+
+                هنا الدوسة بتفتح البنود وبس، والتاجر هو اللي بيختار.
+              */}
+              {section.children ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setManual((m) => ({ ...m, [section.href]: !expanded }))}
+                    aria-expanded={expanded}
+                    className="flex min-w-0 flex-1 items-center gap-3 px-3 py-3 text-start text-sm font-medium lg:hidden"
+                  >
+                    <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+                    <span className="truncate">{section.label}</span>
+                  </button>
+
+                  <Link
+                    href={section.href}
+                    onClick={() => {
+                      setManual((m) => ({ ...m, [section.href]: true }))
+                      setOpen(false)
+                    }}
+                    aria-current={isActive(pathname, section.href) ? 'page' : undefined}
+                    className="hidden min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-sm font-medium lg:flex"
+                  >
+                    <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+                    <span className="truncate">{section.label}</span>
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={() => setManual((m) => ({ ...m, [section.href]: !expanded }))}
+                    aria-expanded={expanded}
+                    aria-label={`${expanded ? 'اطوِ' : 'افتح'} ${section.label}`}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg lg:h-9 lg:w-9"
+                  >
+                    <ChevronDown
+                      className={cn('h-4 w-4 transition-transform', expanded && 'rotate-180')}
+                      aria-hidden="true"
+                    />
+                  </button>
+                </>
+              ) : (
+                <Link
+                  href={section.href}
+                  onClick={() => setOpen(false)}
+                  aria-current={isActive(pathname, section.href) ? 'page' : undefined}
+                  className="flex min-w-0 flex-1 items-center gap-3 px-3 py-3 text-sm font-medium lg:py-2.5"
                 >
-                  <ChevronDown
-                    className={cn('h-4 w-4 transition-transform', expanded && 'rotate-180')}
-                    aria-hidden="true"
-                  />
-                </button>
+                  <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+                  <span className="truncate">{section.label}</span>
+                </Link>
               )}
             </div>
 
@@ -525,6 +563,37 @@ export function Sidebar({
         {primary.map((item) => {
           const Icon = item.icon
           const on = isActive(pathname, item.href)
+
+          /*
+            البند اللي تحته بنود بيفتح القايمة عليه مفتوحًا — ما
+            بيروحش لصفحة.
+
+            نفس السبب اللي في اللوحة: «المنتجات» جوّاها الأقسام
+            والمخزون والفروع والموردين وسلة المهملات. الدوسة اللي
+            بتودّي لقايمة المنتجات على طول بتخبّي الخمسة دول، والتاجر
+            على الفون مالوش شريط جانبي يفكّره بيهم.
+          */
+          if (item.children?.length) {
+            return (
+              <button
+                key={item.href}
+                type="button"
+                onClick={() => {
+                  setManual((m) => ({ ...m, [item.href]: true }))
+                  setOpen(true)
+                }}
+                aria-expanded={open}
+                className={cn(
+                  'flex flex-1 flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-medium transition-colors',
+                  on ? 'text-[var(--primary)]' : 'text-[var(--fg-muted)]',
+                )}
+              >
+                <Icon className="h-[22px] w-[22px]" aria-hidden="true" />
+                {item.label}
+              </button>
+            )
+          }
+
           return (
             <Link
               key={item.href}
