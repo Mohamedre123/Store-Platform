@@ -21,6 +21,8 @@ export type CarrierKey =
   | 'sprint'
   | 'r2s'
   | 'aramex'
+  /** مندوب التاجر نفسه — الشحنة بتمشي في `shipments.courierId` */
+  | 'internal'
   | 'other'
 
 export type Carrier = {
@@ -40,6 +42,7 @@ export const CARRIERS: Carrier[] = [
   { key: 'sprint', label: 'سبرينت', trackUrl: null },
   { key: 'r2s', label: 'R2S', trackUrl: null },
   { key: 'aramex', label: 'أرامكس', trackUrl: 'https://www.aramex.com/eg/en/track/shipments?ShipmentNumber={n}' },
+  { key: 'internal', label: 'مندوب المتجر', trackUrl: null },
   { key: 'other', label: 'شركة تانية', trackUrl: null },
 ]
 

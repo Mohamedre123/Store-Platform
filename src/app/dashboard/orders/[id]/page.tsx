@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 import { and, asc, eq, inArray } from 'drizzle-orm'
 import { AlertTriangle, ArrowRight, Mail, MapPin, MessageCircle, Phone, StickyNote, User } from 'lucide-react'
 import { db } from '@/db'
-import { categories, orderEvents, orderItems, orders, productOptions, products, productVariants } from '@/db/schema'
+import { categories, couriers, orderEvents, orderItems, orders, productOptions, products, productVariants, shipments } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { guard } from '@/lib/permissions'
 import { formatMoney, formatDateTime } from '@/lib/utils'
@@ -22,6 +22,7 @@ import { OrderNote, StatusControls } from '../status-controls'
 import { IncompleteActions } from '../incomplete-actions'
 import { ConvertCart } from '../convert-cart'
 import { regionsFor } from '@/lib/regions'
+import { CourierCard, type CourierOption } from './courier-card'
 
 export const metadata = { title: 'تفاصيل الطلب' }
 
@@ -38,13 +39,37 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
   if (!order) notFound()
 
-  const [items, events] = await Promise.all([
+  const [items, events, courierOptions, assignedRows] = await Promise.all([
     db.select().from(orderItems).where(eq(orderItems.orderId, order.id)),
     db
       .select()
       .from(orderEvents)
       .where(eq(orderEvents.orderId, order.id))
       .orderBy(asc(orderEvents.createdAt)),
+
+    /*
+      المندوبون الشغّالين — عشان الإسناد يتم من هنا مباشرةً.
+
+      استعلامان خفيفان على جدول صغير. التاجر اللي بيشحن بشركة
+      ما عندوش صفوف هنا، والكارت بيختفي عنده من غير أي إعداد.
+    */
+    db
+      .select({
+        id: couriers.id,
+        name: couriers.name,
+        phone: couriers.phone,
+        zones: couriers.zones,
+      })
+      .from(couriers)
+      .where(and(eq(couriers.storeId, store.id), eq(couriers.isActive, true)))
+      .orderBy(couriers.name),
+
+    db
+      .select({ name: couriers.name, phone: couriers.phone })
+      .from(shipments)
+      .innerJoin(couriers, eq(couriers.id, shipments.courierId))
+      .where(and(eq(shipments.storeId, store.id), eq(shipments.orderId, order.id)))
+      .limit(1),
   ])
 
   /**
@@ -384,6 +409,23 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               <StatusControls orderId={order.id} status={order.status} isIncomplete={false} />
             )}
           </Reveal>
+
+          {!order.isIncomplete && (
+            <Reveal delay={100}>
+              <CourierCard
+                orderId={order.id}
+                couriers={courierOptions as CourierOption[]}
+                assigned={assignedRows[0] ?? null}
+                city={address?.city ?? null}
+                codAmount={
+                  order.paymentStatus === 'paid'
+                    ? 0
+                    : Math.max(0, order.total - order.depositPaid)
+                }
+                currency={order.currency}
+              />
+            </Reveal>
+          )}
 
           <Reveal delay={120}>
             <Card className="flex flex-col gap-4 p-5">

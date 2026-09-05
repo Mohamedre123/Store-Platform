@@ -76,6 +76,7 @@ export const NAV: NavSection[] = [
       { href: '/dashboard/orders/new', label: 'طلب جديد', permission: 'orders.manage' },
       { href: '/dashboard/orders?filter=incomplete', label: 'السلات المتروكة' },
       { href: '/dashboard/shipments', label: 'الشحنات' },
+      { href: '/dashboard/couriers', label: 'المندوبون', permission: 'orders.manage' },
       { href: '/dashboard/returns', label: 'المرتجعات' },
       { href: '/dashboard/bookings', label: 'الحجوزات' },
     ],

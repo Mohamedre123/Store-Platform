@@ -126,6 +126,71 @@ export const shippingRates = pgTable(
   ],
 )
 
+/**
+ * مندوبو التاجر نفسه — مش شركة شحن.
+ *
+ * ## المشكلة اللي بيحلّها الجدول ده
+ * أغلب التجّار في مصر بيوصّلوا بمندوب بتاعهم: واحد أو اتنين
+ * بموتوسيكل بيلفّوا على العناوين ويحصّلوا الفلوس. النظام كله عندنا
+ * كان مبنيًّا على «شركة شحن ليها API» — فالتاجر ده كان بيسجّل
+ * شحناته «شركة تانية» بلا اسم ولا رقم ولا حساب، وبيفضل يتابع
+ * مندوبه على ورقة.
+ *
+ * ## والمندوب مش صف في جدول الشحنات
+ * الشحنة حدث بيحصل مرة، والمندوب بيفضل شهور: ليه مناطق بيغطّيها،
+ * وأجرة بياخدها على الطلب، وحساب فلوس بيتقفل آخر اليوم. لو خزّنّا
+ * اسمه على كل شحنة، تغيير رقم تليفونه كان هيحتاج يعدّي على كل
+ * شحنة عملها من أول يوم.
+ *
+ * ## الأجرة على الطلب لا نسبة
+ * المندوب في السوق ده بياخد مبلغًا ثابتًا على التوصيلة، مش نسبة من
+ * قيمة الطلب. النسبة كانت هتخلّي توصيل طلب بألف جنيه لنفس البيت
+ * يتكلّف عشر أضعاف توصيل طلب بمية — وده مش اللي بيحصل.
+ */
+export const couriers = pgTable(
+  'couriers',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    storeId: uuid('store_id').notNull().references(() => stores.id, { onDelete: 'cascade' }),
+
+    name: text('name').notNull(),
+    phone: text('phone').notNull(),
+    vehicle: text('vehicle').$type<'motorcycle' | 'car' | 'van' | 'foot'>().notNull().default('motorcycle'),
+
+    /** المناطق اللي بيغطّيها — نفس أسماء المدن في `shipping_rates` */
+    zones: jsonb('zones').$type<string[]>().notNull().default([]),
+
+    /** أجرته على الطلب الواحد، بالقرش */
+    feePerOrder: money('fee_per_order'),
+
+    /**
+     * رمز صفحته — بيفتح بيه قايمة طلباته من موبايله.
+     *
+     * ## ليه رابط مش حساب
+     * المندوب مش هيعمل حساب ولا هيفتكر باسورد. الرابط بيتبعتله على
+     * واتساب مرة، وبيفضل مفتوح على موبايله طول اليوم.
+     *
+     * ## والرمز ده بيفتح بيانات عملاء
+     * أسماء وتليفونات وعناوين اللي عندهم طلبات معاه — وده اللي
+     * المندوب محتاجه عشان يوصّل أصلًا. عشان كده:
+     * - الرمز طويل وعشوائي مش رقم متسلسل
+     * - بيتغيّر بضغطة لما التاجر يستغنى عنه، فالرابط القديم يموت
+     * - وما بيوريش غير الطلبات المسنودة له هو، اللي لسه في الطريق بس
+     */
+    accessToken: text('access_token').notNull(),
+
+    isActive: boolean('is_active').notNull().default(true),
+    note: text('note'),
+
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('couriers_token_unique').on(t.accessToken),
+    index('couriers_store_idx').on(t.storeId, t.isActive),
+  ],
+)
+
 /** الشحنات المُنشأة عند شركات الشحن */
 export const shipments = pgTable(
   'shipments',
@@ -133,7 +198,16 @@ export const shipments = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     storeId: uuid('store_id').notNull().references(() => stores.id, { onDelete: 'cascade' }),
     orderId: uuid('order_id').notNull(),
-    carrier: text('carrier').notNull(), // bosta | mylerz | jt | wavex | sprint | r2s | easypost
+    carrier: text('carrier').notNull(), // bosta | mylerz | jt | wavex | sprint | r2s | internal
+
+    /**
+     * مندوب التاجر اللي ماشي بالشحنة — لما `carrier = 'internal'`.
+     *
+     * على الشحنة لا على الطلب: الطلب اللي رجع واتبعت تاني ممكن
+     * يمشي مع مندوب غير الأول، والتاريخ ده لازم يفضل مقروءًا عشان
+     * حساب كل واحد فيهم يقفل صح.
+     */
+    courierId: uuid('courier_id'),
     trackingNumber: text('tracking_number'),
     carrierShipmentId: text('carrier_shipment_id'),
     awbUrl: text('awb_url'),
@@ -152,6 +226,7 @@ export const shipments = pgTable(
     index('shipments_order_idx').on(t.orderId),
     index('shipments_store_idx').on(t.storeId, t.status),
     index('shipments_tracking_idx').on(t.trackingNumber),
+    index('shipments_courier_idx').on(t.courierId, t.status),
   ],
 )
 
