@@ -100,9 +100,23 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </div>
         </header>
 
-        <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
-          {/* تبويبات القسم — بتظهر لوحدها في الصفحات اللي ليها إخوان */}
-          <div className="mb-6 empty:mb-0">
+        {/*
+          `pb-24` على الفون عشان الشريط السفلي ما يغطّيش آخر الصفحة.
+
+          من غيرها، آخر زرار في أي صفحة بيقع تحت الشريط — والتاجر
+          بيفضل يسحب لتحت ومش لاقي حاجة، لأن اللي هو بيدوّر عليه
+          موجود بس متغطّي.
+        */}
+        <main className="mx-auto max-w-6xl px-4 pb-24 pt-6 sm:px-6 sm:py-8 lg:pb-8">
+          {/*
+            تبويبات القسم — **على الشاشة الواسعة بس**.
+
+            على الفون التنقّل بقى من الشريط السفلي و«المزيد»، وشريط
+            تبويبات فوق كمان كان بيبقى تنقّلين لنفس الحاجة في شاشة
+            واحدة صغيرة: واحد بيتسحب بالإصبع وواحد ثابت تحت، والتاجر
+            مش عارف أنهي واحد المفروض يستعمله.
+          */}
+          <div className="mb-6 hidden empty:mb-0 lg:block">
             <SectionTabs role={store.role} permissions={store.permissions} />
           </div>
           {children}

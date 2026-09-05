@@ -13,7 +13,7 @@ import {
   LogOut,
   LayoutDashboard,
   Megaphone,
-  Menu,
+  MoreHorizontal,
   Package,
   Globe,
   Plug,
@@ -267,6 +267,15 @@ export function Sidebar({
     children: s.children?.filter((c) => allowed(c.permission)),
   }))
 
+  /**
+   * بنود الشريط السفلي — أول تلاتة مسموحين من القايمة.
+   *
+   * مش مكتوبين بأسمائهم عن قصد: الموظف اللي مالوش صلاحية المنتجات
+   * كان هيلاقي زرارًا يرجّعله ٤٠٤ في أهم مكان في الشاشة. الاشتقاق
+   * من نفس القايمة المفلترة بيخلّي الشريط بتاعه هو.
+   */
+  const primary = sections.slice(0, 3)
+
   const nav = (
     <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
       {sections.map((section) => {
@@ -447,16 +456,7 @@ export function Sidebar({
         سايبة مش جزء من الصفحة. و`safe-top` بيدّيه مساحة النوتش
         عشان ما يتحشرش تحت ساعة التليفون.
       */}
-      <div className="safe-top sticky top-0 z-40 flex items-center gap-2 border-b border-[var(--border)] bg-[var(--surface)] px-3 lg:hidden">
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          aria-label="فتح القائمة"
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-[var(--fg-muted)] transition-colors hover:bg-[var(--surface-2)]"
-        >
-          <Menu className="h-5 w-5" aria-hidden="true" />
-        </button>
-
+      <div className="safe-top sticky top-0 z-40 flex items-center gap-2.5 border-b border-[var(--border)] bg-[var(--surface)] px-4 lg:hidden">
         <Image
           src={storeLogo || brand.logo}
           alt=""
@@ -477,32 +477,84 @@ export function Sidebar({
         </a>
       </div>
 
-      {/* الدرج على الموبايل */}
+      {/*
+        «المزيد» — لوحة كاملة لا درج جانبي.
+
+        الدرج كان بياخد ٨٥٪ من العرض وبيسيب شريطًا من الصفحة القديمة
+        على الجنب: التاجر شايف نُص حاجة ونُص حاجة، وبيدوس على الشريط
+        بالغلط فتتقفل عليه. اللوحة الكاملة قرار واحد — إما أنت في
+        القايمة أو في الصفحة.
+      */}
       {open && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <button
-            type="button"
-            aria-label="إغلاق القائمة"
-            onClick={() => setOpen(false)}
-            className="absolute inset-0 bg-[var(--color-ink-950)]/50"
-          />
-          <aside className="absolute inset-y-0 start-0 flex w-[min(18rem,85vw)] flex-col bg-[var(--surface)] shadow-xl">
-            <div className="flex items-center justify-between border-b border-[var(--border)] pe-2">
-              <div className="min-w-0 flex-1">{header}</div>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                aria-label="إغلاق"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-[var(--fg-muted)] hover:bg-[var(--surface-2)]"
-              >
-                <X className="h-5 w-5" aria-hidden="true" />
-              </button>
-            </div>
+        <div className="fixed inset-0 z-50 flex flex-col bg-[var(--bg)] lg:hidden">
+          <div className="safe-top flex h-14 shrink-0 items-center justify-between border-b border-[var(--border)] px-4">
+            <span className="text-base font-bold">المزيد</span>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              aria-label="إغلاق"
+              className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--fg-muted)] hover:bg-[var(--surface-2)]"
+            >
+              <X className="h-5 w-5" aria-hidden="true" />
+            </button>
+          </div>
+
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
             {nav}
             {footer}
-          </aside>
+          </div>
         </div>
       )}
+
+      {/*
+        الشريط السفلي — التنقّل الأساسي على الفون.
+
+        ## ليه تحت لا فوق
+        الإبهام بيوصل لتحت الشاشة، ومش بيوصل لأعلى زاوية من غير ما
+        اليد التانية تمسك. التاجر بيدير متجره وهو ماشي وواقف في
+        المخزن — والقايمة اللي محتاجة إيدين مش قايمة.
+
+        ## وتلات بنود بس + «المزيد»
+        دول اللي بيتفتحوا كل يوم. أي حاجة أكتر بتخلّي كل زرار أصغر
+        من مساحة اللمس المريحة، والتاجر يدوس على اللي جنبه.
+      */}
+      <nav
+        className="safe-bottom fixed inset-x-0 bottom-0 z-40 flex border-t border-[var(--border)] bg-[var(--surface)] lg:hidden"
+        aria-label="التنقّل السريع"
+      >
+        {primary.map((item) => {
+          const Icon = item.icon
+          const on = isActive(pathname, item.href)
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={() => setOpen(false)}
+              aria-current={on ? 'page' : undefined}
+              className={cn(
+                'flex flex-1 flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-medium transition-colors',
+                on ? 'text-[var(--primary)]' : 'text-[var(--fg-muted)]',
+              )}
+            >
+              <Icon className="h-[22px] w-[22px]" aria-hidden="true" />
+              {item.label}
+            </Link>
+          )
+        })}
+
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className={cn(
+            'flex flex-1 flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-medium transition-colors',
+            open ? 'text-[var(--primary)]' : 'text-[var(--fg-muted)]',
+          )}
+        >
+          <MoreHorizontal className="h-[22px] w-[22px]" aria-hidden="true" />
+          المزيد
+        </button>
+      </nav>
 
       {/* الشريط الثابت على الشاشات الكبيرة */}
       <aside className="fixed inset-y-0 start-0 hidden w-64 flex-col border-e border-[var(--border)] bg-[var(--surface)]/85 backdrop-blur-md lg:flex">

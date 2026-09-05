@@ -29,7 +29,12 @@ import {
 import { dashboardUrl, publicStoreUrl } from '@/lib/domain'
 import { validateCoupon, recordCouponUse } from '@/lib/coupons'
 import { issueOrderOtp, isPhoneVerifiedForOrder, otpDeliverable, verifyOrderOtp } from '@/lib/order-otp'
-import { computeOfferDiscount, getActiveOffers } from '@/lib/offers'
+import {
+  computeBundleDiscount,
+  computeOfferDiscount,
+  getActiveBundles,
+  getActiveOffers,
+} from '@/lib/offers'
 import { findAffiliateByCode, recordAffiliateConversion } from '@/lib/affiliates'
 import { dispatchWebhook } from '@/lib/webhooks'
 import { runAutomations } from '@/lib/automation'
@@ -652,9 +657,24 @@ async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
     if (res.ok) coupon = { id: res.couponId, code: res.code, discount: res.discount, freeShipping: res.freeShipping }
   }
 
-  // خصم الكمية بيتجمع مع الكوبون — الاتنين مصلحة العميل والتاجر حاططهم بنفسه
-  const activeOffers = await getActiveOffers(store.id)
-  const offerDiscount = computeOfferDiscount(lines, activeOffers)
+  /*
+    خصم الكمية والباقات بيتجمعوا مع الكوبون — الاتنين مصلحة العميل
+    والتاجر حاططهم بنفسه.
+
+    لكن **العرض والباقة ما بيتجمعوش مع بعض**: بناخد الأعلى فيهم.
+    الاتنين خصم على نفس المنتجات، وجمعهم معناه إن التاجر اللي حطّ
+    «طقم بـ٤٢٠» و«٣ قطع خصم ١٥٪» يلاقي العميل واخد الاتنين على
+    نفس السلة — وهو ما قصدش كده لما حطّ كل واحد فيهم لوحده.
+  */
+  const [activeOffers, activeBundles] = await Promise.all([
+    getActiveOffers(store.id),
+    getActiveBundles(store.id),
+  ])
+
+  const qtyDiscount = computeOfferDiscount(lines, activeOffers)
+  const bundleDiscount = computeBundleDiscount(lines, activeBundles)
+  const offerDiscount =
+    (bundleDiscount?.amount ?? 0) > (qtyDiscount?.amount ?? 0) ? bundleDiscount : qtyDiscount
 
   const settings = await getCheckoutSettings(store.id)
 
