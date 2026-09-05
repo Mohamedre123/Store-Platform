@@ -16,6 +16,7 @@ import { recordAudit } from '@/lib/audit'
 import { getStoreTheme } from '@/lib/storefront'
 import { isEmailConfigured, safeReplyTo, sendEmail } from '@/lib/email'
 import { isEmailableStatus, orderStatusEmail } from '@/lib/store-emails'
+import { emailAllowedFor, getEmailPrefs } from '@/lib/email-prefs'
 import { publicStoreUrl } from '@/lib/domain'
 import { awardOrderPoints } from '@/lib/loyalty'
 import { rewardReferralForOrder } from '@/lib/referrals'
@@ -416,6 +417,16 @@ export async function applyOrderStatus(
 
   if (wantsEmail(notify) && order.customerEmail && isEmailableStatus(status) && isEmailConfigured()) {
     void (async () => {
+      /*
+        مفتاح التاجر للحالة دي.
+
+        الفحص جوّه الدالة المؤجّلة لا قبلها: قراءة زيادة على كل تغيير
+        حالة حتى لو الرسالة مقفولة أصلًا مالهاش لازمة. والقراءة مغلّفة
+        بـcache، فالتغييرات المتتالية في نفس الطلب بتقرا مرة واحدة.
+      */
+      const prefs = await getEmailPrefs(store.id)
+      if (!emailAllowedFor(prefs, status)) return
+
       const theme = await getStoreTheme(store.id)
       const storeEmail = store.email
 

@@ -70,6 +70,37 @@ export const messagingSettings = pgTable('messaging_settings', {
   emailFromName: text('email_from_name'),
   emailFromAddress: text('email_from_address'),
 
+  /**
+   * أنهي رسايل بريد تخرج للعميل.
+   *
+   * ## ليه كلها مفتوحة افتراضيًا
+   * الرسايل دي كانت بتتبعت **من غير أي مفتاح** — يعني كل المتاجر
+   * الشغّالة دلوقتي بتبعتها. أي افتراضي غير «مفتوح» كان هيوقّف
+   * رسايل تجّار شغّالين في لحظة النشر، وهم مش طالبين حاجة.
+   *
+   * فالمفاتيح دي **بتدّي تحكّمًا لأول مرة** لا بتغيّر سلوكًا: التاجر
+   * اللي مبسوط ما يعملش حاجة، واللي عايز يقفل واحدة يقفلها.
+   *
+   * ## وليه مفتاح لكل حالة مش مفتاح واحد
+   * «اتشحن» رسالة العميل مستنّيها. و«بيتجهّز» رسالة أغلب التجّار
+   * بيعتبروها ضجيج — بيغيّروا الحالة دي عشان تنظيمهم هم، مش عشان
+   * العميل. مفتاح واحد بيخلّي التاجر يقفل الاتنين عشان واحدة.
+   */
+  emailOnConfirmed: boolean('email_on_confirmed').notNull().default(true),
+  emailOnProcessing: boolean('email_on_processing').notNull().default(true),
+  emailOnShipped: boolean('email_on_shipped').notNull().default(true),
+  emailOnDelivered: boolean('email_on_delivered').notNull().default(true),
+  emailOnCancelled: boolean('email_on_cancelled').notNull().default(true),
+  emailOnReturned: boolean('email_on_returned').notNull().default(true),
+
+  /**
+   * إشعار التاجر بالطلب الجديد.
+   *
+   * منفصل عن رسايل العميل: ده بيروح للتاجر هو، والتاجر اللي بيتابع
+   * لوحته طول اليوم بتبقى رسالة زيادة في صندوقه على كل طلب.
+   */
+  emailNewOrderToMerchant: boolean('email_new_order_to_merchant').notNull().default(true),
+
   updatedAt: updatedAt(),
 })
 

@@ -40,6 +40,7 @@ import { enqueue } from '@/lib/jobs'
 import { normalizePhone } from '@/lib/utils'
 import { ATTRIBUTION_COOKIE, parseAttribution, type Attribution } from '@/lib/attribution'
 import { checkBlocked } from '@/lib/blocklist'
+import { getEmailPrefs } from '@/lib/email-prefs'
 import { getCurrentCustomer } from '@/lib/customer-auth'
 import { orderQuotaForStore } from '@/lib/entitlements'
 import { startPayment } from '@/lib/payment-dispatch'
@@ -1469,8 +1470,14 @@ async function sendOrderEmails(ctx: {
     })
   }
 
-  // إشعار التاجر — على بريد المتجر لو موجود
-  if (store.email) {
+  /*
+    إشعار التاجر — على بريد المتجر لو موجود وهو مفتوح.
+
+    ده بيروح للتاجر هو لا للعميل، والتاجر اللي بيتابع لوحته طول
+    اليوم بتبقى رسالة زيادة في صندوقه على كل طلب. مفتوح افتراضيًا
+    لأنه كان بيتبعت بلا مفتاح.
+  */
+  if (store.email && (await getEmailPrefs(store.id)).newOrderToMerchant) {
     const mail = newOrderNotificationEmail(brandInfo, order, `${dashboardUrl()}/orders`)
     await sendEmail({
       to: store.email,
