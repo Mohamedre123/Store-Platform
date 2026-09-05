@@ -49,6 +49,27 @@ export async function POST(req: NextRequest) {
         ? 'mobile'
         : 'desktop'
 
+    /*
+      الموقع من ترويسات Vercel.
+
+      x-vercel-ip-city بيجي مرمَّزًا بـURL ("Cairo" عادي، بس
+      "Al Jizah" بيبقى "Al%20Jizah") — فمن غير فكّ الترميز اسم أي
+      مدينة فيها مسافة كان هيتخزّن بعلامات نسبة ويطلع في الشاشة كده.
+
+      وبتغيب محليًا وعلى أي استضافة تانية، فبتتخزّن null والشاشة
+      بتقول «مش معروفة» بدل ما تكدب.
+    */
+    const decodeGeo = (v: string | null) => {
+      if (!v) return null
+      try {
+        return decodeURIComponent(v)
+      } catch {
+        return v
+      }
+    }
+    const country = req.headers.get('x-vercel-ip-country')
+    const city = decodeGeo(req.headers.get('x-vercel-ip-city'))
+
     await recordEvent({
       storeId: store.id,
       type: body.type,
@@ -57,6 +78,8 @@ export async function POST(req: NextRequest) {
       path: body.path,
       referrer: body.referrer,
       device,
+      country,
+      city,
       /*
         الإسناد من الكوكي لا من جسم الطلب.
 

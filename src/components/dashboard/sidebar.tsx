@@ -121,6 +121,7 @@ export const NAV: NavSection[] = [
       { href: '/dashboard/marketing/campaigns', label: 'حملات البريد' },
       { href: '/dashboard/automations', label: 'الأتمتة' },
       { href: '/dashboard/analytics', label: 'التحليلات', permission: 'reports.view' },
+      { href: '/dashboard/analytics/live', label: 'العرض المباشر', permission: 'reports.view' },
       { href: '/dashboard/analytics/reports', label: 'تقارير مفصّلة', permission: 'reports.view' },
       { href: '/dashboard/expenses', label: 'المصروفات والأرباح', permission: 'finance.view' },
       { href: '/dashboard/experiments', label: 'تجارب A/B' },

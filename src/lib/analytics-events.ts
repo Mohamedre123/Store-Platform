@@ -40,6 +40,19 @@ export async function recordEvent(input: {
    * بأثر رجعي بيحتاج قراءة تانية.
    */
   utm?: Record<string, string> | null
+  /**
+   * البلد والمدينة — من ترويسات المستضيف لا من المتصفح.
+   *
+   * العمودين دول كانوا في المخطط من أول يوم ومحدّش بيكتب فيهم، فأي
+   * سؤال عن «الزوار دول منين» مكانش ليه إجابة. وده مش رفاهية: التاجر
+   * اللي بيشحن للقاهرة بس محتاج يعرف إن نص زواره من الإسكندرية
+   * **قبل** ما يقرّر يوسّع مناطق شحنه.
+   *
+   * ومن الترويسة لا من المتصفح لأن المتصفح مُدخل غير موثوق — زي
+   * الإسناد بالظبط. المحلي بيرجّع فاضي، والشاشة بتقول «مش معروفة».
+   */
+  country?: string | null
+  city?: string | null
 }): Promise<void> {
   await db.insert(storeEvents).values({
     storeId: input.storeId,
@@ -49,6 +62,8 @@ export async function recordEvent(input: {
     path: input.path?.slice(0, 300) ?? null,
     referrer: input.referrer?.slice(0, 300) ?? null,
     device: input.device ?? null,
+    country: input.country?.slice(0, 4) ?? null,
+    city: input.city?.slice(0, 80) ?? null,
     utm: input.utm ?? null,
   })
 }
