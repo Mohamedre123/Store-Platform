@@ -8,6 +8,7 @@ import { stores } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { assertCan } from '@/lib/permissions'
 import { recordAudit } from '@/lib/audit'
+import { sanitizeHeadHtml } from '@/lib/head-html'
 
 export type SeoState = { ok?: boolean; error?: string } | null
 
@@ -28,7 +29,11 @@ const schema = z.object({
   seoDescription: z.string().trim().max(180).nullish(),
   seoKeywords: z.string().trim().max(300).nullish(),
   ogImage: z.string().trim().max(600).nullish(),
+  ogTitle: z.string().trim().max(90).nullish(),
+  ogDescription: z.string().trim().max(200).nullish(),
+  headHtml: z.string().max(4000).nullish(),
   allowIndexing: z.boolean(),
+  hideOutOfStock: z.boolean().default(false),
 
   maintenanceMode: z.boolean(),
   maintenanceMessage: z.string().trim().max(300).nullish(),
@@ -56,6 +61,16 @@ export async function saveSeoAction(raw: unknown): Promise<SeoState> {
   const maintenance = input.maintenanceMode
   const coming = maintenance ? false : input.comingSoon
 
+  /*
+    وسوم التوثيق بتتفحص على الخادم لا في الشاشة.
+
+    الشاشة بتوري الرسالة بدري وده لطيف، لكن الفعل بيتنادى من غيرها
+    كمان — والفحص اللي في المتصفح وحده معناه إن أي حد يبعت `<script>`
+    مباشرةً ويتحقن في رأس متجره على نطاقنا.
+  */
+  const head = sanitizeHeadHtml(input.headHtml ?? '')
+  if (!head.ok) return { error: head.error }
+
   await db
     .update(stores)
     .set({
@@ -63,7 +78,11 @@ export async function saveSeoAction(raw: unknown): Promise<SeoState> {
       seoDescription: input.seoDescription?.trim() || null,
       seoKeywords: input.seoKeywords?.trim() || null,
       ogImage: input.ogImage?.trim() || null,
+      ogTitle: input.ogTitle?.trim() || null,
+      ogDescription: input.ogDescription?.trim() || null,
+      headHtml: head.value || null,
       allowIndexing: input.allowIndexing,
+      hideOutOfStock: input.hideOutOfStock,
       maintenanceMode: maintenance,
       maintenanceMessage: input.maintenanceMessage?.trim() || null,
       comingSoon: coming,

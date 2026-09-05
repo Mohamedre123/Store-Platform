@@ -46,6 +46,10 @@ export type StorefrontStore = {
   seoDescription: string | null
   seoKeywords: string | null
   ogImage: string | null
+  ogTitle: string | null
+  ogDescription: string | null
+  /** وسوم التوثيق — متفحوصة وقت الحفظ في `sanitizeHeadHtml` */
+  headHtml: string | null
   allowIndexing: boolean
   tagline: string | null
   logoLight: string | null
@@ -123,6 +127,9 @@ export const getStore = cache(async (identifier: string): Promise<StorefrontStor
       seoDescription: stores.seoDescription,
       seoKeywords: stores.seoKeywords,
       ogImage: stores.ogImage,
+      ogTitle: stores.ogTitle,
+      ogDescription: stores.ogDescription,
+      headHtml: stores.headHtml,
       allowIndexing: stores.allowIndexing,
       deletedAt: stores.deletedAt,
     })
@@ -266,8 +273,33 @@ const productFields = {
 }
 
 /** المنتجات المعروضة — النشطة فقط، وغير المحذوفة */
+/**
+ * شروط ظهور المنتج في **القوايم** — لا في صفحته.
+ *
+ * الخمس استدعاءات بتاعتها كلها قوايم (كل المنتجات، والعدّ،
+ * والمقترحات، والمختارة، والبحث). صفحة المنتج بتقرا بمسار تاني
+ * عن قصد: إعلان شغّال على منتج خلص ما يصحّش يودّي لصفحة ٤٠٤ —
+ * ده بيحرق ميزانية الإعلان وبيأذي السيو. العميل بيوصل للصفحة
+ * ويشوف «نفد» ويسيب بريده.
+ *
+ * ## وإخفاء النافد استعلام فرعي لا وسيط
+ * الشرط محتاج مفتاح من صف المتجر، وتمريره كان معناه تعديل خمس
+ * دوال وكل اللي بينادوها — وأول واحد ينسى يمرّره بيرجّع منتجات
+ * التاجر مخفية أو ظاهرة عكس ما طلب. القراءة بالمفتاح الأساسي
+ * تقريبًا ببلاش، والشرط بيفضل في مكان واحد.
+ */
 const visible = (storeId: string) =>
-  and(eq(products.storeId, storeId), eq(products.status, 'active'), sql`${products.deletedAt} is null`)
+  and(
+    eq(products.storeId, storeId),
+    eq(products.status, 'active'),
+    sql`${products.deletedAt} is null`,
+    sql`(
+      not coalesce((select s.hide_out_of_stock from stores s where s.id = ${storeId}), false)
+      or ${products.trackInventory} = false
+      or ${products.stock} > 0
+      or ${products.allowBackorder}
+    )`,
+  )
 
 export const listProducts = cache(
   async (

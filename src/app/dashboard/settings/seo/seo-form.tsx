@@ -14,7 +14,11 @@ export type SeoValues = {
   seoDescription: string
   seoKeywords: string
   ogImage: string
+  ogTitle: string
+  ogDescription: string
+  headHtml: string
   allowIndexing: boolean
+  hideOutOfStock: boolean
   maintenanceMode: boolean
   maintenanceMessage: string
   comingSoon: boolean
@@ -160,6 +164,59 @@ export function SeoForm({
             value={v.ogImage ? [v.ogImage] : []}
             onChange={(urls) => set('ogImage', urls[0] ?? '')}
             folder="banners"
+          />
+
+          {/*
+            عنوان ووصف المشاركة منفصلين عن بتوع جوجل.
+
+            جوجل بيقرا نصًّا فيه كلمات البحث، وواتساب بيعرض سطرًا
+            بيتقري بالعين. «تيشيرتات قطن رجالي أسعار جملة مصر»
+            بتظبط في البحث وبتبان إعلانًا رخيصًا لما حد يبعت الرابط
+            لصاحبه. الفاضي بيرجع لعنوان جوجل، فاللي مش فارق معاه
+            ما يلمسهمش.
+          */}
+          <TextField
+            label="عنوان المشاركة"
+            value={v.ogTitle}
+            onChange={(x) => set('ogTitle', x)}
+            placeholder={v.seoTitle.trim() || storeName}
+            hint="سيبه فاضي وهياخد عنوان جوجل. املاه لما تحب تكتب سطرًا بشري أكتر لواتساب وفيسبوك."
+          />
+
+          <TextField
+            label="وصف المشاركة"
+            value={v.ogDescription}
+            onChange={(x) => set('ogDescription', x)}
+            placeholder={v.seoDescription.trim() || `تسوّق من ${storeName}`}
+            multiline
+            hint="السطر اللي تحت العنوان في معاينة الرابط."
+          />
+        </Group>
+
+        <Group title="عرض المنتجات">
+          <Toggle
+            label="اخفي المنتجات اللي خلصت من القوايم"
+            hint="رابط المنتج بيفضل شغّال — يعني إعلانك اللي ماشي عليه ما بيوديش لصفحة ٤٠٤. بس مش هيبان في الأقسام والبحث لحد ما ترجّع الكمية."
+            checked={v.hideOutOfStock}
+            onChange={(x) => set('hideOutOfStock', x)}
+          />
+        </Group>
+
+        <Group title="وسوم التوثيق">
+          <p className="text-xs leading-relaxed text-[var(--fg-subtle)]">
+            جوجل سيرش كونسول وميتا وبنترست بيدّوك وسم <code>meta</code> عشان تثبت إن الموقع بتاعك.
+            الصقه هنا زي ما جالك بالظبط.{' '}
+            <strong>السكربتات مرفوضة هنا عن قصد</strong> — متجرك على نطاق فرعي من نطاقنا، وأي
+            جافاسكربت متحقونة فيه بتأثّر على سمعة كل تاجر تاني على المنصة. البكسلات ليها مكانها في
+            صفحة الإضافات.
+          </p>
+          <TextField
+            label="وسوم الرأس"
+            value={v.headHtml}
+            onChange={(x) => set('headHtml', x)}
+            placeholder={'<meta name="google-site-verification" content="..." />'}
+            multiline
+            hint="١٠ وسوم كحد أقصى."
           />
         </Group>
       </Card>

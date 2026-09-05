@@ -22,6 +22,27 @@ import { FONT_STACKS, RADIUS_PX } from '@/lib/customization'
 
 export const dynamic = 'force-dynamic'
 
+/**
+ * وسوم التوثيق من نص محفوظ لأزواج اسم/قيمة.
+ *
+ * Next بياخد `other` كأزواج لا كـHTML — وده أحسن: الوسم بيتبني
+ * عندنا لا بيتلزق زي ما هو. والنص المحفوظ عدّى على
+ * `sanitizeHeadHtml` وقت الحفظ، فالقراءة هنا مجرد فك.
+ */
+function parseVerificationTags(html: string | null): Record<string, string> | undefined {
+  if (!html?.trim()) return undefined
+  const out: Record<string, string> = {}
+  const re = /<meta\s+([^>]*?)\/?>/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(html))) {
+    const attrs = m[1]
+    const key = attrs.match(/(?:name|property)="([^"]+)"/)?.[1]
+    const content = attrs.match(/content="([^"]*)"/)?.[1]
+    if (key && content !== undefined) out[key] = content
+  }
+  return Object.keys(out).length ? out : undefined
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -45,6 +66,16 @@ export async function generateMetadata({
   const seoDescription =
     store.seoDescription?.trim() || store.tagline || `تسوّق من ${store.name}`
   const shareImage = store.ogImage ?? store.logoLight ?? undefined
+
+  /*
+    عنوان المشاركة بيغلب عنوان جوجل لو التاجر كتبه.
+
+    الاتنين بيتقروا في مكانين مختلفين: جوجل بيقرا نصًّا فيه كلمات
+    البحث، وواتساب بيعرض سطرًا بيتقري بالعين. والفاضي بيرجع لعنوان
+    جوجل، فالسلوك القديم فاضل زي ما هو لكل تاجر ما لمسش الخانة.
+  */
+  const shareTitle = store.ogTitle?.trim() || seoTitle
+  const shareDescription = store.ogDescription?.trim() || seoDescription
 
   return {
     title: { absolute: seoTitle, template: `%s | ${store.name}` },
@@ -84,15 +115,28 @@ export async function generateMetadata({
       إن حد يدوس عليه ولا يعدّيه.
     */
     openGraph: {
-      title: seoTitle,
-      description: seoDescription,
+      title: shareTitle,
+      description: shareDescription,
       type: 'website',
       siteName: store.name,
       images: shareImage ? [shareImage] : undefined,
     },
     twitter: shareImage
-      ? { card: 'summary_large_image', title: seoTitle, description: seoDescription, images: [shareImage] }
+      ? {
+          card: 'summary_large_image',
+          title: shareTitle,
+          description: shareDescription,
+          images: [shareImage],
+        }
       : undefined,
+    /*
+      وسوم التوثيق اللي التاجر لزقها.
+
+      `other` بتاخد أزواج اسم/قيمة لا HTML، فبنفكّ الوسوم المحفوظة
+      لأزواج. والمحفوظ اتفحص وقت الحفظ (`sanitizeHeadHtml`) —
+      يعني الوسوم هنا مبنية عندنا لا جاية من التاجر كنص.
+    */
+    other: parseVerificationTags(store.headHtml),
   }
 }
 
