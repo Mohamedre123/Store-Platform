@@ -3,6 +3,7 @@ import { decodeSlug } from '@/lib/utils'
 import { headers } from 'next/headers'
 import { Package } from 'lucide-react'
 import {
+  countProducts,
   getCategoryBySlug,
   getStore,
   getStoreTheme,
@@ -13,6 +14,7 @@ import {
 import { parseSort } from '@/lib/sort-options'
 import { ProductCard } from '@/components/storefront/product-card'
 import { loadProductOptions } from '@/lib/product-options'
+import { Pagination } from '@/components/storefront/pagination'
 import { ListingControls } from '@/components/storefront/listing-controls'
 
 export const dynamic = 'force-dynamic'
@@ -31,7 +33,7 @@ export default async function CategoryPage({
   searchParams,
 }: {
   params: Promise<{ store: string; slug: string }>
-  searchParams: Promise<{ sort?: string }>
+  searchParams: Promise<{ sort?: string; page?: string }>
 }) {
   const { store: identifier, slug: rawSlug } = await params
   const slug = decodeSlug(rawSlug)
@@ -44,17 +46,27 @@ export default async function CategoryPage({
   const isPreview = (await headers()).get('x-zawya-preview') === '1'
   const theme = await getStoreTheme(store.id, isPreview)
   const { listing } = theme.custom
-  const sort = parseSort((await searchParams).sort)
+  const query = await searchParams
+  const sort = parseSort(query.sort)
 
-  const [items, cats] = await Promise.all([
+  /* نفس ترقيم صفحة «كل المنتجات» — القسم كان بيخفي بضاعته بنفس الطريقة */
+  const perPage = listing.perPage || 24
+  const page = Math.max(1, Math.floor(Number(query.page) || 1))
+
+  const [items, cats, total] = await Promise.all([
     listProducts(store.id, {
       categoryId: category.id,
       includeChildren: true,
-      limit: listing.perPage || 60,
+      limit: perPage,
+      offset: (page - 1) * perPage,
       sort,
     }),
     listing.showCategoryFilter ? listCategories(store.id) : Promise.resolve([]),
+    countProducts(store.id, { categoryId: category.id, includeChildren: true }),
   ])
+
+  const totalPages = Math.max(1, Math.ceil(total / perPage))
+  if (page > totalPages && total > 0) notFound()
 
   /* خيارات المنتجات المعروضة — عشان العميل يختار مقاسه من على البطاقة */
   const optionSets = await loadProductOptions(
@@ -98,6 +110,13 @@ export default async function CategoryPage({
             ))}
           </div>
         )}
+
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          basePath={`/category/${rawSlug}`}
+          params={{ sort: query.sort }}
+        />
       </div>
     </div>
   )

@@ -268,15 +268,32 @@ export default async function StorefrontLayout({
     (l) => l.label.trim() && l.url.trim(),
   )
 
-  const nav = customLinks.length
-    ? customLinks.map((l) => ({ label: l.label.trim(), href: l.url.trim() }))
-    : [
-        { label: 'الرئيسية', href: '/' },
-        { label: 'كل المنتجات', href: '/products' },
-        ...(showCategoriesBar
-          ? []
-          : cats.slice(0, 4).map((c) => ({ label: c.name, href: `/category/${c.slug}` }))),
-      ]
+  /**
+   * صفحات المتجر في الهيدر.
+   *
+   * «سياسة الاستبدال» و«من إحنا» كانوا في الفوتر بس — وأغلب الزوار
+   * على الموبايل ما بيوصلوش للفوتر أصلًا. والصفحات دي هي اللي بتطمّن
+   * العميل قبل ما يدفع.
+   *
+   * بتتضاف بعد اللي التاجر كتبه لا قبله: هو رتّب قايمته بنفسه، وحقن
+   * حاجة في نُصّها بيبوّظ الترتيب.
+   */
+  const headerPages = custom.header.showPagesInHeader
+    ? policyPages.slice(0, 3).map((p) => ({ label: p.title, href: `/pages/${p.slug}` }))
+    : []
+
+  const nav = [
+    ...(customLinks.length
+      ? customLinks.map((l) => ({ label: l.label.trim(), href: l.url.trim() }))
+      : [
+          { label: 'الرئيسية', href: '/' },
+          { label: 'كل المنتجات', href: '/products' },
+          ...(showCategoriesBar
+            ? []
+            : cats.slice(0, 4).map((c) => ({ label: c.name, href: `/category/${c.slug}` }))),
+        ]),
+    ...headerPages,
+  ]
 
   /**
    * ألوان المتجر تُحقن كمتغيّرات CSS على الحاوية.

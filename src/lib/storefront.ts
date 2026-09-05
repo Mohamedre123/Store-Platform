@@ -274,6 +274,15 @@ export const listProducts = cache(
     storeId: string,
     options: {
       limit?: number
+      /**
+       * التخطّي — أساس الترقيم.
+       *
+       * من غيره كانت صفحة «كل المنتجات» بترجّع أول `perPage` منتج
+       * **وبس**: المتجر بمية منتج بيعرض ٢٤ والباقي مالوش أي طريق
+       * يتوصّل بيه من الصفحة دي غير البحث. ده كان عطلًا مش إعدادًا
+       * ناقصًا.
+       */
+      offset?: number
       /** قسم واحد، أو قسم وكل أولاده لو `includeChildren` */
       categoryId?: string
       includeChildren?: boolean
@@ -325,6 +334,48 @@ export const listProducts = cache(
       .where(and(...conditions))
       .orderBy(orderBy)
       .limit(limit)
+      .offset(options.offset ?? 0)
+  },
+)
+
+/**
+ * عدد المنتجات المعروضة — للترقيم.
+ *
+ * استعلام منفصل عن القايمة عن قصد: `count(*) over ()` بيرجّع العدد
+ * مع كل صف، وده بيضاعف حجم النتيجة على صفحة بتتحمّل لكل زائر.
+ * والعدّ لوحده استعلام رخيص لأنه بيمشي على الفهرس.
+ */
+export const countProducts = cache(
+  async (
+    storeId: string,
+    options: { categoryId?: string; includeChildren?: boolean; onSale?: boolean } = {},
+  ): Promise<number> => {
+    const conditions = [visible(storeId)]
+
+    if (options.categoryId) {
+      if (options.includeChildren) {
+        const children = await db
+          .select({ id: categories.id })
+          .from(categories)
+          .where(and(eq(categories.storeId, storeId), eq(categories.parentId, options.categoryId)))
+        conditions.push(inArray(products.categoryId, [options.categoryId, ...children.map((c) => c.id)]))
+      } else {
+        conditions.push(eq(products.categoryId, options.categoryId))
+      }
+    }
+
+    if (options.onSale) {
+      conditions.push(
+        and(isNotNull(products.compareAtPrice), gt(products.compareAtPrice, products.price))!,
+      )
+    }
+
+    const [row] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(products)
+      .where(and(...conditions))
+
+    return row?.n ?? 0
   },
 )
 

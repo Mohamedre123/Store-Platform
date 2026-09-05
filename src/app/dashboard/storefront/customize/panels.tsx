@@ -240,6 +240,12 @@ export function Panel({
             checked={s.showCategoriesBar}
             onChange={(v) => patch('header', { showCategoriesBar: v })}
           />
+          <Toggle
+            label="صفحات المتجر في القايمة"
+            hint="«سياسة الاستبدال» و«من إحنا» بتبان فوق كمان لا في الفوتر بس — وأغلب الزوار على الموبايل ما بيوصلوش للفوتر."
+            checked={s.showPagesInHeader ?? false}
+            onChange={(v) => patch('header', { showPagesInHeader: v })}
+          />
         </Group>
 
         {/*
@@ -791,6 +797,12 @@ export function Panel({
         </Group>
 
         <Group title="المنتجات المقترحة">
+          <Toggle
+            label="آراء العملاء"
+            hint="بتزوّد الثقة لما تمتلي. اقفلها وإنت لسه بادئ — «لسه مافيش آراء» تحت كل منتج بتقول للزائر إن محدّش اشترى من هنا."
+            checked={s.showReviews ?? true}
+            onChange={(v) => patch('productPage', { showReviews: v })}
+          />
           <Toggle label="عرض منتجات مشابهة" checked={s.showRelated} onChange={(v) => patch('productPage', { showRelated: v })} />
           {s.showRelated && (
             <TextField

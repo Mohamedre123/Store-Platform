@@ -576,13 +576,15 @@ export default async function ProductPage({
         </div>
       </div>
 
-      <ProductReviews
-        storeIdentifier={identifier}
-        productId={product.id}
-        reviews={productReviews}
-        ratingAverage={product.ratingCount > 0 ? product.ratingSum / product.ratingCount : null}
-        ratingCount={product.ratingCount}
-      />
+      {(productPage.showReviews ?? true) && (
+        <ProductReviews
+          storeIdentifier={identifier}
+          productId={product.id}
+          reviews={productReviews}
+          ratingAverage={product.ratingCount > 0 ? product.ratingSum / product.ratingCount : null}
+          ratingCount={product.ratingCount}
+        />
+      )}
 
       {productPage.showRelated && related.length > 0 && (
         <section className="mt-16">

@@ -58,6 +58,14 @@ export type HeaderSettings = {
   showCategoriesBar: boolean
   logoHeight: number
   /**
+   * صفحات المتجر الثابتة في قايمة الهيدر.
+   *
+   * «سياسة الاستبدال» و«من إحنا» كانوا في الفوتر بس — وأغلب الزوار
+   * على الموبايل ما بيوصلوش للفوتر أصلًا. والصفحات دي هي اللي
+   * بتطمّن العميل قبل ما يدفع.
+   */
+  showPagesInHeader: boolean
+  /**
    * روابط قايمة الهيدر — والفاضي معناه «التلقائي».
    *
    * ## ليه هنا مش في صفحة «قوائم» لوحدها
@@ -220,6 +228,19 @@ export type ProductPageSettings = {
   relatedTitle: string
   stickyBuyBarOnMobile: boolean
   trustLines: string[]
+  /**
+   * مراجعات العملاء على المنتج.
+   *
+   * ## ليه مفتاح مش دايمًا شغّالة
+   * المراجعات كانت مفتوحة على كل متجر بلا أي طريق يقفلها. والتاجر
+   * اللي لسه بادئ ومعندوش مبيعات بيلاقي «لسه مافيش آراء» تحت كل
+   * منتج — وده بيقول للزائر إن محدّش اشترى من هنا، وهي أسوأ رسالة
+   * ممكن تتقال في أول شهر.
+   *
+   * مفتوحة افتراضيًا لأنها بتزوّد الثقة لما تمتلي — بس القرار بقى
+   * قراره.
+   */
+  showReviews: boolean
 }
 
 /* ────────────────────────── السلة ────────────────────────── */
@@ -397,6 +418,7 @@ export function defaultCustomization(theme: {
       showWishlist: false,
       showCategoriesBar: theme.layout.showCategoryStrip,
       logoHeight: 40,
+      showPagesInHeader: false,
       /* فاضية = التلقائي (الرئيسية + كل المنتجات + أول أربع أقسام) */
       links: [],
     },
@@ -422,6 +444,7 @@ export function defaultCustomization(theme: {
       galleryLayout: 'thumbs-bottom',
       showSku: false,
       showStockCounter: true,
+      showReviews: true,
       showShippingNote: true,
       showReturnNote: true,
       showWhatsappAsk: true,
