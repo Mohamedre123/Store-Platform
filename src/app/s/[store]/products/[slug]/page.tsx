@@ -11,6 +11,9 @@ import {
   listProductReviews,
   listProducts,
   listPickedProducts,
+  marketCurrency,
+  marketPrice,
+  priceForMarket,
 } from '@/lib/storefront'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@/db'
@@ -73,7 +76,7 @@ export async function generateMetadata({
     category: categoryName,
     brand: product.brand,
     sku: product.sku,
-    price: formatMoney(product.price, store.currency),
+    price: formatMoney(product.price, marketCurrency(store)),
     store: store.name,
   }
 
@@ -145,9 +148,21 @@ export default async function ProductPage({
   const testTitle = bucket ? variantValue(experiment, bucket, 'title') : null
 
   const displayName = typeof testTitle === 'string' && testTitle ? testTitle : product.name
-  const displayPrice = typeof testPrice === 'number' && testPrice > 0 ? testPrice : product.price
+  /*
+    سعر السوق — التحويل هنا لا في كل مكان بيعرض السعر.
 
-  const off = discountPercent(displayPrice, product.compareAtPrice)
+    سعر التجربة (A/B) بيتحوّل هو كمان: التاجر بيكتبه بعملة متجره،
+    والزائر السعودي المفروض يشوفه بالريال زي أي سعر تاني — وإلا
+    التجربة بتوري رقمين بعملتين مختلفتين لنفس المنتج.
+  */
+  const basePrice = typeof testPrice === 'number' && testPrice > 0 ? testPrice : product.price
+  const displayPrice = marketPrice(basePrice, store)
+  const compareAt =
+    product.compareAtPrice && product.compareAtPrice > 0
+      ? marketPrice(product.compareAtPrice, store)
+      : null
+
+  const off = discountPercent(displayPrice, compareAt)
   const soldOut = product.trackInventory && product.stock <= 0
   const productReviews = await listProductReviews(product.id)
 
@@ -229,14 +244,20 @@ export default async function ProductPage({
     listPickedProducts(store.id, product.upsellProductIds ?? []),
   ])
 
-  const related = picked.length
-    ? picked.filter((p) => p.id !== product.id).slice(0, 4)
-    : (await listProducts(store.id, { categoryId: product.categoryId ?? undefined, limit: 5 }))
-        .filter((p) => p.id !== product.id)
-        .slice(0, 4)
+  const related = priceForMarket(
+    picked.length
+      ? picked.filter((p) => p.id !== product.id).slice(0, 4)
+      : (await listProducts(store.id, { categoryId: product.categoryId ?? undefined, limit: 5 }))
+          .filter((p) => p.id !== product.id)
+          .slice(0, 4),
+    store,
+  )
 
   /* الترقية اللي أغلى من المنتج بس — «رقّي لأرخص» مالهاش معنى */
-  const upgrades = upsells.filter((p) => p.id !== product.id && p.price > product.price).slice(0, 3)
+  const upgrades = priceForMarket(
+    upsells.filter((p) => p.id !== product.id && p.price > product.price).slice(0, 3),
+    store,
+  )
 
   /**
    * الدفع السريع.
@@ -275,7 +296,7 @@ export default async function ProductPage({
           const ship = await getDisplayShipping(store.id, store.country)
           return {
             storeIdentifier: identifier,
-            currency: store.currency,
+            currency: marketCurrency(store),
             country: store.country,
             style: quickSettings?.quickCheckoutStyle ?? 'drawer',
             showItems: quickSettings?.quickCheckoutShowItems ?? true,
@@ -439,7 +460,7 @@ export default async function ProductPage({
                     image: product.images[0],
                     price: displayPrice,
                   }}
-                  currency={store.currency}
+                  currency={marketCurrency(store)}
                   whatsapp={productPage.showWhatsappAsk ? store.whatsapp : null}
                   whatsappOrder={whatsappOrderNumber}
                   productUrl={productUrl}
@@ -457,11 +478,11 @@ export default async function ProductPage({
             <>
               <div className="flex flex-wrap items-baseline gap-3">
                 <span className="tabular text-3xl font-bold text-[var(--sf-primary)]">
-                  {formatMoney(displayPrice, store.currency)}
+                  {formatMoney(displayPrice, marketCurrency(store))}
                 </span>
-                {product.compareAtPrice && (
+                {compareAt && (
                   <span className="tabular text-lg line-through opacity-45">
-                    {formatMoney(product.compareAtPrice, store.currency)}
+                    {formatMoney(compareAt, marketCurrency(store))}
                   </span>
                 )}
               </div>
@@ -537,7 +558,7 @@ export default async function ProductPage({
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium">{u.name}</span>
                         <span className="tabular text-xs opacity-70">
-                          بـ{formatMoney(u.price - displayPrice, store.currency)} زيادة
+                          بـ{formatMoney(u.price - displayPrice, marketCurrency(store))} زيادة
                         </span>
                       </span>
                       <ChevronLeft className="h-4 w-4 shrink-0 opacity-40" aria-hidden="true" />
@@ -603,7 +624,7 @@ export default async function ProductPage({
               <ProductCard
                 key={p.id}
                 product={p}
-                currency={store.currency}
+                currency={marketCurrency(store)}
                 style={listing.cardStyle === 'compact' ? 'clean' : listing.cardStyle}
                 imageRatio={listing.imageRatio}
               />
@@ -624,7 +645,7 @@ export default async function ProductPage({
             maxStock: product.trackInventory ? product.stock : undefined,
           }}
           soldOut={soldOut}
-          currency={store.currency}
+          currency={marketCurrency(store)}
           hasMobileNav={theme.custom.toolbar.mobileNavEnabled}
         />
       )}

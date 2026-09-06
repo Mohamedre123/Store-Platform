@@ -6,6 +6,8 @@ import {
   getStoreTheme,
   listCategories,
   listProducts,
+  marketCurrency,
+  priceForMarket,
 } from '@/lib/storefront'
 import { loadHomeProducts } from '@/lib/home-blocks'
 import { loadProductOptions } from '@/lib/product-options'
@@ -141,7 +143,7 @@ export default async function StoreHomePage({ params }: { params: Promise<{ stor
                   key={section.id}
                   block={resolved}
                   products={home.productsByBlock.get(section.id) ?? []}
-                  currency={store.currency}
+                  currency={marketCurrency(store)}
                   listing={listing}
                   chrome={c}
                   moreHref={moreHrefFor(resolved.categoryId, resolved.moreUrl)}

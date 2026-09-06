@@ -14,6 +14,8 @@ import {
 } from './customization'
 import type { SortKey } from './sort-options'
 import type { ActivePixels } from './plugins'
+import { currentMarket } from './markets'
+import { convertPrice } from './markets-meta'
 import type { Section, ThemeTokens } from '@/db/schema'
 
 /**
@@ -63,6 +65,26 @@ export type StorefrontStore = {
   socialLinks: Record<string, string>
   email: string | null
   currency: string
+  /**
+   * سوق الزائر الحالي — **عرض بس**.
+   *
+   * `currency` فوق بتفضل عملة المتجر الأساسية زي ما هي، وكل مبلغ
+   * بيتخزّن بيها. الحقل ده بيقول «الزائر ده بيشوف إيه»، وبيتقرا في
+   * العرض وحده.
+   *
+   * ## ليه الفصل ده إلزامي
+   * كل تقرير في اللوحة بيجمع `orders.total`. لو خلّينا العملة
+   * بتتغيّر مع الزائر، التقارير كانت هتجمع ريال على جنيه وتطلّع
+   * رقمًا مالوش معنى — والتاجر يبني قراراته عليه من غير ما يشك.
+   *
+   * `null` = المتجر ما ظبّطش أسواقًا، وده حال أغلب التجّار.
+   */
+  display: {
+    marketId: string
+    currency: string
+    rateMicros: number
+    rounding: 'none' | 'nearest' | 'charm'
+  } | null
   country: string
   isPublished: boolean
   vatEnabled: boolean
@@ -146,8 +168,74 @@ export const getStore = cache(async (identifier: string): Promise<StorefrontStor
   if (!store || store.deletedAt) return null
 
   const { deletedAt: _ignored, ...rest } = store
-  return rest
+
+  /*
+    سوق الزائر — بيتقرا مرة لكل طلب.
+
+    `currentMarket` مغلّفة بـ`cache`، والدالة دي كمان — فالقراءة
+    بتحصل مرة واحدة مهما نادتها كام صفحة في نفس الطلب.
+
+    والمتجر اللي ما ظبّطش أسواقًا (وده أغلب التجّار) بياخد `null`
+    وبيمشي بعملته زي ما هو — الميزة مقفولة ما لم تُطلَب.
+  */
+  const market = await currentMarket(store.id)
+
+  return {
+    ...rest,
+    display: market
+      ? {
+          marketId: market.id,
+          currency: market.currency,
+          rateMicros: market.rateMicros,
+          rounding: market.rounding,
+        }
+      : null,
+  }
 })
+
+/**
+ * السعر زي ما الزائر بيشوفه، وعملته.
+ *
+ * ## استعمل الاتنين مع بعض دايمًا
+ * `marketPrice` من غير `marketCurrency` بيدّي رقمًا سعوديًّا
+ * مكتوب جنبه «ج.م» — وده أسوأ من إن الميزة ما تشتغلش.
+ *
+ * ## والمتجر بلا أسواق بيرجع بنفس الرقم بالظبط
+ * مفيش تحويل ولا تقريب ولا أي تغيير — فالتاجر اللي مش مستخدم
+ * الميزة ما بيتأثرش بوجودها أصلًا.
+ */
+export function marketPrice(amount: number, store: Pick<StorefrontStore, 'display'>): number {
+  if (!store.display) return amount
+  return convertPrice(amount, store.display.rateMicros, store.display.rounding)
+}
+
+export function marketCurrency(store: Pick<StorefrontStore, 'currency' | 'display'>): string {
+  return store.display?.currency ?? store.currency
+}
+
+/** بيحوّل قايمة منتجات لأسعار السوق — نقطة واحدة بدل تحويل في كل شاشة */
+function priceForMarket<T extends { price: number; compareAtPrice?: number | null }>(
+  rows: T[],
+  store: Pick<StorefrontStore, 'display'>,
+): T[] {
+  if (!store.display) return rows
+  const { rateMicros, rounding } = store.display
+  /*
+    `compareAtPrice` اختياري في النوع لأن بعض القوايم مالهاش سعر
+    مشطوب (اقتراحات السلة مثلًا). الحقل بيتحوّل لو موجود وبيتساب
+    زي ما هو لو مش موجود — فالمساعد الواحد بيخدم كل الأشكال بدل
+    نسخة لكل نوع.
+  */
+  return rows.map((r) => ({
+    ...r,
+    price: convertPrice(r.price, rateMicros, rounding),
+    ...(typeof r.compareAtPrice === 'number' && r.compareAtPrice > 0
+      ? { compareAtPrice: convertPrice(r.compareAtPrice, rateMicros, rounding) }
+      : {}),
+  }))
+}
+
+export { priceForMarket }
 
 /**
  * البانر الرئيسي كما هو مخزَّن في المسوّدة.

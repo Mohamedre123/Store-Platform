@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { Package } from 'lucide-react'
-import { countProducts, getStore, getStoreTheme, listCategories, listProducts, listingGrid } from '@/lib/storefront'
+import { countProducts, getStore, getStoreTheme, listCategories, listProducts, listingGrid, marketCurrency, priceForMarket } from '@/lib/storefront'
 import { parseSort } from '@/lib/sort-options'
 import { ProductCard } from '@/components/storefront/product-card'
 import { loadProductOptions } from '@/lib/product-options'
@@ -41,7 +41,9 @@ export default async function ProductsPage({
   const page = Math.max(1, Math.floor(Number(query.page) || 1))
 
   const [items, cats, total] = await Promise.all([
-    listProducts(store.id, { limit: perPage, offset: (page - 1) * perPage, sort }),
+    listProducts(store.id, { limit: perPage, offset: (page - 1) * perPage, sort }).then((r) =>
+      priceForMarket(r, store),
+    ),
     listing.showCategoryFilter ? listCategories(store.id) : Promise.resolve([]),
     countProducts(store.id),
   ])
@@ -91,7 +93,7 @@ export default async function ProductsPage({
               optionSet={optionSets.get(p.id)}
               action="choose"
               product={p}
-              currency={store.currency}
+              currency={marketCurrency(store)}
               style={listing.cardStyle}
               imageRatio={listing.imageRatio}
               showRating={listing.showRating}

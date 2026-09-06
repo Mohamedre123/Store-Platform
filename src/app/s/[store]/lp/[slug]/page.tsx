@@ -4,7 +4,7 @@ import { headers } from 'next/headers'
 import { and, eq, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { funnels, productVariants, products } from '@/db/schema'
-import { getStore } from '@/lib/storefront'
+import { getStore, marketCurrency } from '@/lib/storefront'
 import { getCurrentCustomer } from '@/lib/customer-auth'
 import { mergeTokens, SHADOWS, SPACING_PX, SPEED_MS, WIDTH_PX, type Block } from '@/lib/landing'
 import { FONT_STACKS, RADIUS_PX } from '@/lib/customization'
@@ -158,7 +158,7 @@ export default async function LandingPage({
                   <LandingBlock
                     block={b}
                     product={product}
-                    currency={store.currency}
+                    currency={marketCurrency(store)}
                     storeIdentifier={identifier}
                   />
                 </LandingReveal>

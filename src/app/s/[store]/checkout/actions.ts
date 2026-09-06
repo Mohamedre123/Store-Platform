@@ -17,7 +17,7 @@ import {
   productVariants,
   stores,
 } from '@/db/schema'
-import { getStore, getStoreTheme } from '@/lib/storefront'
+import { getStore, getStoreTheme, marketPrice } from '@/lib/storefront'
 import { computeTotals, getCheckoutSettings, priceCart } from '@/lib/checkout'
 import { furthestStage, STAGE_EVENT } from '@/lib/checkout-stage'
 import type { CheckoutStage } from '@/db/schema'
@@ -877,7 +877,26 @@ async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
       couponId: coupon?.id ?? null,
       total: totals.total,
       costTotal: totals.costTotal,
+      /*
+        العملة الأساسية — **ما تتغيّرش مع سوق الزائر أبدًا**.
+
+        كل تقرير في اللوحة بيجمع `orders.total`. لو خزّنّا الطلب
+        بعملة الزائر، التقارير كانت هتجمع ريال على جنيه وتطلّع رقمًا
+        مالوش معنى — والتاجر يبني قراراته عليه من غير ما يشك.
+      */
       currency: store.currency,
+      /*
+        واللي العميل شافه ودفع بيه — لقطة جنبه.
+
+        بيتخزّن معاه سعر التحويل وقت الطلب، فالفاتورة بعد شهر بتفضل
+        بتعرض نفس الرقم اللي وافق عليه حتى لو التاجر غيّر السعر.
+      */
+      marketId: store.display?.marketId ?? null,
+      displayCurrency: store.display?.currency ?? null,
+      displayTotal: store.display
+        ? marketPrice(totals.total, store)
+        : 0,
+      marketRate: store.display?.rateMicros ?? null,
       paymentMethod: input.paymentGateway === 'cod' ? 'cod' : 'online',
       paymentGateway: input.paymentGateway,
       paymentStatus: 'unpaid' as const,

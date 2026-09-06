@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { Search } from 'lucide-react'
-import { getStore, getStoreTheme, listingGrid, searchProducts } from '@/lib/storefront'
+import { getStore, getStoreTheme, listingGrid, searchProducts, marketCurrency, priceForMarket } from '@/lib/storefront'
 import { ProductCard } from '@/components/storefront/product-card'
 import { loadProductOptions } from '@/lib/product-options'
 import { SearchBox } from '@/components/storefront/search-box'
@@ -25,7 +25,9 @@ export default async function SearchPage({
   const theme = await getStoreTheme(store.id, isPreview)
   const { listing } = theme.custom
 
-  const results = q ? await searchProducts(store.id, q, listing.perPage || 40) : []
+  const results = q
+    ? priceForMarket(await searchProducts(store.id, q, listing.perPage || 40), store)
+    : []
 
   /* خيارات نتائج البحث — عشان العميل يختار مقاسه من غير ما يفتح المنتج */
   const optionSets = await loadProductOptions(
@@ -64,7 +66,7 @@ export default async function SearchPage({
                 optionSet={optionSets.get(p.id)}
                 action="choose"
                 product={p}
-                currency={store.currency}
+                currency={marketCurrency(store)}
                 style={listing.cardStyle}
                 imageRatio={listing.imageRatio}
                 showRating={listing.showRating}

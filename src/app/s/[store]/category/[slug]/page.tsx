@@ -10,6 +10,8 @@ import {
   listCategories,
   listProducts,
   listingGrid,
+  marketCurrency,
+  priceForMarket,
 } from '@/lib/storefront'
 import { parseSort } from '@/lib/sort-options'
 import { ProductCard } from '@/components/storefront/product-card'
@@ -53,7 +55,7 @@ export default async function CategoryPage({
   const perPage = listing.perPage || 24
   const page = Math.max(1, Math.floor(Number(query.page) || 1))
 
-  const [items, cats, total] = await Promise.all([
+  const [rawItems, cats, total] = await Promise.all([
     listProducts(store.id, {
       categoryId: category.id,
       includeChildren: true,
@@ -64,6 +66,9 @@ export default async function CategoryPage({
     listing.showCategoryFilter ? listCategories(store.id) : Promise.resolve([]),
     countProducts(store.id, { categoryId: category.id, includeChildren: true }),
   ])
+
+  /* أسعار السوق — نقطة تحويل واحدة قبل ما توصل أي مكوّن */
+  const items = priceForMarket(rawItems, store)
 
   const totalPages = Math.max(1, Math.ceil(total / perPage))
   if (page > totalPages && total > 0) notFound()
@@ -101,7 +106,7 @@ export default async function CategoryPage({
                 optionSet={optionSets.get(p.id)}
                 action="choose"
                 product={p}
-                currency={store.currency}
+                currency={marketCurrency(store)}
                 style={listing.cardStyle}
                 imageRatio={listing.imageRatio}
               showRating={listing.showRating}

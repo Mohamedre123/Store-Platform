@@ -176,6 +176,7 @@ export const NAV: NavSection[] = [
       { href: '/dashboard/settings/checkout', label: 'الشيك أوت' },
       { href: '/dashboard/settings/orders', label: 'الطلبات والترقيم' },
       { href: '/dashboard/settings/domain', label: 'النطاق' },
+      { href: '/dashboard/markets', label: 'الأسواق والعملات' },
       { href: '/dashboard/settings/seo', label: 'الظهور والسيو' },
       { href: '/dashboard/settings/email', label: 'بريد المتجر' },
       { href: '/dashboard/settings/receipt', label: 'صفحة الطلب' },

@@ -476,3 +476,70 @@ export const checkoutSettings = pgTable('checkout_settings', {
 
   updatedAt: updatedAt(),
 })
+
+/**
+ * الأسواق — واجهة المتجر لكل بلد بعملته.
+ *
+ * ## المشكلة اللي بيحلّها الجدول ده
+ * التاجر المصري اللي بيبيع للخليج كان بيعرض بالجنيه، والعميل
+ * السعودي بيشوف «٥٠٠» ومش عارف هي كام بفلوسه — فبيسيب. والحل
+ * اللي كان بيتعمل: متجر تاني بالكامل، بكتالوج تاني وطلبات تانية
+ * وحساب تاني.
+ *
+ * ## والسعر بيتحوّل بسعر التاجر لا بسعر السوق
+ * مفيش ربط ببورصة عملات، وده مقصود: سعر الصرف الحقيقي بيتحرّك كل
+ * ساعة، والتاجر اللي سعره بيتغيّر وراه من غير علمه بيلاقي هامشه
+ * اتاكل في يوم. الرقم هنا بيده هو، وبيغيّره لما يقرّر.
+ *
+ * ## والتقريب مش تجميل
+ * ٤٩٩ جنيه بسعر ٠.٠٧٧ بتطلع ٣٨.٤٢٣ ريال. الرقم ده بيبان آليًّا
+ * ومش بيبيع. التقريب بيرجّعه ٣٩ أو ٣٩.٩٩ — نفس اللي التاجر بيعمله
+ * بإيده لو كان بيسعّر بنفسه.
+ */
+export const markets = pgTable(
+  'markets',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    storeId: uuid('store_id').notNull().references(() => stores.id, { onDelete: 'cascade' }),
+
+    name: text('name').notNull(),
+    /** ISO-2 — بيه بنعرف سوق الزائر من ترويسة المستضيف */
+    country: text('country').notNull(),
+    currency: text('currency').notNull(),
+
+    /**
+     * سعر التحويل من عملة المتجر الأساسية، مضروبًا في مليون.
+     *
+     * ## ليه مليون مش نقطة أساس
+     * ١ جنيه = ٠.٠٧٧ ريال. بنقاط الأساس (١٠٠٠٠) ده بيبقى ٧٧٠،
+     * والدقة بتقف عند أربع خانات — يعني فرق التقريب بيتراكم على
+     * الطلب الكبير. المليون بيدّي ست خانات، وده كفاية لأي زوج
+     * عملات في السوق ده.
+     *
+     * ## وinteger لا float
+     * نفس قاعدة PLAN: `0.077` في `float` مش `0.077` بالظبط،
+     * وضربها في مية ألف بيدّي أرقامًا زي `7699.999999`.
+     */
+    rateMicros: integer('rate_micros').notNull().default(1_000_000),
+
+    /** none: زي ما هو · nearest: لأقرب صحيح · charm: ‎.99‎ */
+    rounding: text('rounding').$type<'none' | 'nearest' | 'charm'>().notNull().default('nearest'),
+
+    /**
+     * السوق الافتراضي — اللي الزائر اللي مش من بلد مسجّل بيشوفه.
+     *
+     * واحد بس لكل متجر، والفعل بيفكّ اللي قبله قبل ما يعلّم الجديد.
+     * من غير الشرط ده، الزائر المجهول ممكن يشوف سوقين مختلفين في
+     * فتحتين — والسعر بيتغيّر قدامه بلا سبب.
+     */
+    isDefault: boolean('is_default').notNull().default(false),
+    isActive: boolean('is_active').notNull().default(true),
+
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex('markets_store_country_unique').on(t.storeId, t.country),
+    index('markets_store_active_idx').on(t.storeId, t.isActive),
+  ],
+)

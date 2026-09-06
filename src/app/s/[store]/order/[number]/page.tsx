@@ -143,7 +143,7 @@ export default async function OrderPage({
         <PurchasePixel
           eventId={order.eventId}
           value={order.total}
-          currency={order.currency}
+          currency={order.displayCurrency ?? order.currency}
           contentIds={items.map((i) => i.productId).filter((id): id is string => Boolean(id))}
         />
       )}
@@ -260,7 +260,7 @@ export default async function OrderPage({
             )}
             <div className="flex justify-between border-t border-[var(--sf-text)]/10 pt-2 text-base font-bold">
               <dt>الإجمالي</dt>
-              <dd className="tabular text-[var(--sf-primary)]">{formatMoney(order.total, order.currency)}</dd>
+              <dd className="tabular text-[var(--sf-primary)]">{formatMoney(order.displayTotal || order.total, order.displayCurrency ?? order.currency)}</dd>
             </div>
           </dl>
         </div>
@@ -357,7 +357,7 @@ export default async function OrderPage({
             storeIdentifier={identifier}
             orderNumber={order.orderNumber}
             token={order.recoveryToken ?? ''}
-            currency={order.currency}
+            currency={order.displayCurrency ?? order.currency}
             items={items.map((i) => ({
               id: i.id,
               name: i.name,

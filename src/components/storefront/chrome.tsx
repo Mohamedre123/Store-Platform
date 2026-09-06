@@ -7,6 +7,8 @@ import { useState } from 'react'
 import { useCart } from './cart'
 import { CartDrawer } from './cart-drawer'
 import { SearchBox } from './search-box'
+import { MarketPicker } from './market-picker'
+import type { MarketRow } from '@/lib/markets-meta'
 import type { UpsellProduct } from '@/lib/storefront'
 
 type NavItem = { label: string; href: string }
@@ -40,6 +42,8 @@ export function StoreHeader({
   logoHeight = 40,
   currency,
   storeSlug,
+  markets = [],
+  currentMarket = null,
 }: {
   storeName: string
   logo: string | null
@@ -58,6 +62,14 @@ export function StoreHeader({
   cartShowNotes?: boolean
   cartUpsell?: UpsellProduct[]
   cartUpsellTitle?: string
+  /**
+   * أسواق المتجر والسوق الحالي — لمبدّل العملة.
+   *
+   * فاضية = المتجر بعملة واحدة، والمبدّل ما بيظهرش أصلًا. أغلب
+   * التجّار كده، ومفيش سبب يشوفوا زرار بخيار واحد.
+   */
+  markets?: MarketRow[]
+  currentMarket?: MarketRow | null
   showWishlist?: boolean
   logoHeight?: number
   currency: string
@@ -170,6 +182,9 @@ export function StoreHeader({
                 <div className="hidden md:flex">{links}</div>
                 <div className="flex justify-start md:justify-center">{brand}</div>
                 <div className="flex items-center justify-end gap-1">
+                  {currentMarket && (
+                    <MarketPicker markets={markets} current={currentMarket} />
+                  )}
                   {wishlistButton}
                   {accountButton}
                   {cartButton}

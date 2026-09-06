@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { getStore } from '@/lib/storefront'
+import { getStore, marketCurrency, marketPrice } from '@/lib/storefront'
 import { getCurrentCustomer } from '@/lib/customer-auth'
 import { CustomerLoginForm } from '../account/login-form'
 import { getCheckoutSettings, getDisplayShipping, listPaymentOptions } from '@/lib/checkout'
@@ -108,13 +108,22 @@ export default async function CheckoutPage({
         <EmptyCart>
           <CheckoutForm
             storeIdentifier={identifier}
-            currency={store.currency}
+            currency={marketCurrency(store)}
             country={store.country}
             regions={regionsFor(store.country)}
-            shippingByCity={ship.byCity}
+            /*
+              الشحن بعملة السوق زي باقي الأرقام.
+
+              لو سبناه بالعملة الأساسية، العميل السعودي كان هيشوف
+              منتجات بالريال وشحن بالجنيه في نفس الشاشة — والمجموع
+              اللي المتصفح بيحسبه بيبقى مالوش أي معنى.
+            */
+            shippingByCity={Object.fromEntries(
+              Object.entries(ship.byCity).map(([city, price]) => [city, marketPrice(price, store)]),
+            )}
             shippingMethods={await listShippingMethods(store.id)}
-            defaultShipping={ship.defaultPrice}
-            freeOver={ship.freeOver}
+            defaultShipping={marketPrice(ship.defaultPrice, store)}
+            freeOver={ship.freeOver ? marketPrice(ship.freeOver, store) : ship.freeOver}
             carrierName={ship.carrierName}
             payments={options}
             account={{ name: customer.name, phone: customer.phone, email: customer.email }}

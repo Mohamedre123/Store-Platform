@@ -5,7 +5,7 @@ import { and, desc, eq } from 'drizzle-orm'
 import { Heart, MapPin, Package, Sparkles } from 'lucide-react'
 import { db } from '@/db'
 import { customerAddresses, orders, products, wishlists } from '@/db/schema'
-import { getStore } from '@/lib/storefront'
+import { getStore, marketCurrency } from '@/lib/storefront'
 import { getCurrentCustomer } from '@/lib/customer-auth'
 import { formatDate, formatMoney } from '@/lib/utils'
 import { statusMeta } from '@/lib/order-status'
@@ -189,7 +189,7 @@ export default async function AccountPage({ params }: { params: Promise<{ store:
           storeIdentifier={identifier}
           rewards={catalog}
           balance={balance}
-          currency={store.currency}
+          currency={marketCurrency(store)}
         />
       )}
 
@@ -262,7 +262,7 @@ export default async function AccountPage({ params }: { params: Promise<{ store:
                 </span>
                 <span className="line-clamp-2 text-sm font-medium">{p.name}</span>
                 <span className="tabular text-sm font-bold text-[var(--sf-primary)]">
-                  {formatMoney(p.price, store.currency)}
+                  {formatMoney(p.price, marketCurrency(store))}
                 </span>
               </Link>
             ))}

@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
-import { getStore, getStoreTheme, listCartUpsell } from '@/lib/storefront'
+import { getStore, getStoreTheme, listCartUpsell, marketCurrency, priceForMarket } from '@/lib/storefront'
 import { CartPageClient } from './cart-page-client'
 
 export const dynamic = 'force-dynamic'
@@ -15,11 +15,11 @@ export default async function CartPage({ params }: { params: Promise<{ store: st
   const theme = await getStoreTheme(store.id, isPreview)
   const { cart } = theme.custom
 
-  const upsell = cart.showUpsell ? await listCartUpsell(store.id) : []
+  const upsell = cart.showUpsell ? priceForMarket(await listCartUpsell(store.id), store) : []
 
   return (
     <CartPageClient
-      currency={store.currency}
+      currency={marketCurrency(store)}
       emptyMessage={cart.emptyMessage}
       freeShippingBar={cart.freeShippingBar}
       freeOver={cart.freeShippingThreshold}

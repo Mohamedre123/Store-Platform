@@ -1,7 +1,7 @@
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
-import { getStore, getStorePixels, getStoreTheme, listCartUpsell, listCategories, listFooterPages } from '@/lib/storefront'
+import { getStore, getStorePixels, getStoreTheme, listCartUpsell, listCategories, listFooterPages, marketCurrency, priceForMarket } from '@/lib/storefront'
 import { StorePixels } from '@/components/storefront/pixels'
 import { Tracker } from '@/components/storefront/tracker'
 import { CartProvider } from '@/components/storefront/cart'
@@ -18,6 +18,7 @@ import { getWheelConfig } from '@/lib/wheel'
 import { aiAllowed, getAiConfig, isReady } from '@/lib/ai/settings'
 import { StoreLinkProvider } from '@/components/storefront/store-link'
 import { getCurrentCustomer } from '@/lib/customer-auth'
+import { listMarkets } from '@/lib/markets'
 import { FONT_STACKS, RADIUS_PX } from '@/lib/customization'
 
 export const dynamic = 'force-dynamic'
@@ -275,7 +276,17 @@ export default async function StorefrontLayout({
     وأول ما العميل يفتحه لازم يلاقي المقترحات جاهزة — لو استنى طلبًا
     للشبكة، القسم بيظهر بعد ما يكون خلاص قرّر ويضغط «إتمام الطلب».
   */
-  const cartUpsell = custom.cart.showUpsell ? await listCartUpsell(store.id) : []
+  /*
+    أسواق المتجر — للمبدّل في الهيدر.
+
+    بتتقرا مرة واحدة لكل طلب (`listMarkets` مغلّفة بـ`cache`)،
+    والمتجر اللي مالوش أسواق بيرجّع مصفوفة فاضية والمبدّل بيختفي.
+  */
+  const storeMarkets = await listMarkets(store.id)
+
+  const cartUpsell = custom.cart.showUpsell
+    ? priceForMarket(await listCartUpsell(store.id), store)
+    : []
 
   /**
    * شعار المتجر: في المعاينة بنعرض شعار المسوّدة (اللي التاجر لسه رافعه)
@@ -404,6 +415,12 @@ export default async function StorefrontLayout({
             showCategoriesBar={custom.header.showCategoriesBar}
             sticky={custom.header.sticky}
             categories={cats.map((c) => ({ name: c.name, slug: c.slug }))}
+            markets={storeMarkets}
+            currentMarket={
+              store.display
+                ? (storeMarkets.find((m) => m.id === store.display!.marketId) ?? null)
+                : null
+            }
             cartEmptyMessage={custom.cart.emptyMessage}
             cartFreeShippingBar={custom.cart.freeShippingBar}
             cartFreeOver={custom.cart.freeShippingThreshold}
@@ -412,7 +429,7 @@ export default async function StorefrontLayout({
             cartUpsellTitle={custom.cart.upsellTitle}
             showWishlist={custom.header.showWishlist}
             logoHeight={custom.header.logoHeight}
-            currency={store.currency}
+            currency={marketCurrency(store)}
             storeSlug={store.slug}
           />
 
