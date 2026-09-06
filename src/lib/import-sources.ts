@@ -11,7 +11,7 @@
  * والاستيراد بيفشل من أول خطوة قبل ما يشوف منتج واحد.
  */
 
-export type ImportSourceKey = 'shopify' | 'woocommerce'
+export type ImportSourceKey = 'shopify' | 'woocommerce' | 'easyorders'
 
 export type ImportSourceField = {
   key: string
@@ -78,6 +78,25 @@ export const IMPORT_SOURCES: ImportSource[] = [
       },
       { key: 'consumerKey', label: 'Consumer key', placeholder: 'ck_…', secret: true },
       { key: 'consumerSecret', label: 'Consumer secret', placeholder: 'cs_…', secret: true },
+    ],
+  },
+  {
+    key: 'easyorders',
+    name: 'إيزي أوردرز',
+    intro:
+      'بنقرا منتجاتك المنشورة من واجهة التطبيقات الخارجية. المفتاح ده للقراءة بس — والمنتجات المخفية عندهم ما بتتجابش.',
+    steps: [
+      'من لوحة إيزي أوردرز: التطبيقات',
+      'افتح تطبيق التكامل الخارجي واطلب مفتاح ربط (Api-Key)',
+      'انسخ المفتاح والصقه تحت',
+    ],
+    fields: [
+      {
+        key: 'apiKey',
+        label: 'Api-Key',
+        hint: 'مفتاح التطبيقات الخارجية من إيزي أوردرز',
+        secret: true,
+      },
     ],
   },
 ]

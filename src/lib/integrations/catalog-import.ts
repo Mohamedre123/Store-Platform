@@ -354,6 +354,148 @@ async function fetchWoo(creds: Record<string, string>): Promise<CatalogFetch> {
   return { ok: true, items, total: items.length }
 }
 
+/* ────────────────────────── إيزي أوردرز ────────────────────────── */
+
+type EasyVariant = {
+  price?: number | null
+  sale_price?: number | null
+  quantity?: number | null
+}
+
+type EasyProduct = {
+  id?: string
+  name?: string
+  description?: string | null
+  price?: number | null
+  sku?: string | null
+  thumb?: string | null
+  quantity?: number | null
+  hidden?: boolean
+  is_digital?: boolean
+  track_stock?: boolean
+  parsed_categories?: string[] | null
+  variants?: EasyVariant[] | null
+}
+
+type EasyCategory = { id?: string; name?: string }
+
+/**
+ * إيزي أوردرز — أشهر منصة متاجر في السوق المصري.
+ *
+ * ## الحقايق دي اتشافت على حساب حقيقي مش اتخمّنت
+ * المسار `/api/v1/external-apps/products` والترويسة `Api-Key`
+ * والرفض `400 {"message":"Api-Key not valid"}` — كلهم اتجرّبوا
+ * بنداء فعلي. وشكل المنتج اتقري من نفس موديل المنتج عندهم على
+ * متجر فيه ٤٢ منتجًا حقيقيًّا.
+ *
+ * ## السعر الأصلي في `price` وسعر التخفيض في `variants[].sale_price`
+ * والصفر معناه «مفيش تخفيض» لا «ببلاش». ده اللي شفناه على المتجر
+ * الحقيقي: منتج بـ٥٩٩ ومتغيّراته `sale_price: 499`، ومنتج بـ٥١٥
+ * ومتغيّراته `sale_price: 0`.
+ *
+ * من غير الفرق ده، المنتج اللي مالوش تخفيض كان هيتستورد بسعر صفر
+ * — يعني التاجر يلاقي نُص كتالوجه ببلاش في متجره الجديد.
+ *
+ * ## والأسعار بالجنيه لا بالقرش
+ * `515` معناها ٥١٥ جنيه. الضرب في مية لازم، وبيمرّ على نفس
+ * `toMinor` اللي بتقرا الجزء الصحيح والعشري على حدة.
+ *
+ * ## والأقسام معرّفات لا أسماء
+ * `parsed_categories` مصفوفة UUID. من غير جلب `/categories`
+ * وربطها، كل المنتجات كانت هتنزل في قسم اسمه
+ * `4ca82cee-acfd-…` — والتاجر يقعد يعيد تسميتهم بإيده.
+ */
+async function fetchEasyOrders(creds: Record<string, string>): Promise<CatalogFetch> {
+  const key = creds.apiKey?.trim()
+  if (!key) return { ok: false, error: 'المفتاح مطلوب' }
+
+  const base = 'https://api.easy-orders.net/api/v1/external-apps'
+  const headers = { 'Api-Key': key }
+
+  /*
+    الأقسام الأول — عشان نحوّل المعرّفات لأسماء.
+
+    فشلها ما بيوقّفش الاستيراد: المنتجات أهم من أقسامها، والتاجر
+    يقدر يوزّعهم بعدين. لكن فشل المنتجات بيوقّف كل حاجة.
+  */
+  const categoryNames = new Map<string, string>()
+  const catRes = await fetchJson(`${base}/categories`, { headers })
+  if (catRes.ok) {
+    const raw = catRes.data as EasyCategory[] | { data?: EasyCategory[] }
+    const list = Array.isArray(raw) ? raw : (raw?.data ?? [])
+    for (const c of list) {
+      if (c?.id && c.name) categoryNames.set(c.id, c.name)
+    }
+  }
+
+  const items: ImportRow[] = []
+
+  for (let page = 1; page <= 10 && items.length < MAX_ITEMS; page++) {
+    const res = await fetchJson(`${base}/products?page=${page}&limit=100`, { headers })
+
+    if (!res.ok) {
+      /*
+        إيزي أوردرز بيرد 400 على المفتاح الغلط لا 401.
+
+        الرسالة بتقول «Api-Key not valid» بالإنجليزي — بنترجمها
+        عشان التاجر يعرف يصلّح إيه بدل ما يبص على سطر مالوش معنى.
+      */
+      if (res.status === 400 || res.status === 401 || res.status === 403) {
+        return { ok: false, error: 'المفتاح مرفوض — اتأكد إنك ناسخه كامل من إيزي أوردرز' }
+      }
+      return { ok: false, error: `إيزي أوردرز رفض: ${res.error}` }
+    }
+
+    const raw = res.data as { data?: EasyProduct[]; totalPages?: number } | EasyProduct[]
+    const list = Array.isArray(raw) ? raw : (raw?.data ?? [])
+    const totalPages = Array.isArray(raw) ? 1 : (raw?.totalPages ?? 1)
+
+    if (list.length === 0) break
+
+    for (const p of list) {
+      const name = clean(p.name, 200)
+      if (!name) continue
+
+      /* المخفي عندهم يفضل مخفي عندنا — التاجر خبّاه لسبب */
+      if (p.hidden) continue
+
+      const listPrice = toMinor(p.price)
+      if (listPrice <= 0) continue
+
+      /*
+        أرخص `sale_price` بين المتغيّرات، والصفر بيتشال.
+
+        الأرخص لأنه اللي العميل بيشوفه معروضًا على صفحة المنتج
+        («يبدأ من»). والصفر معناه «مفيش تخفيض على المتغيّر ده».
+      */
+      const sales = (p.variants ?? [])
+        .map((v) => toMinor(v?.sale_price))
+        .filter((n) => n > 0 && n < listPrice)
+
+      const sale = sales.length ? Math.min(...sales) : 0
+
+      items.push({
+        name,
+        description: stripHtml(p.description),
+        price: sale > 0 ? sale : listPrice,
+        compareAtPrice: sale > 0 ? listPrice : null,
+        costPrice: null,
+        sku: clean(p.sku, 80),
+        stock: Math.max(0, Number(p.quantity ?? 0) || 0),
+        category: clean(categoryNames.get(p.parsed_categories?.[0] ?? '') ?? null, 80),
+        brand: null,
+        image: clean(p.thumb, 600),
+      })
+
+      if (items.length >= MAX_ITEMS) break
+    }
+
+    if (page >= totalPages) break
+  }
+
+  return { ok: true, items, total: items.length }
+}
+
 /* ────────────────────────── الموزّع ────────────────────────── */
 
 export async function fetchCatalog(
@@ -365,6 +507,8 @@ export async function fetchCatalog(
       return fetchShopify(creds)
     case 'woocommerce':
       return fetchWoo(creds)
+    case 'easyorders':
+      return fetchEasyOrders(creds)
     default:
       return { ok: false, error: 'المنصة دي مش مدعومة' }
   }

@@ -22,6 +22,19 @@ import { cn } from '@/lib/utils'
  * بأسماء الشاشات زي ما هي في لوحة المنصة، بالترتيب — وده الفرق
  * بين إنه يخلّص في دقيقة وإنه يسيب الصفحة.
  */
+/**
+ * عدّ الحقول بالعربي.
+ *
+ * «1 حقول» غلط. العربي فيه مفرد ومثنّى وجمع، والرقم قبل الاسم
+ * بيغيّر صيغته — والتاجر بيقرا السطر ده قبل ما يدوس، فأول انطباع
+ * عن المنصة إنها مكتوبة بترجمة آلية.
+ */
+function fieldCount(n: number): string {
+  if (n === 1) return 'حقل واحد'
+  if (n === 2) return 'حقلين'
+  return `${n} حقول`
+}
+
 export function ApiImport() {
   const [picked, setPicked] = useState<ImportSource | null>(null)
 
@@ -49,7 +62,7 @@ export function ApiImport() {
               <span className="min-w-0">
                 <span className="block text-sm font-semibold">{s.name}</span>
                 <span className="block truncate text-xs text-[var(--fg-subtle)]">
-                  {s.fields.length} حقول · قراءة بس
+                  {fieldCount(s.fields.length)} · قراءة بس
                 </span>
               </span>
               <ArrowRight className="h-4 w-4 shrink-0 rotate-180 text-[var(--fg-subtle)]" aria-hidden="true" />
