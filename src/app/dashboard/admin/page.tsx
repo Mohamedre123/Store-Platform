@@ -269,6 +269,8 @@ export default async function AdminPage({
             ctaLabel: n.ctaLabel,
             ctaHref: n.ctaHref,
             tone: n.tone,
+            rewardKind: n.rewardKind,
+            rewardDays: n.rewardDays,
             audience: n.audience,
             targetStoreIds: n.targetStoreIds,
             minDeliveredOrders: n.minDeliveredOrders,

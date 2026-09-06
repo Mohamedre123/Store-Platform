@@ -102,9 +102,28 @@ export const platformNotices = pgTable(
 
     title: text('title').notNull(),
     body: text('body').notNull(),
-    /** زرار اختياري — «فعّل دلوقتي» أو «كلّمنا» */
+    /** نص الزرار — «فعّل مكافأتك» أو «افتح الصفحة» */
     ctaLabel: text('cta_label'),
+    /** وجهة الزرار — لـ`link` وحده، ومسار داخلي بيتختار من قايمة */
     ctaHref: text('cta_href'),
+
+    /**
+     * الزرار بيعمل إيه.
+     *
+     * `none`: مفيش زرار (تهنئة) · `free_days`: بيمدّ اشتراك
+     * التاجر بالمدة دي فورًا · `link`: بيوديه لصفحة في لوحته.
+     *
+     * ## ليه نوع مش رابط مكتوب بالإيد
+     * اللي بيكتب الرسالة مش مبرمج. الرابط الخام كان بيخلّي الزرار
+     * أحسن حالاته إنه يوصّل التاجر لصفحة يدوّر فيها على مكافأته —
+     * وأسوأ حالاته إنه يوديه على ٤٠٤.
+     */
+    rewardKind: text('reward_kind')
+      .$type<'none' | 'free_days' | 'link'>()
+      .notNull()
+      .default('none'),
+    /** أيام الاشتراك المجاني — لـ`free_days` وحده */
+    rewardDays: integer('reward_days').notNull().default(0),
 
     /** offer: عرض ومكافأة · praise: تهنئة · info: خبر */
     tone: text('tone').$type<'offer' | 'praise' | 'info'>().notNull().default('offer'),
@@ -153,4 +172,34 @@ export const noticeDismissals = pgTable(
     dismissedAt: timestamp('dismissed_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('notice_dismissals_unique').on(t.noticeId, t.storeId)],
+)
+
+/**
+ * التاجر فعّل المكافأة.
+ *
+ * ## الفهرس الفريد هو الحارس لا الفحص
+ * التاجر اللي بيدوس مرتين بسرعة بيبعت طلبين متوازيين، والاتنين
+ * بيقروا «لسه ماخدهاش» قبل ما أي واحد فيهم يكتب. الفحص وحده كان
+ * بيديله شهرين — القيد في القاعدة هو اللي بيمنعها فعلًا.
+ *
+ * ## وبيتكتب **قبل** المنح لا بعده
+ * الصف بيتحجز الأول؛ لو الحجز رجع فاضي يبقى حد سبقنا وبنقف. لو
+ * منحنا الأول وفشل التسجيل، التاجر بياخد المكافأة ومفيش أثر إنه
+ * خدها.
+ */
+export const noticeRedemptions = pgTable(
+  'notice_redemptions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    noticeId: uuid('notice_id').notNull().references(() => platformNotices.id, { onDelete: 'cascade' }),
+    storeId: uuid('store_id').notNull(),
+    grantedDays: integer('granted_days').notNull().default(0),
+    /** لحد إمتى امتدّ اشتراكه — للسجل ولرسالة التأكيد */
+    grantedUntil: timestamp('granted_until', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex('notice_redemptions_unique').on(t.noticeId, t.storeId),
+    index('notice_redemptions_store_idx').on(t.storeId),
+  ],
 )

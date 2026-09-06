@@ -6,6 +6,8 @@ import { z } from 'zod'
 import { db } from '@/db'
 import { platformNotices } from '@/db/schema'
 import { requirePlatformAdmin } from '@/lib/store-context'
+import { isKnownDestination } from '@/lib/notice-rewards-meta'
+import { formatCount } from '@/lib/utils'
 
 export type NoticeState = { ok?: boolean; error?: string } | null
 
@@ -24,6 +26,8 @@ const schema = z.object({
   ctaLabel: z.string().trim().max(40).nullish(),
   ctaHref: z.string().trim().max(300).nullish(),
   tone: z.enum(['offer', 'praise', 'info']),
+  rewardKind: z.enum(['none', 'free_days', 'link']).default('none'),
+  rewardDays: z.coerce.number().int().min(0).max(365).default(0),
   audience: z.enum(['all', 'stores', 'rule']),
   targetStoreIds: z.array(z.string().uuid()).max(200).default([]),
   minDeliveredOrders: z.coerce.number().int().min(0).max(1_000_000).default(0),
@@ -46,21 +50,52 @@ export async function saveNoticeAction(raw: unknown): Promise<NoticeState> {
   }
 
   /*
-    الرابط لازم يبقى داخلي أو https.
+    وجهة الزرار من قايمة مقفولة — لا من نص حر.
 
-    الإدارة بتكتبه بإيدها، لكن `javascript:` في `href` بيشتغل لو
-    اتلزق بالغلط — والزرار ده بيتعرض في لوحة كل تاجر.
+    الحقل القديم كان بيقبل أي نص، يعني `javascript:` بيشتغل لو
+    اتلزق بالغلط، ومسار مش موجود بيودّي التاجر على ٤٠٤. والزرار ده
+    بيتعرض في لوحة كل تاجر.
+
+    والفحص هنا مش تكرار لفحص الشاشة: الشاشة `select`، والفعل ده
+    بيتنادى من الشبكة مباشرة كمان.
   */
-  const href = input.ctaHref?.trim() || null
-  if (href && !href.startsWith('/') && !href.startsWith('https://')) {
-    return { error: 'الرابط لازم يبدأ بـ/ أو https://' }
+  let href: string | null = null
+  if (input.rewardKind === 'link') {
+    href = input.ctaHref?.trim() || null
+    if (!href) return { error: 'اختار الصفحة اللي الزرار يوديه لها' }
+    if (!isKnownDestination(href)) return { error: 'الصفحة دي مش في القايمة' }
+  }
+
+  /*
+    الأيام شرط لمكافأة الأيام.
+
+    الصفر كان بيعدّي فيطلع زرار «فعّل ٠ يوم مجاني» — بيتضغط وما
+    بيعملش حاجة، والتاجر يفتكر النظام بايظ.
+  */
+  const rewardDays = input.rewardKind === 'free_days' ? input.rewardDays : 0
+  if (input.rewardKind === 'free_days' && rewardDays < 1) {
+    return { error: 'حدّد مدة المكافأة بالأيام' }
   }
 
   const values = {
     title: input.title,
     body: input.body,
-    ctaLabel: input.ctaLabel?.trim() || null,
+    /*
+      نص فاضي بيتملى هنا لا في الشاشة.
+
+      الزرار من غير نص بيرسم مستطيلًا فاضي في لوحة التاجر — والفعل
+      ده بيتنادى من الشبكة كمان، فالافتراضي لازم يبقى في الجهتين.
+    */
+    ctaLabel:
+      input.ctaLabel?.trim() ||
+      (input.rewardKind === 'free_days'
+        ? `فعّل ${formatCount(input.rewardDays)} يوم مجاني`
+        : input.rewardKind === 'link'
+          ? 'افتح الصفحة'
+          : null),
     ctaHref: href,
+    rewardKind: input.rewardKind,
+    rewardDays,
     tone: input.tone,
     audience: input.audience,
     targetStoreIds: input.audience === 'stores' ? input.targetStoreIds : [],

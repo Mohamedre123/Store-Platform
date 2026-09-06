@@ -1,7 +1,7 @@
 import 'server-only'
 import { and, desc, eq, gte, isNull, lte, or, sql } from 'drizzle-orm'
 import { db } from '@/db'
-import { noticeDismissals, platformNotices } from '@/db/schema'
+import { noticeDismissals, noticeRedemptions, platformNotices } from '@/db/schema'
 
 /**
  * رسايل إدارة المنصة للتجّار.
@@ -19,6 +19,7 @@ import { noticeDismissals, platformNotices } from '@/db/schema'
  */
 
 export type NoticeTone = 'offer' | 'praise' | 'info'
+export type RewardKind = 'none' | 'free_days' | 'link'
 
 export type MerchantNotice = {
   id: string
@@ -27,6 +28,10 @@ export type MerchantNotice = {
   ctaLabel: string | null
   ctaHref: string | null
   tone: NoticeTone
+  rewardKind: RewardKind
+  rewardDays: number
+  /** التاجر فعّلها خلاص — البطاقة بتوري «تمّت» بدل الزرار */
+  redeemedUntil: Date | null
 }
 
 /** أرقام التاجر اللي الشروط بتتقاس عليها */
@@ -63,10 +68,74 @@ export async function storeStats(storeId: string): Promise<StoreStats> {
   }
 }
 
+/** الأعمدة اللي بتتقرا للتاجر — مصدر واحد للعرض وللتفعيل */
+const noticeFields = {
+  id: platformNotices.id,
+  title: platformNotices.title,
+  body: platformNotices.body,
+  ctaLabel: platformNotices.ctaLabel,
+  ctaHref: platformNotices.ctaHref,
+  tone: platformNotices.tone,
+  rewardKind: platformNotices.rewardKind,
+  rewardDays: platformNotices.rewardDays,
+  audience: platformNotices.audience,
+  targetStoreIds: platformNotices.targetStoreIds,
+  minDeliveredOrders: platformNotices.minDeliveredOrders,
+  minReferrals: platformNotices.minReferrals,
+}
+
+type NoticeRule = {
+  audience: 'all' | 'stores' | 'rule'
+  targetStoreIds: string[]
+  minDeliveredOrders: number
+  minReferrals: number
+}
+
+/**
+ * التاجر ده مستحقّها؟
+ *
+ * ## نفس الدالة بتحرس العرض والتفعيل
+ * لو الفحص اتكتب مرتين، نسخة العرض ونسخة التفعيل بيفرقوا مع أول
+ * تعديل — والفرق ده معناه تاجر بياخد مكافأة مش من حقّه (أو العكس،
+ * وهو بيشوفها ومش قادر ياخدها).
+ */
+function qualifies(rule: NoticeRule, storeId: string, stats: StoreStats): boolean {
+  if (rule.audience === 'stores') return rule.targetStoreIds.includes(storeId)
+  if (rule.audience === 'rule') {
+    /*
+      الشرطين **و** لا **أو**.
+
+      الإدارة اللي بتكتب «وصّل ١٠ وحِيل ٥» قاصدة الاتنين. و«أو»
+      كانت هتخلّي أي واحد فيهم كافيًا — يعني مكافأة بتتصرف على
+      نص الشرط.
+    */
+    return (
+      stats.deliveredOrders >= rule.minDeliveredOrders && stats.referrals >= rule.minReferrals
+    )
+  }
+  return true
+}
+
+/** الرسالة شغّالة ووقتها جه؟ — بيتفحص في العرض وفي التفعيل */
+const liveWindow = (now: Date) =>
+  and(
+    eq(platformNotices.isActive, true),
+    /*
+      `lte`/`gte` لا قالب `sql` خام.
+
+      القالب الخام بيمرّر الـ`Date` لسائق بوستجرس كنص، وهو
+      بيرفضه: «The "string" argument must be of type string…
+      Received an instance of Date». معاملات drizzle بتعرف
+      النوع وبتحوّله صح.
+    */
+    or(isNull(platformNotices.startsAt), lte(platformNotices.startsAt, now))!,
+    or(isNull(platformNotices.endsAt), gte(platformNotices.endsAt, now))!,
+  )
+
 /**
  * الرسايل اللي التاجر ده المفروض يشوفها دلوقتي.
  *
- * الفلترة على تلات مستويات، وكلها في استعلام واحد:
+ * الفلترة على تلات مستويات:
  * ١. شغّالة، وفي مدتها
  * ٢. جمهورها يشمله — الكل، أو متجره بالاسم، أو شرط حقّقه
  * ٣. ما قفلهاش قبل كده
@@ -79,16 +148,16 @@ export async function noticesFor(
 
   const rows = await db
     .select({
-      id: platformNotices.id,
-      title: platformNotices.title,
-      body: platformNotices.body,
-      ctaLabel: platformNotices.ctaLabel,
-      ctaHref: platformNotices.ctaHref,
-      tone: platformNotices.tone,
-      audience: platformNotices.audience,
-      targetStoreIds: platformNotices.targetStoreIds,
-      minDeliveredOrders: platformNotices.minDeliveredOrders,
-      minReferrals: platformNotices.minReferrals,
+      ...noticeFields,
+      /*
+        تاريخ التفعيل بييجي مع الصف لا في استعلام تاني.
+
+        البطاقة محتاجة تعرف «خد المكافأة ولا لأ» عشان ترسم زرارًا
+        أو تأكيدًا — والقراءة المنفصلة كانت هتبقى رحلة زيادة لكل
+        فتحة لوحة.
+      */
+      redeemedUntil: noticeRedemptions.grantedUntil,
+      redeemedAt: noticeRedemptions.createdAt,
     })
     .from(platformNotices)
     .leftJoin(
@@ -98,43 +167,25 @@ export async function noticesFor(
         eq(noticeDismissals.storeId, storeId),
       ),
     )
+    .leftJoin(
+      noticeRedemptions,
+      and(
+        eq(noticeRedemptions.noticeId, platformNotices.id),
+        eq(noticeRedemptions.storeId, storeId),
+      ),
+    )
     .where(
       and(
-        eq(platformNotices.isActive, true),
+        liveWindow(now),
         /* القفل بيخفيها نهائيًا — التاجر قال «شفتها» */
         isNull(noticeDismissals.noticeId),
-        /*
-          `lte`/`gte` لا قالب `sql` خام.
-
-          القالب الخام بيمرّر الـ`Date` لسائق بوستجرس كنص، وهو
-          بيرفضه: «The "string" argument must be of type string…
-          Received an instance of Date». معاملات drizzle بتعرف
-          النوع وبتحوّله صح.
-        */
-        or(isNull(platformNotices.startsAt), lte(platformNotices.startsAt, now))!,
-        or(isNull(platformNotices.endsAt), gte(platformNotices.endsAt, now))!,
       ),
     )
     .orderBy(desc(platformNotices.createdAt))
     .limit(20)
 
   return rows
-    .filter((r) => {
-      if (r.audience === 'stores') return r.targetStoreIds.includes(storeId)
-      if (r.audience === 'rule') {
-        /*
-          الشرطين **و** لا **أو**.
-
-          الإدارة اللي بتكتب «وصّل ١٠ وحِيل ٥» قاصدة الاتنين. و«أو»
-          كانت هتخلّي أي واحد فيهم كافيًا — يعني مكافأة بتتصرف على
-          نص الشرط.
-        */
-        return (
-          stats.deliveredOrders >= r.minDeliveredOrders && stats.referrals >= r.minReferrals
-        )
-      }
-      return true
-    })
+    .filter((r) => qualifies(r, storeId, stats))
     .map((r) => ({
       id: r.id,
       title: r.title,
@@ -142,6 +193,9 @@ export async function noticesFor(
       ctaLabel: r.ctaLabel,
       ctaHref: r.ctaHref,
       tone: r.tone,
+      rewardKind: r.rewardKind,
+      rewardDays: r.rewardDays,
+      redeemedUntil: r.redeemedAt ? (r.redeemedUntil ?? new Date(0)) : null,
     }))
     /*
       تلاتة كحد أقصى في الشاشة.
@@ -150,6 +204,37 @@ export async function noticesFor(
       للوحة إعلانات، والتاجر بيتعلّم يقفلها كلها من غير ما يقراها.
     */
     .slice(0, 3)
+}
+
+/**
+ * رسالة واحدة بشرط إن التاجر ده يستاهلها — **لحظة التفعيل**.
+ *
+ * ## الفحص بيتعاد هنا كامل
+ * البطاقة عند التاجر ممكن تكون بقالها ساعة مفتوحة: الرسالة اتقفلت
+ * من الإدارة، أو مدتها خلصت، أو التاجر رجّع طلبات فنزل تحت الشرط.
+ * والأهم إن معرّف الرسالة بيتبعت من المتصفح — من غير الفحص ده أي
+ * تاجر بيبعت أي معرّف وياخد مكافأة مش مكتوبة له أصلًا.
+ */
+export async function eligibleNotice(
+  storeId: string,
+  noticeId: string,
+): Promise<{
+  id: string
+  rewardKind: RewardKind
+  rewardDays: number
+} | null> {
+  const [row] = await db
+    .select(noticeFields)
+    .from(platformNotices)
+    .where(and(eq(platformNotices.id, noticeId), liveWindow(new Date())))
+    .limit(1)
+
+  if (!row) return null
+
+  const stats = await storeStats(storeId)
+  if (!qualifies(row, storeId, stats)) return null
+
+  return { id: row.id, rewardKind: row.rewardKind, rewardDays: row.rewardDays }
 }
 
 /** التاجر قفل الرسالة — بتختفي عنه للأبد */

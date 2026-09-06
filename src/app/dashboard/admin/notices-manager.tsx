@@ -4,9 +4,16 @@ import { useMemo, useState, useTransition } from 'react'
 import { Gift, Megaphone, PartyPopper, Plus, Sparkles, Trash2, X } from 'lucide-react'
 import { deleteNoticeAction, saveNoticeAction, toggleNoticeAction } from './notice-actions'
 import { Alert, Button, Card, Field, Input, Textarea } from '@/components/ui'
+import {
+  NOTICE_DESTINATIONS,
+  REWARD_DAY_PRESETS,
+  REWARD_KINDS,
+  describeReward,
+  type RewardKind,
+} from '@/lib/notice-rewards-meta'
 import { Toggle } from '@/components/dashboard/controls'
 import { toast } from '@/components/dashboard/toast'
-import { cn } from '@/lib/utils'
+import { cn, formatCount } from '@/lib/utils'
 
 export type NoticeRow = {
   id: string
@@ -15,6 +22,8 @@ export type NoticeRow = {
   ctaLabel: string | null
   ctaHref: string | null
   tone: 'offer' | 'praise' | 'info'
+  rewardKind: RewardKind
+  rewardDays: number
   audience: 'all' | 'stores' | 'rule'
   targetStoreIds: string[]
   minDeliveredOrders: number
@@ -32,6 +41,9 @@ const empty = (): Draft => ({
   ctaLabel: '',
   ctaHref: '',
   tone: 'offer',
+  /* الافتراضي مكافأة حقيقية — ده الغرض من الشاشة أصلًا */
+  rewardKind: 'free_days',
+  rewardDays: 30,
   audience: 'rule',
   targetStoreIds: [],
   minDeliveredOrders: 10,
@@ -151,6 +163,8 @@ export function NoticesManager({
                       ]
                         .filter(Boolean)
                         .join(' و')}
+                {' · '}
+                {describeReward(n.rewardKind, n.rewardDays, n.ctaHref)}
               </span>
             </span>
 
@@ -283,8 +297,132 @@ function NoticeForm({
         />
       </Field>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="نص الزرار" htmlFor="n-cta" hint="اختياري">
+      {/*
+        المكافأة — **اللي الزرار بيعمله**، لا رابط بيتكتب بالإيد.
+
+        الحقل القديم كان بيطلب مسارًا في اللوحة من واحد مش مبرمج.
+        وحتى لو اتكتب صح، الزرار كان أحسن حالاته بيوصّل التاجر لصفحة
+        يدوّر فيها على مكافأته — والمكافأة اللي محتاجة الطرفين
+        يتكلّموا عشان تتفعّل مش مكافأة، دي مهمة.
+      */}
+      <Field
+        label="المكافأة"
+        hint={describeReward(draft.rewardKind, draft.rewardDays, draft.ctaHref)}
+      >
+        <div className="flex flex-col gap-2">
+          <div className="grid gap-2 sm:grid-cols-3">
+            {REWARD_KINDS.map((r) => (
+              <button
+                key={r.key}
+                type="button"
+                onClick={() =>
+                  setDraft({
+                    ...draft,
+                    rewardKind: r.key,
+                    /*
+                      نص الزرار بيتملى لوحده لما يبقى فاضي أو لسه
+                      الافتراضي — والنص اللي الإدارة كتبته بإيدها ما
+                      بيتشلّش من تحتها.
+                    */
+                    ctaLabel:
+                      !draft.ctaLabel?.trim() ||
+                      REWARD_KINDS.some((x) => x.defaultLabel === draft.ctaLabel)
+                        ? r.defaultLabel
+                        : draft.ctaLabel,
+                    ctaHref: r.key === 'link' ? draft.ctaHref : '',
+                  })
+                }
+                className={cn(
+                  'flex flex-col items-start gap-0.5 rounded-lg border px-3 py-2.5 text-start transition-colors',
+                  draft.rewardKind === r.key
+                    ? 'border-[var(--primary)] bg-[var(--primary-soft)]'
+                    : 'border-[var(--border-strong)]',
+                )}
+              >
+                <span
+                  className={cn(
+                    'text-sm font-medium',
+                    draft.rewardKind === r.key && 'text-[var(--primary)]',
+                  )}
+                >
+                  {r.label}
+                </span>
+                <span className="text-xs leading-relaxed text-[var(--fg-subtle)]">{r.hint}</span>
+              </button>
+            ))}
+          </div>
+
+          {draft.rewardKind === 'free_days' && (
+            <div className="flex flex-col gap-3 rounded-lg border border-[var(--border)] p-3">
+              <div className="flex flex-col gap-2">
+                <span className="text-xs font-medium text-[var(--fg-muted)]">المدة</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {REWARD_DAY_PRESETS.map((d) => (
+                    <button
+                      key={d.days}
+                      type="button"
+                      onClick={() => setDraft({ ...draft, rewardDays: d.days })}
+                      className={cn(
+                        'flex h-9 items-center rounded-lg border px-3 text-sm transition-colors',
+                        draft.rewardDays === d.days
+                          ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]'
+                          : 'border-[var(--border-strong)] text-[var(--fg-muted)]',
+                      )}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <Field label="أو اكتب عدد الأيام" htmlFor="n-days">
+                <Input
+                  id="n-days"
+                  type="number"
+                  min={1}
+                  max={365}
+                  inputMode="numeric"
+                  value={draft.rewardDays}
+                  onChange={(e) => setDraft({ ...draft, rewardDays: Number(e.target.value) || 0 })}
+                />
+              </Field>
+
+              {/*
+                القاعدة دي بتتقال للإدارة قبل ما تحفظ.
+
+                «شهر ببلاش» لتاجر فاضله عشر أيام معناها أربعين لا
+                تلاتين — والإدارة اللي فاكراها بتستبدل بتحسب حساب
+                غلط وهي بتوعد.
+              */}
+              <p className="rounded-lg bg-[var(--surface-2)] px-3 py-2 text-xs leading-relaxed text-[var(--fg-muted)]">
+                التاجر بيدوس الزرار فاشتراكه بيتمدّ على طول. ولو لسه مشترك، المدة بتتضاف على آخر
+                اشتراكه — مش بتستبدله.
+              </p>
+            </div>
+          )}
+
+          {draft.rewardKind === 'link' && (
+            <Field label="الصفحة اللي الزرار يوديه لها" htmlFor="n-dest">
+              <select
+                id="n-dest"
+                value={draft.ctaHref ?? ''}
+                onChange={(e) => setDraft({ ...draft, ctaHref: e.target.value })}
+                className="h-11 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-2.5 text-sm focus:border-[var(--primary)] focus:outline-none"
+              >
+                <option value="">اختار صفحة…</option>
+                {NOTICE_DESTINATIONS.map((d) => (
+                  <option key={d.href} value={d.href}>
+                    {d.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+        </div>
+      </Field>
+
+      {draft.rewardKind !== 'none' && (
+        <Field label="نص الزرار" htmlFor="n-cta" hint="سيبه فاضي وإحنا هنكتبه">
           <Input
             id="n-cta"
             value={draft.ctaLabel ?? ''}
@@ -293,19 +431,7 @@ function NoticeForm({
             maxLength={40}
           />
         </Field>
-
-        <Field label="رابط الزرار" htmlFor="n-href" hint="يبدأ بـ/ أو https://">
-          <Input
-            id="n-href"
-            dir="ltr"
-            className="text-start"
-            value={draft.ctaHref ?? ''}
-            onChange={(e) => setDraft({ ...draft, ctaHref: e.target.value })}
-            placeholder="/dashboard/subscription"
-            maxLength={300}
-          />
-        </Field>
-      </div>
+      )}
 
       {/* الجمهور */}
       <Field label="مين يشوفها">
@@ -437,9 +563,12 @@ function NoticeForm({
             <p className="mt-1.5 whitespace-pre-line text-xs leading-relaxed text-[var(--fg-muted)]">
               {draft.body}
             </p>
-            {draft.ctaLabel && (
+            {draft.rewardKind !== 'none' && (
               <span className="mt-3 inline-flex h-9 items-center rounded-lg bg-[var(--primary)] px-4 text-xs font-semibold text-[var(--primary-fg)]">
-                {draft.ctaLabel}
+                {draft.ctaLabel?.trim() ||
+                  (draft.rewardKind === 'free_days'
+                    ? 'فعّل ' + formatCount(draft.rewardDays) + ' يوم مجاني'
+                    : 'افتح الصفحة')}
               </span>
             )}
           </div>
