@@ -166,6 +166,14 @@ export const NAV: NavSection[] = [
   { href: '/dashboard/payments', label: 'الدفع', icon: CreditCard, permission: 'settings.manage' },
   { href: '/dashboard/shipping', label: 'الشحن', icon: Truck, permission: 'settings.manage' },
   { href: '/dashboard/plugins', label: 'الإضافات', icon: Plug, permission: 'settings.manage' },
+  /*
+    «حِيل صاحبك» بند مستقل بلا صلاحية.
+
+    الصفحة عن حساب التاجر ومكافأته لا عن بيانات متجره — مفيش فيها
+    طلبات ولا عملاء ولا فلوس. ودفنها جوّه الإعدادات كان هيخلّيها
+    ميزة محدّش يعرف إنها موجودة.
+  */
+  { href: '/dashboard/referrals', label: 'حِيل صاحبك', icon: Share2 },
   {
     href: '/dashboard/settings',
     label: 'الإعدادات',

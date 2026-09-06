@@ -1,5 +1,5 @@
 import { and, count, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm'
-import { Clock, Inbox, ShieldCheck, Users } from 'lucide-react'
+import { Clock, Inbox, ShieldCheck, Share2, Users } from 'lucide-react'
 import { db } from '@/db'
 import { orders, storeMembers, stores, subscriptionRequests, users } from '@/db/schema'
 import { requirePlatformAdmin } from '@/lib/store-context'
@@ -12,6 +12,9 @@ import { Reveal } from '@/components/motion'
 import { Card } from '@/components/ui'
 import { AdminSearch } from './admin-search'
 import { StoreRow, type AdminStoreRow } from './store-row'
+import { NoticesManager } from './notices-manager'
+import { listNotices } from './notice-actions'
+import { allReferralSignups, deliveredCounts, referralCounts } from '@/lib/merchant-referrals'
 
 export const metadata = { title: 'إدارة المنصة' }
 
@@ -157,6 +160,28 @@ export default async function AdminPage({
     .from(stores)
     .where(isNull(stores.deletedAt))
 
+  /*
+    أرقام المكافآت وسجل الإحالات ورسايل المنصة.
+
+    التلاتة بيتجابوا مع بعض: الطلبات المسلَّمة والإحالات بتظهر جنب
+    كل متجر، والسجل بيقول مين جه من مين، والرسايل بتتكتب من نفس
+    الشاشة — عشان الإدارة تشوف الرقم وتكافئ عليه في نفس المكان.
+  */
+  const [delivered, refCounts, referralFeed, notices, allStoresForPicker] = await Promise.all([
+    deliveredCounts(storeIds),
+    referralCounts(storeIds),
+    allReferralSignups(50),
+    listNotices(),
+    db
+      .select({ id: stores.id, name: stores.name })
+      .from(stores)
+      .where(isNull(stores.deletedAt))
+      .orderBy(desc(stores.createdAt))
+      .limit(300),
+  ])
+
+  const pickerDelivered = await deliveredCounts(allStoresForPicker.map((x) => x.id))
+
   const now = Date.now()
 
   const view: AdminStoreRow[] = rows.map((r) => {
@@ -188,6 +213,8 @@ export default async function AdminPage({
       daysLeft: daysLeft(until),
       active,
       orders: countByStore.get(r.storeId) ?? 0,
+      delivered: delivered.get(r.storeId) ?? 0,
+      referrals: refCounts.get(r.storeId) ?? 0,
       request: req
         ? {
             id: req.id,
@@ -231,6 +258,84 @@ export default async function AdminPage({
           </Card>
         </div>
       </Reveal>
+
+      {/* رسايل ومكافآت — الإدارة بتكتبها والتاجر بيشوفها في لوحته */}
+      <Reveal delay={40}>
+        <NoticesManager
+          notices={notices.map((n) => ({
+            id: n.id,
+            title: n.title,
+            body: n.body,
+            ctaLabel: n.ctaLabel,
+            ctaHref: n.ctaHref,
+            tone: n.tone,
+            audience: n.audience,
+            targetStoreIds: n.targetStoreIds,
+            minDeliveredOrders: n.minDeliveredOrders,
+            minReferrals: n.minReferrals,
+            isActive: n.isActive,
+          }))}
+          stores={allStoresForPicker.map((x) => ({
+            id: x.id,
+            name: x.name,
+            accountId: null,
+            delivered: pickerDelivered.get(x.id) ?? 0,
+          }))}
+        />
+      </Reveal>
+
+      {/* مين جه من مين — سجل إحالات التجّار */}
+      {referralFeed.length > 0 && (
+        <Reveal delay={45}>
+          <section className="flex flex-col gap-3 border-t border-[var(--border)] pt-6">
+            <div>
+              <h2 className="flex items-center gap-2 font-semibold">
+                <Share2 className="h-4 w-4 text-[var(--primary)]" aria-hidden="true" />
+                إحالات التجّار
+              </h2>
+              <p className="mt-0.5 text-sm text-[var(--fg-muted)]">
+                مين سجّل برابط مين — بالاسم ومعرّف الحساب.
+              </p>
+            </div>
+
+            <Card className="divide-y divide-[var(--border)]">
+              {referralFeed.map((f) => (
+                <div key={f.newStoreId} className="flex flex-wrap items-center gap-3 p-4 text-sm">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">{f.newStoreName}</span>
+                    <span dir="ltr" className="block text-start text-xs text-[var(--fg-subtle)]">
+                      {f.newAccountId ?? '—'}
+                    </span>
+                  </span>
+
+                  <span className="shrink-0 text-xs text-[var(--fg-subtle)]">جه من</span>
+
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">{f.referrerStoreName}</span>
+                    <span dir="ltr" className="block text-start text-xs text-[var(--fg-subtle)]">
+                      {f.referrerAccountId ?? '—'}
+                    </span>
+                  </span>
+
+                  <span
+                    className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] ${
+                      f.plan
+                        ? 'bg-[var(--color-success-soft)] text-[var(--color-success)]'
+                        : 'bg-[var(--surface-2)] text-[var(--fg-muted)]'
+                    }`}
+                  >
+                    {f.plan ? 'مشترك' : 'سجّل بس'}
+                  </span>
+
+                  <span className="tabular shrink-0 text-xs text-[var(--fg-subtle)]">
+                    {formatDate(f.at)}
+                  </span>
+                </div>
+              ))}
+            </Card>
+          </section>
+        </Reveal>
+      )}
 
       <Reveal delay={50}>
         <AdminSearch initial={term} />

@@ -18,6 +18,15 @@ export type AdminStoreRow = {
   daysLeft: number | null
   active: boolean
   orders: number
+  /**
+   * الطلبات اللي **اتسلّمت** فعلًا، وإحالاته.
+   *
+   * الرقمين دول هما أساس المكافأة: الطلب اللي اتعمل ممكن يتلغي،
+   * واللي اتشحن ممكن يرجع — المسلَّم وحده هو اللي بيقول إن التاجر
+   * باع. والإدارة بتكتب شرط الرسالة على نفس الرقم اللي بتشوفه هنا.
+   */
+  delivered: number
+  referrals: number
   /** طلب اشتراك معلّق — لو موجود، التفعيل بيقفله معاه */
   request: {
     id: string
@@ -100,8 +109,16 @@ export function StoreRow({ row }: { row: AdminStoreRow }) {
           </bdi>
         </Row>
         <Row label="الطلبات">
-          <span className="tabular">{row.orders}</span>
+          <span className="tabular">
+            {row.orders}
+            <span className="text-[var(--color-success)]"> · {row.delivered} اتسلّم</span>
+          </span>
         </Row>
+        {row.referrals > 0 && (
+          <Row label="جاب تجّار">
+            <span className="tabular font-semibold text-[var(--primary)]">{row.referrals}</span>
+          </Row>
+        )}
         <Row label="الباقة">
           <span>{row.planName ?? '—'}</span>
         </Row>

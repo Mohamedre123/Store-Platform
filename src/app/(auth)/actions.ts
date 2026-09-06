@@ -1,6 +1,8 @@
 'use server'
 
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
+import { attachReferral, REFERRAL_COOKIE } from '@/lib/merchant-referrals'
 import { headers } from 'next/headers'
 import { eq } from 'drizzle-orm'
 import { z } from 'zod'
@@ -118,7 +120,7 @@ export async function signupAction(_prev: FormState, formData: FormData): Promis
    * إنشاء الحساب والمتجر في معاملة واحدة.
    * لو أي خطوة فشلت، ما ينفعش يفضل حساب من غير متجر أو متجر من غير إعدادات.
    */
-  const userId = await db.transaction(async (tx) => {
+  const created = await db.transaction(async (tx) => {
     const [user] = await tx
       .insert(users)
       .values({ email, passwordHash, name, publicId, isPlatformAdmin: isAdminEmail(email) })
@@ -204,13 +206,21 @@ export async function signupAction(_prev: FormState, formData: FormData): Promis
       { storeId: store.id, slug: 'refund', title: 'سياسة الاسترجاع', type: 'refund', isPublished: false },
     ])
 
-    return user.id
+    return { userId: user.id, storeId: store.id }
   })
 
-  await createSession(userId, await requestMeta())
+  /*
+    ربط الإحالة بعد المعاملة لا جوّاها.
+
+    التسجيل أهم من الإحالة: كود غلط أو متجر اتمسح ما يصحّش يوقّع
+    فتح حساب. والدالة نفسها ما بترميش أبدًا — بتسجّل وتكمّل.
+  */
+  await attachReferral(created.storeId, (await cookies()).get(REFERRAL_COOKIE)?.value ?? null)
+
+  await createSession(created.userId, await requestMeta())
 
   // رمز التأكيد يُرسل بعد إنشاء الجلسة، فيقدر يعيد الطلب من صفحة التأكيد
-  const otp = await issueEmailOtp(userId, email, name)
+  const otp = await issueEmailOtp(created.userId, email, name)
   if (otp.ok && otp.autoVerified) redirect('/dashboard')
   redirect('/verify')
 }

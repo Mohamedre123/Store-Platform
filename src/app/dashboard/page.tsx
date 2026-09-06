@@ -38,6 +38,8 @@ import { Greeting } from './greeting'
 import { SetupGuide, type SetupStep } from './setup-guide'
 import { PlanCard } from './plan-card'
 import { StatTiles, type StatTile } from './stat-tiles'
+import { NoticeCards } from '@/components/dashboard/notice-cards'
+import { noticesFor, storeStats } from '@/lib/notices'
 import { OverviewChart, type OverviewSeries } from './overview-chart'
 
 export const metadata = { title: 'لوحة التحكم' }
@@ -216,6 +218,16 @@ export default async function DashboardHome() {
 
   const plan = ent.plan ?? getPlan(store.plan)
 
+  /*
+    رسايل المنصة الموجَّهة للمتجر ده.
+
+    استعلامين خفيفين: أرقام المتجر (طلبات مسلَّمة وإحالات) والرسايل
+    اللي شروطها متحقّقة. الشرط بيتقاس هنا لا وقت الكتابة — التاجر
+    اللي بيوصل للرقم بكرة بيشوف العرض بكرة لوحده.
+  */
+  const rewardStats = await storeStats(store.id)
+  const notices = await noticesFor(store.id, rewardStats)
+
   return (
     <div className="flex flex-col gap-8">
       {!ent.active && (
@@ -242,6 +254,15 @@ export default async function DashboardHome() {
       <Reveal>
         <Greeting storeName={store.name} storeUrl={publicStoreUrl(store)} />
       </Reveal>
+
+      {/*
+        رسايل المنصة — **فوق الأرقام**.
+
+        دي حاجة مكسب للتاجر: مكافأة أو تهنئة. اللي بينزل عشان
+        يلاقيها ما بيلاقيهاش، والإدارة تفتكر إن العرض ما نفعش وهو
+        ما اتشافش أصلًا.
+      */}
+      {notices.length > 0 && <NoticeCards notices={notices} />}
 
       {/* دليل الإعداد — بيختفي بالكامل لما يخلص */}
       <Reveal delay={60}>

@@ -46,6 +46,27 @@ export default function proxy(req: NextRequest) {
   const rf = url.searchParams.get('rf')?.trim().slice(0, 24)
 
   /*
+    كود إحالة **التاجر** (‎?ref=‎ على مسار التسجيل).
+
+    ## ليه ده تالت كود إحالة ومش تكرار
+    - `zw_ref`  → مسوّق بالعمولة بيجيب **مشترين** لمتجر تاجر
+    - `zw_rf`   → عميل بيجيب **عميل** لنفس المتجر
+    - `zw_mref` → تاجر بيجيب **تاجر** للمنصة
+
+    التلاتة جمهورهم ومكافأتهم ومين بيدفعها مختلفين. لو اتشاركوا في
+    مفتاح واحد، زيارة من رابط تاجر كانت هتمسح تتبّع مسوّق (أو
+    العكس) وحد فيهم يضيع مستحقّه.
+
+    ## وبيتكتب على مسار التسجيل وحده
+    نفس المعامل `?ref=` بيستخدمه المسوّقون على صفحات المتجر.
+    الفصل بالمسار بيخلّي كل واحد يقرا اللي يخصّه من غير ما نغيّر
+    الروابط اللي التجّار وزّعوها بالفعل.
+  */
+  const merchantRef = path.startsWith('/signup')
+    ? url.searchParams.get('ref')?.trim().slice(0, 16)
+    : null
+
+  /*
     معرّف زائر ثابت — لتجارب A/B بس.
 
     التوزيع لازم يفضل ثابت للزائر الواحد: لو شاف ٤٩٠ ورجع لقى ٥٥٠،
@@ -91,6 +112,15 @@ export default function proxy(req: NextRequest) {
       res.cookies.set('zw_v', visitorId, {
         path: '/',
         maxAge: 180 * 24 * 60 * 60,
+        sameSite: 'lax',
+        httpOnly: true,
+      })
+    }
+    if (merchantRef) {
+      res.cookies.set('zw_mref', merchantRef, {
+        path: '/',
+        /* ٣٠ يوم — التاجر بيفتح الرابط وبيسجّل بعده بأيام */
+        maxAge: 30 * 24 * 60 * 60,
         sameSite: 'lax',
         httpOnly: true,
       })

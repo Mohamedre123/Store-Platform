@@ -1,7 +1,6 @@
 import { Suspense } from 'react'
 import { getDashboardContext } from '@/lib/store-context'
 import { Sidebar } from '@/components/dashboard/sidebar'
-import { SectionTabs } from '@/components/dashboard/section-tabs'
 import { AuroraBackground } from '@/components/motion'
 import { Preloader } from '@/components/preloader'
 import { AssistantPanel } from '@/components/dashboard/assistant-panel'
@@ -107,18 +106,20 @@ export default async function DashboardLayout({ children }: { children: React.Re
           بيفضل يسحب لتحت ومش لاقي حاجة، لأن اللي هو بيدوّر عليه
           موجود بس متغطّي.
         */}
-        <main className="mx-auto max-w-6xl px-4 pb-24 pt-6 sm:px-6 sm:py-8 lg:pb-8">
-          {/*
-            تبويبات القسم — **على الشاشة الواسعة بس**.
+        {/*
+          مفيش شريط تبويبات — **لا على الفون ولا على الديسكتوب**.
 
-            على الفون التنقّل بقى من الشريط السفلي و«المزيد»، وشريط
-            تبويبات فوق كمان كان بيبقى تنقّلين لنفس الحاجة في شاشة
-            واحدة صغيرة: واحد بيتسحب بالإصبع وواحد ثابت تحت، والتاجر
-            مش عارف أنهي واحد المفروض يستعمله.
-          */}
-          <div className="mb-6 hidden empty:mb-0 lg:block">
-            <SectionTabs role={store.role} permissions={store.permissions} />
-          </div>
+          الشريط كان بيكرّر بنود القسم اللي مفتوحة أصلًا في القايمة
+          الجانبية جنبه بالظبط. يعني نفس السبع بنود مكتوبة مرتين في
+          نفس الشاشة: مرة في القايمة على اليمين ومرة فوق المحتوى —
+          والتكرار ده بياكل من مساحة الصفحة ومن انتباه التاجر، وأول
+          سؤال بيسأله «الاتنين دول نفس الحاجة؟».
+
+          القايمة الجانبية بتفتح بنود القسم اللي إنت جوّاه لوحدها،
+          فالمعلومة اللي الشريط كان بيقولها موجودة قبله. وعلى الفون
+          التنقّل من الشريط السفلي و«المزيد».
+        */}
+        <main className="mx-auto max-w-6xl px-4 pb-24 pt-6 sm:px-6 sm:py-8 lg:pb-8">
           {children}
           {assistantReady && <AssistantPanel />}
           {hasAnyKey && <AssistBubble />}
