@@ -382,6 +382,118 @@
     }
   }
 
+
+  /*
+    ── حركة القوايم واللوحات ──────────────────────────────────
+
+    ## ليه الحركة هنا مش رفاهية
+    اللوحة على الفون بتغطّي الشاشة كلها فجأة. من غير حركة، التاجر
+    مش شايف **إنها جت من فين** — الشاشة بتتبدّل، فمخّه بيقرا ده
+    «رحت لصفحة تانية» لا «فتحت قايمة فوق صفحتي». والفرق ده بيحدّد
+    هو هيدوّر على «رجوع» ولا على «إغلاق».
+
+    الطلوع من تحت بيقول إن القايمة جاية من الشريط اللي هو دوس عليه،
+    وإنها فوق الصفحة مش مكانها.
+
+    ## والمدد قصيرة عن قصد
+    ٢٢٠ مللي للوحة و١٨٠ للقايمة المنسدلة. أطول من كده بيخلّي التاجر
+    اللي بيدوس بسرعة يحسّ إن اللوحة بطيئة — والحركة اللي بتتأخّر
+    بتبقى عايق مش توضيح.
+
+    ## و`prefers-reduced-motion` بيلغيها
+    مش زينة اختيارية: فيه ناس الحركة بتسبّبلهم دوار حقيقي. اللي
+    طالب تقليل الحركة بياخد ظهورًا فوريًا.
+  */
+
+  @keyframes zw-sheet-in {
+    from {
+      opacity: 0;
+      transform: translateY(1.25rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes zw-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  /*
+    فتح القسم — من ارتفاع صفر لارتفاعه الطبيعي.
+
+    `interpolate-size` بتخلّي `height: auto` قابلة للحركة في
+    المتصفحات اللي بتدعمها، والباقي بياخد التلاشي والانزلاق وحدهم.
+    البديل (قياس الارتفاع بالجافاسكربت) بيقرا التخطيط مع كل فتحة
+    وبيعمل وقفة صغيرة في الحركة نفسها.
+  */
+  @keyframes zw-expand {
+    from {
+      opacity: 0;
+      transform: translateY(-0.35rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .zw-sheet {
+    animation: zw-sheet-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .zw-fade {
+    animation: zw-fade-in 180ms ease-out;
+  }
+
+  .zw-expand {
+    animation: zw-expand 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /*
+    بنود القايمة بتظهر ورا بعض.
+
+    التأخير المتدرّج بيخلّي العين تمشي مع القايمة من فوق لتحت بدل
+    ما تلاقي عشر صفوف ظهروا مرة واحدة. والتدرّج بيقف عند البند
+    التامن: أطول من كده والتاجر بيستنّى قايمة تخلص ظهور.
+  */
+  /*
+    التدرّج على الفون بس.
+
+    القايمة مكوّن واحد بيترسم في الشريط الجانبي الثابت وفي لوحة
+    «المزيد». على الديسكتوب الشريط موجود من قبل ما التاجر يدوس
+    حاجة، فحركة ظهور فيه بتبان وميض مالوش سبب مع كل فتحة صفحة.
+    على الفون اللوحة **بتتفتح**، والحركة بتقول جت منين.
+  */
+  @media (max-width: 63.99rem) {
+    .zw-stagger > * {
+      animation: zw-expand 240ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+    }
+  }
+  .zw-stagger > *:nth-child(1) { animation-delay: 20ms; }
+  .zw-stagger > *:nth-child(2) { animation-delay: 40ms; }
+  .zw-stagger > *:nth-child(3) { animation-delay: 60ms; }
+  .zw-stagger > *:nth-child(4) { animation-delay: 80ms; }
+  .zw-stagger > *:nth-child(5) { animation-delay: 100ms; }
+  .zw-stagger > *:nth-child(6) { animation-delay: 120ms; }
+  .zw-stagger > *:nth-child(7) { animation-delay: 140ms; }
+  .zw-stagger > *:nth-child(n + 8) { animation-delay: 160ms; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .zw-sheet,
+    .zw-fade,
+    .zw-expand,
+    .zw-stagger > * {
+      animation: none;
+    }
+  }
+
   .surface {
     background-color: var(--surface);
     border: 1px solid var(--border);

@@ -39,9 +39,12 @@ export type AuditAction =
   | 'member.role_change'
   | 'subscription.activate'
   | 'subscription.deactivate'
+  /** التاجر غيّر كلمة سرّه بنفسه — بيتسجّل من غير أي جزء منها */
+  | 'account.password_changed'
 
 /** أسماء الإجراءات بالعربي — المفتاح إنجليزي في قاعدة البيانات */
 export const AUDIT_LABELS: Record<string, string> = {
+  'account.password_changed': 'تغيير كلمة السر',
   'product.delete': 'حذف منتج',
   'product.price_change': 'تغيير سعر',
   'order.status_change': 'تغيير حالة طلب',

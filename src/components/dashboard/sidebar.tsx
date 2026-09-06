@@ -13,7 +13,11 @@ import {
   LogOut,
   LayoutDashboard,
   Megaphone,
-  MoreHorizontal,
+  LayoutGrid,
+  MoreVertical,
+  Search,
+  Bell,
+  KeyRound,
   Package,
   Globe,
   Plug,
@@ -37,6 +41,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { brand } from '@/lib/brand'
+import { QuickSearch } from './quick-search'
 
 /**
  * قائمة التنقّل.
@@ -244,6 +249,8 @@ export function Sidebar({
   const pathname = usePathname()
   const search = useSearchParams()
   const [open, setOpen] = useState(false)
+  const [searching, setSearching] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   // الأقسام اللي التاجر فتحها أو طواها بإيده — بتغلب الفتح التلقائي
   const [manual, setManual] = useState<Record<string, boolean>>({})
 
@@ -274,10 +281,33 @@ export function Sidebar({
    * كان هيلاقي زرارًا يرجّعله ٤٠٤ في أهم مكان في الشاشة. الاشتقاق
    * من نفس القايمة المفلترة بيخلّي الشريط بتاعه هو.
    */
+  /**
+   * قايمة النقط التلاتة — اللي بيتفتح كتير ومش قسم في القايمة.
+   *
+   * دي بنود **موجودة عندنا فعلًا**: عرض المتجر، الاشتراك، سجل
+   * الرسايل، والأجهزة. مش بنحطّ بنودًا شكلية (إشعارات، مجتمع)
+   * ما وراهاش صفحة — البند اللي بيدوس عليه التاجر ويلاقي «قريبًا»
+   * بيخلّيه ما يثقش في باقي القايمة.
+   */
+  const quickMenu = [
+    { href: storeUrl, label: 'عرض المتجر', icon: ExternalLink, external: true },
+    { href: '/dashboard/subscription', label: 'الاشتراك', icon: Crown, external: false },
+    { href: '/dashboard/messages', label: 'سجل الرسايل', icon: Bell, external: false },
+    { href: '/dashboard/settings/sessions', label: 'الأجهزة والجلسات', icon: KeyRound, external: false },
+  ]
+
   const primary = sections.slice(0, 3)
 
   const nav = (
-    <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
+    /*
+      المقاسات على الفون أكبر من الديسكتوب عن قصد.
+
+      القايمة على الديسكتوب شريط جانبي ثابت لازم يفضل ضيّق عشان
+      يسيب مكان للمحتوى — فبنودها ١٤ بكسل ومتقاربة. على الفون هي
+      **الشاشة كلها**، ومفيش أي سبب تفضل صغيرة: الإصبع أعرض من
+      مؤشّر الماوس بمرّات، والتاجر بيقرا وهو ماشي.
+    */
+    <nav className="zw-stagger flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-3 lg:py-4">
       {sections.map((section) => {
         const Icon = section.icon
         const inSection = sectionActive(pathname, section)
@@ -317,9 +347,9 @@ export function Sidebar({
                     type="button"
                     onClick={() => setManual((m) => ({ ...m, [section.href]: !expanded }))}
                     aria-expanded={expanded}
-                    className="flex min-w-0 flex-1 items-center gap-3 px-3 py-3 text-start text-sm font-medium lg:hidden"
+                    className="flex min-w-0 flex-1 items-center gap-3.5 px-3 py-3.5 text-start text-[15px] font-semibold lg:hidden"
                   >
-                    <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+                    <Icon className="h-5 w-5 shrink-0 lg:h-[18px] lg:w-[18px]" aria-hidden="true" />
                     <span className="truncate">{section.label}</span>
                   </button>
 
@@ -332,7 +362,7 @@ export function Sidebar({
                     aria-current={isActive(pathname, section.href) ? 'page' : undefined}
                     className="hidden min-w-0 flex-1 items-center gap-3 px-3 py-2.5 text-sm font-medium lg:flex"
                   >
-                    <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+                    <Icon className="h-5 w-5 shrink-0 lg:h-[18px] lg:w-[18px]" aria-hidden="true" />
                     <span className="truncate">{section.label}</span>
                   </Link>
 
@@ -354,16 +384,16 @@ export function Sidebar({
                   href={section.href}
                   onClick={() => setOpen(false)}
                   aria-current={isActive(pathname, section.href) ? 'page' : undefined}
-                  className="flex min-w-0 flex-1 items-center gap-3 px-3 py-3 text-sm font-medium lg:py-2.5"
+                  className="flex min-w-0 flex-1 items-center gap-3.5 px-3 py-3.5 text-[15px] font-semibold lg:gap-3 lg:py-2.5 lg:text-sm lg:font-medium"
                 >
-                  <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+                  <Icon className="h-5 w-5 shrink-0 lg:h-[18px] lg:w-[18px]" aria-hidden="true" />
                   <span className="truncate">{section.label}</span>
                 </Link>
               )}
             </div>
 
             {section.children && expanded && (
-              <div className="mt-0.5 flex flex-col gap-0.5 border-s border-[var(--border)] ms-5 ps-2">
+              <div className="zw-expand zw-stagger mt-0.5 flex flex-col gap-0.5 border-s border-[var(--border)] ms-5 ps-2">
                 {section.children.map((child) => {
                   /**
                    * المقارنة بتشمل الاستعلام: «كل الطلبات» و«السلات
@@ -380,7 +410,7 @@ export function Sidebar({
                       href={child.href}
                       onClick={() => setOpen(false)}
                       className={cn(
-                        'truncate rounded-lg px-3 py-2 text-sm transition-colors',
+                        'flex min-h-11 items-center truncate rounded-lg px-3 text-[15px] transition-colors lg:min-h-0 lg:py-2 lg:text-sm',
                         childActive
                           ? 'font-medium text-[var(--primary)]'
                           : 'text-[var(--fg-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--fg)]',
@@ -438,7 +468,7 @@ export function Sidebar({
       <Link
         href="/dashboard/subscription"
         onClick={() => setOpen(false)}
-        className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[var(--fg-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--fg)]"
+        className="flex min-h-12 items-center gap-3.5 rounded-lg px-3 text-[15px] font-medium text-[var(--fg-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--fg)] lg:min-h-0 lg:gap-3 lg:py-2.5 lg:text-sm"
       >
         <Crown className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
         الاشتراك
@@ -454,7 +484,7 @@ export function Sidebar({
           href={storeUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-[var(--fg-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--fg)]"
+          className="flex min-h-12 items-center gap-3.5 rounded-lg px-3 text-[15px] font-medium text-[var(--fg-muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--fg)] lg:min-h-0 lg:gap-3 lg:py-2.5 lg:text-sm"
         >
           <ExternalLink className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
           عرض المتجر
@@ -475,7 +505,7 @@ export function Sidebar({
         <button
           type="button"
           onClick={onLogout}
-          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-start text-sm font-medium text-[var(--color-danger)] transition-colors hover:bg-[var(--color-danger-soft)]"
+          className="flex min-h-12 items-center gap-3.5 rounded-lg px-3 text-start text-[15px] font-medium text-[var(--color-danger)] transition-colors hover:bg-[var(--color-danger-soft)] lg:min-h-0 lg:gap-3 lg:py-2.5 lg:text-sm"
         >
           <LogOut className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
           تسجيل الخروج
@@ -494,26 +524,122 @@ export function Sidebar({
         سايبة مش جزء من الصفحة. و`safe-top` بيدّيه مساحة النوتش
         عشان ما يتحشرش تحت ساعة التليفون.
       */}
-      <div className="safe-top sticky top-0 z-40 flex items-center gap-2.5 border-b border-[var(--border)] bg-[var(--surface)] px-4 lg:hidden">
-        <Image
-          src={storeLogo || brand.logo}
-          alt=""
-          width={28}
-          height={28}
-          className="h-7 w-7 shrink-0 rounded-lg object-contain"
-        />
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold">{storeName}</span>
+      {/*
+        هيدر الفون — علامة المنصة، بحث، حساب، وقايمة.
 
-        <a
-          href={storeUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="عرض المتجر"
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-[var(--fg-muted)] transition-colors hover:bg-[var(--surface-2)]"
+        ## ليه علامة المنصة لا اسم المتجر
+        اسم المتجر بيتكرر في كل شاشة جوّه اللوحة، والتاجر عارف هو
+        في متجر مين. اللي مكانه هنا هو **اللي بيثبت في كل الصفحات**:
+        علامة المنصة على جنب، وأدوات بتشتغل من أي شاشة على الجنب
+        التاني. ده شريط تطبيق لا عنوان صفحة.
+
+        ## والبحث هو أهم حاجة فيه
+        «طلبي رقم ٤٢٠ فين؟» بيتسأل عشرات المرات في اليوم. من غير
+        بحث ثابت، الإجابة كانت تلات خطوات في كل مرة.
+      */}
+      <div className="safe-top sticky top-0 z-40 flex items-center gap-1 border-b border-[var(--border)] bg-[var(--surface)] px-3 lg:hidden">
+        <Link href="/dashboard" className="flex min-w-0 shrink-0 items-center gap-2 py-2.5 pe-1">
+          <Image
+            src={brand.mark}
+            alt=""
+            width={28}
+            height={28}
+            className="h-7 w-7 shrink-0 rounded-lg object-contain"
+          />
+          <span className="truncate text-base font-bold">{brand.name}</span>
+        </Link>
+
+        <span className="flex-1" />
+
+        <button
+          type="button"
+          onClick={() => setSearching(true)}
+          aria-label="ابحث في متجرك"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[var(--fg-muted)] transition-colors active:bg-[var(--surface-2)]"
         >
-          <ExternalLink className="h-5 w-5" aria-hidden="true" />
-        </a>
+          <Search className="h-[22px] w-[22px]" aria-hidden="true" />
+        </button>
+
+        {/*
+          أيقونة الحساب بتودّي لصفحة الحساب — مش بتفتح قايمة.
+
+          التاجر بيدوس على صورته وهو عايز «حسابي»، مش عايز قايمة
+          يختار منها. والقايمة ليها زرارها اللي جنبها.
+        */}
+        <Link
+          href="/dashboard/account"
+          aria-label="حسابي"
+          className={cn(
+            'flex h-11 w-11 shrink-0 items-center justify-center rounded-full',
+            isActive(pathname, '/dashboard/account') && 'bg-[var(--primary-soft)]',
+          )}
+        >
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--primary-soft)] text-xs font-bold text-[var(--primary)]">
+            {userName.trim().slice(0, 2) || '؟'}
+          </span>
+        </Link>
+
+        <div className="relative shrink-0">
+          <button
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label="قائمة سريعة"
+            aria-expanded={menuOpen}
+            className="flex h-11 w-11 items-center justify-center rounded-full text-[var(--fg-muted)] transition-colors active:bg-[var(--surface-2)]"
+          >
+            <MoreVertical className="h-[22px] w-[22px]" aria-hidden="true" />
+          </button>
+
+          {menuOpen && (
+            <>
+              <button
+                type="button"
+                aria-label="إغلاق القائمة"
+                onClick={() => setMenuOpen(false)}
+                className="fixed inset-0 z-40 cursor-default"
+              />
+              <div className="zw-fade absolute end-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] py-1 shadow-xl">
+                {quickMenu.map((item) =>
+                  item.external ? (
+                    <a
+                      key={item.href}
+                      href={item.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setMenuOpen(false)}
+                      className="flex min-h-12 items-center gap-3 px-4 text-sm transition-colors active:bg-[var(--surface-2)]"
+                    >
+                      <item.icon className="h-[18px] w-[18px] shrink-0 text-[var(--fg-muted)]" aria-hidden="true" />
+                      {item.label}
+                    </a>
+                  ) : (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMenuOpen(false)}
+                      className="flex min-h-12 items-center gap-3 px-4 text-sm transition-colors active:bg-[var(--surface-2)]"
+                    >
+                      <item.icon className="h-[18px] w-[18px] shrink-0 text-[var(--fg-muted)]" aria-hidden="true" />
+                      {item.label}
+                    </Link>
+                  ),
+                )}
+
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  className="flex min-h-12 w-full items-center gap-3 border-t border-[var(--border)] px-4 text-start text-sm text-[var(--color-danger)] transition-colors active:bg-[var(--color-danger-soft)]"
+                >
+                  <LogOut className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+                  تسجيل الخروج
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
+
+      {searching && <QuickSearch onClose={() => setSearching(false)} />}
 
       {/*
         «المزيد» — لوحة كاملة لا درج جانبي.
@@ -524,7 +650,7 @@ export function Sidebar({
         القايمة أو في الصفحة.
       */}
       {open && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-[var(--bg)] lg:hidden">
+        <div className="zw-sheet fixed inset-0 z-50 flex flex-col bg-[var(--bg)] lg:hidden">
           <div className="safe-top flex h-14 shrink-0 items-center justify-between border-b border-[var(--border)] px-4">
             <span className="text-base font-bold">المزيد</span>
             <button
@@ -584,7 +710,7 @@ export function Sidebar({
                 }}
                 aria-expanded={open}
                 className={cn(
-                  'flex flex-1 flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-medium transition-colors',
+                  'flex flex-1 flex-col items-center justify-center gap-1 py-2.5 text-xs font-medium transition-colors',
                   on ? 'text-[var(--primary)]' : 'text-[var(--fg-muted)]',
                 )}
               >
@@ -601,7 +727,7 @@ export function Sidebar({
               onClick={() => setOpen(false)}
               aria-current={on ? 'page' : undefined}
               className={cn(
-                'flex flex-1 flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-medium transition-colors',
+                'flex flex-1 flex-col items-center justify-center gap-1 py-2.5 text-xs font-medium transition-colors',
                 on ? 'text-[var(--primary)]' : 'text-[var(--fg-muted)]',
               )}
             >
@@ -616,11 +742,11 @@ export function Sidebar({
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           className={cn(
-            'flex flex-1 flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-medium transition-colors',
+            'flex flex-1 flex-col items-center justify-center gap-1 py-2.5 text-xs font-medium transition-colors',
             open ? 'text-[var(--primary)]' : 'text-[var(--fg-muted)]',
           )}
         >
-          <MoreHorizontal className="h-[22px] w-[22px]" aria-hidden="true" />
+          <LayoutGrid className="h-[22px] w-[22px]" aria-hidden="true" />
           المزيد
         </button>
       </nav>
