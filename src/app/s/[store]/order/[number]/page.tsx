@@ -12,6 +12,7 @@ import { CustomerLoginForm } from '../../account/login-form'
 import { returnStatusMeta } from '@/lib/returns-meta'
 import { ReturnForm } from './return-form'
 import { PayNowButton } from './pay-button'
+import { PurchasePixel } from '@/components/storefront/purchase-pixel'
 import { paymentProvider } from '@/lib/providers'
 import { formatMoney, formatDateTime } from '@/lib/utils'
 
@@ -132,6 +133,21 @@ export default async function OrderPage({
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6 sm:py-14">
+      {/*
+        حدث الشرا للمتصفح — بنفس معرّف الخادم.
+
+        بيتحط هنا لا في التخطيط: الحدث ده بيخصّ صفحة الطلب وحدها،
+        وبيتبعت مرة واحدة لكل طلب مهما اتفتحت الصفحة.
+      */}
+      {order.eventId && (
+        <PurchasePixel
+          eventId={order.eventId}
+          value={order.total}
+          currency={order.currency}
+          contentIds={items.map((i) => i.productId).filter((id): id is string => Boolean(id))}
+        />
+      )}
+
       <div className="flex flex-col items-center gap-3 text-center">
         <span className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
           <CheckCircle2 className="h-8 w-8 text-green-600" aria-hidden="true" />

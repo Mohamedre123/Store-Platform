@@ -1,6 +1,6 @@
 'use server'
 
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { after } from 'next/server'
 import { whatsappOrderPlaced } from '@/lib/order-whatsapp'
 import { and, eq, sql } from 'drizzle-orm'
@@ -39,6 +39,12 @@ import { findAffiliateByCode, recordAffiliateConversion } from '@/lib/affiliates
 import { dispatchWebhook } from '@/lib/webhooks'
 import { runAutomations } from '@/lib/automation'
 import { recordReferral } from '@/lib/referrals'
+/*
+  أحداث التحويل من الخادم — الحتة اللي كانت ناقصة خالص.
+  البكسل كان بيبعت PageView وبس، فمبيعات التاجر مكانتش بتوصل
+  ميتا ولا تيك توك.
+*/
+import { capiConfigured, recordPurchaseEvent, sendConversion } from '@/lib/capi'
 import { trackExperimentConversions } from '@/lib/experiments'
 import { generateToken } from '@/lib/crypto'
 import { enqueue } from '@/lib/jobs'
@@ -1049,6 +1055,70 @@ async function placeOrder(raw: unknown): Promise<PlaceOrderState> {
       })().catch((e) => console.error('فشل تسجيل الحجز:', e)),
     )
   }
+
+  /**
+   * حدث الشرا — للمتصفح وللخادم بنفس المعرّف.
+   *
+   * ## ده كان ناقصًا خالص، وهو عطل مش نقص
+   * المنصة كانت بتركّب البكسل وبيبعت `PageView` وبس. مفيش حدث شرا
+   * كان بيخرج من أي مكان — يعني التاجر اللي بيدفع في إعلانات ميتا
+   * بيشوف زيارات بلا مبيعات، وخوارزمية ميتا بتحسّن على «اللي بيفتح»
+   * لا «اللي بيشتري». ده بيحرق الميزانية على أسوأ جمهور ممكن.
+   *
+   * ## والمعرّف بيتكتب على الطلب
+   * صفحة الشكر بتقراه وبتبعت بيه نفس الحدث من المتصفح، فميتا
+   * بتشيل المكرّر. من غيره الطلب الواحد بيتحسب بيعتين.
+   *
+   * ## وبعد المعاملة وبـ`after` عن قصد
+   * العميل مستني صفحة الشكر، ونداء لخادم ميتا ممكن ياخد ثواني.
+   * وفشله ما يصحّش يوقّع طلبًا اتعمل ودُفع فيه.
+   */
+  after(
+    (async () => {
+      const eventId = `zw-${result.orderId}`
+      await db.update(orders).set({ eventId }).where(eq(orders.id, result.orderId!))
+
+      if (!(await capiConfigured(store.id))) return
+
+      const jar = await cookies()
+      const h = await headers()
+
+      const capi = await sendConversion({
+        storeId: store.id,
+        event: 'Purchase',
+        eventId,
+        value: totals.total,
+        currency: store.currency,
+        customer: {
+          email: input.email ?? null,
+          phone,
+          name: input.name ?? null,
+          city: input.city ?? null,
+          country: store.country,
+        },
+        fbp: jar.get('_fbp')?.value ?? null,
+        fbc: jar.get('_fbc')?.value ?? null,
+        clientIp: h.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+        userAgent: h.get('user-agent'),
+        sourceUrl: `${publicStoreUrl(store)}/order/${result.orderNumber}`,
+        contentIds: lines.map((l) => l.productId),
+      })
+
+      await recordPurchaseEvent({
+        storeId: store.id,
+        orderId: result.orderId!,
+        customerId: result.customerId,
+        eventId,
+        value: totals.total,
+        currency: store.currency,
+        utm: attribution ?? null,
+        path: `/order/${result.orderNumber}`,
+        city: input.city ?? null,
+        country: store.country,
+        result: capi,
+      })
+    })().catch((e) => console.error('فشل حدث الشرا:', e)),
+  )
 
   /*
     خصم البيع من توزيع الفروع.

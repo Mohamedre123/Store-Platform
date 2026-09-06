@@ -50,18 +50,39 @@ export const PLUGINS: PluginDef[] = [
   {
     slug: 'facebook_pixel',
     name: 'بكسل فيسبوك وإنستجرام',
-    desc: 'بيقيس زيارات متجرك ومبيعاتك من إعلانات ميتا، وبيبني جمهور إعادة الاستهداف.',
+    desc:
+      'بيقيس زيارات متجرك ومبيعاتك من إعلانات ميتا، وبيبني جمهور إعادة الاستهداف. ' +
+      'ومع توكن التحويلات، حدث الشرا بيخرج من الخادم كمان — فبيوصل حتى لو مانع ' +
+      'الإعلانات أو iOS وقّفوا البكسل في متصفح العميل.',
     group: 'pixels',
-    fields: [{ key: 'pixelId', label: 'معرّف البكسل', placeholder: '1234567890123456' }],
-    where: 'من Meta Events Manager ← Data Sources ← البكسل بتاعك ← الرقم فوق الاسم.',
+    secretFields: ['accessToken'],
+    fields: [
+      { key: 'pixelId', label: 'معرّف البكسل', placeholder: '1234567890123456' },
+      {
+        key: 'accessToken',
+        label: 'توكن واجهة التحويلات (اختياري)',
+        placeholder: 'EAAxxxxxxxxxxxx',
+      },
+    ],
+    where:
+      'المعرّف من Meta Events Manager ← Data Sources ← البكسل بتاعك ← الرقم فوق الاسم. ' +
+      'والتوكن من نفس الصفحة ← Settings ← Conversions API ← Generate access token.',
   },
   {
     slug: 'tiktok_pixel',
     name: 'بكسل تيك توك',
-    desc: 'بيقيس نتايج إعلانات تيك توك ويحسّن استهدافها.',
+    desc:
+      'بيقيس نتايج إعلانات تيك توك ويحسّن استهدافها. ومع توكن الأحداث، ' +
+      'الشرا بيتبعت من الخادم كمان.',
     group: 'pixels',
-    fields: [{ key: 'pixelId', label: 'معرّف البكسل', placeholder: 'C4XXXXXXXXXXXXXXXXXX' }],
-    where: 'من TikTok Ads Manager ← Assets ← Events ← Web Events.',
+    secretFields: ['accessToken'],
+    fields: [
+      { key: 'pixelId', label: 'معرّف البكسل', placeholder: 'C4XXXXXXXXXXXXXXXXXX' },
+      { key: 'accessToken', label: 'توكن واجهة الأحداث (اختياري)', placeholder: 'xxxxxxxx' },
+    ],
+    where:
+      'المعرّف من TikTok Ads Manager ← Assets ← Events ← Web Events. ' +
+      'والتوكن من نفس الصفحة ← Settings ← Events API ← Generate Access Token.',
   },
   {
     slug: 'snapchat_pixel',
