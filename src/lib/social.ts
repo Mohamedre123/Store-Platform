@@ -114,7 +114,7 @@ export async function metaExchange(
         }),
     )
     if (!short?.access_token) {
-      return { ok: false, error: short?.error?.message ?? 'مقدرناش نكمّل الربط' }
+      return { ok: false, error: friendlyMetaError(short?.error?.message) }
     }
 
     const long = await fetchJson<{ access_token?: string }>(
@@ -680,6 +680,36 @@ async function publishTiktokVideo(
 /* ══════════════════════════════════════════════════════════════
    أدوات
    ══════════════════════════════════════════════════════════════ */
+
+/**
+ * خطأ ميتا بالعربي — والأشهر بيتشرح.
+ *
+ * ## «التطبيق في وضع التطوير» هو أكتر خطأ هيحصل في البداية
+ * التطبيق قبل المراجعة بينشر لحد ٢٥ حساب ليهم دور فيه بس. التاجر
+ * اللي مش متضاف بيشوف رسالة إنجليزية عن «development mode»
+ * ومالهاش معنى عنده — فبيفتكر إن المنصة بايظة ويسيب الميزة.
+ *
+ * والرسالة هنا بتقوله يعمل إيه: يكلّم الدعم عشان يتضاف. ده الفرق
+ * بين تاجر بيستنّى دعوة وتاجر بيسيب.
+ */
+function friendlyMetaError(raw: string | undefined): string {
+  if (!raw) return 'مقدرناش نكمّل الربط. جرّب تاني.'
+
+  if (/development mode|not available to the public|role/i.test(raw)) {
+    return (
+      'الربط لسه متاح لعدد محدود من التجّار وإنت لسه مش فيهم. ' +
+      'كلّم الدعم وهنضيفك — أو انشر من موبايلك دلوقتي من صفحة «البوستات».'
+    )
+  }
+  if (/redirect|uri/i.test(raw)) {
+    return 'فيه إعداد ناقص في الربط عندنا. بلّغ الدعم وهنظبّطه.'
+  }
+  if (/permission|scope/i.test(raw)) {
+    return 'مفيش صلاحية كافية على الصفحة. اتأكد إنك أدمن عليها وجرّب تاني.'
+  }
+
+  return `فيسبوك ردّ: ${raw}`
+}
 
 async function markError(accountId: string, error: string): Promise<void> {
   /*
