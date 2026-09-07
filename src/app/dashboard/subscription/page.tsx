@@ -6,7 +6,7 @@ import { getDashboardContext } from '@/lib/store-context'
 import { guard } from '@/lib/permissions'
 import { getEntitlements, getOrderQuota } from '@/lib/entitlements'
 import { ensureAccountId } from '@/lib/account-id'
-import { PLANS, PAID_PLANS, STATUS_LABEL, getPlan, daysLeft } from '@/lib/plans'
+import { PLANS, PAID_PLANS, STATUS_LABEL, getPlan, daysLeft, trialState } from '@/lib/plans'
 import { billing } from '@/lib/billing'
 import { formatMoney, formatDate } from '@/lib/utils'
 import { PageHeader } from '@/components/dashboard/page-shell'
@@ -92,6 +92,13 @@ export default async function SubscriptionPage() {
   }))
 
   const trial = PLANS.find((p) => p.key === 'trial')!
+
+  /* نفس الحكم اللي `startTrialAction` بيفحص بيه — مصدر واحد */
+  const trialCard = trialState({
+    onTrial: ent.onTrial,
+    trialEndsAt: store.trialEndsAt,
+    subscribedUntil: store.subscribedUntil,
+  })
 
   return (
     <div className="flex flex-col gap-6">
@@ -183,13 +190,19 @@ export default async function SubscriptionPage() {
         </Reveal>
       )}
 
-      {/* الباقة التجريبية — التاجر بيبدأها بإيده */}
-      {!ent.isAdmin && (
+{/*
+        الباقة التجريبية — التاجر بيبدأها بإيده.
+
+        وبتختفي خالص لأي متجر اشترك قبل كده. الكارت الرمادي المكتوب
+        عليه «تم استخدامها» فوق اشتراك شغّال بيقرا غلط: التاجر الدافع
+        بيسأل هو ليه شايف عرضًا مالوش لازمة — أو أسوأ، بيضغطه.
+      */}
+      {!ent.isAdmin && trialCard !== 'hidden' && (
         <Reveal delay={60}>
           <TrialCard
             name={trial.name}
             tagline={trial.tagline}
-            state={ent.onTrial ? 'running' : store.trialEndsAt ? 'used' : 'available'}
+            state={trialCard}
             daysLeft={ent.daysLeft}
           />
         </Reveal>

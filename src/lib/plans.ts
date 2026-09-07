@@ -81,6 +81,44 @@ export const STATUS_LABEL: Record<string, string> = {
   suspended: 'موقوف',
 }
 
+/**
+ * حالة التجربة المجانية للمتجر.
+ *
+ * `hidden`: اشترك قبل كده — الكارت بيختفي خالص
+ * `running`: شغّالة دلوقتي
+ * `used`: جرّبها وما اشتركش — الكارت بيفضل يفسّر ليه المميزات مقفولة
+ * `available`: أول مرة
+ *
+ * ## «اشترك قبل كده» لا «مشترك دلوقتي»
+ * الشرط القديم كان بيسأل عن التجربة وحدها، فالمتجر اللي الإدارة
+ * فعّلتله باقة مدفوعة على طول كان `trialEndsAt` بتاعه فاضي —
+ * فبيشوف «ابدأ التجربة المجانية» وهو مشترك ودافع.
+ *
+ * ولو ربطناها بـ«مشترك دلوقتي» بس، اللي اشتراكه خلص كان هياخد
+ * تجربة بعده — يعني أيام مجانية زيادة عن حقه كل ما يسيب اشتراكه
+ * يقع.
+ *
+ * `subscribedUntil` بيتحط أول تفعيل مدفوع وما بيرجعش `null` أبدًا
+ * (الإلغاء بيرجّعه لتاريخ عدّى لا لفاضي) — فهو الأثر الدايم لـ«ده
+ * اشترك».
+ *
+ * ## ومكانها هنا عشان الشاشة والفعل يقروا نفس الحكم
+ * الشرط كان مكتوب في الصفحة، والفعل كان بيفحص حاجة تانية. الفرق
+ * ده معناه زرار بيبان وبيرفض لما يتضغط.
+ */
+export type TrialState = 'available' | 'running' | 'used' | 'hidden'
+
+export function trialState(input: {
+  onTrial: boolean
+  trialEndsAt: Date | string | null
+  subscribedUntil: Date | string | null
+}): TrialState {
+  if (input.onTrial) return 'running'
+  if (input.subscribedUntil) return 'hidden'
+  if (input.trialEndsAt) return 'used'
+  return 'available'
+}
+
 /** كام يوم فاضل — رقم سالب معناه انتهت */
 export function daysLeft(date: Date | null): number | null {
   if (!date) return null

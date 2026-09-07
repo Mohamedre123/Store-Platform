@@ -8,7 +8,7 @@ import { stores, subscriptionRequests } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { activateStore } from '@/lib/subscription'
 import { ensureAccountId } from '@/lib/account-id'
-import { getPlan } from '@/lib/plans'
+import { getPlan, trialState } from '@/lib/plans'
 import { paymentMessage, whatsappLink } from '@/lib/billing'
 import { formatMoney } from '@/lib/utils'
 
@@ -105,9 +105,13 @@ export async function requestSubscriptionAction(raw: unknown): Promise<RequestSt
  * الباقات المدفوعة عكسها تمامًا: ما بتلمسش حالة المتجر خالص لحد ما
  * الإدارة تفعّل، عشان محدّش ياخد اشتراك بضغطة زرار من غير ما يدفع.
  *
- * ## مرة واحدة بس
- * الشرط `trialEndsAt IS NULL`. من غيره التاجر بيدوس الزرار كل ٣
- * أيام ويفضل مجرّب للأبد.
+ * ## مرة واحدة بس، ولمين ما اشتركش خالص
+ * `trialState` هي الحكم، ونفسها بالظبط اللي الصفحة بترسم بيها —
+ * عشان ما يبقاش فيه زرار بيبان وبيرفض لما يتضغط.
+ *
+ * والقاعدة إن أي اشتراك عدّى بيقفل التجربة للأبد. من غير ده، اللي
+ * اشتراكه بيخلص بياخد تجربة وراه، ويفضل ياخد أيام زيادة عن حقّه كل
+ * ما يسيب اشتراكه يقع.
  */
 export async function startTrialAction(): Promise<{ ok?: boolean; error?: string }> {
   const { store, user } = await getDashboardContext()
@@ -119,10 +123,14 @@ export async function startTrialAction(): Promise<{ ok?: boolean; error?: string
     .limit(1)
 
   if (!row) return { error: 'المتجر مش موجود' }
-  if (row.trialEndsAt) return { error: 'التجربة المجانية تم استخدامها قبل كده.' }
-  if (row.subscribedUntil && new Date(row.subscribedUntil) > new Date()) {
-    return { error: 'عندك اشتراك شغّال بالفعل.' }
-  }
+
+  const state = trialState({
+    onTrial: false,
+    trialEndsAt: row.trialEndsAt,
+    subscribedUntil: row.subscribedUntil,
+  })
+  if (state === 'hidden') return { error: 'التجربة للمتاجر الجديدة بس — إنت اشتركت قبل كده.' }
+  if (state !== 'available') return { error: 'التجربة المجانية تم استخدامها قبل كده.' }
 
   const res = await activateStore({
     storeId: store.id,

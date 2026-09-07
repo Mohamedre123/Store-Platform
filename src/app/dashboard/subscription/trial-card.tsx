@@ -20,7 +20,13 @@ export function TrialCard({
 }: {
   name: string
   tagline: string
-  /** available = ينفع يبدأها · running = شغّالة · used = خلصت */
+  /**
+   * available = ينفع يبدأها · running = شغّالة · used = خلصت
+   *
+   * `hidden` مش هنا عن قصد: الصفحة هي اللي بتقرّر تعرض الكارت من
+   * أصله. حالة «مخفي» جوّه مكوّن بترسم نفسه بتخلّي المكوّن يرجّع
+   * `null` أحيانًا — والأب بيحجز له مسافة في الشبكة بتفضل فاضية.
+   */
   state: 'available' | 'running' | 'used'
   daysLeft: number | null
 }) {
