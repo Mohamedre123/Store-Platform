@@ -1,0 +1,449 @@
+import 'server-only'
+import { and, asc, desc, eq, inArray, isNotNull, lte, or, sql } from 'drizzle-orm'
+import { db } from '@/db'
+import { contentSchedules, socialAccounts, socialPosts, stores } from '@/db/schema'
+import { makeImage, nextProductInRotation, productBrief, writeCopy } from './studio'
+import { publishToAccount, type PublishOutcome } from './social'
+import { nextRun, type PresetKey } from './studio-meta'
+
+/**
+ * النشر المجدوَل — «كل يوم الساعة كذا».
+ *
+ * ## ليه ده الجزء اللي بيفرق
+ * التاجر اللي بيفتح الاستوديو ويعمل بوست بإيده بيعمله مرتين وينسى.
+ * والصفحة اللي بتنزل مرة في الأسبوع ما بتبنيش متابعين. الجدولة هي
+ * اللي بتحوّل الأداة من لعبة لقناة تسويق.
+ *
+ * ## وبيمشي على طابور المهام الموجود
+ * مفيش عامل جديد ولا منبّه تاني. `pg_cron` بينده مسار المهام كل
+ * دقيقة أصلًا، والجدول بيتحوّل لمهمة في نفس الطابور — يعني نفس
+ * إعادة المحاولة ونفس السجل ونفس القفل اللي بيمنع التنفيذ المزدوج.
+ */
+
+/* ══════════════════════════════════════════════════════════════
+   البوستات
+   ══════════════════════════════════════════════════════════════ */
+
+export type PostRow = {
+  id: string
+  caption: string
+  hashtags: string[]
+  imageUrls: string[]
+  productId: string | null
+  targets: string[]
+  status: 'draft' | 'ready' | 'scheduled' | 'publishing' | 'published' | 'failed'
+  scheduledFor: Date | null
+  publishedAt: Date | null
+  results: PublishOutcome[]
+  createdAt: Date
+}
+
+export async function listPosts(storeId: string, limit = 40): Promise<PostRow[]> {
+  const rows = await db
+    .select()
+    .from(socialPosts)
+    .where(eq(socialPosts.storeId, storeId))
+    .orderBy(desc(socialPosts.createdAt))
+    .limit(limit)
+
+  return rows.map((r) => ({
+    id: r.id,
+    caption: r.caption,
+    hashtags: r.hashtags,
+    imageUrls: r.imageUrls,
+    productId: r.productId,
+    targets: r.targets,
+    status: r.status,
+    scheduledFor: r.scheduledFor,
+    publishedAt: r.publishedAt,
+    results: r.results,
+    createdAt: r.createdAt,
+  }))
+}
+
+export async function createPost(input: {
+  storeId: string
+  userId: string | null
+  caption: string
+  hashtags: string[]
+  imageUrls: string[]
+  productId?: string | null
+  targets?: string[]
+  scheduleId?: string | null
+  status?: PostRow['status']
+  scheduledFor?: Date | null
+}): Promise<string> {
+  const [row] = await db
+    .insert(socialPosts)
+    .values({
+      storeId: input.storeId,
+      caption: input.caption,
+      hashtags: input.hashtags,
+      imageUrls: input.imageUrls,
+      productId: input.productId ?? null,
+      targets: input.targets ?? [],
+      scheduleId: input.scheduleId ?? null,
+      status: input.status ?? 'ready',
+      scheduledFor: input.scheduledFor ?? null,
+      createdBy: input.userId,
+    })
+    .returning({ id: socialPosts.id })
+
+  return row.id
+}
+
+/**
+ * نشر بوست على وجهاته.
+ *
+ * ## الوجهات بتتفلتر على متجرها
+ * معرّفات الحسابات بتيجي من المتصفح. من غير الفلترة، تاجر بيبعت
+ * معرّف حساب تاجر تاني وينشر على صفحته — وده أخطر حاجة في الميزة
+ * كلها.
+ *
+ * ## والنتيجة بتتخزّن لكل وجهة
+ * اللي نزل على فيسبوك وفشل على إنستجرام بيفضل ناجحًا على فيسبوك.
+ * إعادة المحاولة بتشتغل على اللي فشل بس.
+ */
+export async function publishPost(
+  storeId: string,
+  postId: string,
+): Promise<{ ok: boolean; results: PublishOutcome[]; error?: string }> {
+  const [post] = await db
+    .select()
+    .from(socialPosts)
+    .where(and(eq(socialPosts.id, postId), eq(socialPosts.storeId, storeId)))
+    .limit(1)
+
+  if (!post) return { ok: false, results: [], error: 'البوست مش موجود' }
+  if (post.imageUrls.length === 0) return { ok: false, results: [], error: 'البوست من غير صورة' }
+  if (post.targets.length === 0) {
+    return { ok: false, results: [], error: 'ما اخترتش حساب تنشر عليه' }
+  }
+
+  /* الحسابات بتاعة المتجر ده بس */
+  const owned = await db
+    .select({ id: socialAccounts.id })
+    .from(socialAccounts)
+    .where(
+      and(eq(socialAccounts.storeId, storeId), inArray(socialAccounts.id, post.targets)),
+    )
+
+  if (owned.length === 0) {
+    return { ok: false, results: [], error: 'الحسابات المختارة مش موجودة' }
+  }
+
+  await db
+    .update(socialPosts)
+    .set({ status: 'publishing', updatedAt: new Date() })
+    .where(eq(socialPosts.id, postId))
+
+  const results: PublishOutcome[] = []
+  for (const acc of owned) {
+    results.push(
+      await publishToAccount(storeId, acc.id, {
+        caption: post.caption,
+        hashtags: post.hashtags,
+        imageUrl: post.imageUrls[0],
+      }),
+    )
+  }
+
+  const anyOk = results.some((r) => r.ok)
+
+  await db
+    .update(socialPosts)
+    .set({
+      status: anyOk ? 'published' : 'failed',
+      publishedAt: anyOk ? new Date() : null,
+      results,
+      updatedAt: new Date(),
+    })
+    .where(eq(socialPosts.id, postId))
+
+  return { ok: anyOk, results }
+}
+
+export async function deletePost(storeId: string, postId: string): Promise<void> {
+  await db
+    .delete(socialPosts)
+    .where(and(eq(socialPosts.id, postId), eq(socialPosts.storeId, storeId)))
+}
+
+/* ══════════════════════════════════════════════════════════════
+   الجداول
+   ══════════════════════════════════════════════════════════════ */
+
+export type ScheduleRow = {
+  id: string
+  name: string
+  isActive: boolean
+  days: number[]
+  timeOfDay: string
+  targets: string[]
+  source: 'auto' | 'category' | 'products'
+  categoryId: string | null
+  productIds: string[]
+  style: string | null
+  preset: string
+  autoPublish: boolean
+  lastRunAt: Date | null
+  nextRunAt: Date | null
+  lastError: string | null
+}
+
+export async function listSchedules(storeId: string): Promise<ScheduleRow[]> {
+  const rows = await db
+    .select()
+    .from(contentSchedules)
+    .where(eq(contentSchedules.storeId, storeId))
+    .orderBy(asc(contentSchedules.createdAt))
+
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    isActive: r.isActive,
+    days: r.days,
+    timeOfDay: r.timeOfDay,
+    targets: r.targets,
+    source: r.source,
+    categoryId: r.categoryId,
+    productIds: r.productIds,
+    style: r.style,
+    preset: r.preset,
+    autoPublish: r.autoPublish,
+    lastRunAt: r.lastRunAt,
+    nextRunAt: r.nextRunAt,
+    lastError: r.lastError,
+  }))
+}
+
+/**
+ * حفظ جدول — والميعاد الجاي بيتحسب هنا.
+ *
+ * الحساب وقت الحفظ لا وقت القراءة: النبضة بتقرا فهرسًا واحدًا
+ * («هات اللي ميعاده فات») بدل ما تلفّ على كل جداول المنصة وتحسب
+ * لكل واحد كل دقيقة.
+ */
+export async function saveSchedule(input: {
+  storeId: string
+  userId: string
+  id?: string | null
+  name: string
+  days: number[]
+  timeOfDay: string
+  targets: string[]
+  source: 'auto' | 'category' | 'products'
+  categoryId?: string | null
+  productIds?: string[]
+  style?: string | null
+  preset: PresetKey
+  autoPublish: boolean
+  isActive: boolean
+}): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  if (input.days.length === 0) return { ok: false, error: 'اختار يوم واحد على الأقل' }
+  if (!/^\d{2}:\d{2}$/.test(input.timeOfDay)) return { ok: false, error: 'الميعاد مش مظبوط' }
+
+  const [store] = await db
+    .select({ timezone: stores.timezone })
+    .from(stores)
+    .where(eq(stores.id, input.storeId))
+    .limit(1)
+
+  const next = input.isActive
+    ? nextRun(input.days, input.timeOfDay, store?.timezone ?? 'Africa/Cairo')
+    : null
+
+  const values = {
+    name: input.name.trim() || 'جدول نشر',
+    days: input.days,
+    timeOfDay: input.timeOfDay,
+    targets: input.targets,
+    source: input.source,
+    categoryId: input.source === 'category' ? (input.categoryId ?? null) : null,
+    productIds: input.source === 'products' ? (input.productIds ?? []) : [],
+    style: input.style?.trim() || null,
+    preset: input.preset,
+    autoPublish: input.autoPublish,
+    isActive: input.isActive,
+    nextRunAt: next,
+    updatedAt: new Date(),
+  }
+
+  if (input.id) {
+    const updated = await db
+      .update(contentSchedules)
+      .set(values)
+      .where(and(eq(contentSchedules.id, input.id), eq(contentSchedules.storeId, input.storeId)))
+      .returning({ id: contentSchedules.id })
+    if (!updated.length) return { ok: false, error: 'الجدول مش موجود' }
+    return { ok: true, id: updated[0].id }
+  }
+
+  const [row] = await db
+    .insert(contentSchedules)
+    .values({ storeId: input.storeId, createdBy: input.userId, ...values })
+    .returning({ id: contentSchedules.id })
+
+  return { ok: true, id: row.id }
+}
+
+export async function deleteSchedule(storeId: string, id: string): Promise<void> {
+  await db
+    .delete(contentSchedules)
+    .where(and(eq(contentSchedules.id, id), eq(contentSchedules.storeId, storeId)))
+}
+
+/* ══════════════════════════════════════════════════════════════
+   التشغيل
+   ══════════════════════════════════════════════════════════════ */
+
+/**
+ * الجداول اللي ميعادها فات — بتتحوّل لمهام.
+ *
+ * ## الميعاد الجاي بيتكتب **قبل** التنفيذ
+ * التوليد بياخد ثواني وممكن يفشل. لو حدّثنا الميعاد بعده، الجدول
+ * اللي فشل بيفضل مستحقًّا وبيتنفّذ كل دقيقة لحد ما ينجح — يعني
+ * ستين محاولة في الساعة على مفتاح التاجر.
+ */
+export async function queueDueSchedules(): Promise<number> {
+  const now = new Date()
+
+  const due = await db
+    .select({
+      id: contentSchedules.id,
+      storeId: contentSchedules.storeId,
+      days: contentSchedules.days,
+      timeOfDay: contentSchedules.timeOfDay,
+    })
+    .from(contentSchedules)
+    .where(
+      and(
+        eq(contentSchedules.isActive, true),
+        isNotNull(contentSchedules.nextRunAt),
+        lte(contentSchedules.nextRunAt, now),
+      ),
+    )
+    .limit(20)
+
+  if (due.length === 0) return 0
+
+  const { enqueue } = await import('./jobs')
+
+  for (const s of due) {
+    const [store] = await db
+      .select({ timezone: stores.timezone })
+      .from(stores)
+      .where(eq(stores.id, s.storeId))
+      .limit(1)
+
+    await db
+      .update(contentSchedules)
+      .set({
+        lastRunAt: now,
+        nextRunAt: nextRun(s.days, s.timeOfDay, store?.timezone ?? 'Africa/Cairo', now),
+      })
+      .where(eq(contentSchedules.id, s.id))
+
+    await enqueue({
+      storeId: s.storeId,
+      type: 'content.schedule',
+      payload: { scheduleId: s.id },
+      /*
+        محاولتين بس.
+
+        التوليد بيستهلك من مفتاح التاجر. الخمسة الافتراضية على جدول
+        بيفشل كل يوم بتبقى خمستاشر نداء في الأسبوع على الفاضي —
+        والبوست الفايت أهون من فاتورة مش مفهومة.
+      */
+      maxAttempts: 2,
+    })
+  }
+
+  return due.length
+}
+
+/**
+ * تنفيذ جدول — بيولّد الصورة والكلام ويعمل بوست.
+ *
+ * بيرجّع خطأ نصًّا لا بيرمي: الطابور بيسجّله على المهمة، وبيتكتب
+ * على الجدول كمان عشان التاجر يشوفه في شاشته من غير ما يفتح
+ * السجل.
+ */
+export async function runSchedule(scheduleId: string): Promise<{ ok: boolean; error?: string }> {
+  const [s] = await db
+    .select()
+    .from(contentSchedules)
+    .where(eq(contentSchedules.id, scheduleId))
+    .limit(1)
+
+  if (!s) return { ok: false, error: 'الجدول مش موجود' }
+  if (!s.isActive) return { ok: true }
+
+  const fail = async (error: string) => {
+    await db
+      .update(contentSchedules)
+      .set({ lastError: error.slice(0, 300), updatedAt: new Date() })
+      .where(eq(contentSchedules.id, s.id))
+    return { ok: false, error }
+  }
+
+  /* المنتج اللي الدور عليه */
+  const productId = await nextProductInRotation(s.storeId, s.lastProductId, {
+    categoryId: s.source === 'category' ? s.categoryId : null,
+    ids: s.source === 'products' ? s.productIds : undefined,
+  })
+
+  if (!productId) return fail('مفيش منتجات نشطة يتعمل عنها بوست')
+
+  const product = await productBrief(s.storeId, productId)
+  if (!product) return fail('المنتج مش موجود')
+
+  /* الكلام الأول — أرخص، ولو فشل ما نضيّعش نداء صورة */
+  const copy = await writeCopy({
+    storeId: s.storeId,
+    productId,
+    tone: 'sell',
+    extra: s.style,
+  })
+  if ('error' in copy) return fail(copy.error)
+
+  const image = await makeImage({
+    storeId: s.storeId,
+    userId: s.createdBy ?? '',
+    prompt: [
+      `صورة إعلانية لمنتج «${product.name}».`,
+      s.style?.trim() ? s.style.trim() : '',
+    ]
+      .filter(Boolean)
+      .join(' '),
+    preset: s.preset as PresetKey,
+    productId,
+    seedUrl: product.image,
+  })
+  if ('error' in image) return fail(image.error)
+
+  const postId = await createPost({
+    storeId: s.storeId,
+    userId: s.createdBy,
+    caption: copy.caption,
+    hashtags: copy.hashtags,
+    imageUrls: [image.url],
+    productId,
+    targets: s.targets,
+    scheduleId: s.id,
+    status: s.autoPublish ? 'scheduled' : 'ready',
+  })
+
+  /* الدور بيتقدّم بعد النجاح — الفشل ما يصحّش يتخطّى منتجًا */
+  await db
+    .update(contentSchedules)
+    .set({ lastProductId: productId, lastError: null, updatedAt: new Date() })
+    .where(eq(contentSchedules.id, s.id))
+
+  if (s.autoPublish && s.targets.length > 0) {
+    const res = await publishPost(s.storeId, postId)
+    if (!res.ok) return fail(res.error ?? 'فشل النشر')
+  }
+
+  return { ok: true }
+}

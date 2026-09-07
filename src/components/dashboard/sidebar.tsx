@@ -122,6 +122,17 @@ export const NAV: NavSection[] = [
     permission: 'marketing.manage',
     children: [
       { href: '/dashboard/marketing', label: 'الكوبونات والعروض' },
+      /*
+        الاستوديو فوق في التسويق — مش تحت في الإضافات.
+
+        دي أداة بتتفتح كل يوم، مش إعداد بيتظبّط مرة. ومكانها جنب
+        الحملات والكوبونات لأن التاجر بيفتح القسم ده وهو ناوي
+        يسوّق — لا وهو بيدوّر على إضافة.
+      */
+      { href: '/dashboard/studio', label: 'استوديو المحتوى' },
+      { href: '/dashboard/studio/posts', label: 'البوستات' },
+      { href: '/dashboard/studio/schedules', label: 'النشر التلقائي' },
+      { href: '/dashboard/studio/accounts', label: 'حسابات السوشيال' },
       { href: '/dashboard/landing', label: 'صفحات الهبوط' },
       { href: '/dashboard/affiliates', label: 'المسوّقون' },
       { href: '/dashboard/marketing/campaigns', label: 'حملات البريد' },

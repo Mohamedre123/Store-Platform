@@ -1,7 +1,8 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useTransition } from 'react'
-import { BarChart3, Check, HelpCircle, MessageCircle, Sparkles, Target } from 'lucide-react'
+import { BarChart3, Check, HelpCircle, MessageCircle, Sparkles, Target, ArrowLeft } from 'lucide-react'
 import { savePluginAction } from './actions'
 import { PLUGINS, type PluginDef } from '@/lib/plugins'
 import { Alert } from '@/components/ui'
@@ -315,6 +316,22 @@ function PluginCard({
 
       <div className="flex flex-col gap-4 border-t border-[var(--border)] pt-4">
         {msg && <Alert tone={msg.ok ? 'success' : 'danger'}>{msg.text}</Alert>}
+
+        {/*
+          الإضافة اللي ليها شاشة — الزرار بعد التفعيل بس.
+
+          قبله بيودّي على شاشة بتقول «مش مفعّلة»، وده طريق مسدود
+          بيرجّع التاجر من حيث بدأ.
+        */}
+        {def.openHref && enabled && (
+          <Link
+            href={def.openHref}
+            className="flex h-11 w-fit items-center gap-2 rounded-lg bg-[var(--primary)] px-5 text-sm font-semibold text-[var(--primary-fg)] transition-opacity hover:opacity-90"
+          >
+            {def.openLabel ?? 'افتح'}
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          </Link>
+        )}
 
         {def.fields.map((f) => (
           <label key={f.key} className="flex flex-col gap-1.5">

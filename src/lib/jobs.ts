@@ -34,6 +34,7 @@ export type JobType =
   | 'catalog.sync'
   | 'order.confirm_request'
   | 'campaign.send'
+  | 'content.schedule'
 
 /** يحجز مهمة للتنفيذ بعد مدة */
 export async function enqueue(input: {
@@ -152,6 +153,22 @@ type Handler = (
  * البداية الباردة على الفاضي.
  */
 const HANDLERS: Record<string, Handler> = {
+  /*
+    جدول نشر حان ميعاده.
+
+    بيولّد صورة وكلام ويعمل بوست، وينشره لو التاجر مفعّل النشر
+    التلقائي. الميعاد الجاي اتكتب وقت الحجز لا هنا — فالفشل ما
+    بيخلّيش الجدول يتنفّذ كل دقيقة على مفتاح التاجر.
+  */
+  'content.schedule': async (payload, storeId) => {
+    if (!storeId || typeof payload.scheduleId !== 'string') {
+      return { ok: false, error: 'حمولة ناقصة' }
+    }
+    const { runSchedule } = await import('./content-schedules')
+    const res = await runSchedule(payload.scheduleId)
+    return res.ok ? { ok: true } : { ok: false, error: res.error ?? 'فشل التوليد' }
+  },
+
   'shipment.retry': async (payload, storeId) => {
     if (!storeId || typeof payload.orderId !== 'string') return { ok: false, error: 'حمولة ناقصة' }
     const { queueShipmentForOrder } = await import('./shipment-dispatch')

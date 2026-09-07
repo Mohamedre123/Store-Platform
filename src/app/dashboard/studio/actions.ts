@@ -1,0 +1,292 @@
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { and, desc, eq, ilike, isNull } from 'drizzle-orm'
+import { db } from '@/db'
+import { products, storePlugins } from '@/db/schema'
+import { getDashboardContext } from '@/lib/store-context'
+import { assertCan } from '@/lib/permissions'
+import { makeImage, productBrief, writeCopy } from '@/lib/studio'
+import {
+  createPost,
+  deletePost,
+  deleteSchedule,
+  publishPost,
+  saveSchedule,
+} from '@/lib/content-schedules'
+import { disconnectAccount } from '@/lib/social'
+import type { PresetKey, ToneKey } from '@/lib/studio-meta'
+
+/**
+ * أفعال الاستوديو.
+ *
+ * ## كل فعل بيفحص الإضافة والصلاحية
+ * الشاشة بتخبّي الأزرار لما الإضافة مقفولة، والأفعال هي اللي بتمنع
+ * النداء المباشر. والتوليد بيستهلك من مفتاح التاجر — يعني نداء
+ * مباشر من غير فحص بيصرف فلوسه.
+ */
+
+async function studioContext() {
+  const { store, user, actor } = await getDashboardContext()
+  assertCan(actor, 'marketing.manage')
+
+  const [row] = await db
+    .select({ enabled: storePlugins.enabled })
+    .from(storePlugins)
+    .where(and(eq(storePlugins.storeId, store.id), eq(storePlugins.pluginSlug, 'studio')))
+    .limit(1)
+
+  if (!row?.enabled) throw new Error('فعّل «استوديو المحتوى» من الإضافات الأول')
+
+  return { store, user }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   التوليد
+   ══════════════════════════════════════════════════════════════ */
+
+export type ImageState =
+  | { ok: true; id: string; url: string; prompt: string }
+  | { ok: false; error: string }
+
+export async function generateImageAction(input: {
+  prompt: string
+  preset: PresetKey
+  productId?: string | null
+  parentId?: string | null
+  useProductPhoto?: boolean
+}): Promise<ImageState> {
+  const { store, user } = await studioContext()
+
+  const prompt = String(input.prompt ?? '').trim()
+  if (prompt.length < 3) return { ok: false, error: 'اكتب وصفًا للصورة' }
+  if (prompt.length > 1200) return { ok: false, error: 'الوصف طويل أوي' }
+
+  /*
+    صورة المنتج كأساس — للتوليد الأول بس.
+
+    التاجر اللي عايز صورة إعلانية لمنتجه بيقصد منتجه هو لا منتجًا
+    مخترعًا شبهه. والتعديل بياخد أبوه أصلًا، فتمرير صورة المنتج
+    معاه كان هيرجّع الشكل للبداية في كل تعديل.
+  */
+  let seedUrl: string | null = null
+  if (!input.parentId && input.useProductPhoto && input.productId) {
+    const p = await productBrief(store.id, input.productId)
+    seedUrl = p?.image ?? null
+  }
+
+  const res = await makeImage({
+    storeId: store.id,
+    userId: user.id,
+    prompt,
+    preset: input.preset,
+    productId: input.productId ?? null,
+    parentId: input.parentId ?? null,
+    seedUrl,
+  })
+
+  if ('error' in res) return { ok: false, error: res.error }
+
+  revalidatePath('/dashboard/studio')
+  return { ok: true, id: res.id, url: res.url, prompt: res.prompt }
+}
+
+export type CopyState =
+  | { ok: true; caption: string; hashtags: string[] }
+  | { ok: false; error: string }
+
+export async function generateCopyAction(input: {
+  productId?: string | null
+  tone: ToneKey
+  extra?: string | null
+}): Promise<CopyState> {
+  const { store } = await studioContext()
+
+  const res = await writeCopy({
+    storeId: store.id,
+    productId: input.productId ?? null,
+    tone: input.tone,
+    extra: input.extra ?? null,
+  })
+
+  if ('error' in res) return { ok: false, error: res.error }
+  return { ok: true, caption: res.caption, hashtags: res.hashtags }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   البوستات
+   ══════════════════════════════════════════════════════════════ */
+
+export type SaveState = { ok?: true; id?: string; error?: string }
+
+export async function savePostAction(input: {
+  caption: string
+  hashtags: string[]
+  imageUrls: string[]
+  productId?: string | null
+  targets?: string[]
+  publishNow?: boolean
+}): Promise<SaveState> {
+  const { store, user } = await studioContext()
+
+  const caption = String(input.caption ?? '').trim()
+  if (!caption) return { error: 'اكتب نص البوست' }
+  if (input.imageUrls.length === 0) return { error: 'محتاج صورة واحدة على الأقل' }
+
+  const id = await createPost({
+    storeId: store.id,
+    userId: user.id,
+    caption,
+    hashtags: (input.hashtags ?? []).slice(0, 12),
+    imageUrls: input.imageUrls.slice(0, 4),
+    productId: input.productId ?? null,
+    targets: input.targets ?? [],
+    status: 'ready',
+  })
+
+  if (input.publishNow) {
+    const res = await publishPost(store.id, id)
+    revalidatePath('/dashboard/studio/posts')
+    if (!res.ok) return { id, error: res.error ?? 'البوست اتحفظ بس النشر فشل' }
+  }
+
+  revalidatePath('/dashboard/studio/posts')
+  return { ok: true, id }
+}
+
+export async function publishPostAction(postId: string): Promise<SaveState> {
+  const { store } = await studioContext()
+  const res = await publishPost(store.id, postId)
+  revalidatePath('/dashboard/studio/posts')
+
+  if (!res.ok) {
+    /* أول سبب حقيقي — «فشل» لوحدها ما بتقولش للتاجر يعمل إيه */
+    const reason = res.results.find((r) => !r.ok)?.error
+    return { error: reason ?? res.error ?? 'فشل النشر' }
+  }
+  return { ok: true }
+}
+
+export async function deletePostAction(postId: string): Promise<void> {
+  const { store } = await studioContext()
+  await deletePost(store.id, postId)
+  revalidatePath('/dashboard/studio/posts')
+}
+
+/* ══════════════════════════════════════════════════════════════
+   الجدولة
+   ══════════════════════════════════════════════════════════════ */
+
+export async function saveScheduleAction(input: {
+  id?: string | null
+  name: string
+  days: number[]
+  timeOfDay: string
+  targets: string[]
+  source: 'auto' | 'category' | 'products'
+  categoryId?: string | null
+  productIds?: string[]
+  style?: string | null
+  preset: PresetKey
+  autoPublish: boolean
+  isActive: boolean
+}): Promise<SaveState> {
+  const { store, user } = await studioContext()
+
+  /*
+    النشر التلقائي محتاج وجهة.
+
+    الجدول اللي بينشر لوحده على صفر حسابات بيولّد بوستًا كل يوم
+    وبيحطّه في الطابور من غير ما ينشره — والتاجر مستنّي بوستات على
+    صفحته ومش لاقي.
+  */
+  if (input.autoPublish && input.targets.length === 0) {
+    return { error: 'اختار حسابًا واحدًا على الأقل عشان النشر التلقائي يشتغل' }
+  }
+
+  const res = await saveSchedule({
+    storeId: store.id,
+    userId: user.id,
+    id: input.id,
+    name: input.name,
+    days: input.days,
+    timeOfDay: input.timeOfDay,
+    targets: input.targets,
+    source: input.source,
+    categoryId: input.categoryId,
+    productIds: input.productIds,
+    style: input.style,
+    preset: input.preset,
+    autoPublish: input.autoPublish,
+    isActive: input.isActive,
+  })
+
+  revalidatePath('/dashboard/studio/schedules')
+  return res.ok ? { ok: true, id: res.id } : { error: res.error }
+}
+
+export async function deleteScheduleAction(id: string): Promise<void> {
+  const { store } = await studioContext()
+  await deleteSchedule(store.id, id)
+  revalidatePath('/dashboard/studio/schedules')
+}
+
+/**
+ * تشغيل جدول دلوقتي — للتجربة.
+ *
+ * التاجر اللي ظبّط جدول لبكرة الصبح مش هيستنّى لبكرة عشان يعرف
+ * الشكل. والتجربة بتكشف مشاكل المفتاح والوصف قبل ما يسيبه شغّالًا.
+ */
+export async function runScheduleNowAction(id: string): Promise<SaveState> {
+  const { store } = await studioContext()
+
+  const { runSchedule } = await import('@/lib/content-schedules')
+  const { contentSchedules } = await import('@/db/schema')
+
+  const [own] = await db
+    .select({ id: contentSchedules.id })
+    .from(contentSchedules)
+    .where(and(eq(contentSchedules.id, id), eq(contentSchedules.storeId, store.id)))
+    .limit(1)
+
+  if (!own) return { error: 'الجدول مش موجود' }
+
+  const res = await runSchedule(id)
+  revalidatePath('/dashboard/studio/posts')
+  revalidatePath('/dashboard/studio/schedules')
+  return res.ok ? { ok: true } : { error: res.error }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   الحسابات والمنتجات
+   ══════════════════════════════════════════════════════════════ */
+
+export async function disconnectAccountAction(id: string): Promise<void> {
+  const { store } = await studioContext()
+  await disconnectAccount(store.id, id)
+  revalidatePath('/dashboard/studio/accounts')
+}
+
+/** بحث المنتجات لمنتقي الاستوديو */
+export async function searchProductsAction(
+  q: string,
+): Promise<Array<{ id: string; name: string; image: string | null }>> {
+  const { store } = await studioContext()
+  const term = String(q ?? '').trim()
+
+  const rows = await db
+    .select({ id: products.id, name: products.name, images: products.images })
+    .from(products)
+    .where(
+      and(
+        eq(products.storeId, store.id),
+        eq(products.status, 'active'),
+        isNull(products.deletedAt),
+        term ? ilike(products.name, `%${term}%`) : undefined,
+      ),
+    )
+    .orderBy(desc(products.createdAt))
+    .limit(20)
+
+  return rows.map((r) => ({ id: r.id, name: r.name, image: r.images?.[0] ?? null }))
+}

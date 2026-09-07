@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { platformSettings } from '@/db/schema'
 import { drainJobs, pruneJobs } from '@/lib/jobs'
+import { queueDueSchedules } from '@/lib/content-schedules'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -65,8 +66,17 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  /*
+    الجداول المستحقّة بتتحوّل لمهام **قبل** السحب.
+
+    كده الجدول اللي حان ميعاده في نفس الدقيقة بيتنفّذ في نفس
+    النبضة بدل ما يستنّى اللي بعدها — والفرق بيبان للتاجر اللي
+    طالب الساعة ١٠:٠٠ بالظبط.
+  */
+  const queued = await queueDueSchedules().catch(() => 0)
+
   const summary = await drainJobs(40)
   const pruned = await pruneJobs().catch(() => 0)
 
-  return NextResponse.json({ ok: true, ...summary, pruned })
+  return NextResponse.json({ ok: true, ...summary, pruned, queued })
 }
