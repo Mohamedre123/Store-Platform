@@ -7,9 +7,25 @@ import { ProductCard } from '@/components/storefront/product-card'
 import { loadProductOptions } from '@/lib/product-options'
 import { ListingControls } from '@/components/storefront/listing-controls'
 import { Pagination } from '@/components/storefront/pagination'
+import { makeT } from '@/lib/i18n'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'كل المنتجات' }
+/**
+ * الوسم بلغة الزائر.
+ *
+ * `metadata` الثابتة كانت بتكتب «كل المنتجات» في تبويب المتصفح مهما
+ * كانت لغة الصفحة — واللي فاتح المتجر إنجليزي وشايف عنوان عربي
+ * بيفتكر إنه فتح صفحة غلط. والوسم ده بيروح لجوجل كمان.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ store: string }>
+}) {
+  const { store: identifier } = await params
+  const store = await getStore(identifier)
+  return { title: makeT(store?.locale ?? 'ar')('nav.products') }
+}
 
 export default async function ProductsPage({
   params,
@@ -21,6 +37,8 @@ export default async function ProductsPage({
   const { store: identifier } = await params
   const store = await getStore(identifier)
   if (!store) notFound()
+
+  const t = makeT(store.locale)
 
   const isPreview = (await headers()).get('x-zawya-preview') === '1'
   const theme = await getStoreTheme(store.id, isPreview)
@@ -72,18 +90,18 @@ export default async function ProductsPage({
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <h1 className="mb-6 text-2xl font-bold tracking-tight sm:text-3xl">كل المنتجات</h1>
+      <h1 className="mb-6 text-2xl font-bold tracking-tight sm:text-3xl">{t('nav.products')}</h1>
 
       <ListingControls
         showSort={listing.showSort}
         showCategoryFilter={listing.showCategoryFilter}
-        categories={cats.map((c) => ({ name: c.name, slug: c.slug }))}
+        categories={cats.map((c) => ({ name: t.pick(c.name, c.nameEn), slug: c.slug }))}
       />
 
       {items.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-20 text-center">
           <Package className="h-10 w-10 opacity-25" aria-hidden="true" />
-          <p className="opacity-65">مافيش منتجات معروضة دلوقتي.</p>
+          <p className="opacity-65">{t('empty.products')}</p>
         </div>
       ) : (
         <div className={listingGrid(listing)}>
@@ -94,6 +112,7 @@ export default async function ProductsPage({
               action="choose"
               product={p}
               currency={marketCurrency(store)}
+              locale={store.locale}
               style={listing.cardStyle}
               imageRatio={listing.imageRatio}
               showRating={listing.showRating}

@@ -2,9 +2,18 @@ import { notFound } from 'next/navigation'
 import { headers } from 'next/headers'
 import { getStore, getStoreTheme, listCartUpsell, marketCurrency, priceForMarket } from '@/lib/storefront'
 import { CartPageClient } from './cart-page-client'
+import { makeT } from '@/lib/i18n'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'السلة' }
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ store: string }>
+}) {
+  const { store: identifier } = await params
+  const store = await getStore(identifier)
+  return { title: makeT(store?.locale ?? 'ar')('cart.title') }
+}
 
 export default async function CartPage({ params }: { params: Promise<{ store: string }> }) {
   const { store: identifier } = await params

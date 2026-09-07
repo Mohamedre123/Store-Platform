@@ -4,7 +4,7 @@ import { db } from '@/db'
 import { categories, products } from '@/db/schema'
 import type { Section } from '@/db/schema'
 import { legacySource, readBlock, renderType, type ProductsBlock } from './blocks'
-import type { StorefrontProduct } from './storefront'
+import { productFields, type StorefrontProduct } from './storefront'
 
 /**
  * جلب بيانات بلوكات الصفحة الرئيسية.
@@ -23,21 +23,6 @@ import type { StorefrontProduct } from './storefront'
  * تحت بشكل تاني) بياخدوا نفس النتيجة من استعلام واحد.
  */
 
-const productFields = {
-  id: products.id,
-  name: products.name,
-  slug: products.slug,
-  shortDescription: products.shortDescription,
-  price: products.price,
-  compareAtPrice: products.compareAtPrice,
-  images: products.images,
-  stock: products.stock,
-  trackInventory: products.trackInventory,
-  ratingSum: products.ratingSum,
-  ratingCount: products.ratingCount,
-  showStockCounter: products.showStockCounter,
-  categoryName: categories.name,
-}
 
 const visible = (storeId: string) =>
   and(eq(products.storeId, storeId), eq(products.status, 'active'), sql`${products.deletedAt} is null`)

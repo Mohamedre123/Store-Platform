@@ -20,6 +20,8 @@ import { StoreLinkProvider } from '@/components/storefront/store-link'
 import { getCurrentCustomer } from '@/lib/customer-auth'
 import { listMarkets } from '@/lib/markets'
 import { FONT_STACKS, RADIUS_PX } from '@/lib/customization'
+import { LOCALE_META, makeT } from '@/lib/i18n'
+import { LocaleProvider } from '@/components/storefront/locale'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,9 +65,18 @@ export async function generateMetadata({
    * والعنوان بيفضل `absolute` عشان قالب المنصة ما يلزقش اسمنا على
    * علامة التاجر.
    */
-  const seoTitle = store.seoTitle?.trim() || store.name
+  /*
+    اسم المتجر في الوسوم بلغة الزائر كمان.
+
+    القالب `%s | اسم المتجر` بيتلزق على عنوان كل صفحة جوّه المتجر،
+    فاسم عربي هناك كان بيخلّي تبويب المتصفح نُصّه إنجليزي ونُصّه
+    عربي في كل صفحة — والوسم ده هو اللي بيروح لجوجل وواتساب.
+  */
+  const tm = makeT(store.locale)
+  const storeName = tm.pick(store.name, store.nameEn)
+  const seoTitle = store.seoTitle?.trim() || storeName
   const seoDescription =
-    store.seoDescription?.trim() || store.tagline || `تسوّق من ${store.name}`
+    store.seoDescription?.trim() || store.tagline || `تسوّق من ${storeName}`
   const shareImage = store.ogImage ?? store.logoLight ?? undefined
 
   /*
@@ -79,7 +90,7 @@ export async function generateMetadata({
   const shareDescription = store.ogDescription?.trim() || seoDescription
 
   return {
-    title: { absolute: seoTitle, template: `%s | ${store.name}` },
+    title: { absolute: seoTitle, template: `%s | ${storeName}` },
     description: seoDescription,
     keywords: store.seoKeywords?.trim() || undefined,
     /*
@@ -119,7 +130,7 @@ export async function generateMetadata({
       title: shareTitle,
       description: shareDescription,
       type: 'website',
-      siteName: store.name,
+      siteName: storeName,
       images: shareImage ? [shareImage] : undefined,
     },
     twitter: shareImage
@@ -151,6 +162,15 @@ export default async function StorefrontLayout({
   const { store: identifier } = await params
   const store = await getStore(identifier)
   if (!store) notFound()
+
+  /*
+    المترجم بيتبني مرة واحدة هنا.
+
+    `store.locale` اتحسبت جوّه `getStore` (المغلّفة بـ`cache`)،
+    فاللغة بتوصل لكل صفحة في المتجر من غير ما نمرّرها في أي خاصية.
+  */
+  const t = makeT(store.locale)
+  const dir = LOCALE_META[store.locale].dir
 
   const h = await headers()
   const isPreview = h.get('x-zawya-preview') === '1'
@@ -220,7 +240,7 @@ export default async function StorefrontLayout({
       >
         <StoreClosed
           kind={closed}
-          storeName={store.name}
+          storeName={t.pick(store.name, store.nameEn)}
           storeSlug={store.slug}
           logo={id.logoLight ?? store.logoLight}
           message={closed === 'maintenance' ? store.maintenanceMessage : store.comingSoonMessage}
@@ -341,11 +361,14 @@ export default async function StorefrontLayout({
     ...(customLinks.length
       ? customLinks.map((l) => ({ label: l.label.trim(), href: l.url.trim() }))
       : [
-          { label: 'الرئيسية', href: '/' },
-          { label: 'كل المنتجات', href: '/products' },
+          { label: t('nav.home'), href: '/' },
+          { label: t('nav.products'), href: '/products' },
           ...(showCategoriesBar
             ? []
-            : cats.slice(0, 4).map((c) => ({ label: c.name, href: `/category/${c.slug}` }))),
+            : cats.slice(0, 4).map((c) => ({
+                label: t.pick(c.name, c.nameEn),
+                href: `/category/${c.slug}`,
+              }))),
         ]),
     ...headerPages,
   ]
@@ -373,6 +396,7 @@ export default async function StorefrontLayout({
   } as React.CSSProperties
 
   return (
+    <LocaleProvider locale={store.locale}>
     <StoreLinkProvider base={base}>
       <CartProvider
         storeSlug={store.slug}
@@ -384,10 +408,34 @@ export default async function StorefrontLayout({
       <div
         style={vars}
         data-zawya-store
+        lang={store.locale}
+        /*
+          الاتجاه على الحاوية لا على `html`.
+
+          `html` بيترسم في تخطيط الجذر اللي بيلفّ المنصة كلها وما
+          بيعرفش أي متجر ده. و`dir` هنا كفاية للشكل: كلاسات
+          `start`/`end` بتتحلّ على أقرب `dir` فوقها، يعني المتجر
+          كله بيتقلب من السطر ده.
+        */
+        dir={dir}
         className="min-h-screen-safe flex flex-col"
         // لون النص والخلفية من المتجر لا من المنصة
       >
         <div style={{ background: 'var(--sf-bg)', color: 'var(--sf-text)' }} className="flex min-h-full flex-1 flex-col">
+          {/*
+            وسم `html` بيتظبّط قبل أول رسم.
+
+            `dir` على الحاوية بيكفي الشكل، لكن جوجل وقارئ الشاشة
+            بيقروا `html lang` — وتخطيط الجذر بيكتبه `ar` لأنه
+            بيلفّ المنصة كمان وما بيعرفش المتجر. السكربت بيمشي قبل
+            الرسم فمفيش وميض، و`suppressHydrationWarning` موجودة
+            على `html` أصلًا.
+          */}
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `document.documentElement.lang=${JSON.stringify(store.locale)};document.documentElement.dir=${JSON.stringify(dir)}`,
+            }}
+          />
           <PreviewBridge />
           <StorePixels pixels={pixels} preview={isPreview} />
           {/* التاجر بيعاين متجره كتير — لو قِسنا زياراته، أرقامه تبقى كذب */}
@@ -397,14 +445,16 @@ export default async function StorefrontLayout({
             <StorePreloader
               settings={custom.preloader}
               logo={storeLogo}
-              storeName={store.name}
+              storeName={t.pick(store.name, store.nameEn)}
               preview={isPreview}
             />
           )}
 
           <AnnouncementBar settings={custom.announcement} />
           <StoreHeader
-            storeName={store.name}
+            locale={store.locale}
+            enabledLocales={store.enabledLocales}
+            storeName={t.pick(store.name, store.nameEn)}
             logo={storeLogo}
             hideName={isPreview ? custom.identity.hideNameInHeader : store.hideNameInHeader}
             nav={nav}
@@ -414,7 +464,7 @@ export default async function StorefrontLayout({
             showAccount={custom.header.showAccount}
             showCategoriesBar={custom.header.showCategoriesBar}
             sticky={custom.header.sticky}
-            categories={cats.map((c) => ({ name: c.name, slug: c.slug }))}
+            categories={cats.map((c) => ({ name: t.pick(c.name, c.nameEn), slug: c.slug }))}
             markets={storeMarkets}
             currentMarket={
               store.display
@@ -443,7 +493,8 @@ export default async function StorefrontLayout({
 
           <StoreFooter
             footer={custom.footer}
-            storeName={store.name}
+            storeName={t.pick(store.name, store.nameEn)}
+            locale={store.locale}
             contact={{ phone: store.phone, whatsapp: store.whatsapp, social: store.socialLinks }}
             policyPages={policyPages}
           />
@@ -482,5 +533,6 @@ export default async function StorefrontLayout({
       </div>
       </CartProvider>
     </StoreLinkProvider>
+    </LocaleProvider>
   )
 }

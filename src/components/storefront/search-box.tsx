@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search } from 'lucide-react'
 import { useStoreHref } from './store-link'
+import { useT } from './locale'
 
 /** خانة البحث — بتوجّه لصفحة النتايج بالاستعلام في الرابط */
 export function SearchBox({
@@ -15,6 +16,7 @@ export function SearchBox({
   autoFocus?: boolean
   compact?: boolean
 }) {
+  const t = useT()
   const [q, setQ] = useState(initialQuery)
   const router = useRouter()
   const href = useStoreHref()
@@ -38,8 +40,8 @@ export function SearchBox({
           onKeyDown={(e) => e.key === 'Enter' && go()}
           autoFocus={autoFocus}
           type="search"
-          aria-label="ابحث في المنتجات"
-          placeholder="ابحث في المنتجات…"
+          aria-label={t('search.placeholder')}
+          placeholder={t('search.placeholderLong')}
           className={`w-full rounded-[var(--sf-radius)] border border-[var(--sf-text)]/18 bg-[var(--sf-surface)] pe-10 ps-3 outline-none focus:border-[var(--sf-primary)] ${
             compact ? 'h-10 text-sm' : 'h-12 text-base'
           }`}
@@ -53,7 +55,7 @@ export function SearchBox({
           compact ? 'h-10 text-sm' : 'h-12'
         }`}
       >
-        بحث
+        {t('nav.search')}
       </button>
     </div>
   )

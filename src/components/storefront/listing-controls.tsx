@@ -4,6 +4,7 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { SLink as Link } from './store-link'
 import { ArrowUpDown } from 'lucide-react'
 import { SORT_OPTIONS, type SortKey } from '@/lib/sort-options'
+import { useT } from './locale'
 
 /**
  * أدوات صفحة المنتجات: الترتيب وفلتر الأقسام.
@@ -22,6 +23,7 @@ export function ListingControls({
   categories: Array<{ name: string; slug: string }>
   activeCategory?: string
 }) {
+  const t = useT()
   const router = useRouter()
   const pathname = usePathname()
   const params = useSearchParams()
@@ -48,7 +50,7 @@ export function ListingControls({
                 : 'border-[var(--sf-text)]/15 opacity-70 hover:opacity-100'
             }`}
           >
-            الكل
+            {t('filter.all')}
           </Link>
           {categories.map((c) => (
             <Link
@@ -71,7 +73,7 @@ export function ListingControls({
       {showSort && (
         <label className="flex shrink-0 items-center gap-2 text-sm">
           <ArrowUpDown className="h-4 w-4 opacity-60" aria-hidden="true" />
-          <span className="sr-only">ترتيب المنتجات</span>
+          <span className="sr-only">{t('sort.label')}</span>
           <select
             value={sort}
             onChange={(e) => changeSort(e.target.value)}
@@ -79,7 +81,7 @@ export function ListingControls({
           >
             {SORT_OPTIONS.map((o) => (
               <option key={o.key} value={o.key}>
-                {o.label}
+                {t(o.msg)}
               </option>
             ))}
           </select>

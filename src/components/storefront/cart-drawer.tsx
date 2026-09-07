@@ -7,6 +7,7 @@ import { useCart } from './cart'
 import { CartLines, CartNoteField, CartUpsell, FreeShippingProgress } from './cart-parts'
 import { formatMoney } from '@/lib/utils'
 import type { UpsellProduct } from '@/lib/storefront'
+import { useT } from './locale'
 
 /** درج السلة — يفتح من جهة البداية ويقفل بـEscape أو بالضغط برّه */
 export function CartDrawer({
@@ -28,6 +29,7 @@ export function CartDrawer({
   upsell?: UpsellProduct[]
   upsellTitle?: string
 }) {
+  const t = useT()
   const { items, isOpen, setOpen, subtotal, count, needsOptions } = useCart()
 
   useEffect(() => {
@@ -64,7 +66,7 @@ export function CartDrawer({
           <button
             type="button"
             onClick={() => setOpen(false)}
-            aria-label="إغلاق"
+            aria-label={t('nav.close')}
             className="flex h-10 w-10 items-center justify-center rounded-lg transition-colors hover:bg-[var(--sf-text)]/6"
           >
             <X className="h-5 w-5" aria-hidden="true" />

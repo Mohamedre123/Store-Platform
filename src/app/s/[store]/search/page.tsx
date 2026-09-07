@@ -5,9 +5,18 @@ import { getStore, getStoreTheme, listingGrid, searchProducts, marketCurrency, p
 import { ProductCard } from '@/components/storefront/product-card'
 import { loadProductOptions } from '@/lib/product-options'
 import { SearchBox } from '@/components/storefront/search-box'
+import { makeT } from '@/lib/i18n'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'البحث' }
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ store: string }>
+}) {
+  const { store: identifier } = await params
+  const store = await getStore(identifier)
+  return { title: makeT(store?.locale ?? 'ar')('search.title') }
+}
 
 export default async function SearchPage({
   params,
@@ -19,6 +28,8 @@ export default async function SearchPage({
   const { store: identifier } = await params
   const store = await getStore(identifier)
   if (!store) notFound()
+
+  const t = makeT(store.locale)
 
   const q = (await searchParams).q?.trim() ?? ''
   const isPreview = (await headers()).get('x-zawya-preview') === '1'
@@ -37,7 +48,7 @@ export default async function SearchPage({
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <h1 className="mb-5 text-2xl font-bold tracking-tight">البحث</h1>
+      <h1 className="mb-5 text-2xl font-bold tracking-tight">{t('search.title')}</h1>
 
       <div className="mb-8 max-w-lg">
         <SearchBox initialQuery={q} autoFocus />
@@ -51,8 +62,8 @@ export default async function SearchPage({
       ) : results.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-16 text-center">
           <Search className="h-10 w-10 opacity-25" aria-hidden="true" />
-          <p className="font-medium">مالقيناش نتايج لـ«{q}»</p>
-          <p className="text-sm opacity-65">جرّب كلمة تانية أو تصفّح كل المنتجات.</p>
+          <p className="font-medium">{t('search.empty')}</p>
+          <p className="text-sm opacity-65">{t('search.hint')}</p>
         </div>
       ) : (
         <>
@@ -67,6 +78,7 @@ export default async function SearchPage({
                 action="choose"
                 product={p}
                 currency={marketCurrency(store)}
+                locale={store.locale}
                 style={listing.cardStyle}
                 imageRatio={listing.imageRatio}
                 showRating={listing.showRating}

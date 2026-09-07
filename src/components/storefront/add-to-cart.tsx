@@ -5,6 +5,7 @@ import { Check, Minus, Plus, ShoppingBag } from 'lucide-react'
 import { useCart, type CartItem } from './cart'
 import { QuickCheckout, type QuickCheckoutSettings } from './quick-checkout'
 import { WhatsappIcon } from './whatsapp-icon'
+import { useT } from './locale'
 
 /**
  * زر الإضافة للسلة.
@@ -37,6 +38,7 @@ export function AddToCart({
   /** إعدادات الدفع السريع — `null` لما التاجر قافله */
   quick?: QuickCheckoutSettings | null
 }) {
+  const t = useT()
   const { add } = useCart()
   const [quantity, setQuantity] = useState(1)
   const [added, setAdded] = useState(false)
@@ -63,7 +65,7 @@ export function AddToCart({
           <button
             type="button"
             onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-            aria-label="تقليل الكمية"
+            aria-label={t('product.qtyDecrease')}
             className="flex h-11 w-11 items-center justify-center"
           >
             <Minus className="h-4 w-4" aria-hidden="true" />
@@ -73,7 +75,7 @@ export function AddToCart({
             type="button"
             onClick={() => setQuantity((q) => Math.min(max, q + 1))}
             disabled={quantity >= max}
-            aria-label="زيادة الكمية"
+            aria-label={t('product.qtyIncrease')}
             className="flex h-11 w-11 items-center justify-center disabled:opacity-35"
           >
             <Plus className="h-4 w-4" aria-hidden="true" />

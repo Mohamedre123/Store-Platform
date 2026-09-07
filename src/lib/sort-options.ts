@@ -1,3 +1,5 @@
+import type { MsgKey } from './i18n'
+
 /**
  * خيارات ترتيب المنتجات.
  *
@@ -7,11 +9,17 @@
  */
 export type SortKey = 'newest' | 'price_asc' | 'price_desc' | 'best_selling'
 
-export const SORT_OPTIONS: Array<{ key: SortKey; label: string }> = [
-  { key: 'newest', label: 'الأحدث' },
-  { key: 'best_selling', label: 'الأكثر مبيعًا' },
-  { key: 'price_asc', label: 'الأرخص أولًا' },
-  { key: 'price_desc', label: 'الأغلى أولًا' },
+/**
+ * الترتيب بمفتاح ترجمة لا بنص جاهز.
+
+ * النص المكتوب هنا كان بيوصل للمتجر الإنجليزي عربي — والقايمة دي
+ * بتترسم في مكوّن عميل، فمكانه الطبيعي هو القاموس.
+ */
+export const SORT_OPTIONS: Array<{ key: SortKey; msg: MsgKey }> = [
+  { key: 'newest', msg: 'sort.newest' },
+  { key: 'best_selling', msg: 'sort.best' },
+  { key: 'price_asc', msg: 'sort.priceAsc' },
+  { key: 'price_desc', msg: 'sort.priceDesc' },
 ]
 
 /** يحوّل قيمة الرابط لمفتاح صالح — أي قيمة غريبة تبقى «الأحدث» */

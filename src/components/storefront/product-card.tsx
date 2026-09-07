@@ -4,6 +4,7 @@ import { ImageOff, SlidersHorizontal, Star } from 'lucide-react'
 import type { StorefrontProduct } from '@/lib/storefront'
 import { discountPercent } from '@/lib/storefront'
 import { formatMoney } from '@/lib/utils'
+import { makeT, type Locale } from '@/lib/i18n'
 import type { CardStyle } from '@/lib/themes'
 import { CardAdd } from './card-add'
 import type { ProductOptionSet } from '@/lib/product-options'
@@ -18,6 +19,7 @@ import type { ProductOptionSet } from '@/lib/product-options'
 export function ProductCard({
   product,
   currency,
+  locale = 'ar',
   style = 'clean',
   imageRatio = 'square',
   showRating = true,
@@ -29,6 +31,14 @@ export function ProductCard({
 }: {
   product: StorefrontProduct
   currency: string
+  /**
+   * لغة الزائر — بتتمرّر جنب العملة بالظبط.
+   *
+   * البطاقة مكوّن خادم، فما تقدرش تنادي `useT`. والتمرير هنا نفس
+   * تمرير `currency`: الصفحة اللي بتعرف السعر بتعرف اللغة، والاتنين
+   * بيتقروا من نفس صف المتجر.
+   */
+  locale?: Locale
   style?: CardStyle
   imageRatio?: 'square' | 'portrait' | 'wide'
   showRating?: boolean
@@ -54,6 +64,9 @@ export function ProductCard({
   /** بلاطة الفسيفساء — الصورة بتملا المساحة المضاعفة */
   fill?: boolean
 }) {
+  const t = makeT(locale)
+  /* الاسم الإنجليزي لو التاجر كتبه، وإلا العربي زي ما هو */
+  const title = t.pick(product.name, product.nameEn)
   const mode = action ?? (showQuickAdd ? 'add' : 'none')
   const soldOutForAdd = product.trackInventory && product.stock <= 0
 
@@ -61,6 +74,7 @@ export function ProductCard({
     <ProductCardBody
       product={product}
       currency={currency}
+      locale={locale}
       style={style}
       imageRatio={imageRatio}
       showRating={showRating}
@@ -78,7 +92,7 @@ export function ProductCard({
         <CardAdd
           product={{
             productId: product.id,
-            name: product.name,
+            name: title,
             slug: product.slug,
             image: product.images[0],
             price: product.price,
@@ -99,7 +113,7 @@ export function ProductCard({
           className="mt-2 flex min-h-10 w-full items-center justify-center gap-1.5 rounded-[var(--sf-radius)] border border-[var(--sf-primary)] text-sm font-semibold text-[var(--sf-primary)] transition-colors hover:bg-[var(--sf-primary)] hover:text-white"
         >
           <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-          {soldOutForAdd ? 'شوف التفاصيل' : 'الخيارات'}
+          {soldOutForAdd ? t('product.details') : t('product.options')}
         </Link>
       )}
     </div>
@@ -109,6 +123,7 @@ export function ProductCard({
 function ProductCardBody({
   product,
   currency,
+  locale = 'ar',
   style = 'clean',
   imageRatio = 'square',
   showRating = true,
@@ -116,11 +131,15 @@ function ProductCardBody({
 }: {
   product: StorefrontProduct
   currency: string
+  locale?: Locale
   style?: CardStyle
   imageRatio?: 'square' | 'portrait' | 'wide'
   showRating?: boolean
   fill?: boolean
 }) {
+  const t = makeT(locale)
+  /* الاسم الإنجليزي لو التاجر كتبه، وإلا العربي زي ما هو */
+  const title = t.pick(product.name, product.nameEn)
   const off = discountPercent(product.price, product.compareAtPrice)
   const soldOut = product.trackInventory && product.stock <= 0
   const rating = showRating && product.ratingCount ? product.ratingSum / product.ratingCount : null
@@ -140,7 +159,7 @@ function ProductCardBody({
       {product.images[0] ? (
         <Image
           src={product.images[0]}
-          alt={product.name}
+          alt={title}
           fill
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
           className="object-cover transition-transform duration-500 group-hover:scale-[1.04]"
@@ -168,11 +187,11 @@ function ProductCardBody({
   const price = (
     <span className="flex flex-wrap items-baseline gap-2">
       <span className="tabular font-bold text-[var(--sf-primary)]">
-        {formatMoney(product.price, currency)}
+        {formatMoney(product.price, currency, t.intl)}
       </span>
       {product.compareAtPrice && (
         <span className="tabular text-xs line-through opacity-45">
-          {formatMoney(product.compareAtPrice, currency)}
+          {formatMoney(product.compareAtPrice, currency, t.intl)}
         </span>
       )}
     </span>
@@ -187,7 +206,7 @@ function ProductCardBody({
       >
         <span className="relative h-24 w-24 shrink-0 overflow-hidden rounded-[var(--sf-radius)] bg-[var(--sf-text)]/6">
           {product.images[0] ? (
-            <Image src={product.images[0]} alt={product.name} fill sizes="96px" className="object-cover" />
+            <Image src={product.images[0]} alt={title} fill sizes="96px" className="object-cover" />
           ) : (
             <span className="flex h-full items-center justify-center opacity-25">
               <ImageOff className="h-6 w-6" aria-hidden="true" />
@@ -195,7 +214,7 @@ function ProductCardBody({
           )}
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="line-clamp-2 font-medium">{product.name}</span>
+          <span className="line-clamp-2 font-medium">{title}</span>
           {product.shortDescription && (
             <span className="line-clamp-2 text-sm opacity-60">{product.shortDescription}</span>
           )}
@@ -211,8 +230,8 @@ function ProductCardBody({
       <Link href={href} className="group relative block overflow-hidden rounded-[var(--sf-radius)]">
         {picture}
         <span className="absolute inset-x-0 bottom-0 flex flex-col gap-1 bg-gradient-to-t from-black/75 to-transparent p-3 pt-10 text-white">
-          <span className="line-clamp-2 text-sm font-semibold">{product.name}</span>
-          <span className="tabular text-sm font-bold">{formatMoney(product.price, currency)}</span>
+          <span className="line-clamp-2 text-sm font-semibold">{title}</span>
+          <span className="tabular text-sm font-bold">{formatMoney(product.price, currency, t.intl)}</span>
         </span>
       </Link>
     )
@@ -226,7 +245,7 @@ function ProductCardBody({
         className="group flex flex-col gap-2 rounded-[var(--sf-radius)] border border-[var(--sf-text)]/12 bg-[var(--sf-surface)] p-3 transition-shadow hover:shadow-lg"
       >
         {picture}
-        <span className="line-clamp-2 text-sm font-medium">{product.name}</span>
+        <span className="line-clamp-2 text-sm font-medium">{title}</span>
         {rating !== null && (
           <span className="flex items-center gap-1 text-xs opacity-70">
             <Star className="h-3 w-3 fill-current text-amber-500" aria-hidden="true" />
@@ -248,7 +267,7 @@ function ProductCardBody({
     >
       {picture}
       <span className={`line-clamp-2 ${editorial ? 'text-base' : 'text-sm'} font-medium`}>
-        {product.name}
+        {title}
       </span>
       {price}
       {product.showStockCounter && product.trackInventory && product.stock > 0 && product.stock <= 10 && (

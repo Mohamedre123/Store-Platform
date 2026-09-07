@@ -13,6 +13,7 @@ import { formatCount, formatMoney, isValidEmail, isValidPhone } from '@/lib/util
 import { COUNTRIES, type Region } from '@/lib/regions'
 /* الأنواع مشتركة مع الدفع السريع — نسخة تانية منها كانت هتفترق عند أول إضافة */
 import type { FieldMode, PaymentOption } from '@/lib/checkout-ui'
+import { useT } from '@/components/storefront/locale'
 export type { PaymentOption }
 
 export type CheckoutConfig = {
@@ -105,6 +106,7 @@ export function CheckoutForm({
    */
   account: { name: string | null; phone: string | null; email: string | null }
 }) {
+  const t = useT()
   const { items, subtotal, clear, pendingOptions, needsOptions } = useCart()
   const router = useRouter()
   const href = useStoreHref()
@@ -252,7 +254,7 @@ export function CheckoutForm({
       })
       if (res.ok) {
         setCoupon({ code: res.code, discount: res.discount, freeShipping: res.freeShipping })
-        setCouponMsg({ ok: true, text: res.freeShipping ? 'شحن مجاني اتطبّق' : 'الكود اتطبّق' })
+        setCouponMsg({ ok: true, text: res.freeShipping ? t('checkout.freeShippingApplied') : t('checkout.couponApplied') })
       } else {
         setCoupon(null)
         setCouponMsg({ ok: false, text: res.error })
@@ -348,20 +350,20 @@ export function CheckoutForm({
       للخيارات اللي قدامه في الملخّص بدل ما يدوّر.
     */
     if (needsOptions) {
-      setError('فيه منتج محتاج تحدّد مقاسه أو لونه — حدّده من ملخّص الطلب')
+      setError(t('err.needsOptionSummary'))
       return
     }
 
     if (!isValidPhone(fullPhone)) {
-      setError('اكتب رقم تليفون صحيح')
+      setError(t('err.phone'))
       return
     }
     if (!isValidEmail(email)) {
-      setError('اكتب بريدًا إلكترونيًا صحيح — الفاتورة هتوصلك عليه')
+      setError(t('err.emailInvoice'))
       return
     }
     if (config.addressMode === 'structured' && req(config.fieldCity) && !city) {
-      setError('اختار المحافظة')
+      setError(t('checkout.chooseGovernorate'))
       return
     }
     if (config.minOrderEnabled && subtotal < config.minOrderAmount) {
@@ -431,7 +433,7 @@ export function CheckoutForm({
       })
 
       if (!result || !result.ok) {
-        setError(result?.error ?? 'حصلت مشكلة. جرّب تاني.')
+        setError(result?.error ?? t('err.generic'))
         return
       }
 
@@ -495,12 +497,12 @@ export function CheckoutForm({
       {/* النموذج */}
       <div className="flex flex-col gap-6">
         <section className="flex flex-col gap-4">
-          <h2 className="font-bold">بياناتك</h2>
+          <h2 className="font-bold">{t('checkout.contact')}</h2>
 
           {show(config.fieldName) && (
             <label className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium">الاسم {req(config.fieldName) && <span className="text-red-500">*</span>}</span>
-              <input value={name} onChange={(e) => { setName(e.target.value); setTouchedContact(true) }} className={input} placeholder="محمد أحمد" />
+              <span className="text-sm font-medium">{t('checkout.name')} {req(config.fieldName) && <span className="text-red-500">*</span>}</span>
+              <input value={name} onChange={(e) => { setName(e.target.value); setTouchedContact(true) }} className={input} placeholder={t('checkout.namePlaceholder')} />
             </label>
           )}
 
@@ -524,7 +526,7 @@ export function CheckoutForm({
                 <select
                   value={dialCode}
                   onChange={(e) => setDialCode(e.target.value)}
-                  aria-label="كود الدولة"
+                  aria-label={t('checkout.countryCode')}
                   dir="ltr"
                   /* `basis` + `shrink-0` بيثبّتوا عرضه، والخانة بتاخد الباقي */
                   className={`${inputBase} w-[6.5rem] shrink-0 px-2 text-start text-sm`}
@@ -560,7 +562,7 @@ export function CheckoutForm({
                 placeholder="01012345678"
               />
             )}
-            <span className="text-xs opacity-60">هنكلّمك عليه لتأكيد الطلب</span>
+            <span className="text-xs opacity-60">{t('checkout.phoneHint')}</span>
           </label>
 
           {/*
@@ -583,7 +585,7 @@ export function CheckoutForm({
               className={`${input} text-start`}
               placeholder="you@example.com"
             />
-            <span className="text-xs opacity-60">هنبعتلك عليه الفاتورة وتأكيد الطلب</span>
+            <span className="text-xs opacity-60">{t('checkout.emailHint')}</span>
           </label>
         </section>
 
@@ -595,7 +597,7 @@ export function CheckoutForm({
         */}
         {config.deliveryMode === 'delivery_pickup' && (
           <section className="flex flex-col gap-3">
-            <h2 className="font-bold">طريقة الاستلام</h2>
+            <h2 className="font-bold">{t('checkout.method')}</h2>
             <div className="grid gap-3 sm:grid-cols-2">
               {(['delivery', 'pickup'] as const).map((mode) => (
                 <button
@@ -616,10 +618,10 @@ export function CheckoutForm({
                   )}
                   <span className="min-w-0 flex-1">
                     <span className="block font-medium">
-                      {mode === 'delivery' ? 'توصيل لعندك' : 'أستلم من الفرع'}
+                      {mode === 'delivery' ? t('checkout.delivery') : t('checkout.pickup')}
                     </span>
                     <span className="mt-0.5 block text-sm opacity-65">
-                      {mode === 'delivery' ? 'بنوصّله للعنوان اللي تكتبه' : 'من غير مصاريف شحن'}
+                      {mode === 'delivery' ? t('checkout.deliveryHint') : t('checkout.pickupHint')}
                     </span>
                   </span>
                   {fulfillment === mode && (
@@ -634,7 +636,7 @@ export function CheckoutForm({
         {/* الفرع اللي هيستلم منه — بيبان مع الاستلام بس */}
         {pickup && config.branches.length > 0 && (
           <section className="flex flex-col gap-3">
-            <h2 className="font-bold">تستلم من فين</h2>
+            <h2 className="font-bold">{t('checkout.pickupWhere')}</h2>
             {config.branches.length === 1 ? (
               <p className="rounded-[var(--sf-radius)] border border-[var(--sf-text)]/15 p-4 text-sm leading-relaxed">
                 <span className="block font-medium">{config.branches[0].name}</span>
@@ -656,7 +658,7 @@ export function CheckoutForm({
 
         {needsAddress && (
           <section className="flex flex-col gap-4">
-            <h2 className="font-bold">عنوان التوصيل</h2>
+            <h2 className="font-bold">{t('checkout.deliveryAddress')}</h2>
 
             {/*
               الدولة — للمتاجر اللي بتبيع لبرّه بلدها.
@@ -689,7 +691,7 @@ export function CheckoutForm({
                   المحافظة {req(config.fieldCity) && <span className="text-red-500">*</span>}
                 </span>
                 <select value={city} onChange={(e) => setCity(e.target.value)} className={input}>
-                  <option value="">اختار المحافظة</option>
+                  <option value="">{t('checkout.chooseGovernorate')}</option>
                   {regions.map((r) => (
                     <option key={r.code} value={r.name}>
                       {r.name}
@@ -704,7 +706,7 @@ export function CheckoutForm({
                 <span className="text-sm font-medium">
                   المنطقة {req(config.fieldArea) && <span className="text-red-500">*</span>}
                 </span>
-                <input value={area} onChange={(e) => setArea(e.target.value)} className={input} placeholder="المعادي" />
+                <input value={area} onChange={(e) => setArea(e.target.value)} className={input} placeholder={t('checkout.cityPlaceholder')} />
               </label>
             )}
 
@@ -717,14 +719,14 @@ export function CheckoutForm({
                   value={street}
                   onChange={(e) => setStreet(e.target.value)}
                   className={input}
-                  placeholder="شارع ٩، عمارة ١٢"
+                  placeholder={t('checkout.addressPlaceholder')}
                 />
               </label>
             )}
 
             {show(config.fieldBuilding) && (
               <label className="flex flex-col gap-1.5">
-                <span className="text-sm font-medium">المبنى / الشقة</span>
+                <span className="text-sm font-medium">{t('checkout.building')}</span>
                 <input value={building} onChange={(e) => setBuilding(e.target.value)} className={input} />
               </label>
             )}
@@ -763,7 +765,7 @@ export function CheckoutForm({
         */}
         {!pickup && shippingMethods.length > 1 && (
           <section className="flex flex-col gap-3">
-            <h2 className="font-bold">طريقة الشحن</h2>
+            <h2 className="font-bold">{t('checkout.shippingMethod')}</h2>
             {shippingMethods.map((m) => {
               const price = Math.max(0, cityPrice + m.priceDelta)
               const days =
@@ -800,7 +802,7 @@ export function CheckoutForm({
                     الرقم الكامل بيتقارن بنظرة.
                   */}
                   <span className="tabular shrink-0 text-sm font-semibold">
-                    {price === 0 ? 'مجاني' : formatMoney(price, currency)}
+                    {price === 0 ? t('checkout.free') : formatMoney(price, currency, t.intl)}
                   </span>
                 </button>
               )
@@ -816,7 +818,7 @@ export function CheckoutForm({
         */}
         {config.showPaymentSelector && (
         <section className="flex flex-col gap-3">
-          <h2 className="font-bold">طريقة الدفع</h2>
+          <h2 className="font-bold">{t('checkout.payment')}</h2>
           {payments.map((p) => (
             <button
               key={p.gateway}
@@ -854,7 +856,7 @@ export function CheckoutForm({
 
               <span className="min-w-0 flex-1">
                 <span className="block font-medium">
-                  {p.displayName ?? (p.gateway === 'cod' ? 'الدفع عند الاستلام' : p.gateway)}
+                  {p.displayName ?? (p.gateway === 'cod' ? t('checkout.cod') : p.gateway)}
                 </span>
                 {p.instructions && (
                   <span className="mt-0.5 block text-sm leading-relaxed opacity-65">{p.instructions}</span>
@@ -880,13 +882,13 @@ export function CheckoutForm({
 
         {show(config.fieldNotes) && (
           <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">ملاحظات على الطلب</span>
+            <span className="text-sm font-medium">{t('checkout.notes')}</span>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
               className="w-full rounded-[var(--sf-radius)] border border-[var(--sf-text)]/18 bg-[var(--sf-surface)] p-3 text-base outline-none focus:border-[var(--sf-primary)]"
-              placeholder="أي تفاصيل تحب نعرفها"
+              placeholder={t('checkout.notesPlaceholder')}
             />
           </label>
         )}
@@ -903,7 +905,7 @@ export function CheckoutForm({
       */}
       <aside className="min-w-0 lg:sticky lg:top-20 lg:self-start">
         <div className="flex flex-col gap-4 rounded-[var(--sf-radius)] border border-[var(--sf-text)]/12 bg-[var(--sf-surface)] p-4">
-          <h2 className="font-bold">ملخص الطلب</h2>
+          <h2 className="font-bold">{t('checkout.summary')}</h2>
 
           <ul className="flex flex-col gap-3">
             {items.map((i) => (
@@ -979,7 +981,7 @@ export function CheckoutForm({
                       value={couponInput}
                       onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
                       onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), applyCoupon())}
-                      placeholder="كود الخصم"
+                      placeholder={t('checkout.coupon')}
                       dir="ltr"
                       /*
                         `min-w-0` هي اللي بتمنع الخروج من الكادر.
@@ -996,7 +998,7 @@ export function CheckoutForm({
                       disabled={applyingCoupon || !couponInput.trim()}
                       className="h-11 shrink-0 whitespace-nowrap rounded-[var(--sf-radius)] border border-[var(--sf-primary)] px-4 text-sm font-medium text-[var(--sf-primary)] transition-colors hover:bg-[var(--sf-primary)]/8 disabled:opacity-50"
                     >
-                      {applyingCoupon ? '…' : 'تطبيق'}
+                      {applyingCoupon ? '…' : t('checkout.apply')}
                     </button>
                   </div>
                   {couponMsg && !couponMsg.ok && (
@@ -1009,12 +1011,12 @@ export function CheckoutForm({
 
           <dl className="flex flex-col gap-2 border-t border-[var(--sf-text)]/10 pt-3 text-sm">
             <div className="flex justify-between">
-              <dt className="opacity-65">المنتجات</dt>
+              <dt className="opacity-65">{t('checkout.items')}</dt>
               <dd className="tabular">{formatMoney(subtotal, currency)}</dd>
             </div>
             {discount > 0 && (
               <div className="flex justify-between text-green-600">
-                <dt className="opacity-90">الخصم</dt>
+                <dt className="opacity-90">{t('checkout.discount')}</dt>
                 <dd className="tabular">− {formatMoney(discount, currency)}</dd>
               </div>
             )}
@@ -1022,14 +1024,14 @@ export function CheckoutForm({
               <dt className="flex items-center gap-1.5 opacity-65">
                 <Truck className="h-3.5 w-3.5" aria-hidden="true" />
                 {/* اسم الشركة لما تكون هي اللي بتوصّل — العميل بيعرف مين هيرنّله */}
-                {carrierName ? `الشحن · ${carrierName}` : 'الشحن'}
+                {carrierName ? `${t('checkout.shipping')} · ${carrierName}` : t('checkout.shipping')}
               </dt>
               <dd className="tabular">
-                {shipping === 0 ? <span className="text-green-600">مجاني</span> : formatMoney(shipping, currency)}
+                {shipping === 0 ? <span className="text-green-600">{t('checkout.free')}</span> : formatMoney(shipping, currency, t.intl)}
               </dd>
             </div>
             <div className="flex justify-between border-t border-[var(--sf-text)]/10 pt-2 text-base font-bold">
-              <dt>الإجمالي</dt>
+              <dt>{t('checkout.total')}</dt>
               <dd className="tabular text-[var(--sf-primary)]">{formatMoney(total, currency)}</dd>
             </div>
           </dl>
@@ -1070,11 +1072,11 @@ export function CheckoutForm({
             */}
             {pending
               ? selectedOnline
-                ? 'بنجهّز صفحة الدفع…'
-                : 'جاري تأكيد الطلب…'
+                ? t('checkout.preparingPayment')
+                : t('checkout.confirming')
               : selectedOnline
                 ? `تأكيد والدفع · ${formatMoney(total, currency)}`
-                : 'تأكيد الطلب'}
+                : t('checkout.confirm')}
           </button>
 
           {needsOptions ? (

@@ -18,6 +18,7 @@ import { ProductCard } from '@/components/storefront/product-card'
 import { loadProductOptions } from '@/lib/product-options'
 import { Pagination } from '@/components/storefront/pagination'
 import { ListingControls } from '@/components/storefront/listing-controls'
+import { makeT } from '@/lib/i18n'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,8 +27,12 @@ export async function generateMetadata({ params }: { params: Promise<{ store: st
   const slug = decodeSlug(rawSlug)
   const store = await getStore(identifier)
   if (!store) return { title: 'القسم' }
+
   const category = await getCategoryBySlug(store.id, slug)
-  return { title: category?.name ?? 'القسم' }
+  const tm = makeT(store.locale)
+  return {
+    title: category ? tm.pick(category.name, category.nameEn) : tm('common.category'),
+  }
 }
 
 export default async function CategoryPage({
@@ -41,6 +46,8 @@ export default async function CategoryPage({
   const slug = decodeSlug(rawSlug)
   const store = await getStore(identifier)
   if (!store) notFound()
+
+  const t = makeT(store.locale)
 
   const category = await getCategoryBySlug(store.id, slug)
   if (!category) notFound()
@@ -83,20 +90,22 @@ export default async function CategoryPage({
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{category.name}</h1>
+      <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+        {t.pick(category.name, category.nameEn)}
+      </h1>
       {category.description && <p className="mt-2 max-w-2xl opacity-70">{category.description}</p>}
 
       <div className="mt-8">
         <ListingControls
           showSort={listing.showSort}
           showCategoryFilter={listing.showCategoryFilter}
-          categories={cats.map((c) => ({ name: c.name, slug: c.slug }))}
+          categories={cats.map((c) => ({ name: t.pick(c.name, c.nameEn), slug: c.slug }))}
           activeCategory={slug}
         />
         {items.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-20 text-center">
             <Package className="h-10 w-10 opacity-25" aria-hidden="true" />
-            <p className="opacity-65">مافيش منتجات في القسم ده لسه.</p>
+            <p className="opacity-65">{t('empty.category')}</p>
           </div>
         ) : (
           <div className={gridClass}>
@@ -107,6 +116,7 @@ export default async function CategoryPage({
                 action="choose"
                 product={p}
                 currency={marketCurrency(store)}
+                locale={store.locale}
                 style={listing.cardStyle}
                 imageRatio={listing.imageRatio}
               showRating={listing.showRating}

@@ -144,6 +144,7 @@ export default async function StoreHomePage({ params }: { params: Promise<{ stor
                   block={resolved}
                   products={home.productsByBlock.get(section.id) ?? []}
                   currency={marketCurrency(store)}
+                  locale={store.locale}
                   listing={listing}
                   chrome={c}
                   moreHref={moreHrefFor(resolved.categoryId, resolved.moreUrl)}

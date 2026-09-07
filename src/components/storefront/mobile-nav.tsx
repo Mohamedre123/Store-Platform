@@ -5,6 +5,7 @@ import { SLink as Link } from './store-link'
 import { Home, LayoutGrid, ShoppingBag, User } from 'lucide-react'
 import { useCart } from './cart'
 import { useStoreHref } from './store-link'
+import { useT } from './locale'
 
 /**
  * شريط التنقّل السفلي على الموبايل.
@@ -23,13 +24,14 @@ export function MobileNav({
   showAccount: boolean
   showCart: boolean
 }) {
+  const t = useT()
   const pathname = usePathname()
   const href = useStoreHref()
   const { count, setOpen, ready, mode } = useCart()
 
   const items = [
-    { key: 'home', label: 'الرئيسية', icon: Home, path: '/' },
-    { key: 'products', label: 'المنتجات', icon: LayoutGrid, path: '/products' },
+    { key: 'home', label: t('nav.home'), icon: Home, path: '/' },
+    { key: 'products', label: t('nav.productsShort'), icon: LayoutGrid, path: '/products' },
   ]
 
   const isActive = (path: string) => {
@@ -52,7 +54,7 @@ export function MobileNav({
         */
         className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--sf-text)]/10 bg-[var(--sf-surface)]/70 backdrop-blur-xl md:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
-        aria-label="تنقّل سريع"
+        aria-label={t('nav.quick')}
       >
         <div className="flex items-stretch">
           {items.map(({ key, label, icon: Icon, path }) => {

@@ -6,6 +6,7 @@ import { useCart } from './cart'
 import { OptionChips, useVariantChoice } from './option-chips'
 import { formatMoney } from '@/lib/utils'
 import type { ProductOptionSet } from '@/lib/product-options'
+import { useT } from './locale'
 
 /**
  * الإضافة من على بطاقة المنتج، مع الخيارات لو المنتج ليه خيارات.
@@ -53,6 +54,7 @@ function PlainAdd({
   product: React.ComponentProps<typeof CardAdd>['product']
   soldOut: boolean
 }) {
+  const t = useT()
   const { add, setOpen } = useCart()
   const [added, setAdded] = useState(false)
 
@@ -76,12 +78,12 @@ function PlainAdd({
       {added ? (
         <>
           <Check className="h-4 w-4" aria-hidden="true" />
-          اتضاف
+          {t('add.added')}
         </>
       ) : (
         <>
           <Plus className="h-4 w-4" aria-hidden="true" />
-          أضف للسلة
+          {t('add.toCart')}
         </>
       )}
     </button>
@@ -97,6 +99,7 @@ function WithOptions({
   optionSet: ProductOptionSet
   currency: string
 }) {
+  const t = useT()
   const { add, setOpen } = useCart()
   const [added, setAdded] = useState(false)
   const { picked, pick, selected, available } = useVariantChoice(optionSet.options, optionSet.variants)
@@ -154,17 +157,17 @@ function WithOptions({
         {added ? (
           <>
             <Check className="h-4 w-4" aria-hidden="true" />
-            اتضاف
+            {t('add.added')}
           </>
         ) : allOut ? (
-          'نفدت الكمية'
+          t('add.soldOut')
         ) : ready ? (
           <>
             <Plus className="h-4 w-4" aria-hidden="true" />
-            أضف للسلة
+            {t('add.toCart')}
           </>
         ) : (
-          'اختار الخيارات'
+          t('add.chooseOptions')
         )}
       </button>
     </div>

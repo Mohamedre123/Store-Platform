@@ -20,6 +20,7 @@ import { db } from '@/db'
 import { categories as categoriesTable, productOptionValues, productOptions, productVariants, wishlists } from '@/db/schema'
 import { renderSeo } from '@/lib/seo-template'
 import { formatMoney, decodeSlug } from '@/lib/utils'
+import { makeT } from '@/lib/i18n'
 import { cookies } from 'next/headers'
 import { getCurrentCustomer } from '@/lib/customer-auth'
 import {
@@ -58,6 +59,14 @@ export async function generateMetadata({
   if (!product) return { title: 'المنتج مش موجود' }
 
   /*
+    عنوان التبويب بلغة الزائر كمان.
+
+    اللي فاتح المتجر إنجليزي وشايف عنوان التبويب عربي بيفتكر إنه
+    فتح صفحة غلط — والوسم ده هو اللي بيروح لجوجل وواتساب.
+  */
+  const tm = makeT(store.locale)
+
+  /*
     قوالب السيو بتتحلّ هنا لا وقت الحفظ: التاجر كتب «{Name} من
     {Brand}» مرة، ولو غيّر الاسم بكرة العنوان بيتغيّر معاه لوحده.
   */
@@ -72,15 +81,15 @@ export async function generateMetadata({
   }
 
   const ctx = {
-    name: product.name,
+    name: tm.pick(product.name, product.nameEn),
     category: categoryName,
     brand: product.brand,
     sku: product.sku,
-    price: formatMoney(product.price, marketCurrency(store)),
+    price: formatMoney(product.price, marketCurrency(store), tm.intl),
     store: store.name,
   }
 
-  const title = renderSeo(product.seoTitle, ctx) || product.name
+  const title = renderSeo(product.seoTitle, ctx) || tm.pick(product.name, product.nameEn)
   const description =
     renderSeo(product.seoDescription, ctx) || product.shortDescription || undefined
 
@@ -144,10 +153,24 @@ export default async function ProductPage({
     void trackExperimentView(experiment.id, bucket)
   }
 
+  const t = makeT(store.locale)
+
   const testPrice = bucket ? variantValue(experiment, bucket, 'price') : null
   const testTitle = bucket ? variantValue(experiment, bucket, 'title') : null
 
-  const displayName = typeof testTitle === 'string' && testTitle ? testTitle : product.name
+  /*
+    اسم واحد للعرض وللسلة.
+
+    كان بيتحسب هنا وبيتحط في السلة بس، والعنوان فوق كان بيقرا
+    `product.name` خام — يعني تجربة A/B على العنوان كانت بتغيّر
+    اللي بيتسجّل في الطلب من غير ما تغيّر اللي الزائر قراه، والتجربة
+    نفسها بتقيس حاجة ما حصلتش.
+
+    والاسم الإنجليزي بيدخل من هنا كمان: عنوان التجربة بيغلبه لأن
+    التاجر كتبه لتجربة شغّالة دلوقتي.
+  */
+  const displayName =
+    typeof testTitle === 'string' && testTitle ? testTitle : t.pick(product.name, product.nameEn)
   /*
     سعر السوق — التحويل هنا لا في كل مكان بيعرض السعر.
 
@@ -368,7 +391,7 @@ export default async function ProductPage({
               {product.images[0] ? (
                 <Image
                   src={product.images[0]}
-                  alt={product.name}
+                  alt={displayName}
                   fill
                   priority
                   sizes="(max-width: 768px) 100vw, 50vw"
@@ -420,7 +443,7 @@ export default async function ProductPage({
 
         {/* التفاصيل */}
         <div className="flex flex-col gap-5">
-          <h1 className="text-balance text-2xl font-bold tracking-tight sm:text-3xl">{product.name}</h1>
+          <h1 className="text-balance text-2xl font-bold tracking-tight sm:text-3xl">{displayName}</h1>
 
           {productPage.showSku && product.sku && (
             <span className="-mt-2 text-xs text-[var(--sf-text)]/50">
@@ -478,11 +501,11 @@ export default async function ProductPage({
             <>
               <div className="flex flex-wrap items-baseline gap-3">
                 <span className="tabular text-3xl font-bold text-[var(--sf-primary)]">
-                  {formatMoney(displayPrice, marketCurrency(store))}
+                  {formatMoney(displayPrice, marketCurrency(store), t.intl)}
                 </span>
                 {compareAt && (
                   <span className="tabular text-lg line-through opacity-45">
-                    {formatMoney(compareAt, marketCurrency(store))}
+                    {formatMoney(compareAt, marketCurrency(store), t.intl)}
                   </span>
                 )}
               </div>
@@ -511,7 +534,7 @@ export default async function ProductPage({
                     whatsapp={productPage.showWhatsappAsk ? store.whatsapp : null}
                   whatsappOrder={whatsappOrderNumber}
                   productUrl={productUrl}
-                    productName={product.name}
+                    productName={displayName}
                     quick={quick}
                   />
                 </div>
@@ -558,7 +581,7 @@ export default async function ProductPage({
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium">{u.name}</span>
                         <span className="tabular text-xs opacity-70">
-                          بـ{formatMoney(u.price - displayPrice, marketCurrency(store))} زيادة
+                          بـ{formatMoney(u.price - displayPrice, marketCurrency(store), t.intl)} زيادة
                         </span>
                       </span>
                       <ChevronLeft className="h-4 w-4 shrink-0 opacity-40" aria-hidden="true" />
@@ -588,8 +611,10 @@ export default async function ProductPage({
 
           {product.description && (
             <div className="border-t border-[var(--sf-text)]/10 pt-5">
-              <h2 className="mb-2 font-bold">تفاصيل المنتج</h2>
-              <p className="whitespace-pre-line leading-relaxed opacity-80">{product.description}</p>
+              <h2 className="mb-2 font-bold">{t('product.description')}</h2>
+              <p className="whitespace-pre-line leading-relaxed opacity-80">
+                {t.pick(product.description, product.descriptionEn)}
+              </p>
             </div>
           )}
 
@@ -618,10 +643,11 @@ export default async function ProductPage({
 
       {productPage.showRelated && related.length > 0 && (
         <section className="mt-16">
-          <h2 className="mb-6 text-xl font-bold tracking-tight">{productPage.relatedTitle || 'منتجات ممكن تعجبك'}</h2>
+          <h2 className="mb-6 text-xl font-bold tracking-tight">{productPage.relatedTitle || t('product.relatedTitle')}</h2>
           <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
             {related.map((p) => (
               <ProductCard
+                locale={store.locale}
                 key={p.id}
                 product={p}
                 currency={marketCurrency(store)}

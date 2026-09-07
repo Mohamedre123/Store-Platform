@@ -1,6 +1,7 @@
 import { SLink as Link } from './store-link'
 import { CreditCard } from 'lucide-react'
 import type { FooterSettings } from '@/lib/customization'
+import { makeT, type Locale } from '@/lib/i18n'
 
 /* أيقونات السوشيال inline — إصدار lucide الحالي شال أيقونات العلامات التجارية */
 type IconProps = { className?: string }
@@ -30,11 +31,14 @@ const Tiktok = svg('M16 3v3.2a4.8 4.8 0 0 0 3.8 4.7v3A7.7 7.7 0 0 1 16 12.8V16a5
 export function StoreFooter({
   footer,
   storeName,
+  locale = 'ar',
   contact,
   policyPages = [],
 }: {
   footer: FooterSettings
   storeName: string
+  /** لغة الزائر — الفوتر مكوّن خادم فما بيقدرش ينادي useT */
+  locale?: Locale
   /**
    * بيانات تواصل المتجر — من «إعدادات ← بيانات المتجر».
    *
@@ -52,6 +56,7 @@ export function StoreFooter({
   /** صفحات السياسات المنشورة — بتنضم لروابط الفوتر تلقائيًا */
   policyPages?: Array<{ slug: string; title: string }>
 }) {
+  const t = makeT(locale)
   const link = (key: string, legacy?: string) =>
     (contact?.social?.[key] || legacy || '').trim()
 
@@ -95,7 +100,7 @@ export function StoreFooter({
 
           {hasLinks && (
             <div className="flex flex-col gap-2">
-              <h3 className="text-sm font-bold">روابط</h3>
+              <h3 className="text-sm font-bold">{t('footer.links')}</h3>
               <ul className="flex flex-col gap-1.5">
                 {policyPages.map((p) => (
                   <li key={p.slug}>
@@ -120,7 +125,7 @@ export function StoreFooter({
 
           {(phone || waNumber) && (
             <div className="flex flex-col gap-2">
-              <h3 className="text-sm font-bold">كلّمنا</h3>
+              <h3 className="text-sm font-bold">{t('footer.contact')}</h3>
               <ul className="flex flex-col gap-1.5 text-sm opacity-65">
                 {phone && (
                   <li>
@@ -147,7 +152,7 @@ export function StoreFooter({
 
           {footer.showSocial && socials.length > 0 && (
             <div className="flex flex-col gap-2">
-              <h3 className="text-sm font-bold">تابعنا</h3>
+              <h3 className="text-sm font-bold">{t('footer.follow')}</h3>
               <div className="flex flex-wrap gap-2">
                 {socials.map(({ key, url, Icon, label }) => (
                   <a
@@ -178,7 +183,7 @@ export function StoreFooter({
                 <span className="text-xs">دفع عند الاستلام · بطاقات</span>
               </span>
             )}
-            {footer.showPoweredBy && <span className="opacity-70">مدعوم بـزاوية</span>}
+            {footer.showPoweredBy && <span className="opacity-70">{t('footer.poweredBy')}زاوية</span>}
           </div>
         </div>
       </div>

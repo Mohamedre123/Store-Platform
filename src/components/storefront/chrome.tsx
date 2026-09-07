@@ -8,6 +8,9 @@ import { useCart } from './cart'
 import { CartDrawer } from './cart-drawer'
 import { SearchBox } from './search-box'
 import { MarketPicker } from './market-picker'
+import { LocalePicker } from './locale-picker'
+import { useT } from './locale'
+import type { Locale } from '@/lib/i18n'
 import type { MarketRow } from '@/lib/markets-meta'
 import type { UpsellProduct } from '@/lib/storefront'
 
@@ -44,6 +47,8 @@ export function StoreHeader({
   storeSlug,
   markets = [],
   currentMarket = null,
+  locale = 'ar',
+  enabledLocales = ['ar'],
 }: {
   storeName: string
   logo: string | null
@@ -70,11 +75,20 @@ export function StoreHeader({
    */
   markets?: MarketRow[]
   currentMarket?: MarketRow | null
+  /**
+   * لغة الزائر ولغات المتجر المفتوحة — لمبدّل اللغة.
+   *
+   * واحدة = المتجر بلغة واحدة والمبدّل ما بيظهرش. أغلب التجّار كده،
+   * ومفيش سبب يشوفوا زرار بخيار واحد.
+   */
+  locale?: Locale
+  enabledLocales?: Locale[]
   showWishlist?: boolean
   logoHeight?: number
   currency: string
   storeSlug: string
 }) {
+  const t = useT()
   const { count, setOpen, ready, mode: cartMode } = useCart()
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -115,7 +129,7 @@ export function StoreHeader({
   const wishlistButton = showWishlist ? (
     <Link
       href="/account"
-      aria-label="المفضّلة"
+      aria-label={t('nav.wishlist')}
       className="flex h-11 w-11 items-center justify-center rounded-lg transition-colors hover:bg-[var(--sf-text)]/6"
     >
       <Heart className="h-5 w-5" aria-hidden="true" />
@@ -125,7 +139,7 @@ export function StoreHeader({
   const accountButton = showAccount ? (
     <Link
       href="/account"
-      aria-label="حسابي"
+      aria-label={t('nav.account')}
       className="flex h-11 w-11 items-center justify-center rounded-lg transition-colors hover:bg-[var(--sf-text)]/6"
     >
       <User className="h-5 w-5" aria-hidden="true" />
@@ -148,7 +162,7 @@ export function StoreHeader({
   )
   const cartClass =
     'relative flex h-11 w-11 items-center justify-center rounded-lg transition-colors hover:bg-[var(--sf-text)]/6'
-  const cartLabel = `السلة${ready && count ? ` — ${count} منتج` : ''}`
+  const cartLabel = t('nav.cart')
 
   const cartButton = !showCart ? null : cartMode === 'page' ? (
     <Link href="/cart" aria-label={cartLabel} className={cartClass}>
@@ -182,6 +196,7 @@ export function StoreHeader({
                 <div className="hidden md:flex">{links}</div>
                 <div className="flex justify-start md:justify-center">{brand}</div>
                 <div className="flex items-center justify-end gap-1">
+                  <LocalePicker enabled={enabledLocales} current={locale} />
                   {currentMarket && (
                     <MarketPicker markets={markets} current={currentMarket} />
                   )}
@@ -191,7 +206,7 @@ export function StoreHeader({
                   <button
                     type="button"
                     onClick={() => setMenuOpen(true)}
-                    aria-label="القائمة"
+                    aria-label={t('nav.menu')}
                     className="flex h-11 w-11 items-center justify-center rounded-lg md:hidden"
                   >
                     <Menu className="h-5 w-5" aria-hidden="true" />
@@ -211,12 +226,23 @@ export function StoreHeader({
                       </div>
                       <Link
                         href="/search"
-                        aria-label="بحث"
+                        aria-label={t('nav.search')}
                         className="flex h-11 w-11 items-center justify-center rounded-lg transition-colors hover:bg-[var(--sf-text)]/6 lg:hidden"
                       >
                         <Search className="h-5 w-5" aria-hidden="true" />
                       </Link>
                     </>
+                  )}
+                  {/*
+                    المبدّلات في التخطيطين.
+
+                    كانوا في «centered» وحده، و«top» هو الافتراضي —
+                    يعني أغلب المتاجر اللي ظبّطت أسواقها ما كانش
+                    ليها مبدّل عملة أصلًا.
+                  */}
+                  <LocalePicker enabled={enabledLocales} current={locale} />
+                  {currentMarket && (
+                    <MarketPicker markets={markets} current={currentMarket} />
                   )}
                   {wishlistButton}
                   {accountButton}
@@ -224,7 +250,7 @@ export function StoreHeader({
                   <button
                     type="button"
                     onClick={() => setMenuOpen(true)}
-                    aria-label="القائمة"
+                    aria-label={t('nav.menu')}
                     className="flex h-11 w-11 items-center justify-center rounded-lg md:hidden"
                   >
                     <Menu className="h-5 w-5" aria-hidden="true" />
@@ -308,7 +334,7 @@ export function StoreHeader({
               <button
                 type="button"
                 onClick={() => setMenuOpen(false)}
-                aria-label="إغلاق"
+                aria-label={t('nav.close')}
                 className="flex h-10 w-10 items-center justify-center rounded-lg"
               >
                 <X className="h-5 w-5" aria-hidden="true" />

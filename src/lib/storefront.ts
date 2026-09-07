@@ -1,5 +1,6 @@
 import 'server-only'
 import { cache } from 'react'
+import { cookies, headers } from 'next/headers'
 import { and, desc, eq, gt, ilike, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { banners, categories, checkoutSettings, pages, products, productVariants, reviews, stores, storePlugins, storeThemes } from '@/db/schema'
@@ -15,6 +16,7 @@ import {
 import type { SortKey } from './sort-options'
 import type { ActivePixels } from './plugins'
 import { currentMarket } from './markets'
+import { LOCALE_COOKIE, resolveLocale, type Locale } from './i18n'
 import { convertPrice } from './markets-meta'
 import type { Section, ThemeTokens } from '@/db/schema'
 
@@ -86,6 +88,19 @@ export type StorefrontStore = {
     rounding: 'none' | 'nearest' | 'charm'
   } | null
   country: string
+  /**
+   * لغة الزائر الحالي — **عرض بس، زي `display`**.
+   *
+   * `defaultLocale` تحتها بتفضل اللي التاجر ظبّطه زي ما هو. الحقل
+   * ده بيقول «الزائر ده بيقرا بإيه» وبيتحسب مرة واحدة لكل طلب.
+   *
+   * وحطّه هنا مقصود: كل صفحة في المتجر بتجيب `store` أصلًا، فاللغة
+   * بتوصل لـ٦٧ ملف من غير ما نمرّرها في خاصية واحدة جديدة.
+   */
+  locale: Locale
+  /** اللغات اللي التاجر فتحها — المبدّل بيختفي لو واحدة بس */
+  enabledLocales: Locale[]
+  defaultLocale: Locale
   isPublished: boolean
   vatEnabled: boolean
   vatRate: number
@@ -131,6 +146,8 @@ export const getStore = cache(async (identifier: string): Promise<StorefrontStor
       email: stores.email,
       currency: stores.currency,
       country: stores.country,
+      defaultLocale: stores.defaultLocale,
+      enabledLocales: stores.enabledLocales,
       isPublished: stores.isPublished,
       vatEnabled: stores.vatEnabled,
       vatRate: stores.vatRate,
@@ -180,8 +197,25 @@ export const getStore = cache(async (identifier: string): Promise<StorefrontStor
   */
   const market = await currentMarket(store.id)
 
+  /*
+    لغة الزائر — بتتقرا من كوكيته، وبعدها من متصفحه.
+
+    الاتنين بيتقصّوا على `enabledLocales`: المتجر اللي مفتحش
+    الإنجليزي بيرجّع عربي مهما كان المتصفح — وإلا كل زائر أجنبي كان
+    هيلاقي زراير إنجليزي فوق بضاعة أسماؤها عربي، وده أوحش من عربي
+    كامل.
+  */
+  const [jar, h] = await Promise.all([cookies(), headers()])
+  const locale = resolveLocale({
+    cookie: jar.get(LOCALE_COOKIE)?.value ?? null,
+    acceptLanguage: h.get('accept-language'),
+    enabled: store.enabledLocales,
+    fallback: store.defaultLocale,
+  })
+
   return {
     ...rest,
+    locale,
     display: market
       ? {
           marketId: market.id,
@@ -331,6 +365,13 @@ export const getStoreTheme = cache(
 export type StorefrontProduct = {
   id: string
   name: string
+  /**
+   * الاسم الإنجليزي — `null` لو التاجر ما ترجمش المنتج ده.
+   *
+   * العرض بيرجع للعربي لوحده (`t.pick`). التاجر اللي ترجم عشرة من
+   * مية لازم يعرض التسعين الباقيين بأسمائهم لا بخانات فاضية.
+   */
+  nameEn: string | null
   slug: string
   shortDescription: string | null
   price: number
@@ -342,11 +383,21 @@ export type StorefrontProduct = {
   ratingCount: number
   showStockCounter: boolean
   categoryName: string | null
+  categoryNameEn: string | null
 }
 
-const productFields = {
+/**
+ * أعمدة المنتج في القوايم — **مصدر واحد**.
+ *
+ * كانت متكرّرة هنا وفي `home-blocks`، والنسختين اتفرّقوا: إضافة
+ * عمود هنا كانت بتسيب بلوكات الصفحة الرئيسية بالشكل القديم، ونوع
+ * `StorefrontProduct` هو اللي مسك الفرق وقت البناء. التصدير بيمنع
+ * الفرق من أصله.
+ */
+export const productFields = {
   id: products.id,
   name: products.name,
+  nameEn: products.nameEn,
   slug: products.slug,
   shortDescription: products.shortDescription,
   price: products.price,
@@ -358,6 +409,7 @@ const productFields = {
   ratingCount: products.ratingCount,
   showStockCounter: products.showStockCounter,
   categoryName: categories.name,
+  categoryNameEn: categories.nameEn,
 }
 
 /** المنتجات المعروضة — النشطة فقط، وغير المحذوفة */
@@ -503,6 +555,7 @@ export const countProducts = cache(
 export type UpsellProduct = {
   id: string
   name: string
+  nameEn: string | null
   slug: string
   price: number
   image: string | null
@@ -543,6 +596,7 @@ export const listCartUpsell = cache(async (storeId: string, limit = 6): Promise<
     .select({
       id: products.id,
       name: products.name,
+      nameEn: products.nameEn,
       slug: products.slug,
       price: products.price,
       images: products.images,
@@ -571,6 +625,7 @@ export const listCartUpsell = cache(async (storeId: string, limit = 6): Promise<
   const mapped: UpsellProduct[] = rows.map((r) => ({
     id: r.id,
     name: r.name,
+    nameEn: r.nameEn,
     slug: r.slug,
     price: r.price,
     image: r.images?.[0] ?? null,
@@ -623,6 +678,7 @@ export const listCategories = cache(async (storeId: string) => {
     .select({
       id: categories.id,
       name: categories.name,
+      nameEn: categories.nameEn,
       slug: categories.slug,
       image: categories.image,
       parentId: categories.parentId,

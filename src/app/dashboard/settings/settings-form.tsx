@@ -44,6 +44,7 @@ export function SettingsForm({
   colors: { primary: string; accent: string }
   store: {
     name: string
+    nameEn: string | null
     tagline: string | null
     email: string | null
     phone: string | null
@@ -53,6 +54,8 @@ export function SettingsForm({
     favicon: string | null
     country: string
     currency: string
+    enabledLocales: Array<'ar' | 'en'>
+    defaultLocale: 'ar' | 'en'
     vatEnabled: boolean
     vatRate: number
     vatIncludedInPrice: boolean
@@ -60,6 +63,7 @@ export function SettingsForm({
 }) {
   /* ── بيانات المتجر ── */
   const [name, setName] = useState(store.name)
+  const [nameEn, setNameEn] = useState(store.nameEn ?? '')
   const [tagline, setTagline] = useState(store.tagline ?? '')
   const [email, setEmail] = useState(store.email ?? '')
   const [phone, setPhone] = useState(store.phone ?? '')
@@ -73,6 +77,8 @@ export function SettingsForm({
   const [savingInfo, startInfo] = useTransition()
 
   /* ── الإقليمية ── */
+  const [english, setEnglish] = useState(store.enabledLocales.includes('en'))
+  const [defaultLocale, setDefaultLocale] = useState<'ar' | 'en'>(store.defaultLocale)
   const [country, setCountry] = useState(store.country)
   const [currency, setCurrency] = useState(store.currency)
   const [vatEnabled, setVatEnabled] = useState(store.vatEnabled)
@@ -86,6 +92,7 @@ export function SettingsForm({
     startInfo(async () => {
       const res = await saveStoreInfoAction({
         name,
+        nameEn,
         tagline,
         email,
         phone,
@@ -106,6 +113,8 @@ export function SettingsForm({
       const res = await saveRegionalAction({
         country,
         currency,
+        englishEnabled: english,
+        defaultLocale,
         vatEnabled,
         vatRate,
         vatIncludedInPrice: vatIncluded,
@@ -131,6 +140,28 @@ export function SettingsForm({
           <span className="text-sm font-medium">اسم المتجر</span>
           <input value={name} onChange={(e) => setName(e.target.value)} className={field} />
         </label>
+
+        {/*
+          الاسم الإنجليزي بيظهر لما اللغة تتفتح بس.
+
+          خانة إنجليزي في وش تاجر ما فتحش الإنجليزي زحمة بتخلّيه
+          يسأل هي دي إيه — وأغلب التجّار ما هيفتحوهاش أصلًا.
+        */}
+        {english && (
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium">اسم المتجر بالإنجليزي</span>
+            <input
+              value={nameEn}
+              onChange={(e) => setNameEn(e.target.value)}
+              dir="ltr"
+              placeholder={name}
+              className={`${field} text-start`}
+            />
+            <span className="text-xs text-[var(--fg-muted)]">
+              سيبها فاضية والزائر الإنجليزي هيشوف الاسم العربي زي ما هو.
+            </span>
+          </label>
+        )}
 
         <label className="flex flex-col gap-1.5">
           <span className="flex flex-wrap items-center justify-between gap-2 text-sm font-medium">
@@ -313,6 +344,54 @@ export function SettingsForm({
             </span>
           )}
         </label>
+
+        {/*
+          لغات المتجر.
+
+          مقفولة افتراضيًا: المتجر اللي زراره إنجليزي وأسماء بضاعته
+          عربي أوحش من متجر عربي بالكامل — العميل بيفتكر الصفحة
+          نُصّها ما حمّلش. فالتاجر هو اللي بيفتحها لما يبقى جاهز.
+        */}
+        <div className="flex flex-col gap-4 border-t border-[var(--border)] pt-5">
+          <Toggle
+            label="افتح الإنجليزي لزوار متجرك"
+            hint="مبدّل لغة بيظهر في الهيدر، والزائر الأجنبي بيلاقي متجرك بلغته من غير ما يعمل حاجة."
+            checked={english}
+            onChange={setEnglish}
+          />
+
+          {english && (
+            <>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-sm font-medium">اللغة اللي الزائر الجديد بيلاقيها</span>
+                <select
+                  value={defaultLocale}
+                  onChange={(e) => setDefaultLocale(e.target.value as 'ar' | 'en')}
+                  className={field}
+                >
+                  <option value="ar">العربية</option>
+                  <option value="en">English</option>
+                </select>
+                <span className="text-xs text-[var(--fg-muted)]">
+                  ودي للزائر اللي متصفحه مش بيقول لغته. اللي متصفحه إنجليزي بياخد إنجليزي، واللي
+                  بيختار بإيده اختياره بيفضل معاه.
+                </span>
+              </label>
+
+              {/*
+                الرجوع للعربي بيتقال هنا لا بيتكتشف بعدين.
+
+                التاجر اللي فتح الإنجليزي وشاف منتجاته بأسماء عربية
+                بيفتكر الترجمة بايظة — وهو ببساطة ما كتبش الأسماء.
+              */}
+              <p className="rounded-lg bg-[var(--surface-2)] px-3.5 py-2.5 text-xs leading-relaxed text-[var(--fg-muted)]">
+                زراير المتجر وصفحاته بتتترجم لوحدها. أسماء منتجاتك وأقسامك بتترجم لما تكتبها إنت —
+                خانة «الاسم بالإنجليزي» في صفحة كل منتج وكل قسم. واللي ما تكتبوش بيظهر بالعربي زي
+                ما هو، فمفيش خانة بتطلع فاضية عند العميل.
+              </p>
+            </>
+          )}
+        </div>
 
         <div className="flex flex-col gap-4 border-t border-[var(--border)] pt-5">
           <Toggle

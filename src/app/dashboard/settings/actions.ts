@@ -19,6 +19,8 @@ export type SettingsState = { ok?: boolean; error?: string } | null
  */
 export async function saveStoreInfoAction(input: {
   name: string
+  /** الاسم الإنجليزي — فاضي = مترجمش، والعرض بيرجع للعربي */
+  nameEn?: string
   tagline: string
   email: string
   phone: string
@@ -60,6 +62,7 @@ export async function saveStoreInfoAction(input: {
     .update(stores)
     .set({
       name,
+      nameEn: input.nameEn?.trim() || null,
       tagline: input.tagline.trim() || null,
       email: email || null,
       phone: input.phone.trim() ? normalizePhone(input.phone, dial) : null,
@@ -150,6 +153,10 @@ export async function saveRegionalAction(input: {
   vatEnabled: boolean
   vatRate: string
   vatIncludedInPrice: boolean
+  /** الإنجليزي مفتوح للزوار؟ */
+  englishEnabled?: boolean
+  /** اللغة اللي الزائر الجديد بيلاقيها */
+  defaultLocale?: 'ar' | 'en'
 }): Promise<SettingsState> {
   const { store } = await getDashboardContext()
 
@@ -167,6 +174,21 @@ export async function saveRegionalAction(input: {
       vatEnabled: input.vatEnabled,
       vatRate: Math.round((pct || 0) * 100),
       vatIncludedInPrice: input.vatIncludedInPrice,
+      /*
+        العربي مفتوح دايمًا.
+
+        المتجر اللي يقفل لغته الأساسية بيبقى بلا لغة أصلًا، و
+        `resolveLocale` بترجع لأول عنصر في قايمة فاضية.
+      */
+      enabledLocales: input.englishEnabled ? ['ar', 'en'] : ['ar'],
+      /*
+        والافتراضي بيرجع للعربي لو الإنجليزي اتقفل.
+
+        سيبه `en` بعد ما اللغة تتقفل كان بيخلّي كل زائر يقع على لغة
+        مش في القايمة المسموحة — والنتيجة ساعتها بتتحدّد بترتيب
+        المصفوفة لا بقرار التاجر.
+      */
+      defaultLocale: input.englishEnabled ? (input.defaultLocale ?? 'ar') : 'ar',
     })
     .where(eq(stores.id, store.id))
 

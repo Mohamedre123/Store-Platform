@@ -5,6 +5,7 @@ import { BlockHead, BlockItem, BlockShell, hoverClass, type BlockChrome } from '
 import type { ProductsBlock } from '@/lib/blocks'
 import type { ListingSettings } from '@/lib/customization'
 import type { StorefrontProduct } from '@/lib/storefront'
+import type { Locale } from '@/lib/i18n'
 import type { ProductOptionSet } from '@/lib/product-options'
 
 /**
@@ -51,6 +52,7 @@ export function ProductsBlockView({
   block,
   products,
   currency,
+  locale = 'ar',
   listing,
   chrome,
   moreHref,
@@ -59,6 +61,8 @@ export function ProductsBlockView({
   block: ProductsBlock
   products: StorefrontProduct[]
   currency: string
+  /** لغة الزائر — بتعدّي للبطاقات جنب العملة */
+  locale?: Locale
   listing: ListingSettings
   chrome: BlockChrome
   moreHref: string
@@ -69,6 +73,7 @@ export function ProductsBlockView({
 
   const cardProps = {
     currency,
+    locale,
     style: block.cardStyle === 'inherit' ? listing.cardStyle : block.cardStyle,
     imageRatio: block.imageRatio === 'inherit' ? listing.imageRatio : block.imageRatio,
     showRating: listing.showRating,
