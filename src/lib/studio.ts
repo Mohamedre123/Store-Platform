@@ -6,6 +6,7 @@ import { editImage, generate, isImageModel, listImageModels } from './ai/gemini'
 import { getAiConfig, GEMINI_PRO_SLUG, GEMINI_SLUG } from './ai/settings'
 import { catalogBlock, briefLine, getStoreBrief, operationsBlock } from './ai/store-context'
 import { uploadImage, uploadVideo } from './storage'
+import { getStoreTheme } from './storefront'
 import { checkVideo, downloadVideo, listVideoModels, startVideo, type VeoAspect } from './ai/veo'
 import { recordUpload } from './media'
 import { formatMoney } from './utils'
@@ -85,7 +86,16 @@ export type ProductBrief = {
   description: string | null
   category: string | null
   options: string[]
+  /** أول صورة — للاستعمال المباشر */
   image: string | null
+  /**
+   * صور المنتج كلها.
+   *
+   * المنتج اللي ليه خمس صور (ألوان أو زوايا) بيدّي خمس بوستات
+   * مختلفة. الاكتفاء بالأولى كان بيخلّي الجدول ينشر نفس الشكل كل
+   * مرة — والمتابع بيتعلّم يعدّيه.
+   */
+  images: string[]
 }
 
 /** منتج بتفاصيله — الأساس اللي البوست بيتكتب منه */
@@ -119,6 +129,7 @@ export async function productBrief(
     category: inCatalog?.category ?? null,
     options: inCatalog?.options ?? [],
     image: row.images?.[0] ?? null,
+    images: row.images ?? [],
   }
 }
 
@@ -140,11 +151,61 @@ async function storeContext(storeId: string, merchantBrief?: string | null): Pro
   ].join('\n')
 }
 
+/**
+ * هوية المتجر البصرية — للصورة.
+ *
+ * ## من غيرها الصورة بتطلع «حلوة» لكن مش بتاعته
+ * التاجر اللي ظبّط ألوانه وخطوطه في محرّر التخصيص وشاف صورة
+ * إعلانية بألوان تانية خالص بيحسّها إعلان لمتجر غيره — والهوية
+ * هي اللي بتخلّي متابعه يعرف البوست من غير ما يقرا الاسم.
+ */
+async function brandBlock(storeId: string): Promise<string> {
+  const theme = await getStoreTheme(storeId)
+  const id = theme.custom.identity
+
+  return [
+    'هوية المتجر البصرية — التزم بيها:',
+    `- اللون الأساسي: ${id.primary}`,
+    `- اللون المساعد: ${id.accent}`,
+    `- خلفية المتجر: ${id.background}`,
+    `- لون النص: ${id.text}`,
+    `- الحواف: ${id.radius === 'none' ? 'حادّة' : id.radius === 'full' ? 'دايرية جدًا' : 'مستديرة'}`,
+    '',
+    'استخدم اللونين دول في الخلفية والعناصر والنص المكتوب على الصورة.',
+    'الصورة لازم تبان إنها من نفس المتجر لو اتحطّت جنب صورة تانية منه.',
+  ].join('\n')
+}
+
 /* ══════════════════════════════════════════════════════════════
    الكلام
    ══════════════════════════════════════════════════════════════ */
 
-export type CopyResult = { caption: string; hashtags: string[] }
+/**
+ * البوست بأجزائه.
+ *
+ * ## ليه مقسّم مش نص واحد
+ * البوست البيعي له تركيب: **هوك** بيوقّف التمرير، **متن** بيقنع،
+ * و**دعوة** بتقول اعمل إيه. النص الواحد كان بيطلع فقرة متوسّطة
+ * مالهاش أول ولا آخر — والتاجر مش عارف يعدّل الهوك لوحده لو مش
+ * عاجبه.
+ *
+ * و`caption` بيتركّب منهم للنسخ والنشر — المنصات بتاخد نصًّا
+ * واحدًا في الآخر.
+ */
+export type CopyResult = {
+  /** أول سطر — اللي بيوقّف الإصبع */
+  hook: string
+  /** المتن — الفوايد والتفاصيل */
+  body: string
+  /** الدعوة للفعل */
+  cta: string
+  hashtags: string[]
+}
+
+/** الأجزاء متجمّعة كنص واحد — للنسخ وللنشر */
+export function joinCopy(c: { hook: string; body: string; cta: string }): string {
+  return [c.hook, c.body, c.cta].map((x) => x.trim()).filter(Boolean).join('\n\n')
+}
 
 /**
  * كتابة بوست.
@@ -198,11 +259,28 @@ export async function writeCopy(input: {
     '- **ما تخترعش أي معلومة**: لا سعر ولا خصم ولا مقاس ولا ميعاد شحن مش مكتوب فوق.',
     '  المعلومة الغلط في بوست بتوصل لعميل بيطلب على أساسها، وبتتحوّل لمرتجع وشكوى.',
     '- من غير إيموجي أكتر من تلاتة في البوست كله.',
-    '- الطول من ٤٠ لـ٩٠ كلمة.',
     '',
-    'رُدّ بـJSON بالشكل ده بالظبط ومن غير أي كلام حواليه:',
-    '{"caption":"نص البوست","hashtags":["#هاشتاج","#تاني"]}',
-    'الهاشتاجات من ٤ لـ٨، عربي ومناسبة للمنتج والسوق المصري.',
+    /*
+      أقسام معلَّمة لا JSON.
+
+      الرد المقطوع في نص JSON بيبقى غير صالح، والتحليل بيفشل
+      والتاجر بيشوف أقواس وعلامات تنصيص في وش البوست — وده اللي
+      كان بيحصل فعلًا. الأقسام المعلَّمة بتتقرا حتى لو الرد اتقطع:
+      اللي وصل بيتاخد واللي ما وصلش بيفضل فاضي.
+    */
+    'اكتب بالشكل ده بالظبط، كل قسم في سطر بعد علامته، ومن غير أي كلام تاني:',
+    '',
+    '[هوك]',
+    'سطر واحد بيوقّف التمرير — سؤال أو موقف أو مفاجأة. من ٥ لـ١٢ كلمة.',
+    '',
+    '[نص]',
+    'من سطرين لأربعة: أهم فايدتين أو تلاتة بلغة العميل مش لغة الكتالوج.',
+    '',
+    '[دعوة]',
+    'سطر واحد بيقول للعميل يعمل إيه دلوقتي.',
+    '',
+    '[هاشتاجات]',
+    'من ٤ لـ٨ هاشتاجات عربي مناسبة للمنتج والسوق المصري، في سطر واحد مفصولة بمسافة.',
   ]
     .filter(Boolean)
     .join('\n')
@@ -211,9 +289,19 @@ export async function writeCopy(input: {
     apiKey: key.apiKey,
     model: key.model,
     /* تعليمات النظام منفصلة عن كلام التاجر — أصعب إن وصفه يلغيها */
-    system: 'إنت كاتب محتوى تسويقي مصري بيكتب لمتاجر أونلاين. بترد بـJSON بس.',
+    system:
+      'إنت كاتب محتوى تسويقي مصري بيكتب لمتاجر أونلاين. بترد بالأقسام المعلَّمة ' +
+      'المطلوبة منك بالظبط ومن غير أي مقدّمات ولا شرح.',
     messages: [{ role: 'user', text: prompt }],
     temperature: 0.9,
+    /*
+      الحد الافتراضي (٨٠٠) كان بيقطع الرد في النص.
+
+      العربي بياخد توكنات أكتر من الإنجليزي لنفس عدد الكلمات،
+      والموديل بيصرف توكنات على التفكير قبل ما يكتب. والقطع كان
+      بيخلّي التاجر يشوف نص بوست.
+    */
+    maxTokens: 2000,
   })
   if (!res.ok) return { error: res.error.message }
 
@@ -221,41 +309,50 @@ export async function writeCopy(input: {
 }
 
 /**
- * فكّ رد الموديل.
+ * فكّ الرد لأقسامه.
  *
- * ## الرجوع للنص الخام لو الـJSON اتكسر
- * الموديل بيلفّ الرد أحيانًا في ```json أو بيزوّد جملة قبله.
- * الرمي في الحالة دي كان بيخلّي التاجر يخسر بوستًا مكتوبًا كويس
- * عشان قوس — والنص الخام أحسن من لا حاجة.
+ * ## بيشتغل حتى لو الرد اتقطع
+ * الأقسام بتتقرا بعلاماتها. القسم اللي ما وصلش بيفضل فاضي، واللي
+ * وصل بيتاخد — والتاجر بياخد نص بوست يعدّله بدل أقواس JSON مكسورة
+ * في وشّه.
+ *
+ * ## ولو مفيش علامات خالص
+ * بنرجّع النص كله كمتن. الرمي كان بيضيّع بوستًا مكتوبًا كويس عشان
+ * الموديل نسي علامة.
  */
 function parseCopy(raw: string): CopyResult {
-  const cleaned = raw.replace(/```json|```/g, '').trim()
-  const start = cleaned.indexOf('{')
-  const end = cleaned.lastIndexOf('}')
+  const text = raw.replace(/```+/g, '').trim()
 
-  if (start >= 0 && end > start) {
-    try {
-      const parsed = JSON.parse(cleaned.slice(start, end + 1)) as {
-        caption?: unknown
-        hashtags?: unknown
-      }
-      const caption = typeof parsed.caption === 'string' ? parsed.caption.trim() : ''
-      const tags = Array.isArray(parsed.hashtags)
-        ? parsed.hashtags
-            .filter((t): t is string => typeof t === 'string')
-            .map((t) => (t.startsWith('#') ? t : '#' + t))
-            .map((t) => t.replace(/\s+/g, '_'))
-            .slice(0, 10)
-        : []
-      if (caption) return { caption, hashtags: tags }
-    } catch {
-      /* بيقع للنص الخام تحت */
+  const grab = (label: string): string => {
+    /*
+      لحد أول علامة تانية أو آخر النص.
+
+      الوقوف عند سطر فاضي كان بيقصّ المتن اللي فيه أكتر من فقرة.
+    */
+    const re = new RegExp('\\[' + label + '\\]\\s*([\\s\\S]*?)(?=\\n\\s*\\[|$)')
+    return text.match(re)?.[1]?.trim() ?? ''
+  }
+
+  const hook = grab('هوك')
+  const body = grab('نص')
+  const cta = grab('دعوة')
+  const tagLine = grab('هاشتاجات')
+
+  const hashtags = [...(tagLine || text).matchAll(/#[^\s#]+/g)]
+    .map((m) => m[0])
+    .slice(0, 10)
+
+  /* مفيش علامات خالص — النص كله متن، والهاشتاجات بتتشال منه */
+  if (!hook && !body && !cta) {
+    return {
+      hook: '',
+      body: text.replace(/#[^\s#]+/g, '').trim(),
+      cta: '',
+      hashtags,
     }
   }
 
-  /* النص زي ما جه — والهاشتاجات بتتلقّط منه لو فيه */
-  const tags = [...cleaned.matchAll(/#[^\s#]+/g)].map((m) => m[0]).slice(0, 10)
-  return { caption: cleaned.replace(/#[^\s#]+/g, '').trim(), hashtags: tags }
+  return { hook, body, cta: cta.replace(/#[^\s#]+/g, '').trim(), hashtags }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -327,6 +424,8 @@ export async function makeImage(input: {
     ? input.prompt
     : [
         await storeContext(input.storeId, input.merchantBrief),
+        '',
+        await brandBlock(input.storeId),
         '',
         `صمّم صورة إعلانية احترافية بنسبة ${preset.aspect} (${preset.label}).`,
         input.prompt,
@@ -457,6 +556,8 @@ export async function startProductVideo(input: {
   */
   const prompt = [
     await storeContext(input.storeId, input.merchantBrief),
+    '',
+    await brandBlock(input.storeId),
     '',
     'اعمل فيديو إعلاني قصير:',
     input.prompt,

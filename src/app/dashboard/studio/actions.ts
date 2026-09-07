@@ -98,7 +98,7 @@ export async function generateImageAction(input: {
 }
 
 export type CopyState =
-  | { ok: true; caption: string; hashtags: string[] }
+  | { ok: true; hook: string; body: string; cta: string; hashtags: string[] }
   | { ok: false; error: string }
 
 export async function generateCopyAction(input: {
@@ -116,7 +116,7 @@ export async function generateCopyAction(input: {
   })
 
   if ('error' in res) return { ok: false, error: res.error }
-  return { ok: true, caption: res.caption, hashtags: res.hashtags }
+  return { ok: true, hook: res.hook, body: res.body, cta: res.cta, hashtags: res.hashtags }
 }
 
 export type VideoStartState =

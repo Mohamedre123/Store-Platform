@@ -5,6 +5,7 @@ import { useState, useTransition } from 'react'
 import { Check, Copy, Download, Loader2, Send, Trash2 } from 'lucide-react'
 import { deletePostAction, publishPostAction } from '../actions'
 import { platformOf } from '@/lib/studio-meta'
+import { SharePost } from '@/components/dashboard/share-post'
 import { Card } from '@/components/ui'
 import { toast } from '@/components/dashboard/toast'
 import { cn, formatDateTime } from '@/lib/utils'
@@ -141,6 +142,21 @@ export function PostsList({
                   </button>
                 )}
 
+                {/*
+                  المشاركة من الموبايل قبل النسخ والتنزيل.
+
+                  دي أقصر طريق للنشر لحد ما الربط التلقائي يشتغل:
+                  ضغطة بتفتح شاشة المشاركة بالصورة والكلام مع بعض،
+                  والتاجر بيختار إنستجرام. الباقي بديل للكمبيوتر.
+                */}
+                {(p.videoUrl || p.imageUrls[0]) && p.status !== 'published' && (
+                  <SharePost
+                    url={p.videoUrl ?? p.imageUrls[0]}
+                    text={text}
+                    kind={p.videoUrl ? 'video' : 'image'}
+                  />
+                )}
+
                 <button
                   type="button"
                   onClick={() => {
@@ -187,8 +203,8 @@ export function PostsList({
               {p.targets.length === 0 && p.status !== 'published' && (
                 <p className="flex items-center gap-1.5 text-xs text-[var(--fg-subtle)]">
                   <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                  جاهز — نزّل {p.videoUrl ? 'الفيديو' : 'الصورة'} وانسخ الكلام وانشره بإيدك، أو
-                  اربط صفحتك عشان ينزل لوحده.
+                  جاهز — من الموبايل دوس «انشره من موبايلك» واختار المنصة، أو نزّل{' '}
+                  {p.videoUrl ? 'الفيديو' : 'الصورة'} وانسخ الكلام.
                 </p>
               )}
             </div>

@@ -3,6 +3,7 @@ import { and, asc, desc, eq, inArray, isNotNull, lte, or, sql } from 'drizzle-or
 import { db } from '@/db'
 import { contentSchedules, socialAccounts, socialPosts, stores } from '@/db/schema'
 import {
+  joinCopy,
   makeImage,
   nextProductInRotation,
   pollProductVideo,
@@ -416,11 +417,38 @@ export async function runSchedule(scheduleId: string): Promise<{ ok: boolean; er
   const product = await productBrief(s.storeId, productId)
   if (!product) return fail('المنتج مش موجود')
 
+  /*
+    صورة مختلفة من المنتج كل مرة.
+
+    المنتج اللي ليه خمس صور (ألوان أو زوايا) بيدّي خمس بوستات
+    مختلفة الشكل. الاكتفاء بالأولى كان بيخلّي الجدول ينشر نفس
+    الصورة كل ما الدور يرجع عليه — والمتابع بيتعلّم يعدّي البوست.
+
+    والدوران بعدد المرات اللي الجدول اشتغلها: بيتحسب من عدد
+    البوستات اللي طلعت من الجدول ده، فما بيحتاجش عمودًا جديدًا
+    وبيفضل مظبوط لو التاجر مسح بوستًا.
+  */
+  const [{ n: runs = 0 } = { n: 0 }] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(socialPosts)
+    .where(eq(socialPosts.scheduleId, s.id))
+
+  const photos = product.images.length ? product.images : [product.image].filter(Boolean)
+  const seed = photos.length ? photos[runs % photos.length] : null
+
   /* الكلام الأول — أرخص، ولو فشل ما نضيّعش نداء صورة */
+  /*
+    والنبرة بتلفّ كمان.
+
+    «بوست بيعي» كل يوم بيخلّي الصفحة قالبًا واحدًا متكرّرًا. التنويع
+    بين البيع والحكاية والنصيحة بيخلّي المتابع يفضل بيقرا — ودي
+    نفس النصيحة اللي أي مدير محتوى بيقولها.
+  */
+  const tones = ['sell', 'story', 'launch', 'tips'] as const
   const copy = await writeCopy({
     storeId: s.storeId,
     productId,
-    tone: 'sell',
+    tone: tones[runs % tones.length],
     extra: s.style,
   })
   if ('error' in copy) return fail(copy.error)
@@ -449,7 +477,7 @@ export async function runSchedule(scheduleId: string): Promise<{ ok: boolean; er
       storeId: s.storeId,
       prompt: brief,
       preset: s.preset as PresetKey,
-      seedUrl: product.image,
+      seedUrl: seed,
     })
     if ('error' in job) return fail(job.error)
 
@@ -478,7 +506,7 @@ export async function runSchedule(scheduleId: string): Promise<{ ok: boolean; er
       prompt: brief,
       preset: s.preset as PresetKey,
       productId,
-      seedUrl: product.image,
+      seedUrl: seed,
     })
     if ('error' in image) return fail(image.error)
     imageUrl = image.url
@@ -487,7 +515,7 @@ export async function runSchedule(scheduleId: string): Promise<{ ok: boolean; er
   const postId = await createPost({
     storeId: s.storeId,
     userId: s.createdBy,
-    caption: copy.caption,
+    caption: joinCopy(copy),
     hashtags: copy.hashtags,
     imageUrls: imageUrl ? [imageUrl] : [],
     videoUrl,

@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import Image from 'next/image'
 import { useTransition } from 'react'
 import { AlertTriangle, Link2, Trash2 } from 'lucide-react'
@@ -132,11 +133,31 @@ export function AccountsPanel({
           </p>
         </div>
 
+        {/*
+          الرسالة بتقول الطريق البديل لا بس إن الميزة مقفولة.
+
+          «لسه بيتجهّز» لوحدها بتسيب التاجر واقف. وهو مش واقف فعلًا
+          — يقدر ينشر من موبايله بضغطتين دلوقتي، والفرق بين
+          الجملتين هو الفرق بين إنه يستخدم الأداة ولا يسيبها.
+        */}
         {entries.length === 0 ? (
-          <p className="rounded-lg bg-[var(--surface-2)] px-3.5 py-3 text-sm leading-relaxed text-[var(--fg-muted)]">
-            الربط بالسوشيال لسه بيتجهّز على المنصة. لحد ما يفتح، البوستات بتتحفظ جاهزة في
-            «البوستات» وتنزّلها وتنشرها بإيدك — الصور والكلام شغّالين عادي.
-          </p>
+          <div className="flex flex-col gap-2 rounded-lg bg-[var(--surface-2)] px-3.5 py-3 text-sm leading-relaxed text-[var(--fg-muted)]">
+            <p>
+              الربط التلقائي لسه بيتجهّز على المنصة —{' '}
+              <strong className="text-[var(--fg)]">بس الأداة شغّالة بالكامل من غيره</strong>.
+            </p>
+            <p>
+              اعمل البوست من الاستوديو، وافتح «البوستات» من موبايلك، ودوس{' '}
+              <strong className="text-[var(--fg)]">«انشره من موبايلك»</strong> — هتفتحلك شاشة
+              المشاركة بالصورة والكلام مع بعض وتختار إنستجرام أو فيسبوك أو تيك توك. ضغطتين.
+            </p>
+            <Link
+              href="/dashboard/studio/posts"
+              className="mt-1 flex h-10 w-fit items-center rounded-lg bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-fg)]"
+            >
+              افتح البوستات
+            </Link>
+          </div>
         ) : (
           <div className="flex flex-col gap-2">
             {entries.map((p) => (

@@ -27,6 +27,7 @@ import {
 } from './actions'
 import { PRESETS, TONES, platformOf, presetOf, type PresetKey, type ToneKey } from '@/lib/studio-meta'
 import { Alert, Card } from '@/components/ui'
+import { SharePost } from '@/components/dashboard/share-post'
 import { toast } from '@/components/dashboard/toast'
 import { cn } from '@/lib/utils'
 
@@ -90,7 +91,15 @@ export function StudioClient({
   /* الكلام */
   const [tone, setTone] = useState<ToneKey>('sell')
   const [extra, setExtra] = useState('')
-  const [caption, setCaption] = useState('')
+  /*
+    الأجزاء منفصلة عن بعض.
+
+    التاجر بيعدّل الهوك لوحده لما يبقى مش عاجبه من غير ما يخاف
+    يلخبط الباقي — والنص الواحد كان بيخلّي أي تعديل مغامرة.
+  */
+  const [hook, setHook] = useState('')
+  const [body, setBody] = useState('')
+  const [cta, setCta] = useState('')
   const [hashtags, setHashtags] = useState<string[]>([])
   const [copyError, setCopyError] = useState<string | null>(null)
   const [writing, startCopy] = useTransition()
@@ -99,6 +108,9 @@ export function StudioClient({
   const [targets, setTargets] = useState<string[]>([])
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saving, startSave] = useTransition()
+
+  /* النص المركَّب — ده اللي بيتحفظ وبيتنسخ وبينشر */
+  const caption = [hook, body, cta].map((x) => x.trim()).filter(Boolean).join('\n\n')
 
   const current = chain.at(-1) ?? null
   /* الوسيط اللي هيتحفظ فعلًا — بيتبع التبويب المفتوح لا اللي اتعمل */
@@ -204,7 +216,9 @@ export function StudioClient({
       })
       if (!res.ok) setCopyError(res.error)
       else {
-        setCaption(res.caption)
+        setHook(res.hook)
+        setBody(res.body)
+        setCta(res.cta)
         setHashtags(res.hashtags)
       }
     })
@@ -647,14 +661,45 @@ export function StudioClient({
         {copyError && <Alert tone="danger">{copyError}</Alert>}
 
         {caption && (
-          <div className="flex flex-col gap-2">
-            <textarea
-              value={caption}
-              onChange={(e) => setCaption(e.target.value)}
-              rows={5}
-              aria-label="نص البوست"
-              className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] p-3 text-sm leading-relaxed focus:border-[var(--primary)] focus:outline-none"
-            />
+          <div className="flex flex-col gap-3">
+            {/*
+              كل جزء في خانته وباسمه.
+
+              البوست البيعي له تركيب: هوك بيوقّف التمرير، متن
+              بيقنع، ودعوة بتقول اعمل إيه. الخانة الواحدة كانت
+              بتطلّع فقرة مالهاش أول ولا آخر، والتاجر مش عارف
+              يعدّل جزءًا من غير ما يقرا الباقي كله.
+            */}
+            {[
+              {
+                label: 'الهوك',
+                hint: 'أول سطر — ده اللي بيوقّف الإصبع',
+                value: hook,
+                set: setHook,
+                rows: 2,
+              },
+              { label: 'النص', hint: 'الفوايد والتفاصيل', value: body, set: setBody, rows: 5 },
+              {
+                label: 'الدعوة للفعل',
+                hint: 'بيقول للعميل يعمل إيه دلوقتي',
+                value: cta,
+                set: setCta,
+                rows: 2,
+              },
+            ].map((f) => (
+              <label key={f.label} className="flex flex-col gap-1.5">
+                <span className="flex flex-wrap items-baseline gap-2">
+                  <span className="text-sm font-medium">{f.label}</span>
+                  <span className="text-xs text-[var(--fg-subtle)]">{f.hint}</span>
+                </span>
+                <textarea
+                  value={f.value}
+                  onChange={(e) => f.set(e.target.value)}
+                  rows={f.rows}
+                  className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] p-3 text-sm leading-relaxed focus:border-[var(--primary)] focus:outline-none"
+                />
+              </label>
+            ))}
             {hashtags.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {hashtags.map((h) => (
@@ -705,15 +750,31 @@ export function StudioClient({
             */
             <div className="flex flex-col gap-2 rounded-lg bg-[var(--surface-2)] p-3.5">
               <p className="text-sm leading-relaxed text-[var(--fg-muted)]">
-                لسه ما ربطتش صفحاتك. احفظ البوست دلوقتي وهتلاقيه في «البوستات» تنزّله وتنشره بإيدك،
-                أو اربط صفحتك ونخلّيه ينزل لوحده.
+                لسه ما ربطتش صفحاتك. من موبايلك تقدر تنشره دلوقتي بضغطة — بتفتحلك شاشة المشاركة
+                بالصورة والكلام مع بعض وتختار المنصة. أو احفظه وهتلاقيه في «البوستات».
               </p>
-              <Link
-                href="/dashboard/studio/accounts"
-                className="flex h-10 w-fit items-center rounded-lg border border-[var(--border-strong)] px-3 text-sm font-medium"
-              >
-                اربط صفحاتك
-              </Link>
+              <div className="flex flex-wrap gap-2">
+                {/*
+                  المشاركة من الموبايل هنا كمان.
+
+                  التاجر اللي لسه عامل البوست دلوقتي عايز ينشره
+                  دلوقتي — تحويله لصفحة تانية عشان يعمل ضغطة كان
+                  بيخلّيه ينسى.
+                */}
+                {hasMedia && (
+                  <SharePost
+                    url={media === 'video' ? video!.url : current!.url}
+                    text={[caption, hashtags.join(' ')].filter(Boolean).join('\n\n')}
+                    kind={media}
+                  />
+                )}
+                <Link
+                  href="/dashboard/studio/accounts"
+                  className="flex h-10 w-fit items-center rounded-lg border border-[var(--border-strong)] px-3 text-sm font-medium"
+                >
+                  اربط صفحاتك
+                </Link>
+              </div>
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">
