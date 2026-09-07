@@ -32,10 +32,17 @@ export async function savePluginAction(input: {
     if (value) config[field.key] = value
   }
 
-  // التفعيل من غير المعرّف الأساسي مش هيعمل حاجة — نمنعه بدل ما التاجر
-  // يفتكر إنه شغّال وهو مش شغّال
+  /*
+    التفعيل من غير المعرّف الأساسي مش هيعمل حاجة — نمنعه بدل ما
+    التاجر يفتكر إنه شغّال وهو مش شغّال.
+
+    **والفحص ده للإضافات اللي ليها حقول بس.** فيه إضافات بتتفتح
+    بمفتاح وخلاص (زي الاستوديو — إعدادها شاشة كاملة مش خانة نص)،
+    و`def.fields[0]` عليها `undefined` — فالسطر كان بيرمي وقت
+    التشغيل وأول ضغطة تفعيل تطلّع «حصلت مشكلة مؤقتة».
+  */
   const required = def.fields[0]
-  if (input.enabled && !config[required.key]) {
+  if (required && input.enabled && !config[required.key]) {
     return { error: `اكتب ${required.label} الأول` }
   }
 
