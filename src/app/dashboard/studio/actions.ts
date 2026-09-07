@@ -6,7 +6,13 @@ import { db } from '@/db'
 import { products, storePlugins } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { assertCan } from '@/lib/permissions'
-import { makeImage, productBrief, writeCopy } from '@/lib/studio'
+import {
+  makeImage,
+  pollProductVideo,
+  productBrief,
+  startProductVideo,
+  writeCopy,
+} from '@/lib/studio'
 import {
   createPost,
   deletePost,
@@ -113,6 +119,78 @@ export async function generateCopyAction(input: {
   return { ok: true, caption: res.caption, hashtags: res.hashtags }
 }
 
+export type VideoStartState =
+  | { ok: true; operation: string }
+  | { ok: false; error: string }
+
+/**
+ * بدء فيديو — بيرجّع اسم العملية والمتصفح بيسأل عليها.
+ *
+ * التوليد بياخد من دقيقة لتلاتة، ودالة الخادم عمرها ثواني.
+ * الانتظار جوّاها كان بيموت قبل ما الفيديو يخلص — والتاجر بيدفع
+ * تمن توليد ما شافوش.
+ */
+export async function startVideoAction(input: {
+  prompt: string
+  preset: PresetKey
+  productId?: string | null
+  useProductPhoto?: boolean
+  /** صورة من الاستوديو تتحرّك — بتغلب صورة المنتج */
+  seedAssetUrl?: string | null
+}): Promise<VideoStartState> {
+  const { store } = await studioContext()
+
+  const prompt = String(input.prompt ?? '').trim()
+  if (prompt.length < 3) return { ok: false, error: 'اكتب وصفًا للفيديو' }
+  if (prompt.length > 1200) return { ok: false, error: 'الوصف طويل أوي' }
+
+  let seedUrl: string | null = input.seedAssetUrl?.trim() || null
+  if (!seedUrl && input.useProductPhoto && input.productId) {
+    const p = await productBrief(store.id, input.productId)
+    seedUrl = p?.image ?? null
+  }
+
+  const res = await startProductVideo({
+    storeId: store.id,
+    prompt,
+    preset: input.preset,
+    seedUrl,
+  })
+
+  if ('error' in res) return { ok: false, error: res.error }
+  return { ok: true, operation: res.operation }
+}
+
+export type VideoPollState =
+  | { state: 'running' }
+  | { state: 'done'; id: string; url: string }
+  | { state: 'failed'; error: string }
+
+export async function checkVideoAction(input: {
+  operation: string
+  prompt: string
+  preset: PresetKey
+  productId?: string | null
+}): Promise<VideoPollState> {
+  const { store, user } = await studioContext()
+
+  /*
+    اسم العملية بييجي من المتصفح — والمفتاح مفتاح المتجر ده.
+
+    أسوأ ما يحصل لو حد بعت اسم عملية مش بتاعته إن جوجل بترفضه
+    (المفتاح مختلف)، فالتسريب مش وارد. والصف بيتكتب على متجره هو
+    من الجلسة لا من الحمولة.
+  */
+  return pollProductVideo({
+    storeId: store.id,
+    userId: user.id,
+    operation: String(input.operation ?? ''),
+    prompt: String(input.prompt ?? '').slice(0, 1200),
+    preset: input.preset,
+    productId: input.productId ?? null,
+  })
+}
+
 /* ══════════════════════════════════════════════════════════════
    البوستات
    ══════════════════════════════════════════════════════════════ */
@@ -123,6 +201,7 @@ export async function savePostAction(input: {
   caption: string
   hashtags: string[]
   imageUrls: string[]
+  videoUrl?: string | null
   productId?: string | null
   targets?: string[]
   publishNow?: boolean
@@ -131,7 +210,9 @@ export async function savePostAction(input: {
 
   const caption = String(input.caption ?? '').trim()
   if (!caption) return { error: 'اكتب نص البوست' }
-  if (input.imageUrls.length === 0) return { error: 'محتاج صورة واحدة على الأقل' }
+  if (input.imageUrls.length === 0 && !input.videoUrl) {
+    return { error: 'محتاج صورة أو فيديو' }
+  }
 
   const id = await createPost({
     storeId: store.id,
@@ -139,6 +220,7 @@ export async function savePostAction(input: {
     caption,
     hashtags: (input.hashtags ?? []).slice(0, 12),
     imageUrls: input.imageUrls.slice(0, 4),
+    videoUrl: input.videoUrl ?? null,
     productId: input.productId ?? null,
     targets: input.targets ?? [],
     status: 'ready',
@@ -188,6 +270,7 @@ export async function saveScheduleAction(input: {
   productIds?: string[]
   style?: string | null
   preset: PresetKey
+  media: 'image' | 'video'
   autoPublish: boolean
   isActive: boolean
 }): Promise<SaveState> {
@@ -217,6 +300,7 @@ export async function saveScheduleAction(input: {
     productIds: input.productIds,
     style: input.style,
     preset: input.preset,
+    media: input.media,
     autoPublish: input.autoPublish,
     isActive: input.isActive,
   })

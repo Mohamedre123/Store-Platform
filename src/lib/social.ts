@@ -382,7 +382,14 @@ export type PublishOutcome = { accountId: string; ok: boolean; externalId?: stri
 export async function publishToAccount(
   storeId: string,
   accountId: string,
-  post: { caption: string; hashtags: string[]; imageUrl: string },
+  /**
+   * الوسيط: صورة أو فيديو، واحد بس.
+   *
+   * `videoUrl` بيغلب لو الاتنين موجودين — البوست اللي فيه فيديو
+   * هو فيديو، والصورة معاه بتبقى غلاف لا محتوى تاني. ونشر
+   * الاتنين كان بيطلّع بوستين على نفس الصفحة.
+   */
+  post: { caption: string; hashtags: string[]; imageUrl?: string | null; videoUrl?: string | null },
 ): Promise<PublishOutcome> {
   const [acc] = await db
     .select()
@@ -400,12 +407,22 @@ export async function publishToAccount(
   const text = [post.caption, post.hashtags.join(' ')].filter(Boolean).join('\n\n')
 
   try {
-    const res =
-      acc.platform === 'facebook'
-        ? await publishFacebook(acc.externalId, token, text, post.imageUrl)
+    const video = post.videoUrl?.trim() || null
+    const image = post.imageUrl?.trim() || null
+
+    if (!video && !image) return { accountId, ok: false, error: 'البوست من غير صورة ولا فيديو' }
+
+    const res = video
+      ? acc.platform === 'facebook'
+        ? await publishFacebookVideo(acc.externalId, token, text, video)
         : acc.platform === 'instagram'
-          ? await publishInstagram(acc.externalId, token, text, post.imageUrl)
-          : await publishTiktok(token, text, post.imageUrl, acc.canPublish)
+          ? await publishInstagramReel(acc.externalId, token, text, video)
+          : await publishTiktokVideo(token, text, video, acc.canPublish)
+      : acc.platform === 'facebook'
+        ? await publishFacebook(acc.externalId, token, text, image!)
+        : acc.platform === 'instagram'
+          ? await publishInstagram(acc.externalId, token, text, image!)
+          : await publishTiktok(token, text, image!, acc.canPublish)
 
     if (!res.ok) {
       await markError(acc.id, res.error)
@@ -518,6 +535,142 @@ async function publishTiktok(
 
   if (data.error && data.error.code !== 'ok') {
     return { ok: false, error: data.error.message ?? 'تيك توك رفض النشر' }
+  }
+  if (!data.data?.publish_id) return { ok: false, error: 'تيك توك ما رجّعش معرّف النشر' }
+
+  return { ok: true, data: data.data.publish_id }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   الفيديو
+   ══════════════════════════════════════════════════════════════ */
+
+/** فيديو على صفحة فيسبوك */
+async function publishFacebookVideo(
+  pageId: string,
+  token: string,
+  description: string,
+  videoUrl: string,
+): Promise<SocialResult<string>> {
+  /*
+    `graph-video` لا `graph`.
+
+    رفع الفيديو عند ميتا على نطاق تاني، والنطاق العادي بيرد بخطأ
+    مالوش علاقة بالسبب.
+  */
+  const res = await fetch(`https://graph-video.facebook.com/v21.0/${pageId}/videos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ file_url: videoUrl, description, access_token: token }),
+  })
+
+  const data = (await res.json()) as { id?: string; error?: { message?: string } }
+  if (!res.ok || data.error) {
+    return { ok: false, error: data.error?.message ?? 'فيسبوك رفض الفيديو' }
+  }
+  return { ok: true, data: data.id ?? '' }
+}
+
+/**
+ * ريلز إنستجرام — تلات خطوات.
+ *
+ * ## والانتظار إلزامي بين الرفع والنشر
+ * إنستجرام بيعالج الفيديو بعد الرفع، والنشر على حاوية لسه بتتعالج
+ * بيترفض بـ«Media not ready». مفيش ويب هوك للحالة دي — السؤال هو
+ * الطريقة الوحيدة، والحدّ الأقصى ٩٠ ثانية عشان الدالة ما تموتش
+ * وهي مستنّية.
+ */
+async function publishInstagramReel(
+  igUserId: string,
+  token: string,
+  caption: string,
+  videoUrl: string,
+): Promise<SocialResult<string>> {
+  const created = await fetch(`${GRAPH}/${igUserId}/media`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      media_type: 'REELS',
+      video_url: videoUrl,
+      caption,
+      /* بيبان في التايم لاين كمان لا في تبويب الريلز وحده */
+      share_to_feed: true,
+      access_token: token,
+    }),
+  })
+
+  const cData = (await created.json()) as { id?: string; error?: { message?: string } }
+  if (!created.ok || !cData.id) {
+    return { ok: false, error: cData.error?.message ?? 'إنستجرام رفض الفيديو' }
+  }
+
+  const ready = await waitForContainer(cData.id, token)
+  if (!ready.ok) return ready
+
+  const published = await fetch(`${GRAPH}/${igUserId}/media_publish`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ creation_id: cData.id, access_token: token }),
+  })
+
+  const pData = (await published.json()) as { id?: string; error?: { message?: string } }
+  if (!published.ok || !pData.id) {
+    return { ok: false, error: pData.error?.message ?? 'إنستجرام رفض النشر' }
+  }
+  return { ok: true, data: pData.id }
+}
+
+/** انتظار معالجة الحاوية — بيسأل كل خمس ثواني */
+async function waitForContainer(containerId: string, token: string): Promise<SocialResult<string>> {
+  for (let i = 0; i < 18; i++) {
+    await new Promise((r) => setTimeout(r, 5000))
+
+    const res = await fetchJson<{ status_code?: string; status?: string }>(
+      `${GRAPH}/${containerId}?fields=status_code,status&access_token=${encodeURIComponent(token)}`,
+    )
+
+    if (res?.status_code === 'FINISHED') return { ok: true, data: containerId }
+    if (res?.status_code === 'ERROR') {
+      return { ok: false, error: res.status ?? 'إنستجرام فشل في معالجة الفيديو' }
+    }
+  }
+
+  return {
+    ok: false,
+    error: 'إنستجرام أخد وقت أطول من المتوقّع في معالجة الفيديو. جرّب تنشره تاني بعد شوية.',
+  }
+}
+
+/**
+ * فيديو تيك توك — وده المسار الطبيعي عندهم.
+ *
+ * تيك توك أصلًا منصة فيديو، فالمسار ده أبسط من بوست الصور: نوع
+ * الوسيط `VIDEO` والمصدر رابط، وخلاص.
+ */
+async function publishTiktokVideo(
+  token: string,
+  caption: string,
+  videoUrl: string,
+  canPublish: boolean,
+): Promise<SocialResult<string>> {
+  const res = await fetch(`${TIKTOK}/post/publish/video/init/`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      post_info: canPublish
+        ? { title: caption.slice(0, 2200), privacy_level: 'PUBLIC_TO_EVERYONE' }
+        : { title: caption.slice(0, 2200) },
+      source_info: { source: 'PULL_FROM_URL', video_url: videoUrl },
+    }),
+  })
+
+  const data = (await res.json()) as {
+    data?: { publish_id?: string }
+    error?: { code?: string; message?: string }
+  }
+
+  if (data.error && data.error.code !== 'ok') {
+    return { ok: false, error: data.error.message ?? 'تيك توك رفض الفيديو' }
   }
   if (!data.data?.publish_id) return { ok: false, error: 'تيك توك ما رجّعش معرّف النشر' }
 

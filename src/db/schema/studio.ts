@@ -42,6 +42,15 @@ export const studioAssets = pgTable(
     /** مسار التخزين — للحذف */
     path: text('path').notNull(),
 
+    /**
+     * صورة ولا فيديو.
+     *
+     * العرض والتنزيل والنشر تلاتتهم بيختلفوا — و`<img>` على ملف
+     * mp4 بيرسم أيقونة مكسورة من غير ما يقول ليه.
+     */
+    kind: text('kind').$type<'image' | 'video'>().notNull().default('image'),
+    mimeType: text('mime_type').notNull().default('image/png'),
+
     /** مقاس المنصة اللي اتولّدت له: square · portrait · story · landscape */
     preset: text('preset').notNull().default('square'),
 
@@ -147,6 +156,15 @@ export const socialPosts = pgTable(
     /** الهاشتاجات منفصلة — التاجر بيعدّلها لوحدها وبتتلزق آخر النص */
     hashtags: jsonb('hashtags').$type<string[]>().notNull().default([]),
     imageUrls: jsonb('image_urls').$type<string[]>().notNull().default([]),
+    /**
+     * الفيديو — عمود لوحده لا في `imageUrls`.
+     *
+     * كل منصة بتنشر الفيديو بمسار مختلف عن الصورة (ريلز، فيديو
+     * الصفحة، فيديو تيك توك). لو اتخزّنوا مع بعض، كل ناشر كان
+     * هيحتاج يخمّن النوع من امتداد الرابط — وأول رابط من غير
+     * امتداد بيتنشر بالمسار الغلط ويترفض.
+     */
+    videoUrl: text('video_url'),
 
     productId: uuid('product_id').references(() => products.id, { onDelete: 'set null' }),
 
@@ -232,6 +250,14 @@ export const contentSchedules = pgTable(
     /** نبرة الكتابة وتوجيه الصورة — بيتلزق في الوصف */
     style: text('style'),
     preset: text('preset').notNull().default('square'),
+    /**
+     * الجدول بيعمل صور ولا فيديو.
+     *
+     * الافتراضي صورة: الفيديو أغلى بمراحل، والجدول اليومي عليه
+     * بيطلّع فاتورة التاجر ما توقّعهاش. بيختاره بإيده وهو شايف
+     * التنبيه.
+     */
+    media: text('media').$type<'image' | 'video'>().notNull().default('image'),
 
     /**
      * ينشر لوحده ولا يستنّى موافقة؟

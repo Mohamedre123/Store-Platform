@@ -15,6 +15,19 @@ const BUCKET = 'store-assets'
 const MAX_BYTES = 5 * 1024 * 1024
 const ALLOWED = ['image/jpeg', 'image/png', 'image/webp', 'image/avif', 'image/gif']
 
+/**
+ * الفيديو حدّه أعلى وأنواعه أقل.
+ *
+ * ثمانية ثواني من Veo بتطلع حوالي ٣–٨ ميجا. حدّ الصور (٥) كان
+ * هيرفض أغلب النواتج بعد ما التاجر يكون استنّى دقيقتين ودفع تمن
+ * التوليد — يعني بيخسر الاتنين.
+ *
+ * و`video/mp4` وحده مقصود: هو اللي المنصات بتقبله. أي صيغة تانية
+ * بتترفع وبترجع من فيسبوك بخطأ بعد النشر بوقت.
+ */
+const MAX_VIDEO_BYTES = 60 * 1024 * 1024
+const ALLOWED_VIDEO = ['video/mp4']
+
 export type UploadFolder = 'products' | 'categories' | 'banners' | 'logos' | 'misc'
 
 function config() {
@@ -38,6 +51,47 @@ export function validateImage(file: File): { ok: true } | { ok: false; error: st
 function safeName(original: string) {
   const ext = (original.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '')
   return `${Date.now()}_${nanoid(8)}.${ext || 'jpg'}`
+}
+
+/**
+ * رفع فيديو.
+ *
+ * منفصلة عن `uploadImage` لأن الحدود والأنواع مختلفة — ودمجهم في
+ * دالة بعلَم كان بيخلّي كل نداء يفتكر يبعت العلم الصح، وأول واحد
+ * ينساه بيرفع فيديو بحدّ الصور.
+ */
+export async function uploadVideo(
+  storeId: string,
+  file: File,
+): Promise<{ ok: true; url: string; path: string } | { ok: false; error: string }> {
+  if (!ALLOWED_VIDEO.includes(file.type)) {
+    return { ok: false, error: 'الفيديو لازم يكون MP4.' }
+  }
+  if (file.size > MAX_VIDEO_BYTES) {
+    return { ok: false, error: 'الفيديو أكبر من ٦٠ ميجا.' }
+  }
+
+  const { url, key } = config()
+  const path = `${storeId}/videos/${safeName(file.name)}`
+
+  const res = await fetch(`${url}/storage/v1/object/${BUCKET}/${path}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${key}`,
+      apikey: key,
+      'Content-Type': file.type,
+      'x-upsert': 'false',
+      'cache-control': 'public, max-age=31536000, immutable',
+    },
+    body: await file.arrayBuffer(),
+  })
+
+  if (!res.ok) {
+    console.error('فشل رفع الفيديو:', res.status, await res.text())
+    return { ok: false, error: 'مقدرناش نرفع الفيديو. جرّب تاني.' }
+  }
+
+  return { ok: true, url: `${url}/storage/v1/object/public/${BUCKET}/${path}`, path }
 }
 
 export async function uploadImage(

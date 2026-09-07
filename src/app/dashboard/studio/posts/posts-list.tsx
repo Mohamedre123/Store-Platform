@@ -14,6 +14,7 @@ type Post = {
   caption: string
   hashtags: string[]
   imageUrls: string[]
+  videoUrl: string | null
   status: string
   targets: string[]
   publishedAt: string | null
@@ -57,11 +58,24 @@ export function PostsList({
 
         return (
           <Card key={p.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start">
-            {p.imageUrls[0] && (
+            {/*
+              الفيديو بعنصره لا في `<img>`.
+
+              `<img>` على mp4 بيرسم أيقونة مكسورة من غير ما يقول
+              ليه — والتاجر بيفتكر إن الفيديو نفسه بايظ.
+            */}
+            {p.videoUrl ? (
+              <video
+                src={p.videoUrl}
+                controls
+                playsInline
+                className="aspect-square w-full shrink-0 rounded-xl border border-[var(--border)] bg-black object-cover sm:w-32"
+              />
+            ) : p.imageUrls[0] ? (
               <span className="relative block aspect-square w-full shrink-0 overflow-hidden rounded-xl border border-[var(--border)] sm:w-32">
                 <Image src={p.imageUrls[0]} alt="" fill sizes="128px" className="object-cover" />
               </span>
-            )}
+            ) : null}
 
             <div className="flex min-w-0 flex-1 flex-col gap-2.5">
               <div className="flex flex-wrap items-center gap-2">
@@ -141,16 +155,16 @@ export function PostsList({
                   انسخ الكلام
                 </button>
 
-                {p.imageUrls[0] && (
+                {(p.videoUrl || p.imageUrls[0]) && (
                   <a
-                    href={p.imageUrls[0]}
+                    href={p.videoUrl ?? p.imageUrls[0]}
                     download
                     target="_blank"
                     rel="noreferrer"
                     className="flex h-10 items-center gap-1.5 rounded-lg border border-[var(--border-strong)] px-3 text-sm text-[var(--fg-muted)]"
                   >
                     <Download className="h-4 w-4" aria-hidden="true" />
-                    نزّل الصورة
+                    {p.videoUrl ? 'نزّل الفيديو' : 'نزّل الصورة'}
                   </a>
                 )}
 
@@ -173,7 +187,8 @@ export function PostsList({
               {p.targets.length === 0 && p.status !== 'published' && (
                 <p className="flex items-center gap-1.5 text-xs text-[var(--fg-subtle)]">
                   <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                  جاهز — نزّل الصورة وانسخ الكلام وانشره بإيدك، أو اربط صفحتك عشان ينزل لوحده.
+                  جاهز — نزّل {p.videoUrl ? 'الفيديو' : 'الصورة'} وانسخ الكلام وانشره بإيدك، أو
+                  اربط صفحتك عشان ينزل لوحده.
                 </p>
               )}
             </div>

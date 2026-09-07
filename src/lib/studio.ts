@@ -5,7 +5,8 @@ import { products, studioAssets } from '@/db/schema'
 import { editImage, generate, isImageModel, listImageModels } from './ai/gemini'
 import { getAiConfig, GEMINI_PRO_SLUG, GEMINI_SLUG } from './ai/settings'
 import { catalogBlock, briefLine, getStoreBrief, operationsBlock } from './ai/store-context'
-import { uploadImage } from './storage'
+import { uploadImage, uploadVideo } from './storage'
+import { checkVideo, downloadVideo, listVideoModels, startVideo, type VeoAspect } from './ai/veo'
 import { recordUpload } from './media'
 import { formatMoney } from './utils'
 import { presetOf, toneOf, type PresetKey, type ToneKey } from './studio-meta'
@@ -369,6 +370,8 @@ export async function makeImage(input: {
       url: up.url,
       path: up.path,
       preset: input.preset,
+      kind: 'image',
+      mimeType: res.data.mimeType,
       productId: input.productId ?? null,
       parentId: input.parentId ?? null,
       createdBy: input.userId,
@@ -405,6 +408,144 @@ async function fetchAsInline(
   }
 }
 
+/* ══════════════════════════════════════════════════════════════
+   الفيديو
+   ══════════════════════════════════════════════════════════════ */
+
+/**
+ * نسبة الفيديو من المقاس.
+ *
+ * Veo بياخد `16:9` و`9:16` بس. المربّع والطولي بيتحوّلوا للطولي
+ * لأن ده اللي بيشتغل في ريلز وتيك توك — والعرضي بيفضل عرضي.
+ * الرفض كان بيخلّي التاجر يختار مقاسًا شرعيًّا وياخد رسالة خطأ.
+ */
+function videoAspect(preset: PresetKey): VeoAspect {
+  return preset === 'landscape' ? '16:9' : '9:16'
+}
+
+export type VideoJob = { operation: string; model: string }
+
+/**
+ * بدء توليد فيديو — بيرجّع اسم العملية.
+ *
+ * ## الانتظار على المتصفح لا على الخادم
+ * Veo بياخد من دقيقة لتلاتة. دالة الخادم عندنا عمرها ثواني —
+ * والانتظار جوّاها كان بيموت قبل ما الفيديو يخلص، والتاجر بيدفع
+ * تمن توليد ما شافوش.
+ */
+export async function startProductVideo(input: {
+  storeId: string
+  prompt: string
+  preset: PresetKey
+  /** صورة يتحرّك منها — صورة المنتج أو ناتج الاستوديو */
+  seedUrl?: string | null
+  merchantBrief?: string | null
+}): Promise<VideoJob | StudioError> {
+  const key = await studioKey(input.storeId)
+  if ('error' in key) return key
+
+  const models = await listVideoModels(key.apiKey)
+  if (!models.ok) return { error: models.error.message }
+
+  const seed = input.seedUrl ? await fetchAsInline(input.seedUrl) : null
+
+  /*
+    وصف المتجر بيدخل هنا كمان.
+
+    الفيديو من غير سياق بيطلع لقطة عامة تنفع لأي منتج. واللي بيفرق
+    إنه يعرف المنتج ده بيتباع لمين وبأي أسلوب.
+  */
+  const prompt = [
+    await storeContext(input.storeId, input.merchantBrief),
+    '',
+    'اعمل فيديو إعلاني قصير:',
+    input.prompt,
+    '',
+    'قواعد:',
+    '- حركة كاميرا هادية وبسيطة — الزوم السريع والدوران بيبانوا رخاص.',
+    '- المنتج في وسط الكادر وواضح طول الفيديو.',
+    '- من غير أي كلام مكتوب على الفيديو، والنص بيتحط في البوست نفسه.',
+  ].join('\n')
+
+  const started = await startVideo({
+    apiKey: key.apiKey,
+    model: models.data[0],
+    prompt,
+    aspect: videoAspect(input.preset),
+    image: seed ?? undefined,
+  })
+
+  if (!started.ok) return { error: started.error.message }
+  return { operation: started.data, model: models.data[0] }
+}
+
+export type VideoProgress =
+  | { state: 'running' }
+  | { state: 'done'; id: string; url: string }
+  | { state: 'failed'; error: string }
+
+/**
+ * السؤال على الفيديو — وحفظه أول ما يجهز.
+ *
+ * ## الرفع عندنا لا الاحتفاظ برابط جوجل
+ * الرابط اللي بترجّعه جوجل محتاج المفتاح عشان يتحمّل، ومدته
+ * محدودة. حفظه زي ما هو كان بيخلّي البوست يبان شغّالًا وبيقع أول
+ * ما حد تاني يفتحه — أو لما ينزل على فيسبوك.
+ */
+export async function pollProductVideo(input: {
+  storeId: string
+  userId: string
+  operation: string
+  prompt: string
+  preset: PresetKey
+  productId?: string | null
+}): Promise<VideoProgress> {
+  const key = await studioKey(input.storeId)
+  if ('error' in key) return { state: 'failed', error: key.error }
+
+  const status = await checkVideo(key.apiKey, input.operation)
+  if (!status.ok) return { state: 'failed', error: status.error.message }
+  if (status.data.state === 'running') return { state: 'running' }
+  if (status.data.state === 'failed') return { state: 'failed', error: status.data.message }
+
+  const file = await downloadVideo(key.apiKey, status.data.uri)
+  if (!file.ok) return { state: 'failed', error: file.error.message }
+
+  const video = new File([new Uint8Array(file.data)], 'studio.mp4', { type: 'video/mp4' })
+  const up = await uploadVideo(input.storeId, video)
+  if (!up.ok) return { state: 'failed', error: up.error }
+
+  await recordUpload({
+    storeId: input.storeId,
+    path: up.path,
+    url: up.url,
+    name: `فيديو — ${input.prompt.slice(0, 40)}`,
+    folder: 'misc',
+    sizeBytes: video.size,
+    mimeType: 'video/mp4',
+    uploadedBy: input.userId,
+  }).catch(() => {
+    /* الملف موجود على التخزين خلاص — صف المكتبة مش سبب لفشل */
+  })
+
+  const [row] = await db
+    .insert(studioAssets)
+    .values({
+      storeId: input.storeId,
+      prompt: input.prompt,
+      url: up.url,
+      path: up.path,
+      preset: input.preset,
+      kind: 'video',
+      mimeType: 'video/mp4',
+      productId: input.productId ?? null,
+      createdBy: input.userId,
+    })
+    .returning({ id: studioAssets.id })
+
+  return { state: 'done', id: row.id, url: up.url }
+}
+
 /** آخر صور الاستوديو — للمعرض */
 export async function recentAssets(storeId: string, limit = 24) {
   return db
@@ -413,6 +554,7 @@ export async function recentAssets(storeId: string, limit = 24) {
       url: studioAssets.url,
       prompt: studioAssets.prompt,
       preset: studioAssets.preset,
+      kind: studioAssets.kind,
       productId: studioAssets.productId,
       createdAt: studioAssets.createdAt,
     })

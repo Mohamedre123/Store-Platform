@@ -64,6 +64,7 @@ export default async function PostsPage() {
               caption: p.caption,
               hashtags: p.hashtags,
               imageUrls: p.imageUrls,
+              videoUrl: p.videoUrl,
               status: p.status,
               targets: p.targets,
               publishedAt: p.publishedAt ? p.publishedAt.toISOString() : null,

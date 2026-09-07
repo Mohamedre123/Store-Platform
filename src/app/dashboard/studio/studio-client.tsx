@@ -10,6 +10,7 @@ import {
   Image as ImageIcon,
   Loader2,
   Package,
+  Film,
   Send,
   Sparkles,
   Type,
@@ -17,10 +18,12 @@ import {
   X,
 } from 'lucide-react'
 import {
+  checkVideoAction,
   generateCopyAction,
   generateImageAction,
   savePostAction,
   searchProductsAction,
+  startVideoAction,
 } from './actions'
 import { PRESETS, TONES, platformOf, presetOf, type PresetKey, type ToneKey } from '@/lib/studio-meta'
 import { Alert, Card } from '@/components/ui'
@@ -29,7 +32,7 @@ import { cn } from '@/lib/utils'
 
 type Product = { id: string; name: string; image: string | null }
 type Account = { id: string; platform: string; name: string; status: string }
-type Asset = { id: string; url: string; prompt: string; preset: string }
+type Asset = { id: string; url: string; prompt: string; preset: string; kind: string }
 
 /**
  * أداة الاستوديو.
@@ -60,6 +63,9 @@ export function StudioClient({
   const [found, setFound] = useState<Product[]>(products)
   const [searching, startSearch] = useTransition()
 
+  /* الوسيط */
+  const [media, setMedia] = useState<'image' | 'video'>('image')
+
   /* الصورة */
   const [preset, setPreset] = useState<PresetKey>('square')
   const [imagePrompt, setImagePrompt] = useState('')
@@ -69,6 +75,17 @@ export function StudioClient({
   const [editPrompt, setEditPrompt] = useState('')
   const [imgError, setImgError] = useState<string | null>(null)
   const [makingImage, startImage] = useTransition()
+
+  /*
+    الفيديو — حالته لوحدها لأن انتظاره دقايق لا ثواني.
+
+    `useTransition` بيغطّي نداءً واحدًا. الفيديو نداء بداية وعشرات
+    نداءات سؤال، والتاجر لازم يشوف إنه ماشي طول الوقت ده — مش مؤشّر
+    بيلفّ من غير كلام.
+  */
+  const [video, setVideo] = useState<{ id: string; url: string } | null>(null)
+  const [videoBusy, setVideoBusy] = useState(false)
+  const [videoWaited, setVideoWaited] = useState(0)
 
   /* الكلام */
   const [tone, setTone] = useState<ToneKey>('sell')
@@ -84,6 +101,8 @@ export function StudioClient({
   const [saving, startSave] = useTransition()
 
   const current = chain.at(-1) ?? null
+  /* الوسيط اللي هيتحفظ فعلًا — بيتبع التبويب المفتوح لا اللي اتعمل */
+  const hasMedia = media === 'video' ? Boolean(video) : Boolean(current)
   const live = accounts.filter((a) => a.status === 'active')
 
   const shape = useMemo(() => presetOf(preset).css, [preset])
@@ -119,6 +138,62 @@ export function StudioClient({
     })
   }
 
+  /**
+   * توليد فيديو — بداية وسؤال متكرر.
+   *
+   * السؤال كل خمس ثواني لمدة تلات دقايق. Veo بياخد من دقيقة
+   * لتلاتة، والوقوف قبلها بيضيّع توليدًا التاجر دفع تمنه.
+   */
+  async function makeVideo() {
+    const prompt = imagePrompt.trim()
+    if (!prompt) return
+
+    setImgError(null)
+    setVideoBusy(true)
+    setVideoWaited(0)
+
+    const started = await startVideoAction({
+      prompt,
+      preset,
+      productId: product?.id ?? null,
+      useProductPhoto,
+      /* الصورة المعروضة دلوقتي بتتحرّك — أدق من صورة المنتج الخام */
+      seedAssetUrl: current?.url ?? null,
+    })
+
+    if (!started.ok) {
+      setImgError(started.error)
+      setVideoBusy(false)
+      return
+    }
+
+    for (let i = 0; i < 36; i++) {
+      await new Promise((r) => setTimeout(r, 5000))
+      setVideoWaited((n) => n + 5)
+
+      const step = await checkVideoAction({
+        operation: started.operation,
+        prompt,
+        preset,
+        productId: product?.id ?? null,
+      })
+
+      if (step.state === 'failed') {
+        setImgError(step.error)
+        setVideoBusy(false)
+        return
+      }
+      if (step.state === 'done') {
+        setVideo({ id: step.id, url: step.url })
+        setVideoBusy(false)
+        return
+      }
+    }
+
+    setImgError('الفيديو أخد وقت أطول من المتوقّع. جرّب تاني.')
+    setVideoBusy(false)
+  }
+
   function write() {
     setCopyError(null)
     startCopy(async () => {
@@ -141,7 +216,8 @@ export function StudioClient({
       const res = await savePostAction({
         caption,
         hashtags,
-        imageUrls: current ? [current.url] : [],
+        imageUrls: media === 'image' && current ? [current.url] : [],
+        videoUrl: media === 'video' ? (video?.url ?? null) : null,
         productId: product?.id ?? null,
         targets,
         publishNow,
@@ -237,10 +313,61 @@ export function StudioClient({
 
       {/* ── الصورة ─────────────────────────────────────── */}
       <Card className="flex flex-col gap-4 p-4">
-        <h2 className="flex items-center gap-2 font-semibold">
-          <ImageIcon className="h-4 w-4 text-[var(--primary)]" aria-hidden="true" />
-          الصورة
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 font-semibold">
+            {media === 'video' ? (
+              <Film className="h-4 w-4 text-[var(--primary)]" aria-hidden="true" />
+            ) : (
+              <ImageIcon className="h-4 w-4 text-[var(--primary)]" aria-hidden="true" />
+            )}
+            {media === 'video' ? 'الفيديو' : 'الصورة'}
+          </h2>
+
+          {/*
+            التبديل صورة/فيديو.
+
+            الفيديو بيتولّد **من الصورة المعروضة** لو فيه واحدة —
+            فالتاجر بيظبّط الصورة لحد ما تعجبه وبعدين يحرّكها،
+            بدل ما يبدأ من الصفر ويجيب حاجة تانية خالص.
+          */}
+          <div className="flex rounded-lg border border-[var(--border-strong)] p-0.5">
+            {(['image', 'video'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMedia(m)}
+                className={cn(
+                  'flex h-9 items-center gap-1.5 rounded-md px-3 text-sm transition-colors',
+                  media === m
+                    ? 'bg-[var(--primary)] text-[var(--primary-fg)]'
+                    : 'text-[var(--fg-muted)]',
+                )}
+              >
+                {m === 'image' ? (
+                  <ImageIcon className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <Film className="h-4 w-4" aria-hidden="true" />
+                )}
+                {m === 'image' ? 'صورة' : 'فيديو'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {media === 'video' && (
+          <p className="rounded-lg bg-[var(--surface-2)] px-3.5 py-2.5 text-xs leading-relaxed text-[var(--fg-muted)]">
+            {/*
+              التشديد بوسم لا بنجوم.
+
+              الماركداون ما بيتفسّرش في JSX — النجمتين كانوا بيظهروا
+              حرفيًا للتاجر وكأن الصفحة بايظة.
+            */}
+            الفيديو بياخد من دقيقة لتلاتة، و
+            <strong className="font-semibold text-[var(--fg)]">أغلى من الصورة بمراحل</strong> —
+            محتاج مفتاح عليه فوترة.
+            {current && ' وهيتحرّك من الصورة اللي فوق.'}
+          </p>
+        )}
 
         <div className="flex flex-col gap-2">
           <span className="text-xs font-medium text-[var(--fg-muted)]">المقاس</span>
@@ -265,6 +392,13 @@ export function StudioClient({
           </div>
         </div>
 
+        {/*
+          الوصف مشترك بين الاتنين، والزرار لا.
+
+          إظهار «اعمل الصورة» وإنت في وضع الفيديو بيخلّي التاجر
+          يدوس الغلط ويدفع تمن حاجة مش عايزها — والاتنين جنب بعض
+          مافيش منهم واحد واضح إنه المقصود.
+        */}
         {!current ? (
           <>
             <textarea
@@ -290,6 +424,7 @@ export function StudioClient({
               </label>
             )}
 
+            {media === 'image' && (
             <button
               type="button"
               disabled={makingImage || imagePrompt.trim().length < 3}
@@ -303,9 +438,14 @@ export function StudioClient({
               )}
               {makingImage ? 'بيرسم…' : 'اعمل الصورة'}
             </button>
+            )}
           </>
         ) : (
           <div className="flex flex-col gap-3">
+            {/*
+              الصورة بتفضل ظاهرة في وضع الفيديو كمان — لأنها الأساس
+              اللي هيتحرّك منه. اللي بيختفي هو أدوات تعديلها.
+            */}
             <div
               className={cn(
                 'relative w-full max-w-sm overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-2)]',
@@ -322,6 +462,7 @@ export function StudioClient({
               مجرد قصّ من آخر السلسلة، والتاجر مش بيخسر تعديلًا عجبه
               عشان اللي بعده طلع وحش.
             */}
+            {media === 'image' && (
             <div className="flex flex-col gap-2">
               <span className="text-xs font-medium text-[var(--fg-muted)]">
                 عدّل عليها بالكلام — «خلّي الخلفية أغمق»، «كبّر الخط»، «شيل الورد»
@@ -352,6 +493,7 @@ export function StudioClient({
                 </button>
               </div>
             </div>
+            )}
 
             <div className="flex flex-wrap gap-2">
               {chain.length > 1 && (
@@ -390,6 +532,64 @@ export function StudioClient({
                 </span>
               )}
             </div>
+          </div>
+        )}
+
+        {media === 'video' && (
+          <div className="flex flex-col gap-3 border-t border-[var(--border)] pt-4">
+            {video ? (
+              <>
+                <video
+                  src={video.url}
+                  controls
+                  playsInline
+                  className={cn(
+                    'w-full max-w-sm rounded-xl border border-[var(--border)] bg-black',
+                    presetOf(preset).css,
+                  )}
+                />
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setVideo(null)}
+                    className="flex h-10 items-center gap-1.5 rounded-lg border border-[var(--border-strong)] px-3 text-sm text-[var(--fg-muted)]"
+                  >
+                    <X className="h-4 w-4" aria-hidden="true" />
+                    فيديو جديد
+                  </button>
+                  <a
+                    href={video.url}
+                    download
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex h-10 items-center gap-1.5 rounded-lg border border-[var(--border-strong)] px-3 text-sm text-[var(--fg-muted)]"
+                  >
+                    <Download className="h-4 w-4" aria-hidden="true" />
+                    نزّله
+                  </a>
+                </div>
+              </>
+            ) : (
+              <button
+                type="button"
+                disabled={videoBusy || imagePrompt.trim().length < 3}
+                onClick={makeVideo}
+                className="flex h-11 w-fit items-center gap-2 rounded-lg bg-[var(--primary)] px-5 text-sm font-semibold text-[var(--primary-fg)] disabled:opacity-50"
+              >
+                {videoBusy ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Film className="h-4 w-4" aria-hidden="true" />
+                )}
+                {/*
+                  العدّاد ظاهر عن قصد.
+
+                  تلات دقايق قدام مؤشّر بيلفّ من غير رقم بتخلّي
+                  التاجر يفتكر إنها وقفت ويعيد — فيدفع تمن توليدين.
+                */}
+                {videoBusy ? `بيصوّر… ${videoWaited} ثانية` : 'اعمل الفيديو'}
+              </button>
+            )}
           </div>
         )}
 
@@ -489,7 +689,7 @@ export function StudioClient({
       </Card>
 
       {/* ── النشر ──────────────────────────────────────── */}
-      {(caption || current) && (
+      {(caption || current || video) && (
         <Card className="flex flex-col gap-4 p-4">
           <h2 className="flex items-center gap-2 font-semibold">
             <Send className="h-4 w-4 text-[var(--primary)]" aria-hidden="true" />
@@ -553,7 +753,7 @@ export function StudioClient({
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              disabled={saving || !caption || !current}
+              disabled={saving || !caption || !hasMedia}
               onClick={() => save(false)}
               className="flex h-11 items-center gap-2 rounded-lg border border-[var(--border-strong)] px-5 text-sm font-semibold disabled:opacity-50"
             >
@@ -563,7 +763,7 @@ export function StudioClient({
             {live.length > 0 && (
               <button
                 type="button"
-                disabled={saving || !caption || !current || targets.length === 0}
+                disabled={saving || !caption || !hasMedia || targets.length === 0}
                 onClick={() => save(true)}
                 className="flex h-11 items-center gap-2 rounded-lg bg-[var(--primary)] px-5 text-sm font-semibold text-[var(--primary-fg)] disabled:opacity-50"
               >
@@ -577,9 +777,9 @@ export function StudioClient({
             )}
           </div>
 
-          {(!caption || !current) && (
+          {(!caption || !hasMedia) && (
             <p className="text-xs text-[var(--fg-subtle)]">
-              محتاج صورة وكلام الاتنين عشان تحفظ البوست.
+              محتاج {media === 'video' ? 'فيديو' : 'صورة'} وكلام الاتنين عشان تحفظ البوست.
             </p>
           )}
         </Card>
@@ -595,10 +795,31 @@ export function StudioClient({
                 key={a.id}
                 type="button"
                 title={a.prompt}
-                onClick={() => setChain([{ id: a.id, url: a.url, prompt: a.prompt }])}
+                onClick={() => {
+                  if (a.kind === 'video') {
+                    setMedia('video')
+                    setVideo({ id: a.id, url: a.url })
+                  } else {
+                    setMedia('image')
+                    setChain([{ id: a.id, url: a.url, prompt: a.prompt }])
+                  }
+                }}
                 className="relative aspect-square overflow-hidden rounded-lg border border-[var(--border)] transition-colors hover:border-[var(--primary)]"
               >
-                <Image src={a.url} alt={a.prompt} fill sizes="120px" className="object-cover" />
+                {/*
+                  `<img>` على ملف mp4 بيرسم أيقونة مكسورة من غير ما
+                  يقول ليه — فالفيديو بيتعرض بعنصره.
+                */}
+                {a.kind === 'video' ? (
+                  <>
+                    <video src={a.url} muted playsInline className="h-full w-full object-cover" />
+                    <span className="absolute bottom-1 end-1 rounded bg-black/60 p-1">
+                      <Film className="h-3 w-3 text-white" aria-hidden="true" />
+                    </span>
+                  </>
+                ) : (
+                  <Image src={a.url} alt={a.prompt} fill sizes="120px" className="object-cover" />
+                )}
               </button>
             ))}
           </div>

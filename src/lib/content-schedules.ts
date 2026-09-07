@@ -2,7 +2,14 @@ import 'server-only'
 import { and, asc, desc, eq, inArray, isNotNull, lte, or, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { contentSchedules, socialAccounts, socialPosts, stores } from '@/db/schema'
-import { makeImage, nextProductInRotation, productBrief, writeCopy } from './studio'
+import {
+  makeImage,
+  nextProductInRotation,
+  pollProductVideo,
+  productBrief,
+  startProductVideo,
+  writeCopy,
+} from './studio'
 import { publishToAccount, type PublishOutcome } from './social'
 import { nextRun, type PresetKey } from './studio-meta'
 
@@ -29,6 +36,7 @@ export type PostRow = {
   caption: string
   hashtags: string[]
   imageUrls: string[]
+  videoUrl: string | null
   productId: string | null
   targets: string[]
   status: 'draft' | 'ready' | 'scheduled' | 'publishing' | 'published' | 'failed'
@@ -51,6 +59,7 @@ export async function listPosts(storeId: string, limit = 40): Promise<PostRow[]>
     caption: r.caption,
     hashtags: r.hashtags,
     imageUrls: r.imageUrls,
+    videoUrl: r.videoUrl,
     productId: r.productId,
     targets: r.targets,
     status: r.status,
@@ -67,6 +76,7 @@ export async function createPost(input: {
   caption: string
   hashtags: string[]
   imageUrls: string[]
+  videoUrl?: string | null
   productId?: string | null
   targets?: string[]
   scheduleId?: string | null
@@ -80,6 +90,7 @@ export async function createPost(input: {
       caption: input.caption,
       hashtags: input.hashtags,
       imageUrls: input.imageUrls,
+      videoUrl: input.videoUrl ?? null,
       productId: input.productId ?? null,
       targets: input.targets ?? [],
       scheduleId: input.scheduleId ?? null,
@@ -115,7 +126,9 @@ export async function publishPost(
     .limit(1)
 
   if (!post) return { ok: false, results: [], error: 'البوست مش موجود' }
-  if (post.imageUrls.length === 0) return { ok: false, results: [], error: 'البوست من غير صورة' }
+  if (post.imageUrls.length === 0 && !post.videoUrl) {
+    return { ok: false, results: [], error: 'البوست من غير صورة ولا فيديو' }
+  }
   if (post.targets.length === 0) {
     return { ok: false, results: [], error: 'ما اخترتش حساب تنشر عليه' }
   }
@@ -143,7 +156,8 @@ export async function publishPost(
       await publishToAccount(storeId, acc.id, {
         caption: post.caption,
         hashtags: post.hashtags,
-        imageUrl: post.imageUrls[0],
+        imageUrl: post.imageUrls[0] ?? null,
+        videoUrl: post.videoUrl,
       }),
     )
   }
@@ -185,6 +199,7 @@ export type ScheduleRow = {
   productIds: string[]
   style: string | null
   preset: string
+  media: 'image' | 'video'
   autoPublish: boolean
   lastRunAt: Date | null
   nextRunAt: Date | null
@@ -210,6 +225,7 @@ export async function listSchedules(storeId: string): Promise<ScheduleRow[]> {
     productIds: r.productIds,
     style: r.style,
     preset: r.preset,
+    media: r.media,
     autoPublish: r.autoPublish,
     lastRunAt: r.lastRunAt,
     nextRunAt: r.nextRunAt,
@@ -237,6 +253,7 @@ export async function saveSchedule(input: {
   productIds?: string[]
   style?: string | null
   preset: PresetKey
+  media: 'image' | 'video'
   autoPublish: boolean
   isActive: boolean
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
@@ -263,6 +280,7 @@ export async function saveSchedule(input: {
     productIds: input.source === 'products' ? (input.productIds ?? []) : [],
     style: input.style?.trim() || null,
     preset: input.preset,
+    media: input.media,
     autoPublish: input.autoPublish,
     isActive: input.isActive,
     nextRunAt: next,
@@ -407,27 +425,72 @@ export async function runSchedule(scheduleId: string): Promise<{ ok: boolean; er
   })
   if ('error' in copy) return fail(copy.error)
 
-  const image = await makeImage({
-    storeId: s.storeId,
-    userId: s.createdBy ?? '',
-    prompt: [
-      `صورة إعلانية لمنتج «${product.name}».`,
-      s.style?.trim() ? s.style.trim() : '',
-    ]
-      .filter(Boolean)
-      .join(' '),
-    preset: s.preset as PresetKey,
-    productId,
-    seedUrl: product.image,
-  })
-  if ('error' in image) return fail(image.error)
+  const brief = [
+    s.media === 'video'
+      ? `فيديو إعلاني قصير لمنتج «${product.name}».`
+      : `صورة إعلانية لمنتج «${product.name}».`,
+    s.style?.trim() ? s.style.trim() : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  let imageUrl: string | null = null
+  let videoUrl: string | null = null
+
+  if (s.media === 'video') {
+    /*
+      الفيديو بيتستنّى **هنا** لا على المتصفح.
+
+      الجدول بيشتغل في مهمة خلفية مالهاش واجهة تسأل — فالانتظار
+      لازم يحصل جوّاها. والحدّ تلات دقايق: أطول من كده يبقى فيه
+      حاجة واقفة عند جوجل، والمهمة هتتعاد بكرة في ميعادها.
+    */
+    const job = await startProductVideo({
+      storeId: s.storeId,
+      prompt: brief,
+      preset: s.preset as PresetKey,
+      seedUrl: product.image,
+    })
+    if ('error' in job) return fail(job.error)
+
+    for (let i = 0; i < 36; i++) {
+      await new Promise((r) => setTimeout(r, 5000))
+      const step = await pollProductVideo({
+        storeId: s.storeId,
+        userId: s.createdBy ?? '',
+        operation: job.operation,
+        prompt: brief,
+        preset: s.preset as PresetKey,
+        productId,
+      })
+      if (step.state === 'failed') return fail(step.error)
+      if (step.state === 'done') {
+        videoUrl = step.url
+        break
+      }
+    }
+
+    if (!videoUrl) return fail('الفيديو أخد وقت أطول من المتوقّع. هيتعاد في الميعاد الجاي.')
+  } else {
+    const image = await makeImage({
+      storeId: s.storeId,
+      userId: s.createdBy ?? '',
+      prompt: brief,
+      preset: s.preset as PresetKey,
+      productId,
+      seedUrl: product.image,
+    })
+    if ('error' in image) return fail(image.error)
+    imageUrl = image.url
+  }
 
   const postId = await createPost({
     storeId: s.storeId,
     userId: s.createdBy,
     caption: copy.caption,
     hashtags: copy.hashtags,
-    imageUrls: [image.url],
+    imageUrls: imageUrl ? [imageUrl] : [],
+    videoUrl,
     productId,
     targets: s.targets,
     scheduleId: s.id,

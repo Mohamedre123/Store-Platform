@@ -92,6 +92,7 @@ export default async function StudioPage() {
             url: a.url,
             prompt: a.prompt,
             preset: a.preset,
+            kind: a.kind,
           }))}
         />
       </Reveal>

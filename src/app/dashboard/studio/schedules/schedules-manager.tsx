@@ -32,6 +32,7 @@ type Schedule = {
   productIds: string[]
   style: string | null
   preset: string
+  media: 'image' | 'video'
   autoPublish: boolean
   lastRunAt: string | null
   nextRunAt: string | null
@@ -52,6 +53,8 @@ const empty = (): Draft => ({
   productIds: [],
   style: null,
   preset: 'square',
+  /* الصورة الافتراضي — الفيديو أغلى بمراحل والتاجر بيختاره وهو شايف */
+  media: 'image',
   autoPublish: false,
 })
 
@@ -102,6 +105,7 @@ export function SchedulesManager({
         productIds: draft.productIds,
         style: draft.style,
         preset: draft.preset as PresetKey,
+        media: draft.media,
         autoPublish: draft.autoPublish,
         isActive: draft.isActive,
       })
@@ -258,8 +262,53 @@ export function SchedulesManager({
             </Field>
           )}
 
+          {/*
+            صورة ولا فيديو.
+
+            التنبيه على التكلفة مكتوب هنا لا في المساعدة: الجدول
+            اليومي على الفيديو بيطلّع فاتورة التاجر ما توقّعهاش،
+            والرقم ده لازم يشوفه قبل ما يحفظ لا بعد أول فاتورة.
+          */}
+          <Field
+            label="بيعمل إيه"
+            hint={
+              draft.media === 'video'
+                ? 'الفيديو أغلى من الصورة بمراحل — راجع تسعير Veo عند جوجل قبل ما تخلّيه يومي'
+                : undefined
+            }
+          >
+            <div className="grid gap-2 sm:grid-cols-2">
+              {[
+                { key: 'image' as const, label: 'صورة', hint: 'أسرع وأرخص' },
+                { key: 'video' as const, label: 'فيديو', hint: 'ريلز وتيك توك — بياخد دقايق' },
+              ].map((m) => (
+                <button
+                  key={m.key}
+                  type="button"
+                  onClick={() => setDraft({ ...draft, media: m.key })}
+                  className={cn(
+                    'flex flex-col items-start gap-0.5 rounded-lg border px-3 py-2.5 text-start transition-colors',
+                    draft.media === m.key
+                      ? 'border-[var(--primary)] bg-[var(--primary-soft)]'
+                      : 'border-[var(--border-strong)]',
+                  )}
+                >
+                  <span
+                    className={cn(
+                      'text-sm font-medium',
+                      draft.media === m.key && 'text-[var(--primary)]',
+                    )}
+                  >
+                    {m.label}
+                  </span>
+                  <span className="text-xs text-[var(--fg-subtle)]">{m.hint}</span>
+                </button>
+              ))}
+            </div>
+          </Field>
+
           {/* الشكل */}
-          <Field label="مقاس الصورة">
+          <Field label={draft.media === 'video' ? 'مقاس الفيديو' : 'مقاس الصورة'}>
             <div className="flex flex-wrap gap-1.5">
               {PRESETS.map((p) => (
                 <button
@@ -396,6 +445,11 @@ export function SchedulesManager({
                     متوقّف
                   </span>
                 )}
+                {s.media === 'video' && (
+                  <span className="rounded bg-[var(--color-info-soft)] px-1.5 py-0.5 text-[11px] text-[var(--color-info)]">
+                    فيديو
+                  </span>
+                )}
                 {s.autoPublish ? (
                   <span className="rounded bg-[var(--color-success-soft)] px-1.5 py-0.5 text-[11px] text-[var(--color-success)]">
                     بينشر لوحده
@@ -451,6 +505,7 @@ export function SchedulesManager({
                     productIds: s.productIds,
                     style: s.style,
                     preset: s.preset,
+                    media: s.media,
                     autoPublish: s.autoPublish,
                   })
                 }
