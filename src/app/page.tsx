@@ -355,9 +355,27 @@ export default function HomePage() {
               <Logo size="sm" />
               <span className="text-[var(--fg-subtle)]">— {brand.tagline}</span>
             </div>
-            <p className="tabular">
-              © {new Date().getFullYear()} {brand.name}
-            </p>
+            {/*
+              الروابط القانونية في الفوتر لا في صفحة مدفونة.
+
+              مراجع ميتا وتيك توك بيدوّر عليها من الصفحة الرئيسية،
+              ومش لاقيها سبب رفض. والعميل اللي بيدوّر على سياسة
+              الخصوصية بيبصّ تحت أول حاجة.
+            */}
+            <nav className="flex flex-wrap items-center gap-x-5 gap-y-2">
+              <Link href="/privacy" className="transition-colors hover:text-[var(--fg)]">
+                سياسة الخصوصية
+              </Link>
+              <Link href="/terms" className="transition-colors hover:text-[var(--fg)]">
+                شروط الاستخدام
+              </Link>
+              <Link href="/data-deletion" className="transition-colors hover:text-[var(--fg)]">
+                حذف بياناتك
+              </Link>
+              <span className="tabular">
+                © {new Date().getFullYear()} {brand.name}
+              </span>
+            </nav>
           </div>
         </footer>
       </main>
