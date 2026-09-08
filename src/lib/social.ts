@@ -43,23 +43,41 @@ export function tiktokConfigured(): boolean {
 
 /** إيه المتاح دلوقتي — الشاشة بتخبّي اللي مش مضبوط بدل ما تعطّل التاجر */
 /**
- * المتاح دلوقتي.
+ * إيه المتاح، وبأي طريق.
  *
- * الوسيط بيغطّي التلاتة مرة واحدة. ولو تطبيقنا مضبوط كمان، الاتنين
- * بيبقوا متاحين — والتاجر بيختار، والقديم ما بيتكسرش.
+ * ## تطبيقنا بيغلب الوسيط — لكل منصة على حدة
+ * تطبيق ميتا بتاعنا بينشر لـ**٢٥ تاجر ببلاش** قبل أي مراجعة.
+ * والباقة المجانية عند الوسيط بتدّي **ملفين**. فلو خلّينا الوسيط
+ * يغلب، حطّ المفتاحين معناه إننا نزلنا من ٢٥ لـ٢ من غير ما حد
+ * ياخد باله.
+ *
+ * والقرار لكل منصة لوحدها: ميتا بتاعتنا لفيسبوك وإنستجرام،
+ * والوسيط لتيك توك لو تطبيق تيك توك لسه مش متوافَق عليه. كده كل
+ * منصة بتمشي على أرخص طريق متاح لها.
  */
-export function availablePlatforms(): SocialPlatform[] {
-  if (providerConfigured()) return ['facebook', 'instagram', 'tiktok']
+export function routeFor(platform: SocialPlatform): 'direct' | 'uploadpost' | null {
+  const direct =
+    platform === 'tiktok' ? tiktokConfigured() : metaConfigured()
 
-  const out: SocialPlatform[] = []
-  if (metaConfigured()) out.push('facebook', 'instagram')
-  if (tiktokConfigured()) out.push('tiktok')
-  return out
+  if (direct) return 'direct'
+  if (providerConfigured()) return 'uploadpost'
+  return null
 }
 
-/** الربط بيمشي على الوسيط؟ — الشاشة بتوضّح الفرق للتاجر */
+export function availablePlatforms(): SocialPlatform[] {
+  return (['facebook', 'instagram', 'tiktok'] as const).filter((p) => routeFor(p) !== null)
+}
+
+/**
+ * فيه منصة بتحتاج صفحة الوسيط؟
+ *
+ * الشاشة بتوري خطوات الوسيط لو فيه واحدة — رحلته مختلفة (صفحة
+ * برّه ورجوع بإيد التاجر)، والتاجر لازم يعرف قبل ما يدوس.
+ */
 export function usingProvider(): boolean {
-  return providerConfigured()
+  return (['facebook', 'instagram', 'tiktok'] as const).some(
+    (p) => routeFor(p) === 'uploadpost',
+  )
 }
 
 /* ══════════════════════════════════════════════════════════════

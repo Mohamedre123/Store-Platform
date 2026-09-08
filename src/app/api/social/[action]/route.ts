@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { getDashboardContext } from '@/lib/store-context'
 import { encryptJson, decryptJson } from '@/lib/crypto'
-import { connectUrl, listConnected, profileFor, providerConfigured } from '@/lib/social-provider'
+import { connectUrl, listConnected, profileFor } from '@/lib/social-provider'
 import {
   metaAuthUrl,
   metaExchange,
@@ -10,6 +10,7 @@ import {
   tiktokExchange,
   metaConfigured,
   tiktokConfigured,
+  routeFor,
 } from '@/lib/social'
 
 export const dynamic = 'force-dynamic'
@@ -112,7 +113,7 @@ export async function GET(
       شيل مفتاح الوسيط والربط بيرجع مباشر — والحسابات القديمة
       بتفضل شغّالة لأن `provider` متخزّن على كل صف.
     */
-    if (providerConfigured()) {
+    if (routeFor(platform) === 'uploadpost') {
       /*
         صفحة الوسيط بتربط كل المنصات مرة واحدة.
 
