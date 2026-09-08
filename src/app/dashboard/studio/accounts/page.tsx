@@ -1,6 +1,6 @@
 import { getDashboardContext } from '@/lib/store-context'
 import { guard } from '@/lib/permissions'
-import { availablePlatforms, listAccounts, usingProvider } from '@/lib/social'
+import { availablePlatforms, listAccounts, publishingEnabled } from '@/lib/social'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { AccountsPanel } from './accounts-panel'
@@ -45,7 +45,7 @@ export default async function SocialAccountsPage({
             lastError: a.lastError,
           }))}
           available={availablePlatforms()}
-          viaProvider={usingProvider()}
+          viaProvider={publishingEnabled()}
           connected={params.connected ?? null}
           error={params.error ?? null}
         />

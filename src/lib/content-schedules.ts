@@ -165,10 +165,20 @@ export async function publishPost(
 
   const anyOk = results.some((r) => r.ok)
 
+  /*
+    الفشل اللي سببه «مش مربوط» بيرجّع البوست **جاهزًا** لا فاشلًا.
+
+    «فشل» بتخلّي التاجر يفتكر إن فيه حاجة غلط في البوست نفسه
+    ويحذفه — وهو سليم تمامًا ومستنّي الربط بس. و«جاهز» بتخلّيه
+    يفضل في الطابور وينزل أول ما الحساب يتربط.
+  */
+  const notLinked =
+    !anyOk && results.every((r) => /مش مربوط|مش موجود|مش مضبوطة|انتهى/.test(r.error ?? ''))
+
   await db
     .update(socialPosts)
     .set({
-      status: anyOk ? 'published' : 'failed',
+      status: anyOk ? 'published' : notLinked ? 'ready' : 'failed',
       publishedAt: anyOk ? new Date() : null,
       results,
       updatedAt: new Date(),
@@ -531,10 +541,34 @@ export async function runSchedule(scheduleId: string): Promise<{ ok: boolean; er
     .set({ lastProductId: productId, lastError: null, updatedAt: new Date() })
     .where(eq(contentSchedules.id, s.id))
 
-  if (s.autoPublish && s.targets.length > 0) {
-    const res = await publishPost(s.storeId, postId)
-    if (!res.ok) return fail(res.error ?? 'فشل النشر')
-  }
+  /*
+    التوليد بينجح حتى لو النشر مقفول.
+
+    ## ليه الفشل هنا مش فشل
+    خدمة النشر ممكن تكون لسه مش مضبوطة، أو التاجر لسه ما ربطش
+    حسابه. والبوست **اتعمل فعلًا** — صورة وكلام وهاشتاجات جاهزين
+    في «البوستات».
+
+    لو رجّعنا فشل، المهمة بتتعاد وبتستهلك من مفتاح التاجر تاني على
+    نفس البوست، والجدول بيتعلّم عليه «آخر خطأ» فالتاجر يفتكر إن
+    الأداة بايظة وهي شغّالة.
+
+    فالبوست بيستنّى، وأول ما الربط يتم بينزل. يعني التاجر بيبني
+    رصيد محتوى من أول يوم بدل ما يبدأ من الصفر.
+  */
+  if (!s.autoPublish || s.targets.length === 0) return { ok: true }
+
+  const res = await publishPost(s.storeId, postId)
+  if (res.ok) return { ok: true }
+
+  /*
+    الفشل بيتسجّل على الجدول عشان التاجر يشوفه — بس المهمة بتنجح.
+    البوست موجود، والنشر هو اللي اتأجّل.
+  */
+  await db
+    .update(contentSchedules)
+    .set({ lastError: (res.error ?? 'النشر اتأجّل').slice(0, 300), updatedAt: new Date() })
+    .where(eq(contentSchedules.id, s.id))
 
   return { ok: true }
 }
