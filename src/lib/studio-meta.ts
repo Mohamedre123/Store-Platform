@@ -18,21 +18,27 @@ export const PRESETS: Array<{
   /** لعرض المعاينة بنفس نسبة الناتج */
   css: string
 }> = [
+  /*
+    الطولي الأول — وده مقاس إنستجرام الحقيقي.
+
+    ٤:٥ بياخد مساحة أطول في التايم لاين من المربّع، يعني بيوقّف
+    الإصبع أكتر. والمربّع اتساب لفيسبوك اللي بيعرضه كامل.
+  */
+  {
+    key: 'portrait',
+    label: 'إنستجرام',
+    ratio: '4:5',
+    aspect: '4:5',
+    hint: 'المقاس اللي بياخد أكبر مساحة في التايم لاين',
+    css: 'aspect-[4/5]',
+  },
   {
     key: 'square',
     label: 'مربّع',
     ratio: '1:1',
     aspect: '1:1',
-    hint: 'بوست فيسبوك وإنستجرام',
+    hint: 'فيسبوك — وبيشتغل في أي مكان',
     css: 'aspect-square',
-  },
-  {
-    key: 'portrait',
-    label: 'طولي',
-    ratio: '4:5',
-    aspect: '4:5',
-    hint: 'بياخد مساحة أكبر في تايم لاين إنستجرام',
-    css: 'aspect-[4/5]',
   },
   {
     key: 'story',
@@ -52,6 +58,7 @@ export const PRESETS: Array<{
   },
 ]
 
+/** الافتراضي أول واحد في القايمة — الطولي */
 export function presetOf(key: string) {
   return PRESETS.find((p) => p.key === key) ?? PRESETS[0]
 }

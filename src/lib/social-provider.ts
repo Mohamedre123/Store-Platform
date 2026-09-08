@@ -219,13 +219,18 @@ export async function publishViaProvider(input: {
   storeId: string
   platform: SocialPlatform
   caption: string
-  mediaUrl: string
+  /**
+   * الصور بترتيبها — واحدة يعني بوست عادي، وأكتر يعني كاروسيل.
+   *
+   * الترتيب هو اللي بينشر: أول واحدة هي الغلاف اللي بيظهر في
+   * التايم لاين، والباقي بيتسحب. عكسه بيخلّي الحكاية مالهاش معنى.
+   */
+  mediaUrls: string[]
   isVideo: boolean
 }): Promise<ProviderResult<string>> {
   try {
-    const file = await fetch(input.mediaUrl)
-    if (!file.ok) return { ok: false, error: 'مقدرناش نجيب الملف من التخزين' }
-    const blob = await file.blob()
+    const urls = input.mediaUrls.filter(Boolean)
+    if (urls.length === 0) return { ok: false, error: 'البوست من غير صورة ولا فيديو' }
 
     const form = new FormData()
     form.append('user', profileFor(input.storeId))
@@ -240,8 +245,24 @@ export async function publishViaProvider(input: {
     form.append('title', input.caption)
 
     const endpoint = input.isVideo ? '/api/upload' : '/api/upload_photos'
-    if (input.isVideo) form.append('video', blob, 'post.mp4')
-    else form.append('photos[]', blob, 'post.png')
+
+    if (input.isVideo) {
+      const file = await fetch(urls[0])
+      if (!file.ok) return { ok: false, error: 'مقدرناش نجيب الفيديو من التخزين' }
+      form.append('video', await file.blob(), 'post.mp4')
+    } else {
+      /*
+        الشرايح بترتيبها، واحدة ورا التانية في نفس الحقل.
+
+        `photos[]` بيتكرر — ودي طريقة `multipart` في تمرير قايمة.
+        والترتيب هو ترتيب الإضافة.
+      */
+      for (let i = 0; i < urls.length; i++) {
+        const file = await fetch(urls[i])
+        if (!file.ok) return { ok: false, error: 'مقدرناش نجيب الصورة ' + (i + 1) }
+        form.append('photos[]', await file.blob(), 'slide' + (i + 1) + '.png')
+      }
+    }
 
     const res = await fetch(BASE + endpoint, { method: 'POST', headers: auth(), body: form })
 

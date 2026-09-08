@@ -11,6 +11,7 @@ import {
   Loader2,
   Package,
   Film,
+  LayoutGrid,
   Send,
   Sparkles,
   Type,
@@ -19,6 +20,7 @@ import {
 } from 'lucide-react'
 import {
   checkVideoAction,
+  generateCarouselAction,
   generateCopyAction,
   generateImageAction,
   savePostAction,
@@ -65,10 +67,20 @@ export function StudioClient({
   const [searching, startSearch] = useTransition()
 
   /* الوسيط */
-  const [media, setMedia] = useState<'image' | 'video'>('image')
+  const [media, setMedia] = useState<'image' | 'carousel' | 'video'>('image')
+
+  /*
+    الكاروسيل — قايمة مرتّبة، والترتيب هو اللي بينشر.
+
+    الشريحة الأولى هي الغلاف، والأخيرة هي الدعوة. أي ترتيب تاني
+    بيخلّي الحكاية مالهاش معنى.
+  */
+  const [slides, setSlides] = useState<Array<{ id: string; url: string; prompt: string }>>([])
+  const [slideCount, setSlideCount] = useState(5)
+  const [carouselBusy, setCarouselBusy] = useState(false)
 
   /* الصورة */
-  const [preset, setPreset] = useState<PresetKey>('square')
+  const [preset, setPreset] = useState<PresetKey>('portrait')
   const [imagePrompt, setImagePrompt] = useState('')
   const [useProductPhoto, setUseProductPhoto] = useState(true)
   /* سلسلة التعديل — آخر واحدة هي المعروضة، والرجوع بيقصّ من الآخر */
@@ -100,6 +112,8 @@ export function StudioClient({
   const [hook, setHook] = useState('')
   const [body, setBody] = useState('')
   const [cta, setCta] = useState('')
+  /* الرابط بيتحط عندنا لا في كلام الموديل — بيغلط فيه */
+  const [link, setLink] = useState('')
   const [hashtags, setHashtags] = useState<string[]>([])
   const [copyError, setCopyError] = useState<string | null>(null)
   const [writing, startCopy] = useTransition()
@@ -110,11 +124,15 @@ export function StudioClient({
   const [saving, startSave] = useTransition()
 
   /* النص المركَّب — ده اللي بيتحفظ وبيتنسخ وبينشر */
-  const caption = [hook, body, cta].map((x) => x.trim()).filter(Boolean).join('\n\n')
+  const caption = [hook, body, [cta.trim(), link.trim()].filter(Boolean).join('\n')]
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .join('\n\n')
 
   const current = chain.at(-1) ?? null
   /* الوسيط اللي هيتحفظ فعلًا — بيتبع التبويب المفتوح لا اللي اتعمل */
-  const hasMedia = media === 'video' ? Boolean(video) : Boolean(current)
+  const hasMedia =
+    media === 'video' ? Boolean(video) : media === 'carousel' ? slides.length > 0 : Boolean(current)
   const live = accounts.filter((a) => a.status === 'active')
 
   const shape = useMemo(() => presetOf(preset).css, [preset])
@@ -206,6 +224,43 @@ export function StudioClient({
     setVideoBusy(false)
   }
 
+  /**
+   * توليد كاروسيل.
+   *
+   * الشرايح بتتولّد **واحدة ورا التانية** لأن كل واحدة محتاجة اللي
+   * قبلها كمرجع — التوازي كان بيطلّع خمس صور مالهمش علاقة ببعض.
+   */
+  async function makeCarouselNow() {
+    const prompt = imagePrompt.trim()
+    if (!prompt) return
+
+    setImgError(null)
+    setCarouselBusy(true)
+
+    const res = await generateCarouselAction({
+      prompt,
+      preset,
+      count: slideCount,
+      productId: product?.id ?? null,
+      useProductPhoto,
+    })
+
+    if (!res.ok) setImgError(res.error)
+    else {
+      setSlides(res.images)
+      /*
+        الناتج الناقص بيتقال صراحةً.
+
+        الطلب خمسة والراجع تلاتة معناه إن اتنين فشلوا — والسكوت
+        بيخلّي التاجر يفتكر إنه طلب تلاتة.
+      */
+      if (res.images.length < slideCount) {
+        toast('طلعت ' + res.images.length + ' شرايح من ' + slideCount + ' — الباقي فشل')
+      }
+    }
+    setCarouselBusy(false)
+  }
+
   function write() {
     setCopyError(null)
     startCopy(async () => {
@@ -219,6 +274,7 @@ export function StudioClient({
         setHook(res.hook)
         setBody(res.body)
         setCta(res.cta)
+        setLink(res.link)
         setHashtags(res.hashtags)
       }
     })
@@ -230,7 +286,12 @@ export function StudioClient({
       const res = await savePostAction({
         caption,
         hashtags,
-        imageUrls: media === 'image' && current ? [current.url] : [],
+        imageUrls:
+          media === 'carousel'
+            ? slides.map((x) => x.url)
+            : media === 'image' && current
+              ? [current.url]
+              : [],
         videoUrl: media === 'video' ? (video?.url ?? null) : null,
         productId: product?.id ?? null,
         targets,
@@ -331,10 +392,12 @@ export function StudioClient({
           <h2 className="flex items-center gap-2 font-semibold">
             {media === 'video' ? (
               <Film className="h-4 w-4 text-[var(--primary)]" aria-hidden="true" />
+            ) : media === 'carousel' ? (
+              <LayoutGrid className="h-4 w-4 text-[var(--primary)]" aria-hidden="true" />
             ) : (
               <ImageIcon className="h-4 w-4 text-[var(--primary)]" aria-hidden="true" />
             )}
-            {media === 'video' ? 'الفيديو' : 'الصورة'}
+            {media === 'video' ? 'الفيديو' : media === 'carousel' ? 'الكاروسيل' : 'الصورة'}
           </h2>
 
           {/*
@@ -345,7 +408,7 @@ export function StudioClient({
             بدل ما يبدأ من الصفر ويجيب حاجة تانية خالص.
           */}
           <div className="flex rounded-lg border border-[var(--border-strong)] p-0.5">
-            {(['image', 'video'] as const).map((m) => (
+            {(['image', 'carousel', 'video'] as const).map((m) => (
               <button
                 key={m}
                 type="button"
@@ -359,10 +422,12 @@ export function StudioClient({
               >
                 {m === 'image' ? (
                   <ImageIcon className="h-4 w-4" aria-hidden="true" />
+                ) : m === 'carousel' ? (
+                  <LayoutGrid className="h-4 w-4" aria-hidden="true" />
                 ) : (
                   <Film className="h-4 w-4" aria-hidden="true" />
                 )}
-                {m === 'image' ? 'صورة' : 'فيديو'}
+                {m === 'image' ? 'صورة' : m === 'carousel' ? 'كاروسيل' : 'فيديو'}
               </button>
             ))}
           </div>
@@ -549,6 +614,103 @@ export function StudioClient({
           </div>
         )}
 
+        {media === 'carousel' && (
+          <div className="flex flex-col gap-3 border-t border-[var(--border)] pt-4">
+            {slides.length === 0 ? (
+              <>
+                <div className="flex flex-col gap-2">
+                  <span className="text-xs font-medium text-[var(--fg-muted)]">عدد الشرايح</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[3, 4, 5, 6, 8, 10].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() => setSlideCount(n)}
+                        className={cn(
+                          'flex h-10 min-w-11 items-center justify-center rounded-lg border px-3 text-sm transition-colors',
+                          slideCount === n
+                            ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]'
+                            : 'border-[var(--border-strong)] text-[var(--fg-muted)]',
+                        )}
+                      >
+                        {n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <p className="rounded-lg bg-[var(--surface-2)] px-3.5 py-2.5 text-xs leading-relaxed text-[var(--fg-muted)]">
+                  الشرايح بتتعمل واحدة ورا التانية عشان يطلعوا بنفس الشكل — يعني{' '}
+                  <strong className="text-[var(--fg)]">{slideCount} صور</strong> بتاخد وقت{' '}
+                  {slideCount} صور. الأولى غلاف، والأخيرة دعوة للطلب، واللي بينهم فوايد وتفاصيل.
+                </p>
+
+                <button
+                  type="button"
+                  disabled={carouselBusy || imagePrompt.trim().length < 3}
+                  onClick={makeCarouselNow}
+                  className="flex h-11 w-fit items-center gap-2 rounded-lg bg-[var(--primary)] px-5 text-sm font-semibold text-[var(--primary-fg)] disabled:opacity-50"
+                >
+                  {carouselBusy ? (
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <LayoutGrid className="h-4 w-4" aria-hidden="true" />
+                  )}
+                  {carouselBusy ? 'بيرسم الشرايح…' : 'اعمل الكاروسيل'}
+                </button>
+              </>
+            ) : (
+              <>
+                {/*
+                  الشرايح بترتيبها، ورقم كل واحدة ظاهر.
+
+                  الترتيب هو اللي بينشر — والرقم بيخلّي التاجر يعرف
+                  الغلاف من الدعوة من غير ما يعدّ.
+                */}
+                <div className="scroll-x flex gap-2 pb-1">
+                  {slides.map((sl, i) => (
+                    <div key={sl.id} className="relative w-40 shrink-0">
+                      <div
+                        className={cn(
+                          'relative overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface-2)]',
+                          shape,
+                        )}
+                      >
+                        <Image src={sl.url} alt="" fill sizes="160px" className="object-cover" />
+                      </div>
+                      <span className="absolute start-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-xs font-bold text-white">
+                        {i + 1}
+                      </span>
+                      <button
+                        type="button"
+                        aria-label={'شيل الشريحة ' + (i + 1)}
+                        onClick={() => setSlides((v) => v.filter((x) => x.id !== sl.id))}
+                        className="absolute end-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white"
+                      >
+                        <X className="h-3 w-3" aria-hidden="true" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSlides([])}
+                    className="flex h-10 items-center gap-1.5 rounded-lg border border-[var(--border-strong)] px-3 text-sm text-[var(--fg-muted)]"
+                  >
+                    <X className="h-4 w-4" aria-hidden="true" />
+                    كاروسيل جديد
+                  </button>
+                  <span className="flex h-10 items-center text-xs text-[var(--fg-subtle)]">
+                    {slides.length} شرايح — الترتيب ده هو اللي هينشر
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         {media === 'video' && (
           <div className="flex flex-col gap-3 border-t border-[var(--border)] pt-4">
             {video ? (
@@ -686,6 +848,13 @@ export function StudioClient({
                 set: setCta,
                 rows: 2,
               },
+              {
+                label: 'الرابط',
+                hint: 'بينزل آخر البوست — امسحه لو مش عايزه',
+                value: link,
+                set: setLink,
+                rows: 2,
+              },
             ].map((f) => (
               <label key={f.label} className="flex flex-col gap-1.5">
                 <span className="flex flex-wrap items-baseline gap-2">
@@ -761,11 +930,23 @@ export function StudioClient({
                   دلوقتي — تحويله لصفحة تانية عشان يعمل ضغطة كان
                   بيخلّيه ينسى.
                 */}
+                {/*
+                  المشاركة بتاخد أول شريحة في الكاروسيل.
+
+                  شاشة المشاركة بتاخد ملفًا واحدًا، والغلاف هو اللي
+                  بيمثّل البوست. والباقي بيتنزّل من «البوستات».
+                */}
                 {hasMedia && (
                   <SharePost
-                    url={media === 'video' ? video!.url : current!.url}
+                    url={
+                      media === 'video'
+                        ? video!.url
+                        : media === 'carousel'
+                          ? slides[0].url
+                          : current!.url
+                    }
                     text={[caption, hashtags.join(' ')].filter(Boolean).join('\n\n')}
-                    kind={media}
+                    kind={media === 'video' ? 'video' : 'image'}
                   />
                 )}
                 <Link

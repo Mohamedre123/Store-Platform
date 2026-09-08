@@ -841,6 +841,15 @@ export async function editImage(input: {
   prompt: string
   /** الصورة الأصلية — سيبها فاضية عشان يولّد من الصفر */
   image?: InlineImage
+  /**
+   * نسبة الصورة — «1:1» أو «4:5» أو «9:16» أو «16:9».
+   *
+   * ## الوصف وحده ما بيكفيش
+   * كتابة «صمّم صورة بنسبة ٤:٥» في النص بيتجاهلها الموديل وبيطلّع
+   * مربّع. النسبة إعداد توليد لا تعليمة — وبتتبعت في
+   * `generationConfig.imageConfig`.
+   */
+  aspectRatio?: string
 }): Promise<GeminiResult<GeneratedImage>> {
   try {
     const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = []
@@ -857,6 +866,13 @@ export async function editImage(input: {
         body: JSON.stringify({
           contents: [{ role: 'user', parts }],
           generationConfig: {
+            /*
+              النسبة بتتبعت هنا لا في النص.
+
+              الموديل بيتجاهل «بنسبة ٤:٥» المكتوبة في الوصف وبيطلّع
+              مربّع — والتاجر بيختار مقاس إنستجرام وياخد حاجة تانية.
+            */
+            ...(input.aspectRatio ? { imageConfig: { aspectRatio: input.aspectRatio } } : {}),
             /*
               لازم نطلب الصورة صراحةً.
 

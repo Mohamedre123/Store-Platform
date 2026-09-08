@@ -157,7 +157,7 @@ export async function publishPost(
       await publishToAccount(storeId, acc.id, {
         caption: post.caption,
         hashtags: post.hashtags,
-        imageUrl: post.imageUrls[0] ?? null,
+        imageUrls: post.imageUrls,
         videoUrl: post.videoUrl,
       }),
     )

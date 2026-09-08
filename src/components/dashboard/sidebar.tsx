@@ -37,6 +37,7 @@ import {
   RotateCcw,
   Truck,
   Users,
+  Sparkles,
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -115,6 +116,26 @@ export const NAV: NavSection[] = [
       { href: '/dashboard/customers/blocked', label: 'الحظر', permission: 'orders.manage' },
     ],
   },
+  /*
+    الاستوديو قسم لوحده — مش بند في التسويق.
+
+    الأربع شاشات دي حاجة واحدة: بتعمل الصورة، بتكتب البوست،
+    بتجدوله، وبتربط الحساب اللي هينشر عليه. توزيعهم على قايمة فيها
+    ١٤ بند تاني كان بيخلّي التاجر يفتح واحدة ويدوّر على الباقي —
+    والأداة تبان أربع أدوات مالهمش علاقة.
+  */
+  {
+    href: '/dashboard/studio',
+    label: 'المحتوى والنشر',
+    icon: Sparkles,
+    permission: 'marketing.manage',
+    children: [
+      { href: '/dashboard/studio', label: 'استوديو المحتوى' },
+      { href: '/dashboard/studio/posts', label: 'البوستات' },
+      { href: '/dashboard/studio/schedules', label: 'النشر التلقائي' },
+      { href: '/dashboard/studio/accounts', label: 'حسابات السوشيال' },
+    ],
+  },
   {
     href: '/dashboard/marketing',
     label: 'التسويق',
@@ -122,17 +143,6 @@ export const NAV: NavSection[] = [
     permission: 'marketing.manage',
     children: [
       { href: '/dashboard/marketing', label: 'الكوبونات والعروض' },
-      /*
-        الاستوديو فوق في التسويق — مش تحت في الإضافات.
-
-        دي أداة بتتفتح كل يوم، مش إعداد بيتظبّط مرة. ومكانها جنب
-        الحملات والكوبونات لأن التاجر بيفتح القسم ده وهو ناوي
-        يسوّق — لا وهو بيدوّر على إضافة.
-      */
-      { href: '/dashboard/studio', label: 'استوديو المحتوى' },
-      { href: '/dashboard/studio/posts', label: 'البوستات' },
-      { href: '/dashboard/studio/schedules', label: 'النشر التلقائي' },
-      { href: '/dashboard/studio/accounts', label: 'حسابات السوشيال' },
       { href: '/dashboard/landing', label: 'صفحات الهبوط' },
       { href: '/dashboard/affiliates', label: 'المسوّقون' },
       { href: '/dashboard/marketing/campaigns', label: 'حملات البريد' },

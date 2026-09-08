@@ -105,7 +105,20 @@ export function PluginsManager({
     if (slug === 'gemini_pro') return pro.enabled && (pro.hasOwnKey || pro.baseReady)
     if (slug === 'claude') return claude.enabled && claude.hasKey
     const row = bySlug.get(slug)
-    return Boolean(row?.enabled && Object.values(row.config ?? {}).some(Boolean))
+    if (!row?.enabled) return false
+
+    /*
+      الإضافة اللي مالهاش حقول شغّالة بمجرد التفعيل.
+
+      الفحص كان بيطلب إعداد محفوظ — وده منطقي للبكسل (معرّف من غيره
+      مالوش لازمة)، وغلط للأدوات اللي إعدادها شاشة كاملة زي
+      الاستوديو. كانت بتتفعّل وتفضل باينة «مقفولة» من برّه، والتاجر
+      يدوس تفعيل تاني وتالت.
+    */
+    const def = PLUGINS.find((d) => d.slug === slug)
+    if (!def || def.fields.length === 0) return true
+
+    return Object.values(row.config ?? {}).some(Boolean)
   }
 
   /** فيه إعدادات محفوظة؟ بيغيّر نص الزرار من «فعّل» لـ«تفاصيل» */
@@ -113,6 +126,10 @@ export function PluginsManager({
     if (slug === 'gemini') return gemini.hasKey
     if (slug === 'gemini_pro') return pro.hasOwnKey || pro.baseReady
     if (slug === 'claude') return claude.hasKey
+    /* مالهاش حقول = مفيش «تفاصيل» تتعرض، والتفعيل وحده كافي */
+    const def = PLUGINS.find((d) => d.slug === slug)
+    if (def && def.fields.length === 0) return Boolean(bySlug.get(slug)?.enabled)
+
     const row = bySlug.get(slug)
     return Boolean(row && Object.values(row.config ?? {}).some(Boolean))
   }

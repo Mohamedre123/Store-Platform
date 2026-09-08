@@ -72,6 +72,31 @@ export function PostsList({
                 playsInline
                 className="aspect-square w-full shrink-0 rounded-xl border border-[var(--border)] bg-black object-cover sm:w-32"
               />
+            ) : p.imageUrls.length > 1 ? (
+              /*
+                الكاروسيل بيبان كاروسيل.
+
+                عرض الغلاف وحده كان بيخلّي التاجر يفتكر إن باقي
+                الشرايح ضاعت — والعدد جنبها بيقول إنها موجودة.
+              */
+              <div className="flex w-full shrink-0 flex-col gap-1.5 sm:w-32">
+                <div className="scroll-x flex gap-1.5">
+                  {p.imageUrls.map((url, i) => (
+                    <span
+                      key={url}
+                      className="relative block aspect-square w-20 shrink-0 overflow-hidden rounded-lg border border-[var(--border)] sm:w-full"
+                    >
+                      <Image src={url} alt="" fill sizes="128px" className="object-cover" />
+                      <span className="absolute start-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-[10px] font-bold text-white">
+                        {i + 1}
+                      </span>
+                    </span>
+                  ))}
+                </div>
+                <span className="text-center text-[11px] text-[var(--fg-subtle)]">
+                  كاروسيل · {p.imageUrls.length} شرايح
+                </span>
+              </div>
             ) : p.imageUrls[0] ? (
               <span className="relative block aspect-square w-full shrink-0 overflow-hidden rounded-xl border border-[var(--border)] sm:w-32">
                 <Image src={p.imageUrls[0]} alt="" fill sizes="128px" className="object-cover" />
@@ -180,7 +205,11 @@ export function PostsList({
                     className="flex h-10 items-center gap-1.5 rounded-lg border border-[var(--border-strong)] px-3 text-sm text-[var(--fg-muted)]"
                   >
                     <Download className="h-4 w-4" aria-hidden="true" />
-                    {p.videoUrl ? 'نزّل الفيديو' : 'نزّل الصورة'}
+                    {p.videoUrl
+                      ? 'نزّل الفيديو'
+                      : p.imageUrls.length > 1
+                        ? 'نزّل أول شريحة'
+                        : 'نزّل الصورة'}
                   </a>
                 )}
 

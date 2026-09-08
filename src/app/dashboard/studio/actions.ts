@@ -7,6 +7,7 @@ import { products, storePlugins } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { assertCan } from '@/lib/permissions'
 import {
+  makeCarousel,
   makeImage,
   pollProductVideo,
   productBrief,
@@ -97,8 +98,58 @@ export async function generateImageAction(input: {
   return { ok: true, id: res.id, url: res.url, prompt: res.prompt }
 }
 
+export type CarouselState =
+  | { ok: true; images: Array<{ id: string; url: string; prompt: string }> }
+  | { ok: false; error: string }
+
+/**
+ * كاروسيل — صور مترابطة في نداء واحد.
+ *
+ * ## بياخد وقت أطول من صورة واحدة بعدد الشرايح
+ * خمس شرايح = خمس نداءات متتابعة، مش متوازية: كل واحدة محتاجة
+ * اللي قبلها كمرجع عشان الشكل يفضل واحد. الشاشة بتقول ده قبل
+ * الضغط عشان التاجر ما يفتكرش إنها وقفت.
+ */
+export async function generateCarouselAction(input: {
+  prompt: string
+  preset: PresetKey
+  count: number
+  productId?: string | null
+  useProductPhoto?: boolean
+}): Promise<CarouselState> {
+  const { store, user } = await studioContext()
+
+  const prompt = String(input.prompt ?? '').trim()
+  if (prompt.length < 3) return { ok: false, error: 'اكتب وصفًا للكاروسيل' }
+  if (prompt.length > 1200) return { ok: false, error: 'الوصف طويل أوي' }
+
+  let seedUrl: string | null = null
+  if (input.useProductPhoto && input.productId) {
+    const p = await productBrief(store.id, input.productId)
+    seedUrl = p?.image ?? null
+  }
+
+  const res = await makeCarousel({
+    storeId: store.id,
+    userId: user.id,
+    prompt,
+    preset: input.preset,
+    count: input.count,
+    productId: input.productId ?? null,
+    seedUrl,
+  })
+
+  if ('error' in res) return { ok: false, error: res.error }
+
+  revalidatePath('/dashboard/studio')
+  return {
+    ok: true,
+    images: res.images.map((i) => ({ id: i.id, url: i.url, prompt: i.prompt })),
+  }
+}
+
 export type CopyState =
-  | { ok: true; hook: string; body: string; cta: string; hashtags: string[] }
+  | { ok: true; hook: string; body: string; cta: string; link: string; hashtags: string[] }
   | { ok: false; error: string }
 
 export async function generateCopyAction(input: {
@@ -116,7 +167,14 @@ export async function generateCopyAction(input: {
   })
 
   if ('error' in res) return { ok: false, error: res.error }
-  return { ok: true, hook: res.hook, body: res.body, cta: res.cta, hashtags: res.hashtags }
+  return {
+    ok: true,
+    hook: res.hook,
+    body: res.body,
+    cta: res.cta,
+    link: res.link,
+    hashtags: res.hashtags,
+  }
 }
 
 export type VideoStartState =

@@ -52,7 +52,7 @@ const empty = (): Draft => ({
   categoryId: null,
   productIds: [],
   style: null,
-  preset: 'square',
+  preset: 'portrait',
   /* الصورة الافتراضي — الفيديو أغلى بمراحل والتاجر بيختاره وهو شايف */
   media: 'image',
   autoPublish: false,

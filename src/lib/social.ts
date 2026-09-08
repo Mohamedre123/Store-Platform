@@ -185,7 +185,7 @@ export type PublishOutcome = { accountId: string; ok: boolean; externalId?: stri
 export async function publishToAccount(
   storeId: string,
   accountId: string,
-  post: { caption: string; hashtags: string[]; imageUrl?: string | null; videoUrl?: string | null },
+  post: { caption: string; hashtags: string[]; imageUrls?: string[]; videoUrl?: string | null },
 ): Promise<PublishOutcome> {
   const [acc] = await db
     .select()
@@ -197,9 +197,11 @@ export async function publishToAccount(
   if (acc.status !== 'active') return { accountId, ok: false, error: 'الربط انتهى — اربط تاني' }
 
   const video = post.videoUrl?.trim() || null
-  const image = post.imageUrl?.trim() || null
-  const media = video ?? image
-  if (!media) return { accountId, ok: false, error: 'البوست من غير صورة ولا فيديو' }
+  const images = (post.imageUrls ?? []).map((u) => u.trim()).filter(Boolean)
+
+  if (!video && images.length === 0) {
+    return { accountId, ok: false, error: 'البوست من غير صورة ولا فيديو' }
+  }
 
   /* الهاشتاجات آخر النص — كل المنصات بتقراها كده */
   const caption = [post.caption, post.hashtags.join(' ')].filter(Boolean).join('\n\n')
@@ -208,7 +210,7 @@ export async function publishToAccount(
     storeId,
     platform: acc.platform,
     caption,
-    mediaUrl: media,
+    mediaUrls: video ? [video] : images,
     isVideo: Boolean(video),
   })
 

@@ -7,6 +7,8 @@ import { getAiConfig, GEMINI_PRO_SLUG, GEMINI_SLUG } from './ai/settings'
 import { catalogBlock, briefLine, getStoreBrief, operationsBlock } from './ai/store-context'
 import { uploadImage, uploadVideo } from './storage'
 import { getStoreTheme } from './storefront'
+import { stores } from '@/db/schema'
+import { publicStoreUrl } from './domain'
 import { checkVideo, downloadVideo, listVideoModels, startVideo, type VeoAspect } from './ai/veo'
 import { recordUpload } from './media'
 import { formatMoney } from './utils'
@@ -81,6 +83,8 @@ async function imageModel(apiKey: string): Promise<string | StudioError> {
 
 export type ProductBrief = {
   id: string
+  /** لبناء رابط الصفحة في البوست */
+  slug: string
   name: string
   price: string
   description: string | null
@@ -106,6 +110,7 @@ export async function productBrief(
   const [row] = await db
     .select({
       id: products.id,
+      slug: products.slug,
       name: products.name,
       price: products.price,
       description: products.description,
@@ -123,6 +128,7 @@ export async function productBrief(
 
   return {
     id: row.id,
+    slug: row.slug,
     name: row.name,
     price: formatMoney(row.price, brief.currency),
     description: row.description?.trim() || row.shortDescription?.trim() || null,
@@ -176,6 +182,29 @@ async function brandBlock(storeId: string): Promise<string> {
   ].join('\n')
 }
 
+/**
+ * الرابط اللي البوست بيوديه عليه.
+ *
+ * ## بينتهي بصفحة المنتج لو فيه منتج
+ * البوست عن تيشيرت بيودّي على المتجر كله، والعميل بيدوّر على
+ * التيشيرت وسط خمسين حاجة ويسيب. الرابط المباشر بيفرق في التحويل
+ * أكتر من أي كلمة في البوست.
+ */
+async function storeLink(storeId: string, productSlug?: string | null): Promise<string> {
+  const [row] = await db
+    .select({
+      slug: stores.slug,
+      customDomain: stores.customDomain,
+      customDomainVerifiedAt: stores.customDomainVerifiedAt,
+    })
+    .from(stores)
+    .where(eq(stores.id, storeId))
+    .limit(1)
+
+  if (!row) return ''
+  return publicStoreUrl(row, productSlug ? `/products/${productSlug}` : '')
+}
+
 /* ══════════════════════════════════════════════════════════════
    الكلام
    ══════════════════════════════════════════════════════════════ */
@@ -197,14 +226,24 @@ export type CopyResult = {
   hook: string
   /** المتن — الفوايد والتفاصيل */
   body: string
-  /** الدعوة للفعل */
+  /** الدعوة للفعل — من غير الرابط */
   cta: string
+  /**
+   * رابط المتجر أو المنتج.
+   *
+   * ## بيتحط عندنا لا عند الموديل
+   * النماذج بتغلط في الروابط: بتزوّد شرطة، أو تخترع مسارًا، أو
+   * تكتب النطاق ناقص. والرابط الغلط في بوست إعلاني بيوصل العميل
+   * لصفحة ٤٠٤ — يعني البوست كله يروح.
+   */
+  link: string
   hashtags: string[]
 }
 
 /** الأجزاء متجمّعة كنص واحد — للنسخ وللنشر */
-export function joinCopy(c: { hook: string; body: string; cta: string }): string {
-  return [c.hook, c.body, c.cta].map((x) => x.trim()).filter(Boolean).join('\n\n')
+export function joinCopy(c: { hook: string; body: string; cta: string; link?: string }): string {
+  const cta = [c.cta.trim(), c.link?.trim()].filter(Boolean).join('\n')
+  return [c.hook, c.body, cta].map((x) => x.trim()).filter(Boolean).join('\n\n')
 }
 
 /**
@@ -226,6 +265,7 @@ export async function writeCopy(input: {
   const key = await studioKey(input.storeId)
   if ('error' in key) return key
 
+  const brief = await getStoreBrief(input.storeId, input.merchantBrief)
   const ctx = await storeContext(input.storeId, input.merchantBrief)
   const tone = toneOf(input.tone)
 
@@ -277,13 +317,25 @@ export async function writeCopy(input: {
     'من سطرين لأربعة: أهم فايدتين أو تلاتة بلغة العميل مش لغة الكتالوج.',
     '',
     '[دعوة]',
-    'سطر واحد بيقول للعميل يعمل إيه دلوقتي.',
+    /*
+      الرابط ممنوع في كلام الموديل.
+
+      النماذج بتغلط فيه: بتزوّد شرطة، أو تخترع مسارًا، أو تكتب
+      النطاق ناقص. والرابط الغلط في بوست إعلاني بيوصل العميل لصفحة
+      ٤٠٤ — يعني البوست كله يروح. بنلزقه إحنا بعدين.
+    */
+    'سطر واحد بيقول للعميل يعمل إيه دلوقتي. **ما تكتبش أي رابط** — إحنا بنحطّه تحته.',
     '',
     '[هاشتاجات]',
-    'من ٤ لـ٨ هاشتاجات عربي مناسبة للمنتج والسوق المصري، في سطر واحد مفصولة بمسافة.',
+    'من ٤ لـ٨ هاشتاجات، **إلزامي** — القسم ده ما يفضلش فاضي أبدًا.',
+    'كل واحد بيبدأ بـ# ومن غير مسافات جوّاه، وكلهم في سطر واحد مفصولين بمسافة.',
+    'يبقوا عربي ومناسبين للمنتج والسوق المصري.',
+    'مثال للشكل: #تيشيرت_رجالي #ملابس_مصرية #اونلاين_شوبينج #توصيل_لكل_المحافظات',
   ]
     .filter(Boolean)
     .join('\n')
+
+  const link = await storeLink(input.storeId, product?.slug)
 
   const res = await generate({
     apiKey: key.apiKey,
@@ -305,7 +357,44 @@ export async function writeCopy(input: {
   })
   if (!res.ok) return { error: res.error.message }
 
-  return parseCopy(res.data)
+  const parsed = parseCopy(res.data)
+
+  return {
+    ...parsed,
+    link,
+    /*
+      هاشتاجات احتياطية لو الموديل نساها.
+
+      القسم بيتنسى أحيانًا مهما كانت التعليمات، والبوست من غير
+      هاشتاجات بيوصل لمتابعي الصفحة بس — يعني نص فايدة النشر راحت.
+      والبديل مبني من بيانات حقيقية: اسم المنتج وقسمه واسم المتجر.
+    */
+    hashtags: parsed.hashtags.length > 0 ? parsed.hashtags : fallbackTags(product, brief),
+  }
+}
+
+/**
+ * هاشتاجات من بيانات المتجر.
+ *
+ * ## مبنية لا مخترعة
+ * اسم المنتج وقسمه واسم المتجر — دي كلمات العميل بيدوّر بيها فعلًا.
+ * والهاشتاج المخترع بيوصل لصفر ناس.
+ */
+function fallbackTags(product: ProductBrief | null, brief: { name: string }): string[] {
+  const words = [
+    product?.name,
+    product?.category,
+    brief.name,
+    'اونلاين شوبينج',
+    'توصيل لكل المحافظات',
+  ]
+
+  return words
+    .filter((w): w is string => Boolean(w?.trim()))
+    /* المسافات بتبقى شرطة سفلية — الهاشتاج بيقف عند أول مسافة */
+    .map((w) => '#' + w.trim().replace(/[^\p{L}\p{N}\s]/gu, '').replace(/\s+/g, '_'))
+    .filter((t) => t.length > 2)
+    .slice(0, 6)
 }
 
 /**
@@ -348,11 +437,12 @@ function parseCopy(raw: string): CopyResult {
       hook: '',
       body: text.replace(/#[^\s#]+/g, '').trim(),
       cta: '',
+      link: '',
       hashtags,
     }
   }
 
-  return { hook, body, cta: cta.replace(/#[^\s#]+/g, '').trim(), hashtags }
+  return { hook, body, cta: cta.replace(/#[^\s#]+/g, '').trim(), link: '', hashtags }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -437,7 +527,13 @@ export async function makeImage(input: {
         '- سيب مساحة فاضية حوالين المنتج — النص اللي ملزوق في الحافة بيتقصّ على المنصات.',
       ].join('\n')
 
-  const res = await editImage({ apiKey: key.apiKey, model, prompt, image: base })
+  const res = await editImage({
+    apiKey: key.apiKey,
+    model,
+    prompt,
+    image: base,
+    aspectRatio: preset.aspect,
+  })
   if (!res.ok) return { error: res.error.message }
 
   /* رفع الناتج */
@@ -505,6 +601,113 @@ async function fetchAsInline(
   } catch {
     return null
   }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   الكاروسيل
+   ══════════════════════════════════════════════════════════════ */
+
+/**
+ * أدوار الشرايح.
+ *
+ * ## الكاروسيل مش خمس صور — دي حكاية بخمس صفحات
+ * خمس صور للمنتج من زوايا مختلفة بيتعدّوا زي أي بوست. اللي بيخلّي
+ * العميل يسحب لآخر شريحة إن كل واحدة بتضيف حاجة: الأولى بتوقّفه،
+ * واللي في النص بتقنعه، والأخيرة بتقوله يعمل إيه.
+ *
+ * والأدوار بتتوزّع على العدد اللي التاجر طلبه: الأولى والأخيرة
+ * ثابتين، واللي بينهم بالدور.
+ */
+const SLIDE_ROLES = {
+  first: 'شريحة الغلاف: المنتج واضح وكبير، وجملة قصيرة جدًا بتشدّ العين.',
+  last: 'الشريحة الأخيرة: دعوة للطلب واضحة، ومساحة فاضية حواليها.',
+  middle: [
+    'شريحة فايدة: ركّز على فايدة واحدة للمنتج بصورة بتوضّحها.',
+    'شريحة تفصيلة: قرّب على خامة المنتج أو تفصيلة فيه.',
+    'شريحة استخدام: المنتج وهو مستخدَم في موقف حقيقي.',
+    'شريحة مقارنة: المنتج جنب حاجة بتوضّح حجمه أو جودته.',
+  ],
+}
+
+function slideBrief(index: number, total: number): string {
+  if (index === 0) return SLIDE_ROLES.first
+  if (index === total - 1) return SLIDE_ROLES.last
+  return SLIDE_ROLES.middle[(index - 1) % SLIDE_ROLES.middle.length]
+}
+
+export type CarouselResult = { images: StudioImage[] } | StudioError
+
+/**
+ * كاروسيل — صور مترابطة شكلًا.
+ *
+ * ## كل شريحة بتتبني على اللي قبلها
+ * الشريحة رقم ٣ بتتولّد **والشريحة ٢ معاها كمرجع**. من غير كده كل
+ * صورة بتطلع بأسلوب وإضاءة وخلفية مختلفة، والخمسة يبانوا خمس
+ * إعلانات لخمس متاجر — مش كاروسيل واحد.
+ *
+ * ## والفشل في النص بيرجّع اللي نجح
+ * أربع شرايح من خمسة أحسن من لا حاجة، والتاجر ينشرهم أو يعيد.
+ * الرمي كان بيضيّع أربع نداءات دفع تمنهم.
+ */
+export async function makeCarousel(input: {
+  storeId: string
+  userId: string
+  prompt: string
+  preset: PresetKey
+  count: number
+  productId?: string | null
+  seedUrl?: string | null
+  merchantBrief?: string | null
+}): Promise<CarouselResult> {
+  const count = Math.max(2, Math.min(10, input.count))
+  const images: StudioImage[] = []
+
+  for (let i = 0; i < count; i++) {
+    /*
+      المرجع: الشريحة اللي قبلها، وأول واحدة بتاخد صورة المنتج.
+
+      كده السلسلة كلها بتفضل شبه بعضها، وأولها بيفضل شبه المنتج
+      الحقيقي.
+    */
+    const previous = images.at(-1)
+
+    const res = await makeImage({
+      storeId: input.storeId,
+      userId: input.userId,
+      prompt: [
+        input.prompt,
+        '',
+        'دي شريحة ' + (i + 1) + ' من ' + count + ' في كاروسيل واحد.',
+        slideBrief(i, count),
+        previous
+          ? 'خلّي الأسلوب والإضاءة والخلفية والألوان **نفسها بالظبط** زي الصورة المرفقة — دي الشريحة اللي قبلها في نفس الكاروسيل.'
+          : '',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      preset: input.preset,
+      productId: input.productId,
+      /*
+        `parentId` فاضي عن قصد.
+
+        هو للتعديل («خلّي الخلفية أغمق») واللي بيشيل سياق المتجر من
+        الوصف. والشريحة الجديدة محتاجة السياق كامل — فبنمرّر
+        السابقة كـ`seedUrl` بدل كده.
+      */
+      seedUrl: previous?.url ?? input.seedUrl ?? null,
+      merchantBrief: input.merchantBrief,
+    })
+
+    if ('error' in res) {
+      /* اللي نجح بيترجّع؛ والفشل من أول شريحة بيرجّع الخطأ */
+      if (images.length === 0) return res
+      break
+    }
+
+    images.push(res)
+  }
+
+  return { images }
 }
 
 /* ══════════════════════════════════════════════════════════════
