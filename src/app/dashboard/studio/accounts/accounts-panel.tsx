@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { useTransition } from 'react'
-import { AlertTriangle, Link2, Trash2 } from 'lucide-react'
+import { AlertTriangle, Link2, RefreshCw, Trash2 } from 'lucide-react'
 import { disconnectAccountAction } from '../actions'
 import { PLATFORMS, platformOf, type SocialPlatform } from '@/lib/studio-meta'
 import { Alert, Card } from '@/components/ui'
@@ -15,6 +15,7 @@ type Account = {
   name: string
   avatar: string | null
   canPublish: boolean
+  provider: string
   status: string
   lastError: string | null
 }
@@ -30,11 +31,14 @@ type Account = {
 export function AccountsPanel({
   accounts,
   available,
+  viaProvider,
   connected,
   error,
 }: {
   accounts: Account[]
   available: SocialPlatform[]
+  /** الربط بيمشي على وسيط — الرحلة مختلفة فالشاشة مختلفة */
+  viaProvider: boolean
   connected: string | null
   error: string | null
 }) {
@@ -140,7 +144,50 @@ export function AccountsPanel({
           — يقدر ينشر من موبايله بضغطتين دلوقتي، والفرق بين
           الجملتين هو الفرق بين إنه يستخدم الأداة ولا يسيبها.
         */}
-        {entries.length === 0 ? (
+        {/*
+          رحلة الوسيط: صفحة برّه، ورجوع بإيد التاجر.
+
+          صفحة الوسيط ما بتردّهوش لعندنا، فمفيش رابط رجوع نستقبله.
+          الزرارين لازم يبانوا مع بعض — واحد بيروح وواحد بيقرا —
+          وإلا التاجر بيربط بنجاح ويرجع يلاقي الشاشة فاضية ويفتكر
+          إن الربط فشل.
+        */}
+        {viaProvider ? (
+          <div className="flex flex-col gap-3">
+            <ol className="flex flex-col gap-2 text-sm text-[var(--fg-muted)]">
+              <li>
+                <strong className="text-[var(--fg)]">١.</strong> دوس «افتح صفحة الربط» — هتفتح في
+                تبويب جديد.
+              </li>
+              <li>
+                <strong className="text-[var(--fg)]">٢.</strong> اربط فيسبوك وإنستجرام (وأي منصة
+                تانية عايزها) من الصفحة دي.
+              </li>
+              <li>
+                <strong className="text-[var(--fg)]">٣.</strong> ارجع هنا ودوس «حدّث الحسابات».
+              </li>
+            </ol>
+
+            <div className="flex flex-wrap gap-2">
+              <a
+                href="/api/social/start?platform=facebook"
+                target="_blank"
+                rel="noreferrer"
+                className="flex h-11 items-center gap-2 rounded-lg bg-[var(--primary)] px-5 text-sm font-semibold text-[var(--primary-fg)]"
+              >
+                افتح صفحة الربط
+                <Link2 className="h-4 w-4" aria-hidden="true" />
+              </a>
+              <a
+                href="/api/social/sync"
+                className="flex h-11 items-center gap-2 rounded-lg border border-[var(--border-strong)] px-5 text-sm font-semibold"
+              >
+                <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                حدّث الحسابات
+              </a>
+            </div>
+          </div>
+        ) : entries.length === 0 ? (
           <div className="flex flex-col gap-2 rounded-lg bg-[var(--surface-2)] px-3.5 py-3 text-sm leading-relaxed text-[var(--fg-muted)]">
             <p>
               الربط التلقائي لسه بيتجهّز على المنصة —{' '}

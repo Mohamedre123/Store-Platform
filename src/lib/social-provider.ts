@@ -7,23 +7,26 @@ import type { SocialPlatform } from './studio-meta'
  * ## المشكلة اللي بيحلّها
  * ميتا وتيك توك بيطلبوا: تطبيق مطوّر، وتأكيد ملكية دومين، وتوثيق
  * نشاط تجاري بسجل ضريبي، ومراجعة بفيديو توضيحي. ده أسابيع من
- * الشغل الإداري **قبل** ما أول بوست ينزل — والتاجر اللي مستنّي
- * الميزة بيسيبها.
+ * الشغل الإداري **قبل** ما أول بوست ينزل.
  *
- * والوسيط عنده الموافقات دي جاهزة أصلًا. بنبعتله الصورة والكلام
- * وهو بينشر. **نفس النتيجة بالظبط عند عميل التاجر** — بوست على
- * صفحته باسمه.
+ * والوسيط عنده الموافقات دي جاهزة. بنبعتله الصورة والكلام وهو
+ * بينشر. **نفس النتيجة بالظبط عند عميل التاجر** — بوست على صفحته
+ * باسمه.
  *
  * ## وده مش بديل دايم بالضرورة
  * `social_accounts.provider` بيخلّي الطريقين يعيشوا جنب بعض: اللي
  * اتربط بتطبيقنا مباشرةً بيفضل شغّال، واللي اتربط بالوسيط كمان.
- * فلما موافقتنا تخلص، مفيش حاجة بتتكسر — التجّار الجداد بس بيربطوا
- * مباشرةً.
+ * فلما موافقتنا تخلص، مفيش حاجة بتتكسر.
  *
  * ## واللي مش بنعمله
  * مفيش أي أداة بتشتغل بباسورد التاجر (سكرابينج). دي بتوقّع حسابه
  * في الحظر، ومعناها إننا بنخزّن باسووردات التجّار عندنا. الوسيط
- * الشرعي أغلى بشوية وبيشتغل من غير ما حد يخسر حسابه.
+ * الشرعي بيشتغل من غير ما حد يخسر حسابه.
+ *
+ * ## العقد ده اتقاس مش اتفترض
+ * أسماء الحقول (`user` و`platform[]` و`title` و`photos[]`) اتجرّبت
+ * على الـAPI الحقيقي بمفتاح شغّال. التخمين الأول كان غلط في أربع
+ * أسماء من خمسة — والغلط ده كان هيبان «فشل النشر» من غير سبب.
  */
 
 const BASE = 'https://api.upload-post.com'
@@ -34,7 +37,7 @@ export function providerConfigured(): boolean {
   return Boolean(process.env.UPLOAD_POST_API_KEY)
 }
 
-function headers(): Record<string, string> {
+function auth(): Record<string, string> {
   return { Authorization: `Apikey ${process.env.UPLOAD_POST_API_KEY ?? ''}` }
 }
 
@@ -42,37 +45,53 @@ function headers(): Record<string, string> {
  * اسم ملف المتجر عند الوسيط.
  *
  * ## مشتقّ من المعرّف لا مخزَّن
- * لو خزّنّاه، المتجر اللي اتعمل له ملف والصف اتمسح بغلط بيفضل عنده
- * ملف يتيم عند الوسيط ومحدش يعرف بتاع مين. والاشتقاق بيخلّي نفس
- * المتجر يدّي نفس الاسم دايمًا.
- *
- * والشرطات بتتشال: الوسيط بيقبل حروف وأرقام وشرطة سفلية بس.
+ * لو خزّنّاه، المتجر اللي اتمسح صفّه بغلط بيسيب ملفًا يتيمًا عند
+ * الوسيط ومحدش يعرف بتاع مين. والاشتقاق بيخلّي نفس المتجر يدّي
+ * نفس الاسم دايمًا.
  */
 export function profileFor(storeId: string): string {
   return 'zw_' + storeId.replace(/-/g, '').slice(0, 24)
 }
 
-/** الملف موجود؟ اعمله. — بيتنادى قبل الربط وقبل النشر */
+/** الملف موجود؟ اعمله */
 export async function ensureProfile(storeId: string): Promise<ProviderResult<string>> {
   const username = profileFor(storeId)
 
   try {
     const res = await fetch(`${BASE}/api/uploadposts/users`, {
       method: 'POST',
-      headers: { ...headers(), 'Content-Type': 'application/json' },
+      headers: { ...auth(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ username }),
     })
 
-    /*
-      الملف الموجود بيرجّع خطأ، وده نجاح مش فشل.
-
-      الرمي هنا كان بيخلّي التاجر مش قادر يربط تاني بعد أول مرة —
-      وإعادة الربط بتحصل كتير (التوكن بيقع، بيغيّر صفحته).
-    */
-    if (res.ok || res.status === 409) return { ok: true, data: username }
+    if (res.ok) return { ok: true, data: username }
 
     const body = await res.text()
-    if (/exist/i.test(body)) return { ok: true, data: username }
+
+    /*
+      الملف الموجود نجاح مش فشل.
+
+      إعادة الربط بتحصل كتير (التوكن بيقع، التاجر بيغيّر صفحته)،
+      والرفض هنا كان بيمنعه من الربط تاني بعد أول مرة.
+    */
+    if (res.status === 409 || /exist|already/i.test(body)) {
+      return { ok: true, data: username }
+    }
+
+    /*
+      حدّ الملفات = حدّ التجّار.
+
+      الباقة المجانية بتدّي ملفين. الرسالة لازم تقول ده صراحةً
+      للإدارة — «فشل الربط» كانت هتخلّيهم يدوّروا في الكود والمشكلة
+      في الاشتراك.
+    */
+    if (/PROFILE_LIMIT_REACHED/i.test(body)) {
+      const limit = body.match(/"profile_limit"\s*:\s*(\d+)/)?.[1] ?? '؟'
+      return {
+        ok: false,
+        error: `وصلنا لحد ${limit} تاجر على باقة خدمة النشر الحالية. بلّغ الدعم عشان نرفعها.`,
+      }
+    }
 
     return { ok: false, error: friendly(res.status, body) }
   } catch (e) {
@@ -81,38 +100,32 @@ export async function ensureProfile(storeId: string): Promise<ProviderResult<str
 }
 
 /**
- * رابط ربط منصة — بيرجّع عنوان شاشة الموافقة.
+ * صفحة ربط الحسابات.
  *
- * التاجر بيروح لشاشة فيسبوك أو تيك توك الحقيقية، بس التطبيق تطبيق
- * الوسيط — فالموافقة بتعدّي من غير ما نستنّى مراجعة.
+ * الوسيط بيدّي صفحة مستضافة عنده، والتاجر بيربط منها فيسبوك
+ * وإنستجرام وغيرهم — كلهم من مكان واحد. الرابط عمره ٤٨ ساعة.
  */
-export async function connectUrl(
-  storeId: string,
-  platform: SocialPlatform,
-  redirectUrl: string,
-): Promise<ProviderResult<string>> {
+export async function connectUrl(storeId: string): Promise<ProviderResult<string>> {
   const profile = await ensureProfile(storeId)
   if (!profile.ok) return profile
 
   try {
-    const res = await fetch(`${BASE}/api/uploadposts/oauth/${platform}/start`, {
+    const res = await fetch(`${BASE}/api/uploadposts/users/generate-jwt`, {
       method: 'POST',
-      headers: { ...headers(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ profile: profile.data, redirect_url: redirectUrl }),
+      headers: { ...auth(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: profile.data }),
     })
 
     const data = (await res.json().catch(() => null)) as {
-      authorize_url?: string
-      url?: string
-      error?: string
+      access_url?: string
+      message?: string
     } | null
 
-    const url = data?.authorize_url ?? data?.url
-    if (!res.ok || !url) {
-      return { ok: false, error: data?.error ?? friendly(res.status, '') }
+    if (!res.ok || !data?.access_url) {
+      return { ok: false, error: data?.message ?? friendly(res.status, '') }
     }
 
-    return { ok: true, data: url }
+    return { ok: true, data: data.access_url }
   } catch (e) {
     return { ok: false, error: netError(e) }
   }
@@ -126,24 +139,26 @@ export type ProviderAccount = {
 }
 
 /**
- * الحسابات اللي التاجر ربطها عند الوسيط.
+ * الحسابات اللي اتربطت فعلًا.
  *
- * بتتنادى بعد رجوعه من شاشة الموافقة: بنقرا اللي اتربط فعلًا بدل
- * ما نصدّق الرابط اللي رجع بيه. الرابط بيقول «تمام» حتى لو التاجر
- * قفل الشاشة في نصّها.
+ * ## بنقرا الحالة بدل ما نصدّق الرجوع
+ * التاجر بيربط في صفحة الوسيط ويرجع بإيده — مفيش رابط بيقول لنا
+ * نجح ولا لأ. والقراءة هي الطريقة الوحيدة المضمونة.
+ *
+ * ## والنص الفاضي معناه «مش مربوط»
+ * الرد بيرجّع `{"tiktok": ""}` للمنصة المدعومة وغير المربوطة.
+ * حفظها كحساب كان هيخلّي التاجر يختارها وجهة ويستنّى بوست مش
+ * هينزل.
  */
 export async function listConnected(storeId: string): Promise<ProviderResult<ProviderAccount[]>> {
   const username = profileFor(storeId)
 
   try {
-    const res = await fetch(`${BASE}/api/uploadposts/users`, { headers: headers() })
+    const res = await fetch(`${BASE}/api/uploadposts/users`, { headers: auth() })
     if (!res.ok) return { ok: false, error: friendly(res.status, await res.text()) }
 
     const data = (await res.json()) as {
-      profiles?: Array<{
-        username?: string
-        social_accounts?: Record<string, unknown>
-      }>
+      profiles?: Array<{ username?: string; social_accounts?: Record<string, unknown> }>
     }
 
     const mine = data.profiles?.find((p) => p.username === username)
@@ -151,35 +166,27 @@ export async function listConnected(storeId: string): Promise<ProviderResult<Pro
 
     const out: ProviderAccount[] = []
 
-    /*
-      شكل الرد بيختلف بين المنصات.
-
-      بعضها بيرجّع كائن فيه الاسم والصورة، وبعضها بيرجّع نصًّا
-      باسم المستخدم بس، والمقفول بيرجّع فاضي. القراءة المرنة
-      بتخلّي منصة جديدة عندهم تشتغل من غير تعديل عندنا.
-    */
     for (const [key, value] of Object.entries(mine.social_accounts ?? {})) {
       const platform = key.toLowerCase()
       if (!isSupported(platform)) continue
-      if (!value) continue
+
+      /* الفاضي = مدعوم بس مش مربوط */
+      if (!value || (typeof value === 'string' && !value.trim())) continue
 
       const obj = typeof value === 'object' ? (value as Record<string, unknown>) : null
       const name =
         (typeof value === 'string' && value) ||
         (typeof obj?.username === 'string' && obj.username) ||
         (typeof obj?.display_name === 'string' && obj.display_name) ||
-        (typeof obj?.name === 'string' && obj.name) ||
-        platform
-
-      const id =
-        (typeof obj?.id === 'string' && obj.id) ||
-        (typeof obj?.social_id === 'string' && obj.social_id) ||
-        /* مفيش معرّف؟ المنصة نفسها كافية — الملف واحد لكل متجر */
         platform
 
       out.push({
         platform,
-        externalId: id,
+        externalId:
+          (typeof obj?.id === 'string' && obj.id) ||
+          (typeof obj?.social_id === 'string' && obj.social_id) ||
+          /* مفيش معرّف؟ المنصة كافية — الملف واحد لكل متجر */
+          platform,
         name: String(name),
         avatar: typeof obj?.avatar_url === 'string' ? obj.avatar_url : null,
       })
@@ -198,10 +205,15 @@ function isSupported(p: string): p is SocialPlatform {
 /**
  * النشر.
  *
- * ## الملف بيتبعت خام لا كرابط
- * الوسيط بياخد `multipart/form-data`. تمرير رابط تخزيننا كان
- * هيخلّيه يحتاج يوصل له — وده بيقع مع أي إعداد خصوصية على البكت.
- * والتحميل عندنا وإعادة الرفع أضمن، والملف صغير أصلًا.
+ * ## الصور والفيديو ليهم مسارات مختلفة
+ * `/api/upload_photos` بياخد `photos[]`، و`/api/upload` بياخد
+ * `video`. المسار الواحد كان بيرفض النوع التاني برسالة عن حقل
+ * ناقص مالهاش علاقة بالسبب الحقيقي.
+ *
+ * ## والملف بيتبعت خام
+ * الوسيط بياخد `multipart/form-data` زي ما مثاله بيقول
+ * (`video=@ملف`). التحميل من تخزيننا وإعادة الرفع أضمن من إننا
+ * نديله رابطًا محتاج يوصل له.
  */
 export async function publishViaProvider(input: {
   storeId: string
@@ -213,38 +225,47 @@ export async function publishViaProvider(input: {
   try {
     const file = await fetch(input.mediaUrl)
     if (!file.ok) return { ok: false, error: 'مقدرناش نجيب الملف من التخزين' }
-
     const blob = await file.blob()
-    const name = input.isVideo ? 'post.mp4' : 'post.png'
 
     const form = new FormData()
-    form.append('file', blob, name)
-    form.append('profile', profileFor(input.storeId))
-    form.append('platforms', input.platform)
-    form.append('caption', input.caption)
+    form.append('user', profileFor(input.storeId))
+    form.append('platform[]', input.platform)
 
-    const res = await fetch(`${BASE}/api/upload`, {
-      method: 'POST',
-      headers: headers(),
-      body: form,
-    })
+    /*
+      `title` هو نص البوست عندهم لا عنوان منفصل.
+
+      الاسم مضلّل، لكنه اللي بيظهر كوصف البوست على كل المنصات —
+      وبعت الكلام في `caption` كان بيخلّي البوست ينزل من غير نص.
+    */
+    form.append('title', input.caption)
+
+    const endpoint = input.isVideo ? '/api/upload' : '/api/upload_photos'
+    if (input.isVideo) form.append('video', blob, 'post.mp4')
+    else form.append('photos[]', blob, 'post.png')
+
+    const res = await fetch(BASE + endpoint, { method: 'POST', headers: auth(), body: form })
 
     const data = (await res.json().catch(() => null)) as {
       success?: boolean
       request_id?: string
+      invalid_platforms?: Record<string, string>
       results?: Record<string, { success?: boolean; error?: string }>
-      error?: string
+      message?: string
     } | null
 
     if (!res.ok || data?.success === false) {
       /*
-        خطأ المنصة نفسها أدقّ من خطأ الوسيط.
+        سبب المنصة نفسها أدقّ من سبب الوسيط.
 
-        «فشل الرفع» ما بتقولش للتاجر يعمل إيه، و«حسابك مش أعمال»
-        بتقوله. فبندوّر على سبب المنصة الأول.
+        «فشل النشر» ما بتقولش للتاجر يعمل إيه، و«الملف مالوش حساب
+        إنستجرام» بتقوله. فبندوّر على السبب المفصّل الأول.
       */
-      const perPlatform = data?.results?.[input.platform]?.error
-      return { ok: false, error: perPlatform ?? data?.error ?? friendly(res.status, '') }
+      const reason =
+        data?.invalid_platforms?.[input.platform] ??
+        data?.results?.[input.platform]?.error ??
+        data?.message
+
+      return { ok: false, error: translate(reason) ?? friendly(res.status, '') }
     }
 
     return { ok: true, data: data?.request_id ?? '' }
@@ -258,20 +279,41 @@ export async function publishViaProvider(input: {
    ══════════════════════════════════════════════════════════════ */
 
 /**
- * رسالة مفهومة بدل رقم.
+ * الأخطاء الشائعة بالعربي.
  *
- * «٤٢٩» ما بتقولش للتاجر يعمل إيه، و«حصّتك خلصت الشهر ده» بتقوله.
+ * الوسيط بيرد بالإنجليزي، والتاجر المصري بيقرا رسالة مالهاش معنى
+ * عنده فبيفتكر المنصة بايظة. والترجمة هنا لأشهرهم بس — الباقي
+ * بيعدّي زي ما هو أحسن من «حصل خطأ».
  */
+function translate(raw: string | undefined): string | null {
+  if (!raw) return null
+
+  if (/no .* account configured|not configured/i.test(raw)) {
+    return 'الحساب ده مش مربوط. اربطه من «حسابات السوشيال» وجرّب تاني.'
+  }
+  if (/business|professional/i.test(raw)) {
+    return 'حساب إنستجرام لازم يكون «أعمال» ومربوط بصفحة فيسبوك.'
+  }
+  if (/quota|limit|plan/i.test(raw)) {
+    return 'حصّة النشر خلصت. بلّغ الدعم عشان نرفعها.'
+  }
+  if (/expired|reconnect|token/i.test(raw)) {
+    return 'الربط انتهى. افصل الحساب واربطه تاني.'
+  }
+
+  return raw
+}
+
 function friendly(status: number, body: string): string {
   if (status === 401 || status === 403) {
     return 'مفتاح خدمة النشر مش مضبوط على المنصة. بلّغ الدعم.'
   }
   if (status === 402 || /quota|limit|plan/i.test(body)) {
-    return 'حصّة النشر خلصت الشهر ده. بلّغ الدعم عشان نرفعها.'
+    return 'حصّة النشر خلصت. بلّغ الدعم عشان نرفعها.'
   }
   if (status === 429) return 'فيه ضغط على النشر دلوقتي. جرّب بعد شوية.'
 
-  const msg = body.match(/"(?:error|message|detail)"\s*:\s*"([^"]{5,200})"/)?.[1]
+  const msg = body.match(/"(?:message|error|detail)"\s*:\s*"([^"]{5,200})"/)?.[1]
   return msg ? `خدمة النشر ردّت: ${msg}` : `خدمة النشر ردّت بخطأ ${status}`
 }
 

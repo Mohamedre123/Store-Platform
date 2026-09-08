@@ -42,6 +42,51 @@ function redirectBack(req: NextRequest, params: Record<string, string>) {
   return NextResponse.redirect(url)
 }
 
+/**
+ * قراءة حسابات الوسيط وحفظها.
+ *
+ * بنقرا الحالة الحقيقية بدل ما نصدّق أي رابط: التاجر ممكن يكون
+ * قفل الصفحة في نصّها، والصف اللي بيتكتب على أساس الرابط بيبان
+ * حسابًا شغّالًا مش بينشر.
+ */
+async function syncProvider(req: NextRequest) {
+  const { store, user } = await getDashboardContext()
+
+  const found = await listConnected(store.id)
+  if (!found.ok) return redirectBack(req, { error: found.error })
+
+  if (found.data.length === 0) {
+    return redirectBack(req, {
+      error: 'لسه مفيش حساب مربوط. افتح صفحة الربط، اربط حسابك، وبعدين ارجع ودوس «حدّث».',
+    })
+  }
+
+  for (const acc of found.data) {
+    await saveAccount({
+      storeId: store.id,
+      userId: user.id,
+      account: {
+        platform: acc.platform,
+        externalId: acc.externalId,
+        name: acc.name,
+        avatar: acc.avatar,
+        /*
+          مفيش توكن بيوصلنا — الوسيط ماسكه.
+
+          والعمود `notNull`، فبنحط علامة واضحة بدل نص فاضي بيبان
+          توكنًا مكسورًا لأي حد بيقرا الجدول بعدين.
+        */
+        accessToken: 'provider',
+        canPublish: true,
+      },
+      provider: 'uploadpost',
+      providerProfile: profileFor(store.id),
+    })
+  }
+
+  return redirectBack(req, { connected: String(found.data.length) })
+}
+
 export async function GET(
   req: NextRequest,
   ctx: { params: Promise<{ action: string }> },
@@ -68,8 +113,13 @@ export async function GET(
       بتفضل شغّالة لأن `provider` متخزّن على كل صف.
     */
     if (providerConfigured()) {
-      const back = `${req.nextUrl.origin}/api/social/callback?platform=${platform}&via=provider`
-      const url = await connectUrl(store.id, platform, back)
+      /*
+        صفحة الوسيط بتربط كل المنصات مرة واحدة.
+
+        فمفيش لزوم لرحلة لكل منصة — التاجر بيروح، بيربط اللي عايزه،
+        وبيرجع. والمنصة في الرابط بتتجاهل هنا عن قصد.
+      */
+      const url = await connectUrl(store.id)
       if (!url.ok) return redirectBack(req, { error: url.error })
       return NextResponse.redirect(url.data)
     }
@@ -97,6 +147,14 @@ export async function GET(
   }
 
   /* ── الرجوع ──────────────────────────────────────────── */
+  /*
+    مزامنة الوسيط — فعل صريح لا رجوع تلقائي.
+
+    صفحة الوسيط ما بتردّش التاجر لعندنا، فمفيش رابط رجوع نستقبله.
+    التاجر بيرجع بإيده ويدوس «حدّث» — وبنقرا اللي اتربط فعلًا.
+  */
+  if (action === 'sync') return syncProvider(req)
+
   if (action === 'callback') {
     /*
       رجوع الوسيط مالوش `code` ولا `state`.
@@ -106,38 +164,7 @@ export async function GET(
       نصّها، والصف الفاضي كان هيبان حسابًا شغّالًا مش بينشر.
     */
     if (req.nextUrl.searchParams.get('via') === 'provider') {
-      const { store, user } = await getDashboardContext()
-
-      const found = await listConnected(store.id)
-      if (!found.ok) return redirectBack(req, { error: found.error })
-      if (found.data.length === 0) {
-        return redirectBack(req, { error: 'ما اتربطش حساب. جرّب تاني وكمّل شاشة الموافقة للآخر.' })
-      }
-
-      for (const acc of found.data) {
-        await saveAccount({
-          storeId: store.id,
-          userId: user.id,
-          account: {
-            platform: acc.platform,
-            externalId: acc.externalId,
-            name: acc.name,
-            avatar: acc.avatar,
-            /*
-              مفيش توكن بيوصلنا — الوسيط ماسكه.
-
-              والعمود `notNull`، فبنحط علامة واضحة بدل نص فاضي
-              بيبان توكنًا مكسورًا لأي حد بيقرا الجدول بعدين.
-            */
-            accessToken: 'provider',
-            canPublish: true,
-          },
-          provider: 'uploadpost',
-          providerProfile: profileFor(store.id),
-        })
-      }
-
-      return redirectBack(req, { connected: String(found.data.length) })
+      return syncProvider(req)
     }
 
     const code = req.nextUrl.searchParams.get('code')
