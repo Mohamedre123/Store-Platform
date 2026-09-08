@@ -119,6 +119,20 @@ export const socialAccounts = pgTable(
      */
     canPublish: boolean('can_publish').notNull().default(true),
 
+    /**
+     * مين بينشر — تطبيقنا ولا وسيط.
+     *
+     * ميتا وتيك توك بيطلبوا موافقة وتوثيق نشاط قبل أول بوست.
+     * الوسيط عنده الموافقات جاهزة، فالتاجر بيربط وينشر من غير ما
+     * نستنّى مراجعة — ونفس النتيجة عند العميل بالظبط.
+     *
+     * والعمود ده بيخلّي الطريقين يعيشوا جنب بعض: المتاجر اللي
+     * اتربطت مباشرةً تفضل شغّالة لما موافقتنا تخلص.
+     */
+    provider: text('provider').$type<'direct' | 'uploadpost'>().notNull().default('direct'),
+    /** معرّف الملف عند الوسيط — الوجهة اللي بينشر عليها */
+    providerProfile: text('provider_profile'),
+
     status: text('status').$type<'active' | 'expired' | 'revoked'>().notNull().default('active'),
     lastError: text('last_error'),
 

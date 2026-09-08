@@ -4,6 +4,7 @@ import { db } from '@/db'
 import { socialAccounts } from '@/db/schema'
 import { encrypt, decrypt } from './crypto'
 import type { SocialPlatform } from './studio-meta'
+import { providerConfigured, publishViaProvider } from './social-provider'
 
 /**
  * النشر على السوشيال.
@@ -41,11 +42,24 @@ export function tiktokConfigured(): boolean {
 }
 
 /** إيه المتاح دلوقتي — الشاشة بتخبّي اللي مش مضبوط بدل ما تعطّل التاجر */
+/**
+ * المتاح دلوقتي.
+ *
+ * الوسيط بيغطّي التلاتة مرة واحدة. ولو تطبيقنا مضبوط كمان، الاتنين
+ * بيبقوا متاحين — والتاجر بيختار، والقديم ما بيتكسرش.
+ */
 export function availablePlatforms(): SocialPlatform[] {
+  if (providerConfigured()) return ['facebook', 'instagram', 'tiktok']
+
   const out: SocialPlatform[] = []
   if (metaConfigured()) out.push('facebook', 'instagram')
   if (tiktokConfigured()) out.push('tiktok')
   return out
+}
+
+/** الربط بيمشي على الوسيط؟ — الشاشة بتوضّح الفرق للتاجر */
+export function usingProvider(): boolean {
+  return providerConfigured()
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -297,6 +311,8 @@ export async function saveAccount(input: {
   account: DiscoveredAccount
   refreshToken?: string | null
   expiresAt?: Date | null
+  provider?: 'direct' | 'uploadpost'
+  providerProfile?: string | null
 }): Promise<void> {
   const values = {
     name: input.account.name,
@@ -307,6 +323,8 @@ export async function saveAccount(input: {
     canPublish: input.account.canPublish,
     status: 'active' as const,
     lastError: null,
+    provider: input.provider ?? ('direct' as const),
+    providerProfile: input.providerProfile ?? null,
     updatedAt: new Date(),
   }
 
@@ -331,6 +349,7 @@ export type ConnectedAccount = {
   name: string
   avatar: string | null
   canPublish: boolean
+  provider: 'direct' | 'uploadpost'
   status: 'active' | 'expired' | 'revoked'
   lastError: string | null
   expiresAt: Date | null
@@ -350,6 +369,7 @@ export async function listAccounts(storeId: string): Promise<ConnectedAccount[]>
       name: socialAccounts.name,
       avatar: socialAccounts.avatar,
       canPublish: socialAccounts.canPublish,
+      provider: socialAccounts.provider,
       status: socialAccounts.status,
       lastError: socialAccounts.lastError,
       expiresAt: socialAccounts.expiresAt,
@@ -400,11 +420,41 @@ export async function publishToAccount(
   if (!acc) return { accountId, ok: false, error: 'الحساب مش موجود' }
   if (acc.status !== 'active') return { accountId, ok: false, error: 'الربط انتهى — اربط تاني' }
 
+  /* الهاشتاجات آخر النص — كل المنصات بتقراها كده */
+  const captionText = [post.caption, post.hashtags.join(' ')].filter(Boolean).join('\n\n')
+
+  /*
+    حساب الوسيط بيمشي في طريقه.
+
+    الفحص هنا لا في المنادي: النشر بيتنادى من الجدول ومن الزرار
+    ومن إعادة المحاولة — وتكرار الشرط في التلاتة كان بيخلّي أول
+    واحد يتنسى ينشر بالطريق الغلط.
+  */
+  if (acc.provider === 'uploadpost') {
+    const video = post.videoUrl?.trim() || null
+    const image = post.imageUrl?.trim() || null
+    const media = video ?? image
+    if (!media) return { accountId, ok: false, error: 'البوست من غير صورة ولا فيديو' }
+
+    const res = await publishViaProvider({
+      storeId,
+      platform: acc.platform,
+      caption: captionText,
+      mediaUrl: media,
+      isVideo: Boolean(video),
+    })
+
+    if (!res.ok) {
+      await markError(acc.id, res.error)
+      return { accountId, ok: false, error: res.error }
+    }
+    return { accountId, ok: true, externalId: res.data }
+  }
+
   const token = safeDecrypt(acc.accessToken)
   if (!token) return { accountId, ok: false, error: 'التوكن مقروش — اربط تاني' }
 
-  /* الهاشتاجات آخر النص — كل المنصات بتقراها كده */
-  const text = [post.caption, post.hashtags.join(' ')].filter(Boolean).join('\n\n')
+  const text = captionText
 
   try {
     const video = post.videoUrl?.trim() || null

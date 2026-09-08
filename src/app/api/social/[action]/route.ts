@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { getDashboardContext } from '@/lib/store-context'
 import { encryptJson, decryptJson } from '@/lib/crypto'
+import { connectUrl, listConnected, profileFor, providerConfigured } from '@/lib/social-provider'
 import {
   metaAuthUrl,
   metaExchange,
@@ -54,12 +55,29 @@ export async function GET(
   if (action === 'start') {
     const { store, user } = await getDashboardContext()
 
+    if (platform !== 'facebook' && platform !== 'instagram' && platform !== 'tiktok') {
+      return redirectBack(req, { error: 'منصة مش معروفة' })
+    }
+
+    /*
+      الوسيط بيغلب لو مضبوط.
+
+      عنده الموافقات جاهزة، فالتاجر بيربط دلوقتي بدل ما يستنّى
+      مراجعة ميتا وتوثيق النشاط. ولو تطبيقنا اتوافق عليه بعدين،
+      شيل مفتاح الوسيط والربط بيرجع مباشر — والحسابات القديمة
+      بتفضل شغّالة لأن `provider` متخزّن على كل صف.
+    */
+    if (providerConfigured()) {
+      const back = `${req.nextUrl.origin}/api/social/callback?platform=${platform}&via=provider`
+      const url = await connectUrl(store.id, platform, back)
+      if (!url.ok) return redirectBack(req, { error: url.error })
+      return NextResponse.redirect(url.data)
+    }
+
     if (platform === 'facebook' || platform === 'instagram') {
       if (!metaConfigured()) return redirectBack(req, { error: 'ربط فيسبوك مش مضبوط على المنصة' })
-    } else if (platform === 'tiktok') {
-      if (!tiktokConfigured()) return redirectBack(req, { error: 'ربط تيك توك مش مضبوط على المنصة' })
-    } else {
-      return redirectBack(req, { error: 'منصة مش معروفة' })
+    } else if (!tiktokConfigured()) {
+      return redirectBack(req, { error: 'ربط تيك توك مش مضبوط على المنصة' })
     }
 
     const state = encryptJson({ storeId: store.id, userId: user.id, ts: Date.now() })
@@ -80,6 +98,48 @@ export async function GET(
 
   /* ── الرجوع ──────────────────────────────────────────── */
   if (action === 'callback') {
+    /*
+      رجوع الوسيط مالوش `code` ولا `state`.
+
+      الربط حصل عنده، فبنقرا **اللي اتربط فعلًا** بدل ما نصدّق
+      الرابط — الرابط بيرجع «تمام» حتى لو التاجر قفل الشاشة في
+      نصّها، والصف الفاضي كان هيبان حسابًا شغّالًا مش بينشر.
+    */
+    if (req.nextUrl.searchParams.get('via') === 'provider') {
+      const { store, user } = await getDashboardContext()
+
+      const found = await listConnected(store.id)
+      if (!found.ok) return redirectBack(req, { error: found.error })
+      if (found.data.length === 0) {
+        return redirectBack(req, { error: 'ما اتربطش حساب. جرّب تاني وكمّل شاشة الموافقة للآخر.' })
+      }
+
+      for (const acc of found.data) {
+        await saveAccount({
+          storeId: store.id,
+          userId: user.id,
+          account: {
+            platform: acc.platform,
+            externalId: acc.externalId,
+            name: acc.name,
+            avatar: acc.avatar,
+            /*
+              مفيش توكن بيوصلنا — الوسيط ماسكه.
+
+              والعمود `notNull`، فبنحط علامة واضحة بدل نص فاضي
+              بيبان توكنًا مكسورًا لأي حد بيقرا الجدول بعدين.
+            */
+            accessToken: 'provider',
+            canPublish: true,
+          },
+          provider: 'uploadpost',
+          providerProfile: profileFor(store.id),
+        })
+      }
+
+      return redirectBack(req, { connected: String(found.data.length) })
+    }
+
     const code = req.nextUrl.searchParams.get('code')
     const raw = req.nextUrl.searchParams.get('state')
     const denied = req.nextUrl.searchParams.get('error_description')

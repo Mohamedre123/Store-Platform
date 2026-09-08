@@ -40,6 +40,7 @@ export default async function SocialAccountsPage({
             name: a.name,
             avatar: a.avatar,
             canPublish: a.canPublish,
+            provider: a.provider,
             status: a.status,
             lastError: a.lastError,
           }))}
