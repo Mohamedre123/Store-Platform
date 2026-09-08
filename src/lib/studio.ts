@@ -324,7 +324,9 @@ export async function writeCopy(input: {
       النطاق ناقص. والرابط الغلط في بوست إعلاني بيوصل العميل لصفحة
       ٤٠٤ — يعني البوست كله يروح. بنلزقه إحنا بعدين.
     */
-    'سطر واحد بيقول للعميل يعمل إيه دلوقتي. **ما تكتبش أي رابط** — إحنا بنحطّه تحته.',
+    'سطر واحد قصير ومباشر بيقول للعميل يعمل إيه دلوقتي — زي «اطلب دلوقتي»',
+    'أو «اطلبه من المتجر» أو «كلّمنا ونجهّزهولك». **ما تكتبش أي رابط**',
+    'ولا تقول «اضغط على اللينك» — إحنا بنحطّ الرابط تحته على طول.',
     '',
     '[هاشتاجات]',
     'من ٤ لـ٨ هاشتاجات، **إلزامي** — القسم ده ما يفضلش فاضي أبدًا.',
@@ -335,7 +337,13 @@ export async function writeCopy(input: {
     .filter(Boolean)
     .join('\n')
 
-  const link = await storeLink(input.storeId, product?.slug)
+  /*
+    رابط المتجر لا رابط المنتج.
+
+    البوست بيعرّف بالمتجر، والعميل اللي بيدخل بيشوف الباقي —
+    ورابط المنتج بيوصّله لصفحة واحدة ويخرج. وده اللي التاجر طلبه.
+  */
+  const link = await storeLink(input.storeId)
 
   const res = await generate({
     apiKey: key.apiKey,
@@ -446,6 +454,183 @@ function parseCopy(raw: string): CopyResult {
 }
 
 /* ══════════════════════════════════════════════════════════════
+   الإخراج الفني
+   ══════════════════════════════════════════════════════════════ */
+
+export type ArtConcept = {
+  /** المكان والمشهد — ده اللي بيفرّق بين إعلان وبطاقة بيانات */
+  scene: string
+  /** الإضاءة والكاميرا */
+  look: string
+  /** التكوين: المنتج فين، والفراغ فين */
+  composition: string
+  /**
+   * الكلام المكتوب على الصورة — كلمتين لأربعة، أو فاضي.
+   *
+   * مش اسم المنتج ولا وصفه. جملة بتخلّي الواحد يقف.
+   */
+  overlay: string
+}
+
+/**
+ * إخراج فني للصورة — خطوة تفكير قبل الرسم.
+ *
+ * ## ليه خطوة زيادة
+ * الوصف اللي بيروح لموديل الصور على طول بيطلّع **بطاقة بيانات**:
+ * المنتج مقصوص على خلفية لون واحد، واسمه ووصفه ومقاساته مكتوبين
+ * جنبه في مستطيلات. ده مش إعلان — ده كتالوج.
+ *
+ * الإعلان بيبدأ بفكرة: المنتج ده بيتباع لمين، وبيتستخدم فين،
+ * وإيه المشهد اللي بيخلّي الواحد يتخيّل نفسه فيه. والخطوة دي
+ * بتخلّي موديل **نصّي** يفكّر في الفكرة دي الأول، وبعدين موديل
+ * الصور ينفّذها.
+ *
+ * ## والنص على الصورة أقل ما يمكن
+ * الإعلان الاحترافي مش بيكتب المواصفات على الصورة — بيحطّ جملة
+ * واحدة، والباقي في البوست. وموديلات الصور بتغلط في العربي لما
+ * يكتر، فالقايمة اللي فيها «المقاسات: XL، L، XL» بتطلع مكرّرة
+ * وغلط زي ما حصل فعلًا.
+ *
+ * ## وكلام التاجر قيد لا اقتراح
+ * لو كتب «عايزه في مكان حقيقي»، الفكرة **لازم** تبقى مكان حقيقي.
+ * التوجيه اللي بيتقرا كاقتراح بيرجّع نفس الخلفية السادة كل مرة —
+ * وده اللي كان بيحصل.
+ */
+async function artDirection(input: {
+  storeId: string
+  apiKey: string
+  model: string
+  product: ProductBrief | null
+  /** كلام التاجر — نبرة الجدول أو وصفه في الاستوديو */
+  direction: string
+  preset: PresetKey
+  merchantBrief?: string | null
+}): Promise<ArtConcept> {
+  const brief = await getStoreBrief(input.storeId, input.merchantBrief)
+  const p = input.product
+
+  const prompt = [
+    'إنت مدير فني بتشتغل لعلامات تجارية، وبتصمّم إعلان واحد.',
+    '',
+    briefLine(brief),
+    '',
+    p
+      ? [
+          'المنتج:',
+          '- الاسم: ' + p.name,
+          '- السعر: ' + p.price,
+          p.category ? '- القسم: ' + p.category : '',
+          p.options.length ? '- المتاح: ' + p.options.join(' | ') : '',
+          p.description ? '- وصف التاجر: ' + p.description : '',
+        ]
+          .filter(Boolean)
+          .join('\n')
+      : 'الإعلان عن المتجر كله لا عن منتج بعينه.',
+    '',
+    'توجيه صاحب المتجر — **التزم بيه حرفيًا**:',
+    input.direction.trim() || '(ما حدّدش حاجة — إنت اللي تختار اللي يليق بالمنتج)',
+    '',
+    'فكّر الأول: المنتج ده بيتباع لمين؟ بيتستخدم فين وإمتى؟ إيه',
+    'المشهد اللي بيخلّي اللي شايفه يتخيّل نفسه فيه؟',
+    '',
+    'وبعدين صمّم لقطة **واحدة** واقعية سينمائية:',
+    '',
+    '[مشهد]',
+    'المكان والسياق بالتفصيل — مكان حقيقي بتفاصيله، لا خلفية لون واحد.',
+    'اذكر العناصر اللي حوالين المنتج وليه هي موجودة.',
+    '',
+    '[إضاءة]',
+    'نوع الإضاءة واتجاهها ووقت اليوم، ونوع العدسة والعمق.',
+    '',
+    '[تكوين]',
+    'المنتج فين في الكادر، والفراغ فين، وإيه اللي بيوجّه العين له.',
+    '',
+    '[نص]',
+    'من كلمتين لأربعة بالعربي بس — جملة بتشدّ، مش اسم المنتج ولا وصفه.',
+    'أو اكتب «مفيش» لو الصورة أقوى من غير كلام.',
+    '',
+    'ممنوع تمامًا: خلفية لون واحد أو تدرّج، منتج مقصوص طاير في الفراغ،',
+    'قوايم مواصفات أو مقاسات أو أسعار مكتوبة على الصورة، أيقونات ومستطيلات',
+    'حوالين المنتج. دي بتخلّي الإعلان يبان كتالوج.',
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  const res = await generate({
+    apiKey: input.apiKey,
+    model: input.model,
+    system:
+      'إنت مدير فني لإعلانات تجارية. بترد بالأقسام المعلَّمة المطلوبة ' +
+      'منك بالظبط ومن غير أي مقدّمات ولا شرح.',
+    messages: [{ role: 'user', text: prompt }],
+    temperature: 1,
+    maxTokens: 1200,
+  })
+
+  /*
+    الفشل بيرجّع فكرة افتراضية لا بيوقّف التوليد.
+
+    التاجر مستنّي صورة. لو خطوة التفكير وقعت (شبكة، حصّة)، أحسن
+    حاجة نرسم بفكرة عامة محترمة من إننا نرجّع خطأ ونضيّع الطلب.
+  */
+  if (!res.ok) return fallbackConcept(input.product, input.direction)
+
+  return parseConcept(res.data, input.product, input.direction)
+}
+
+/** فكرة محترمة لما التفكير يقع — أحسن من الخلفية السادة */
+function fallbackConcept(product: ProductBrief | null, direction: string): ArtConcept {
+  return {
+    scene:
+      direction.trim() ||
+      'مشهد واقعي في مكان طبيعي بيستخدم فيه المنتج، بتفاصيل حقيقية حواليه' +
+        (product ? ' تناسب ' + product.name : ''),
+    look: 'إضاءة طبيعية ناعمة جنبية، عدسة ٥٠ملم، عمق ميدان ضحل والخلفية مموّهة بهدوء',
+    composition: 'المنتج في التلت السفلي، ومساحة فاضية فوقه، والضوء بيوجّه العين له',
+    overlay: '',
+  }
+}
+
+function parseConcept(
+  raw: string,
+  product: ProductBrief | null,
+  direction: string,
+): ArtConcept {
+  const text = raw.replace(/```+/g, '').trim()
+
+  const grab = (label: string): string => {
+    const re = new RegExp('\\[' + label + '\\]\\s*([\\s\\S]*?)(?=\\n\\s*\\[|$)')
+    return text.match(re)?.[1]?.trim() ?? ''
+  }
+
+  const base = fallbackConcept(product, direction)
+  const overlay = grab('نص')
+
+  return {
+    scene: grab('مشهد') || base.scene,
+    look: grab('إضاءة') || base.look,
+    composition: grab('تكوين') || base.composition,
+    /* «مفيش» يعني من غير نص — والصورة النضيفة أحسن من نص مكسور */
+    overlay: /^مفيش/.test(overlay) ? '' : overlay,
+  }
+}
+
+/** الفكرة كوصف لموديل الصور */
+function conceptToPrompt(c: ArtConcept, preset: { aspect: string; label: string }): string {
+  return [
+    'صوّر لقطة إعلانية واحدة، واقعية وسينمائية، بنسبة ' + preset.aspect + '.',
+    '',
+    'المشهد: ' + c.scene,
+    'الإضاءة والكاميرا: ' + c.look,
+    'التكوين: ' + c.composition,
+    c.overlay
+      ? 'اكتب على الصورة النص ده بالظبط وبخط عربي نضيف ومقروء: «' + c.overlay + '» — ' +
+        'وما تكتبش أي كلام تاني خالص.'
+      : 'من غير أي كلام مكتوب على الصورة.',
+  ].join('\n')
+}
+
+/* ══════════════════════════════════════════════════════════════
    الصور
    ══════════════════════════════════════════════════════════════ */
 
@@ -475,6 +660,14 @@ export async function makeImage(input: {
   /** صورة المنتج نفسها كأساس — أول توليد بيبدأ منها */
   seedUrl?: string | null
   merchantBrief?: string | null
+  /**
+   * فكرة جاهزة — للكاروسيل.
+   *
+   * الشرايح كلها لازم تشترك في نفس المشهد والإضاءة، فالفكرة
+   * بتتصمّم مرة واحدة للسِت كله وبتتمرّر لكل شريحة. من غير كده
+   * كل شريحة بتفكّر لوحدها والخمسة يبانوا خمس إعلانات.
+   */
+  concept?: ArtConcept
 }): Promise<StudioImage | StudioError> {
   const key = await studioKey(input.storeId)
   if ('error' in key) return key
@@ -510,22 +703,51 @@ export async function makeImage(input: {
     التعديل «كبّر الخط» ما يحتاجش يعرف سياسة الشحن — وحشو السياق في
     كل تعديل بيخلّي الموديل يعيد رسم الصورة من الأول بدل ما يعدّلها.
   */
-  const prompt = input.parentId
-    ? input.prompt
-    : [
-        await storeContext(input.storeId, input.merchantBrief),
-        '',
-        await brandBlock(input.storeId),
-        '',
-        `صمّم صورة إعلانية احترافية بنسبة ${preset.aspect} (${preset.label}).`,
-        input.prompt,
-        '',
-        'قواعد:',
-        '- الصورة لازم تبان احترافية زي إعلانات العلامات الكبيرة: إضاءة نضيفة وتكوين مريح.',
-        `- أي كلام مكتوب في الصورة يبقى **عربي صحيح** ومقروء.`,
-        '- ما تكتبش أسعارًا ولا أرقامًا مش مذكورة فوق.',
-        '- سيب مساحة فاضية حوالين المنتج — النص اللي ملزوق في الحافة بيتقصّ على المنصات.',
-      ].join('\n')
+  /*
+    التعديل بيمشي بكلام التاجر زي ما هو.
+
+    «خلّي الخلفية أغمق» مش محتاجة إخراج فني ولا سياق متجر — دي
+    تعليمة على صورة موجودة، وحشو السياق معاها بيخلّي الموديل يعيد
+    رسمها من الأول بدل ما يعدّلها.
+  */
+  let prompt = input.prompt
+
+  if (!input.parentId) {
+    /*
+      الفكرة الأول، والرسم بعدها.
+
+      الوصف اللي بيروح لموديل الصور على طول بيطلّع بطاقة بيانات:
+      منتج مقصوص على لون واحد واسمه ومقاساته مكتوبين جنبه. خطوة
+      التفكير دي هي الفرق بين إعلان وكتالوج.
+    */
+    const product = input.productId
+      ? await productBrief(input.storeId, input.productId)
+      : null
+
+    const concept =
+      input.concept ??
+      (await artDirection({
+        storeId: input.storeId,
+        apiKey: key.apiKey,
+        model: key.model,
+        product,
+        direction: input.prompt,
+        preset: input.preset,
+        merchantBrief: input.merchantBrief,
+      }))
+
+    prompt = [
+      await brandBlock(input.storeId),
+      '',
+      conceptToPrompt(concept, preset),
+      '',
+      'قواعد:',
+      '- **ممنوع** خلفية بلون واحد أو تدرّج، وممنوع منتج مقصوص طاير في الفراغ.',
+      '- **ممنوع** أي قايمة مواصفات أو مقاسات أو أسعار أو أيقونات في مستطيلات.',
+      '- المنتج لازم يبان زي ما هو في الصورة المرفقة — نفس الشكل واللون والتفاصيل.',
+      '- سيب مساحة فاضية حوالين الحواف — المنصات بتقصّها.',
+    ].join('\n')
+  }
 
   const res = await editImage({
     apiKey: key.apiKey,
@@ -662,6 +884,28 @@ export async function makeCarousel(input: {
   const count = Math.max(2, Math.min(10, input.count))
   const images: StudioImage[] = []
 
+  /*
+    فكرة واحدة للسِت كله.
+
+    الشرايح لازم تشترك في المشهد والإضاءة والمزاج — وده اللي
+    بيخلّيهم كاروسيل واحد. لو كل شريحة فكّرت لوحدها، الخمسة يطلعوا
+    خمس إعلانات لخمس متاجر.
+  */
+  const key = await studioKey(input.storeId)
+  if ('error' in key) return key
+
+  const product = input.productId ? await productBrief(input.storeId, input.productId) : null
+
+  const concept = await artDirection({
+    storeId: input.storeId,
+    apiKey: key.apiKey,
+    model: key.model,
+    product,
+    direction: input.prompt,
+    preset: input.preset,
+    merchantBrief: input.merchantBrief,
+  })
+
   for (let i = 0; i < count; i++) {
     /*
       المرجع: الشريحة اللي قبلها، وأول واحدة بتاخد صورة المنتج.
@@ -687,6 +931,7 @@ export async function makeCarousel(input: {
         .join('\n'),
       preset: input.preset,
       productId: input.productId,
+      concept,
       /*
         `parentId` فاضي عن قصد.
 
