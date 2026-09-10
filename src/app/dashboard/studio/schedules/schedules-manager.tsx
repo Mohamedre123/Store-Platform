@@ -32,7 +32,8 @@ type Schedule = {
   productIds: string[]
   style: string | null
   preset: string
-  media: 'image' | 'video'
+  media: 'image' | 'carousel' | 'video'
+  slides: number
   autoPublish: boolean
   lastRunAt: string | null
   nextRunAt: string | null
@@ -55,6 +56,7 @@ const empty = (): Draft => ({
   preset: 'portrait',
   /* الصورة الافتراضي — الفيديو أغلى بمراحل والتاجر بيختاره وهو شايف */
   media: 'image',
+  slides: 5,
   autoPublish: false,
 })
 
@@ -106,6 +108,7 @@ export function SchedulesManager({
         style: draft.style,
         preset: draft.preset as PresetKey,
         media: draft.media,
+        slides: draft.slides,
         autoPublish: draft.autoPublish,
         isActive: draft.isActive,
       })
@@ -274,12 +277,15 @@ export function SchedulesManager({
             hint={
               draft.media === 'video'
                 ? 'الفيديو أغلى من الصورة بمراحل — راجع تسعير Veo عند جوجل قبل ما تخلّيه يومي'
-                : undefined
+                : draft.media === 'carousel'
+                  ? 'كل شريحة صورة لوحدها — ' + draft.slides + ' شرايح يوميًا يعني ' + draft.slides + ' صور في اليوم على مفتاحك'
+                  : undefined
             }
           >
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-3">
               {[
                 { key: 'image' as const, label: 'صورة', hint: 'أسرع وأرخص' },
+                { key: 'carousel' as const, label: 'كاروسيل', hint: 'شرايح مترابطة بتتسحب' },
                 { key: 'video' as const, label: 'فيديو', hint: 'ريلز وتيك توك — بياخد دقايق' },
               ].map((m) => (
                 <button
@@ -307,8 +313,41 @@ export function SchedulesManager({
             </div>
           </Field>
 
+          {draft.media === 'carousel' && (
+            <Field
+              label="عدد الشرايح"
+              hint="الأولى غلاف، والأخيرة دعوة للطلب، واللي بينهم فوايد وتفاصيل"
+            >
+              <div className="flex flex-wrap gap-1.5">
+                {[3, 4, 5, 6, 8, 10].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setDraft({ ...draft, slides: n })}
+                    className={cn(
+                      'flex h-10 min-w-11 items-center justify-center rounded-lg border px-3 text-sm transition-colors',
+                      draft.slides === n
+                        ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]'
+                        : 'border-[var(--border-strong)] text-[var(--fg-muted)]',
+                    )}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </Field>
+          )}
+
           {/* الشكل */}
-          <Field label={draft.media === 'video' ? 'مقاس الفيديو' : 'مقاس الصورة'}>
+          <Field
+            label={
+              draft.media === 'video'
+                ? 'مقاس الفيديو'
+                : draft.media === 'carousel'
+                  ? 'مقاس الشرايح'
+                  : 'مقاس الصورة'
+            }
+          >
             <div className="flex flex-wrap gap-1.5">
               {PRESETS.map((p) => (
                 <button
@@ -445,6 +484,11 @@ export function SchedulesManager({
                     متوقّف
                   </span>
                 )}
+                {s.media === 'carousel' && (
+                  <span className="rounded bg-[var(--color-info-soft)] px-1.5 py-0.5 text-[11px] text-[var(--color-info)]">
+                    كاروسيل · {s.slides}
+                  </span>
+                )}
                 {s.media === 'video' && (
                   <span className="rounded bg-[var(--color-info-soft)] px-1.5 py-0.5 text-[11px] text-[var(--color-info)]">
                     فيديو
@@ -506,6 +550,7 @@ export function SchedulesManager({
                     style: s.style,
                     preset: s.preset,
                     media: s.media,
+                    slides: s.slides,
                     autoPublish: s.autoPublish,
                   })
                 }

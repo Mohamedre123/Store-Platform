@@ -328,7 +328,8 @@ export async function saveScheduleAction(input: {
   productIds?: string[]
   style?: string | null
   preset: PresetKey
-  media: 'image' | 'video'
+  media: 'image' | 'carousel' | 'video'
+  slides?: number
   autoPublish: boolean
   isActive: boolean
 }): Promise<SaveState> {
@@ -359,6 +360,7 @@ export async function saveScheduleAction(input: {
     style: input.style,
     preset: input.preset,
     media: input.media,
+    slides: input.slides,
     autoPublish: input.autoPublish,
     isActive: input.isActive,
   })

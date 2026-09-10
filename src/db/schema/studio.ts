@@ -271,7 +271,9 @@ export const contentSchedules = pgTable(
      * بيطلّع فاتورة التاجر ما توقّعهاش. بيختاره بإيده وهو شايف
      * التنبيه.
      */
-    media: text('media').$type<'image' | 'video'>().notNull().default('image'),
+    media: text('media').$type<'image' | 'carousel' | 'video'>().notNull().default('image'),
+    /** عدد شرايح الكاروسيل — بيتقرا لما `media = 'carousel'` بس */
+    slides: integer('slides').notNull().default(5),
 
     /**
      * ينشر لوحده ولا يستنّى موافقة؟

@@ -4,6 +4,7 @@ import { db } from '@/db'
 import { contentSchedules, socialAccounts, socialPosts, stores } from '@/db/schema'
 import {
   joinCopy,
+  makeCarousel,
   makeImage,
   nextProductInRotation,
   pollProductVideo,
@@ -210,7 +211,8 @@ export type ScheduleRow = {
   productIds: string[]
   style: string | null
   preset: string
-  media: 'image' | 'video'
+  media: 'image' | 'carousel' | 'video'
+  slides: number
   autoPublish: boolean
   lastRunAt: Date | null
   nextRunAt: Date | null
@@ -237,6 +239,7 @@ export async function listSchedules(storeId: string): Promise<ScheduleRow[]> {
     style: r.style,
     preset: r.preset,
     media: r.media,
+    slides: r.slides,
     autoPublish: r.autoPublish,
     lastRunAt: r.lastRunAt,
     nextRunAt: r.nextRunAt,
@@ -264,7 +267,8 @@ export async function saveSchedule(input: {
   productIds?: string[]
   style?: string | null
   preset: PresetKey
-  media: 'image' | 'video'
+  media: 'image' | 'carousel' | 'video'
+  slides?: number
   autoPublish: boolean
   isActive: boolean
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
@@ -292,6 +296,13 @@ export async function saveSchedule(input: {
     style: input.style?.trim() || null,
     preset: input.preset,
     media: input.media,
+    /*
+      الحدود بتتقصّ هنا لا في الشاشة بس.
+
+      الفعل بيتنادى من الشبكة مباشرةً كمان، و`slides: 500` كانت
+      هتخلّي الجدول اليومي يولّد ٥٠٠ صورة على مفتاح التاجر.
+    */
+    slides: Math.max(2, Math.min(10, Math.round(input.slides ?? 5))),
     autoPublish: input.autoPublish,
     isActive: input.isActive,
     nextRunAt: next,
@@ -466,16 +477,42 @@ export async function runSchedule(scheduleId: string): Promise<{ ok: boolean; er
   const brief = [
     s.media === 'video'
       ? `فيديو إعلاني قصير لمنتج «${product.name}».`
+      : s.media === 'carousel'
+        ? `كاروسيل إعلاني من ${s.slides} شرايح لمنتج «${product.name}».`
       : `صورة إعلانية لمنتج «${product.name}».`,
     s.style?.trim() ? s.style.trim() : '',
   ]
     .filter(Boolean)
     .join(' ')
 
-  let imageUrl: string | null = null
+  /* قايمة لا صورة واحدة — الكاروسيل بيملاها بشرايحه بترتيبها */
+  let imageUrls: string[] = []
   let videoUrl: string | null = null
 
-  if (s.media === 'video') {
+  if (s.media === 'carousel') {
+    /*
+      نفس كاروسيل الاستوديو بالظبط — فكرة واحدة للسِت كله.
+
+      الشرايح بتشترك في المشهد والإضاءة لأن `makeCarousel` بيصمّم
+      الفكرة مرة وبيمرّرها لكل شريحة. واللي نجح من الشرايح بيتنشر
+      لو في النص واحدة فشلت — أربعة من خمسة أحسن من يوم فاضي.
+    */
+    const set = await makeCarousel({
+      storeId: s.storeId,
+      userId: s.createdBy ?? '',
+      prompt: brief,
+      preset: s.preset as PresetKey,
+      count: s.slides,
+      productId,
+      seedUrl: seed,
+    })
+    if ('error' in set) return fail(set.error)
+
+    /* شريحة واحدة مش كاروسيل — والمنصات بترفضه كده أصلًا */
+    if (set.images.length < 2) return fail('الكاروسيل طلع أقل من شريحتين. هيتعاد في الميعاد الجاي.')
+
+    imageUrls = set.images.map((i) => i.url)
+  } else if (s.media === 'video') {
     /*
       الفيديو بيتستنّى **هنا** لا على المتصفح.
 
@@ -519,7 +556,7 @@ export async function runSchedule(scheduleId: string): Promise<{ ok: boolean; er
       seedUrl: seed,
     })
     if ('error' in image) return fail(image.error)
-    imageUrl = image.url
+    imageUrls = [image.url]
   }
 
   const postId = await createPost({
@@ -527,7 +564,7 @@ export async function runSchedule(scheduleId: string): Promise<{ ok: boolean; er
     userId: s.createdBy,
     caption: joinCopy(copy),
     hashtags: copy.hashtags,
-    imageUrls: imageUrl ? [imageUrl] : [],
+    imageUrls,
     videoUrl,
     productId,
     targets: s.targets,

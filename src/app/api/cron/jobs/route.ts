@@ -6,7 +6,16 @@ import { drainJobs, pruneJobs } from '@/lib/jobs'
 import { queueDueSchedules } from '@/lib/content-schedules'
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+/*
+  خمس دقايق لا دقيقة.
+
+  المهام بتتنفّذ واحدة ورا التانية جوّه نداء واحد. وكاروسيل من خمس
+  شرايح = فكرة + خمس صور متتابعة، والفيديو بيستنّى لحد تلات دقايق —
+  الاتنين كانوا بيتقتلوا في النص عند الدقيقة، والتاجر بيدفع تمن
+  توليد ما بيوصلوش. لو خطة الاستضافة سقفها أقل، الاستضافة بتاخد
+  سقفها هي.
+*/
+export const maxDuration = 300
 
 /**
  * عامل طابور المهام.
