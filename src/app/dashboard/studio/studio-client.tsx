@@ -27,14 +27,34 @@ import {
   searchProductsAction,
   startVideoAction,
 } from './actions'
-import { PRESETS, TONES, platformOf, presetOf, type PresetKey, type ToneKey } from '@/lib/studio-meta'
+import {
+  PRESETS,
+  STYLES,
+  TONES,
+  inferStyle,
+  platformOf,
+  presetOf,
+  styleOf,
+  type ImageStyle,
+  type PresetKey,
+  type ToneKey,
+} from '@/lib/studio-meta'
 import { Alert, Card } from '@/components/ui'
 import { SharePost } from '@/components/dashboard/share-post'
 import { toast } from '@/components/dashboard/toast'
 import { cn } from '@/lib/utils'
 
 type Product = { id: string; name: string; image: string | null }
-type Account = { id: string; platform: string; name: string; status: string }
+type Account = { id: string; platform: string; name: string; avatar: string | null; status: string }
+type Outcome = { accountId: string; ok: boolean; error?: string }
+
+/** «حساب واحد» · «حسابين» · «٣ حسابات» — الرقم لوحده في زرار نشر بيتقرا غلط */
+function accountsLabel(n: number): string {
+  if (n === 1) return 'حساب واحد'
+  if (n === 2) return 'حسابين'
+  if (n <= 10) return n + ' حسابات'
+  return n + ' حساب'
+}
 type Asset = { id: string; url: string; prompt: string; preset: string; kind: string }
 
 /**
@@ -51,11 +71,14 @@ type Asset = { id: string; url: string; prompt: string; preset: string; kind: st
  */
 export function StudioClient({
   hasKey,
+  publishing,
   products,
   accounts,
   assets,
 }: {
   hasKey: boolean
+  /** خدمة النشر مضبوطة على المنصة — من غيرها الربط نفسه مش متاح */
+  publishing: boolean
   products: Product[]
   accounts: Account[]
   assets: Asset[]
@@ -118,10 +141,31 @@ export function StudioClient({
   const [copyError, setCopyError] = useState<string | null>(null)
   const [writing, startCopy] = useTransition()
 
+  /*
+    شكل الصورة — واللي مكتوب في الوصف بيغلبه.
+
+    التاجر بيكتب «خلفية سادة» وناسي الاختيار فوق. الخادم بيفهم
+    الجملة ويغلّبها، والشاشة بتعلّم نفس الشكل عشان يشوف اللي هيتنفّذ.
+  */
+  const [style, setStyle] = useState<ImageStyle>('auto')
+  const typedStyle = inferStyle(imagePrompt)
+  const effectiveStyle: ImageStyle = typedStyle ?? style
+
   /* النشر */
-  const [targets, setTargets] = useState<string[]>([])
+  const live = accounts.filter((a) => a.status === 'active')
+  /* حساب واحد مربوط يبقى مختار من الأول — مفيش اختيار تاني يتعمل */
+  const [targets, setTargets] = useState<string[]>(() => (live.length === 1 ? [live[0].id] : []))
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saving, startSave] = useTransition()
+  /*
+    البوست اللي اتحفظ ونتيجة نشره — مربوطين بالوسيط نفسه.
+
+    `key` هو روابط الصور أو الفيديو. لو التاجر عمل صورة جديدة، المفتاح
+    بيتغيّر والحالة القديمة بتسقط لوحدها: الحفظ الجاي بوست جديد،
+    والحسابات اللي «اتنشر عليها» ترجع تتختار.
+  */
+  const [saved, setSaved] = useState<{ id: string; key: string; published: boolean } | null>(null)
+  const [outcome, setOutcome] = useState<{ key: string; results: Outcome[] } | null>(null)
 
   /* النص المركَّب — ده اللي بيتحفظ وبيتنسخ وبينشر */
   const caption = [hook, body, [cta.trim(), link.trim()].filter(Boolean).join('\n')]
@@ -133,7 +177,16 @@ export function StudioClient({
   /* الوسيط اللي هيتحفظ فعلًا — بيتبع التبويب المفتوح لا اللي اتعمل */
   const hasMedia =
     media === 'video' ? Boolean(video) : media === 'carousel' ? slides.length > 0 : Boolean(current)
-  const live = accounts.filter((a) => a.status === 'active')
+
+  const mediaUrls =
+    media === 'carousel' ? slides.map((x) => x.url) : media === 'image' && current ? [current.url] : []
+  const videoUrl = media === 'video' ? (video?.url ?? null) : null
+  const mediaKey = [...mediaUrls, videoUrl ?? ''].join('|')
+
+  const results = outcome?.key === mediaKey ? outcome.results : []
+  /* اللي اتنشر عليه الوسيط ده خلاص — ما يتنشرش عليه تاني بالغلط */
+  const doneIds = results.filter((r) => r.ok).map((r) => r.accountId)
+  const pending = targets.filter((t) => !doneIds.includes(t))
 
   const shape = useMemo(() => presetOf(preset).css, [preset])
 
@@ -156,6 +209,7 @@ export function StudioClient({
         productId: product?.id ?? null,
         parentId: edit ? (current?.id ?? null) : null,
         useProductPhoto: !edit && useProductPhoto,
+        style,
       })
 
       if (!res.ok) {
@@ -189,6 +243,7 @@ export function StudioClient({
       useProductPhoto,
       /* الصورة المعروضة دلوقتي بتتحرّك — أدق من صورة المنتج الخام */
       seedAssetUrl: current?.url ?? null,
+      style,
     })
 
     if (!started.ok) {
@@ -243,6 +298,7 @@ export function StudioClient({
       count: slideCount,
       productId: product?.id ?? null,
       useProductPhoto,
+      style,
     })
 
     if (!res.ok) setImgError(res.error)
@@ -280,25 +336,70 @@ export function StudioClient({
     })
   }
 
+  /**
+   * حفظ أو نشر — على نفس البوست.
+   *
+   * ## التعديل بعد الحفظ بيحدّث مش بيكرّر
+   * التاجر بيحفظ، ويعدّل الهوك، ويدوس نشر. البوست اللي لسه ما اتنشرش
+   * بيتحدّث بمعرّفه. واللي اتنشر ما بيتلمسش — أي نشر بعده بوست جديد
+   * على الحسابات اللي لسه ما نزلش عليها بس.
+   */
   function save(publishNow: boolean) {
+    const sendTargets = publishNow ? pending : targets
+
+    if (publishNow) {
+      const names = live
+        .filter((a) => sendTargets.includes(a.id))
+        .map((a) => a.name + ' (' + platformOf(a.platform).label + ')')
+        .join('، ')
+      /* النشر علني وباسم التاجر — تأكيد واحد أرخص من بوست نازل بالغلط */
+      if (!confirm('هتنشر البوست دلوقتي على: ' + names + '؟')) return
+    }
+
+    const reuse = saved && saved.key === mediaKey && !saved.published ? saved.id : null
+    const key = mediaKey
+
     setSaveError(null)
     startSave(async () => {
       const res = await savePostAction({
+        id: reuse,
         caption,
         hashtags,
-        imageUrls:
-          media === 'carousel'
-            ? slides.map((x) => x.url)
-            : media === 'image' && current
-              ? [current.url]
-              : [],
-        videoUrl: media === 'video' ? (video?.url ?? null) : null,
+        imageUrls: mediaUrls,
+        videoUrl,
         productId: product?.id ?? null,
-        targets,
+        targets: sendTargets,
         publishNow,
       })
-      if (res.error) setSaveError(res.error)
-      else toast(publishNow ? 'اتنشر' : 'اتحفظ في البوستات')
+
+      const fresh = res.results ?? []
+      const anyOk = fresh.some((r) => r.ok)
+
+      if (res.id) setSaved({ id: res.id, key, published: publishNow && anyOk })
+      if (fresh.length) {
+        setOutcome((o) => ({
+          key,
+          results: [
+            ...(o?.key === key ? o.results.filter((r) => !fresh.some((f) => f.accountId === r.accountId)) : []),
+            ...fresh,
+          ],
+        }))
+      }
+
+      if (!publishNow) {
+        if (res.error) setSaveError(res.error)
+        else toast('اتحفظ في البوستات')
+        return
+      }
+
+      const failed = fresh.filter((r) => !r.ok).length
+      if (anyOk) {
+        /* النجاح الجزئي بيتقال — «اتنشر» لوحدها بتخبّي الحساب اللي فشل */
+        toast(failed ? 'اتنشر على ' + (fresh.length - failed) + ' وفشل على ' + failed : 'اتنشر')
+        setTargets((t) => t.filter((id) => !fresh.some((r) => r.ok && r.accountId === id)))
+      } else {
+        setSaveError(res.error ?? 'فشل النشر')
+      }
     })
   }
 
@@ -472,6 +573,51 @@ export function StudioClient({
         </div>
 
         {/*
+          شكل الصورة — للتوليد الجديد بس.
+
+          التعديل على صورة موجودة بيمشي بكلام التاجر زي ما هو، فالاختيار
+          هناك ما بيعملش حاجة وإظهاره بيوهم إنه هيغيّر الصورة.
+        */}
+        {!(media === 'image' && current) && (
+          <div className="flex flex-col gap-2">
+            <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <span className="text-xs font-medium text-[var(--fg-muted)]">شكل الصورة</span>
+              <span
+                className={cn(
+                  'text-xs',
+                  typedStyle && typedStyle !== style
+                    ? 'text-[var(--primary)]'
+                    : 'text-[var(--fg-subtle)]',
+                )}
+              >
+                {typedStyle && typedStyle !== style
+                  ? `كلامك فيه «${styleOf(typedStyle).label}» — وده اللي هيتنفّذ`
+                  : styleOf(effectiveStyle).hint}
+              </span>
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {STYLES.map((st) => (
+                <button
+                  key={st.key}
+                  type="button"
+                  aria-pressed={effectiveStyle === st.key}
+                  title={st.hint}
+                  onClick={() => setStyle(st.key)}
+                  className={cn(
+                    'flex h-10 items-center rounded-lg border px-3 text-sm transition-colors',
+                    effectiveStyle === st.key
+                      ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]'
+                      : 'border-[var(--border-strong)] text-[var(--fg-muted)]',
+                  )}
+                >
+                  {st.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/*
           الوصف مشترك بين الاتنين، والزرار لا.
 
           إظهار «اعمل الصورة» وإنت في وضع الفيديو بيخلّي التاجر
@@ -484,7 +630,7 @@ export function StudioClient({
               value={imagePrompt}
               onChange={(e) => setImagePrompt(e.target.value)}
               rows={3}
-              placeholder="مثال: المنتج على رخام فاتح، إضاءة طبيعية من الشباك، ورد أبيض جنبه، وجملة «وصل حديثًا» فوق"
+              placeholder="قوله عايزها إزاي وهو هينفّذ — «على خلفية سادة بيج»، «في مطبخ حقيقي بإضاءة الصبح»، «رندر 3D بألوان جريئة»، أو «مينيمال وجملة وصل حديثًا فوق»"
               className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] p-3 text-sm leading-relaxed focus:border-[var(--primary)] focus:outline-none"
             />
 
@@ -903,125 +1049,278 @@ export function StudioClient({
       </Card>
 
       {/* ── النشر ──────────────────────────────────────── */}
-      {(caption || current || video) && (
-        <Card className="flex flex-col gap-4 p-4">
-          <h2 className="flex items-center gap-2 font-semibold">
-            <Send className="h-4 w-4 text-[var(--primary)]" aria-hidden="true" />
-            النشر
-          </h2>
+      {/*
+        النشر — ظاهر أول ما يبقى فيه صورة أو كاروسيل أو فيديو أو كلام.
 
-          {live.length === 0 ? (
+        الشرط القديم كان `caption || current || video`، فالكاروسيل ما
+        كانش بيظهّر زرار النشر خالص لحد ما الكلام يتكتب.
+      */}
+      {(caption || hasMedia) && (
+        <Card className="flex flex-col gap-4 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 font-semibold">
+              <Send className="h-4 w-4 text-[var(--primary)]" aria-hidden="true" />
+              النشر
+            </h2>
+            {accounts.length > 0 && (
+              <Link
+                href="/dashboard/studio/accounts"
+                className="text-xs text-[var(--fg-muted)] underline"
+              >
+                إدارة الحسابات
+              </Link>
+            )}
+          </div>
+
+          {/*
+            الناقص قبل النشر بيتقال كقايمة.
+
+            الزرار الرمادي من غير سبب بيخلّي التاجر يدوس عليه خمس مرات
+            ويفتكر إن الشاشة بايظة.
+          */}
+          {(() => {
+            const steps = [
+              {
+                done: hasMedia,
+                label:
+                  media === 'video'
+                    ? 'اعمل الفيديو'
+                    : media === 'carousel'
+                      ? 'اعمل الكاروسيل'
+                      : 'اعمل الصورة',
+              },
+              { done: Boolean(caption), label: 'اكتب كلام البوست' },
+              ...(live.length > 0
+                ? [{ done: pending.length > 0 || doneIds.length > 0, label: 'اختار الحساب اللي هتنشر عليه' }]
+                : []),
+            ]
+            if (steps.every((s) => s.done)) return null
+            return (
+              <ol className="flex flex-col gap-1.5 rounded-lg bg-[var(--surface-2)] px-3.5 py-3">
+                {steps.map((s, i) => (
+                  <li key={s.label} className="flex items-center gap-2 text-sm">
+                    <span
+                      className={cn(
+                        'flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
+                        s.done
+                          ? 'bg-[var(--color-success)] text-white'
+                          : 'border border-[var(--border-strong)] text-[var(--fg-muted)]',
+                      )}
+                    >
+                      {s.done ? <Check className="h-3 w-3" aria-hidden="true" /> : i + 1}
+                    </span>
+                    <span className={s.done ? 'text-[var(--fg-subtle)] line-through' : ''}>
+                      {s.label}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )
+          })()}
+
+          {accounts.length === 0 ? (
             /*
               مفيش حساب مربوط — والميزة لسه بتفيده.
 
-              البوست بيتحفظ جاهزًا وبينزّله وينشره بإيده. الرسالة
-              بتقول ده صراحةً بدل ما تسيبه يفتكر إن الشاشة بايظة.
+              البوست بيتحفظ جاهزًا، ومن الموبايل بينشره بشاشة المشاركة.
+              الرسالة بتقول الطريقين صراحةً بدل ما تسيبه يدوّر على زرار.
             */
-            <div className="flex flex-col gap-2 rounded-lg bg-[var(--surface-2)] p-3.5">
+            <div className="flex flex-col gap-2 rounded-lg border border-dashed border-[var(--border-strong)] p-3.5">
               <p className="text-sm leading-relaxed text-[var(--fg-muted)]">
-                لسه ما ربطتش صفحاتك. من موبايلك تقدر تنشره دلوقتي بضغطة — بتفتحلك شاشة المشاركة
-                بالصورة والكلام مع بعض وتختار المنصة. أو احفظه وهتلاقيه في «البوستات».
+                {publishing ? (
+                  <>
+                    <strong className="font-semibold text-[var(--fg)]">اربط صفحاتك</strong> وهتنشر من
+                    هنا مباشرةً بضغطة — وتختار الصفحة أو الحساب اللي ينزل عليه.
+                  </>
+                ) : (
+                  'النشر المباشر لسه بيتجهّز على المنصة.'
+                )}{' '}
+                ولحد ما تربط: من موبايلك دوس «انشره من موبايلك» وتختار المنصة، أو احفظه وهتلاقيه في
+                «البوستات».
               </p>
-              <div className="flex flex-wrap gap-2">
-                {/*
-                  المشاركة من الموبايل هنا كمان.
-
-                  التاجر اللي لسه عامل البوست دلوقتي عايز ينشره
-                  دلوقتي — تحويله لصفحة تانية عشان يعمل ضغطة كان
-                  بيخلّيه ينسى.
-                */}
-                {/*
-                  المشاركة بتاخد أول شريحة في الكاروسيل.
-
-                  شاشة المشاركة بتاخد ملفًا واحدًا، والغلاف هو اللي
-                  بيمثّل البوست. والباقي بيتنزّل من «البوستات».
-                */}
-                {hasMedia && (
-                  <SharePost
-                    url={
-                      media === 'video'
-                        ? video!.url
-                        : media === 'carousel'
-                          ? slides[0].url
-                          : current!.url
-                    }
-                    text={[caption, hashtags.join(' ')].filter(Boolean).join('\n\n')}
-                    kind={media === 'video' ? 'video' : 'image'}
-                  />
-                )}
+              {publishing && (
                 <Link
                   href="/dashboard/studio/accounts"
-                  className="flex h-10 w-fit items-center rounded-lg border border-[var(--border-strong)] px-3 text-sm font-medium"
+                  className="flex h-10 w-fit items-center rounded-lg bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-fg)]"
                 >
                   اربط صفحاتك
                 </Link>
-              </div>
+              )}
             </div>
           ) : (
-            <div className="flex flex-wrap gap-2">
-              {live.map((a) => {
-                const on = targets.includes(a.id)
-                const p = platformOf(a.platform)
-                return (
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-medium text-[var(--fg-muted)]">
+                  هتنشر على أنهي حساب؟
+                </span>
+                {live.length > 1 && (
                   <button
-                    key={a.id}
                     type="button"
                     onClick={() =>
-                      setTargets((t) => (on ? t.filter((x) => x !== a.id) : [...t, a.id]))
+                      setTargets(
+                        pending.length === live.filter((a) => !doneIds.includes(a.id)).length
+                          ? []
+                          : live.map((a) => a.id).filter((id) => !doneIds.includes(id)),
+                      )
                     }
-                    className={cn(
-                      'flex h-11 items-center gap-2 rounded-lg border px-3 text-sm transition-colors',
-                      on
-                        ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]'
-                        : 'border-[var(--border-strong)] text-[var(--fg-muted)]',
-                    )}
+                    className="text-xs text-[var(--primary)] underline"
                   >
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-full"
-                      style={{ background: p.color }}
-                      aria-hidden="true"
-                    />
-                    <span className="max-w-[10rem] truncate">{a.name}</span>
-                    <span className="text-[11px] opacity-60">{p.label}</span>
-                    {on && <Check className="h-3.5 w-3.5" aria-hidden="true" />}
+                    {pending.length === live.filter((a) => !doneIds.includes(a.id)).length
+                      ? 'شيل الكل'
+                      : 'اختار الكل'}
                   </button>
-                )
-              })}
+                )}
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                {accounts.map((a) => {
+                  const p = platformOf(a.platform)
+                  const active = a.status === 'active'
+                  const done = doneIds.includes(a.id)
+                  const on = targets.includes(a.id) && !done
+                  const failed = results.find((r) => r.accountId === a.id && !r.ok)
+
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      disabled={!active || done || saving}
+                      aria-pressed={on}
+                      onClick={() =>
+                        setTargets((t) => (on ? t.filter((x) => x !== a.id) : [...t, a.id]))
+                      }
+                      className={cn(
+                        'flex min-h-14 items-center gap-3 rounded-xl border px-3 py-2 text-start transition-colors',
+                        on
+                          ? 'border-[var(--primary)] bg-[var(--primary-soft)]'
+                          : done
+                            ? 'border-[var(--color-success)] bg-[var(--color-success-soft)]'
+                            : 'border-[var(--border-strong)]',
+                        !active && 'opacity-60',
+                      )}
+                    >
+                      <span
+                        className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full"
+                        style={{ background: p.color + '22' }}
+                      >
+                        {/*
+                          `<img>` لا `Image`.
+
+                          صور الحسابات جاية من المنصات نفسها، ونطاقاتها مش
+                          في `remotePatterns` — و`Image` كان هيوقّع الشاشة
+                          كلها عند أول حساب ليه صورة.
+                        */}
+                        {a.avatar ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={a.avatar}
+                            alt=""
+                            referrerPolicy="no-referrer"
+                            className="h-9 w-9 object-cover"
+                          />
+                        ) : (
+                          <span
+                            className="h-3 w-3 rounded-full"
+                            style={{ background: p.color }}
+                            aria-hidden="true"
+                          />
+                        )}
+                      </span>
+
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">{a.name}</span>
+                        <span className="block text-xs text-[var(--fg-subtle)]">
+                          {p.label}
+                          {!active && ' · الربط انتهى — اربطه تاني'}
+                        </span>
+                        {failed && (
+                          <span className="mt-0.5 block text-xs text-[var(--color-danger)]">
+                            {failed.error ?? 'فشل النشر'}
+                          </span>
+                        )}
+                      </span>
+
+                      {done ? (
+                        <span className="flex shrink-0 items-center gap-1 rounded bg-[var(--color-success)] px-2 py-0.5 text-[11px] font-medium text-white">
+                          <Check className="h-3 w-3" aria-hidden="true" />
+                          اتنشر
+                        </span>
+                      ) : (
+                        <span
+                          className={cn(
+                            'flex h-5 w-5 shrink-0 items-center justify-center rounded-md border',
+                            on
+                              ? 'border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-fg)]'
+                              : 'border-[var(--border-strong)]',
+                          )}
+                          aria-hidden="true"
+                        >
+                          {on && <Check className="h-3.5 w-3.5" />}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           )}
 
           {saveError && <Alert tone="danger">{saveError}</Alert>}
 
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={saving || !caption || !hasMedia}
-              onClick={() => save(false)}
-              className="flex h-11 items-center gap-2 rounded-lg border border-[var(--border-strong)] px-5 text-sm font-semibold disabled:opacity-50"
-            >
-              {saving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-              احفظ البوست
-            </button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             {live.length > 0 && (
               <button
                 type="button"
-                disabled={saving || !caption || !hasMedia || targets.length === 0}
+                disabled={saving || !caption || !hasMedia || pending.length === 0}
                 onClick={() => save(true)}
-                className="flex h-11 items-center gap-2 rounded-lg bg-[var(--primary)] px-5 text-sm font-semibold text-[var(--primary-fg)] disabled:opacity-50"
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-5 text-sm font-semibold text-[var(--primary-fg)] disabled:opacity-50 sm:h-11 sm:w-auto"
               >
                 {saving ? (
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                 ) : (
                   <Send className="h-4 w-4" aria-hidden="true" />
                 )}
-                انشر دلوقتي
+                {saving
+                  ? 'بينشر…'
+                  : pending.length > 0
+                    ? 'انشر على ' + accountsLabel(pending.length)
+                    : doneIds.length > 0
+                      ? 'اتنشر — اختار حساب تاني لو عايز'
+                      : 'انشر'}
               </button>
+            )}
+
+            <button
+              type="button"
+              disabled={saving || !caption || !hasMedia}
+              onClick={() => save(false)}
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-[var(--border-strong)] px-5 text-sm font-semibold disabled:opacity-50 sm:w-auto"
+            >
+              {live.length > 0 ? 'احفظه من غير نشر' : 'احفظ البوست'}
+            </button>
+
+            {/*
+              المشاركة من الموبايل — بتاخد أول شريحة في الكاروسيل.
+
+              شاشة المشاركة بتاخد ملفًا واحدًا، والغلاف هو اللي بيمثّل
+              البوست. والزرار بيختفي لوحده في المتصفح اللي مالوش شاشة مشاركة.
+            */}
+            {hasMedia && (
+              <SharePost
+                url={videoUrl ?? mediaUrls[0]}
+                text={[caption, hashtags.join(' ')].filter(Boolean).join('\n\n')}
+                kind={media === 'video' ? 'video' : 'image'}
+              />
             )}
           </div>
 
-          {(!caption || !hasMedia) && (
-            <p className="text-xs text-[var(--fg-subtle)]">
-              محتاج {media === 'video' ? 'فيديو' : 'صورة'} وكلام الاتنين عشان تحفظ البوست.
+          {saved && saved.key === mediaKey && (
+            <p className="flex flex-wrap items-center gap-1.5 text-xs text-[var(--fg-subtle)]">
+              <Check className="h-3.5 w-3.5" aria-hidden="true" />
+              {saved.published ? 'اتنشر واتسجّل في' : 'محفوظ في'}
+              <Link href="/dashboard/studio/posts" className="underline">
+                البوستات
+              </Link>
             </p>
           )}
         </Card>

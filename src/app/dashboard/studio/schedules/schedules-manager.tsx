@@ -10,9 +10,13 @@ import {
 } from '../actions'
 import {
   PRESETS,
+  STYLES,
   WEEKDAYS,
   describeSchedule,
+  inferStyle,
   platformOf,
+  styleOf,
+  type ImageStyle,
   type PresetKey,
 } from '@/lib/studio-meta'
 import { Alert, Button, Card, Field, Input, Textarea } from '@/components/ui'
@@ -34,6 +38,7 @@ type Schedule = {
   preset: string
   media: 'image' | 'carousel' | 'video'
   slides: number
+  imageStyle: ImageStyle
   autoPublish: boolean
   lastRunAt: string | null
   nextRunAt: string | null
@@ -57,6 +62,7 @@ const empty = (): Draft => ({
   /* الصورة الافتراضي — الفيديو أغلى بمراحل والتاجر بيختاره وهو شايف */
   media: 'image',
   slides: 5,
+  imageStyle: 'auto',
   autoPublish: false,
 })
 
@@ -109,6 +115,7 @@ export function SchedulesManager({
         preset: draft.preset as PresetKey,
         media: draft.media,
         slides: draft.slides,
+        imageStyle: draft.imageStyle,
         autoPublish: draft.autoPublish,
         isActive: draft.isActive,
       })
@@ -367,10 +374,56 @@ export function SchedulesManager({
             </div>
           </Field>
 
+          {/*
+            شكل الصورة.
+
+            والكلام المكتوب في «نبرة البوستات» بيغلبه — فلو التاجر كتب
+            «خلفية سادة» واختار شكل تاني، الشاشة بتقوله اللي هيتنفّذ
+            فعلًا بدل ما يتفاجئ بالناتج.
+          */}
+          {(() => {
+            const typed = inferStyle(draft.style)
+            const overridden = typed && typed !== draft.imageStyle ? styleOf(typed) : null
+            return (
+              <Field
+                label="شكل الصورة"
+                hint={
+                  overridden
+                    ? `كلامك تحت فيه «${overridden.label}» — وده اللي هيتنفّذ`
+                    : styleOf(draft.imageStyle).hint
+                }
+              >
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {STYLES.map((st) => {
+                    const on = (overridden?.key ?? draft.imageStyle) === st.key
+                    return (
+                      <button
+                        key={st.key}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => setDraft({ ...draft, imageStyle: st.key })}
+                        className={cn(
+                          'flex min-h-11 flex-col items-start justify-center gap-0.5 rounded-lg border px-3 py-2 text-start transition-colors',
+                          on
+                            ? 'border-[var(--primary)] bg-[var(--primary-soft)]'
+                            : 'border-[var(--border-strong)]',
+                        )}
+                      >
+                        <span className={cn('text-sm font-medium', on && 'text-[var(--primary)]')}>
+                          {st.label}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </Field>
+            )
+          })()}
+
           <Field
             label="نبرة البوستات"
             htmlFor="s-style"
-            hint="اختياري — بيتلزق في كل بوست بيتولّد"
+            hint="اختياري — بيتلزق في كل بوست بيتولّد، وأي شكل صورة تكتبه هنا بيتنفّذ"
           >
             <Textarea
               id="s-style"
@@ -551,6 +604,7 @@ export function SchedulesManager({
                     preset: s.preset,
                     media: s.media,
                     slides: s.slides,
+                    imageStyle: s.imageStyle,
                     autoPublish: s.autoPublish,
                   })
                 }

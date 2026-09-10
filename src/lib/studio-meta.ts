@@ -64,6 +64,206 @@ export function presetOf(key: string) {
 }
 
 /* ══════════════════════════════════════════════════════════════
+   شكل الصورة
+   ══════════════════════════════════════════════════════════════ */
+
+export type ImageStyle = 'auto' | 'scene' | 'plain' | 'minimal' | '3d' | 'flatlay' | 'dark'
+
+/**
+ * أشكال الصورة.
+ *
+ * ## ليه قايمة مش توجيه واحد ثابت
+ * التوجيه الثابت كان «مكان حقيقي، وممنوع خلفية سادة» لكل المنتجات.
+ * فالتاجر اللي كتب «خلفية سادة» كان بيطلب حاجة ممنوعة في نفس
+ * الوصف — والممنوع كان بيغلب، وطلعت صورة في مكان جوّه إطار أبيض.
+ * كل شكل ليه قواعده هو، ومفيش شكل بيمنع التاني.
+ *
+ * - `director` بيروح للمدير الفني: الفكرة لازم تبقى من النوع ده.
+ * - `rules` بتروح لموديل الصور مع الفكرة: القيود اللي ما تتكسرش.
+ * - `en` سطر إنجليزي لنفس القيد — موديلات الصور بتلتزم بالمصطلح
+ *   التقني الإنجليزي («seamless backdrop»، «flat lay») أدق من
+ *   ترجمته.
+ */
+export const STYLES: Array<{
+  key: ImageStyle
+  label: string
+  hint: string
+  director: string
+  rules: string[]
+  en: string
+}> = [
+  {
+    key: 'auto',
+    label: 'يختار لوحده',
+    hint: 'على حسب المنتج وكلامك',
+    director: '',
+    rules: [],
+    en: '',
+  },
+  {
+    key: 'scene',
+    label: 'مكان حقيقي',
+    hint: 'المنتج في مكان استخدامه',
+    director:
+      'مشهد واقعي في مكان حقيقي بيتستخدم فيه المنتج — اذكر المكان بتفاصيله والعناصر اللي حوالين المنتج وليه موجودة.',
+    rules: [
+      'مكان حقيقي بتفاصيله — ممنوع خلفية لون واحد أو تدرّج.',
+      'ممنوع منتج مقصوص طاير في الفراغ — المنتج حاطط على سطح أو مستخدَم في المكان.',
+    ],
+    en: 'Photorealistic lifestyle advertising photograph of the product in a real, detailed location.',
+  },
+  {
+    key: 'plain',
+    label: 'خلفية سادة',
+    hint: 'لون واحد نضيف — شكل الكتالوج الاحترافي',
+    director:
+      'خلفية سادة بلون واحد نضيف ممتد من غير أي مكان ولا ديكور ولا عناصر حوالين المنتج. ' +
+      'اختار لون الخلفية اللي يبرز المنتج — ولو صاحب المتجر قال لون، يبقى هو.',
+    rules: [
+      'الخلفية لون واحد سادة ممتد (seamless) — ممنوع أي مكان أو أوضة أو ترابيزة أو ديكور أو نباتات أو عناصر جنب المنتج.',
+      'ظل ناعم طبيعي تحت المنتج بس، عشان ما يبانش طاير.',
+      'إضاءة استوديو ناعمة ومتوازنة، والمنتج هو الحاجة الوحيدة في الصورة.',
+    ],
+    en: 'Clean studio product shot on a seamless solid single-color backdrop. No room, no furniture, no props, no scenery — only the product and a soft contact shadow.',
+  },
+  {
+    key: 'minimal',
+    label: 'مينيمال',
+    hint: 'فاتح وهادي، وعنصر أو اتنين بس',
+    director:
+      'تكوين مينيمال: خلفية هادية بألوان فاتحة، وعنصر أو اتنين بسطاء بس (بوديوم، ظل شباك، شكل هندسي)، ومساحة فاضية واسعة.',
+    rules: [
+      'عنصر أو اتنين بالكتير جنب المنتج، ومساحة فاضية واسعة.',
+      'ألوان هادية ومتناسقة — من غير زحمة ولا تفاصيل كتير.',
+    ],
+    en: 'Minimalist product photography, soft neutral palette, generous negative space, at most one or two simple props such as a podium or a soft window shadow.',
+  },
+  {
+    key: '3d',
+    label: 'ثري دي',
+    hint: 'رندر ثلاثي الأبعاد — شكل البراندات الكبيرة',
+    director:
+      'رندر ثلاثي الأبعاد احترافي: المنتج في مشهد 3D مصمَّم (أشكال هندسية، بوديوم، خامات لامعة، إضاءة استوديو ملوّنة) — مش صورة لمكان حقيقي.',
+    rules: [
+      'شكل رندر 3D نضيف وحديث — مش صورة فوتوغرافية لمكان حقيقي.',
+      'المنتج نفسه يفضل بشكله وألوانه وتفاصيله الحقيقية جوّه المشهد.',
+    ],
+    en: 'High-end 3D render (CGI) product visual: stylized geometric set, podiums, glossy materials, studio lighting. Not a real-world location photo.',
+  },
+  {
+    key: 'flatlay',
+    label: 'من فوق',
+    hint: 'فلات لاي — المنتج وحاجات بتكمّله',
+    director:
+      'فلات لاي: لقطة من فوق عمودي تمامًا، المنتج على سطح (خشب، قماش، رخام) وحواليه حاجات بتكمّله مترتّبة بعناية.',
+    rules: [
+      'الكاميرا من فوق عمودي تمامًا (٩٠ درجة).',
+      'العناصر حوالين المنتج مترتّبة ومش زحمة، والمنتج هو الأوضح.',
+    ],
+    en: 'Top-down flat lay photograph, camera directly overhead at 90 degrees, neatly arranged complementary items around the product.',
+  },
+  {
+    key: 'dark',
+    label: 'فخم غامق',
+    hint: 'خلفية غامقة وإضاءة درامية',
+    director:
+      'إعلان فخم: خلفية غامقة، وإضاءة درامية مركّزة على المنتج، ولمعة وانعكاسات هادية — شكل البراندات الفاخرة.',
+    rules: [
+      'خلفية غامقة وإضاءة درامية بتبرز المنتج.',
+      'إحساس فخم وهادي، من غير زحمة عناصر.',
+    ],
+    en: 'Luxury dark moody product shot: deep dark background, dramatic rim lighting, subtle reflections, premium feel.',
+  },
+]
+
+export function styleOf(key: string | null | undefined) {
+  return STYLES.find((s) => s.key === key) ?? STYLES[0]
+}
+
+/** توحيد الكتابة قبل البحث — «سادة» و«ساده» و«سادا» واحد */
+function normalizeArabic(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[ً-ْـ]/g, '')
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+}
+
+/*
+  الترتيب مقصود: الأدق الأول.
+
+  «خلفية سادة سودا» خلفية سادة لونها أسود — مش «فخم غامق». و«من فوق
+  على خلفية سادة» خلفية سادة، والزاوية بتفضل في كلام التاجر اللي
+  المدير الفني بيقراه.
+*/
+const STYLE_WORDS: Array<{ key: Exclude<ImageStyle, 'auto'>; re: RegExp }> = [
+  {
+    key: 'plain',
+    re: /ساد(ه|ا)|لون واحد|(بدون|من غير) خلفيه|خلفيه (بيضا|بيضاء|ابيض|سودا|سوداء|اسود|رمادي|ملونه)|ستوديو|استديو|studio|plain|solid (color|background)|white background|packshot/,
+  },
+  { key: '3d', re: /3d|3 ?دي|ثري ?دي|ثلاثي(ه)? الابعاد|رندر|render|cgi/ },
+  { key: 'flatlay', re: /فلات ?لاي|flat ?lay|من فوق|من اعلي|top ?(view|down)/ },
+  { key: 'minimal', re: /مينيمال|minimal|خلفيه فاتحه/ },
+  { key: 'dark', re: /فخم|فخامه|luxury|دارك|dark|خلفيه (غامقه|داكنه)/ },
+  {
+    key: 'scene',
+    re: /مكان (حقيقي|واقعي)|مشهد (حقيقي|واقعي)|صوره واقعيه|lifestyle|لايف ?ستايل|في (البيت|المطبخ|الشارع|الطبيعه|الاوضه|المكتب|الجيم)/,
+  },
+]
+
+/**
+ * الشكل المفهوم من كلام التاجر.
+ *
+ * ## ليه الكلام بيغلب الاختيار
+ * التاجر بيكتب «خلفية سادة» وهو ناسي إن الاختيار فوق على «يختار
+ * لوحده» — أو في جدول اتعمل قبل ما الاختيار يبقى موجود أصلًا.
+ * الجملة المكتوبة هي الأمر الصريح، والاختيار افتراضي.
+ *
+ * ## والنفي بيتشاف
+ * «مش عايز خلفية سادة» عكس «خلفية سادة». بنبص على الكلمتين اللي
+ * قبل الكلمة، ولو فيهم نفي بنعدّيها.
+ */
+export function inferStyle(text: string | null | undefined): Exclude<ImageStyle, 'auto'> | null {
+  if (!text?.trim()) return null
+  const t = normalizeArabic(text)
+
+  for (const { key, re } of STYLE_WORDS) {
+    const global = new RegExp(re.source, 'g')
+    for (const m of t.matchAll(global)) {
+      /*
+        كلمة واحدة مسموح بيها بين النفي والشكل: «مش عايز **خلفية**
+        سادة». من غيرها النفي ما كانش بيتشاف في أشهر صيغة بيتكتب بيها.
+      */
+      const before = t.slice(Math.max(0, m.index - 28), m.index)
+      if (
+        /(^|\s)(مش|مو|بلاش|ممنوع|not|no|without)\s+((عايز|عاوز|حابب|محتاج)\s+)?(\S+\s+)?$/.test(
+          before,
+        )
+      ) {
+        continue
+      }
+      return key
+    }
+  }
+
+  return null
+}
+
+/**
+ * الشكل النهائي — الكلام المكتوب، وبعده الاختيار.
+ *
+ * بيتنادى على الخادم وقت التوليد وعلى الشاشة وقت الكتابة — بنفس
+ * القواعد، فاللي التاجر شايفه متعلّم هو اللي بيتولّد.
+ */
+export function resolveStyle(
+  chosen: string | null | undefined,
+  text: string | null | undefined,
+): ImageStyle {
+  return inferStyle(text) ?? styleOf(chosen).key
+}
+
+/* ══════════════════════════════════════════════════════════════
    نبرة المحتوى
    ══════════════════════════════════════════════════════════════ */
 

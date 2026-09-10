@@ -71,7 +71,12 @@ export default async function PostsPage() {
               createdAt: p.createdAt.toISOString(),
               results: p.results,
             }))}
-            accounts={accounts.map((a) => ({ id: a.id, name: a.name, platform: a.platform }))}
+            accounts={accounts.map((a) => ({
+              id: a.id,
+              name: a.name,
+              platform: a.platform,
+              status: a.status,
+            }))}
           />
         </Reveal>
       )}

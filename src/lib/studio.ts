@@ -12,7 +12,18 @@ import { publicStoreUrl } from './domain'
 import { checkVideo, downloadVideo, listVideoModels, startVideo, type VeoAspect } from './ai/veo'
 import { recordUpload } from './media'
 import { formatMoney } from './utils'
-import { presetOf, toneOf, type PresetKey, type ToneKey } from './studio-meta'
+import {
+  presetOf,
+  STYLES,
+  styleOf,
+  toneOf,
+  type ImageStyle,
+  type PresetKey,
+  type ToneKey,
+} from './studio-meta'
+
+/** شكل محدَّد — «يختار لوحده» بيتحسم قبل الرسم */
+type FixedStyle = Exclude<ImageStyle, 'auto'>
 
 /**
  * استوديو المحتوى — بيولّد صور وكلام من بيانات المتجر نفسه.
@@ -165,20 +176,39 @@ async function storeContext(storeId: string, merchantBrief?: string | null): Pro
  * إعلانية بألوان تانية خالص بيحسّها إعلان لمتجر غيره — والهوية
  * هي اللي بتخلّي متابعه يعرف البوست من غير ما يقرا الاسم.
  */
-async function brandBlock(storeId: string): Promise<string> {
+async function brandBlock(storeId: string, style: FixedStyle): Promise<string> {
   const theme = await getStoreTheme(storeId)
   const id = theme.custom.identity
 
+  /*
+    الألوان بتتستخدم على حسب شكل الصورة.
+
+    «استخدم اللونين في الخلفية» على مشهد في مطبخ حقيقي بتطلّع مطبخ
+    بنفسجي. والشكل هو اللي بيقول اللون يروح فين.
+  */
+  const usage: Record<FixedStyle, string> = {
+    scene: 'استخدم الألوان دي كلمسات في العناصر والنص المكتوب — مش لازم المكان كله يتلوّن بيها.',
+    plain:
+      'لون الخلفية: اللي صاحب المتجر قاله، وإلا درجة هادية من اللون الأساسي أو لون محايد نضيف يبرز المنتج.',
+    minimal: 'درجات فاتحة وهادية من الألوان دي.',
+    '3d': 'استخدم اللونين دول في الأشكال والإضاءة والخامات.',
+    flatlay: 'استخدم الألوان دي بهدوء في السطح أو العناصر اللي حوالين المنتج.',
+    dark: 'اللون الأساسي كلمسة إضاءة أو انعكاس على الخلفية الغامقة.',
+  }
+
+  /*
+    لون خلفية الموقع والحواف مش هنا عن قصد.
+
+    «خلفية المتجر: #ffffff» و«الحواف: مستديرة» كانوا بيتقروا تعليمات
+    على الصورة نفسها — فبتطلع الصورة جوّه كارت أبيض بحواف مدوّرة.
+    وده الإطار الأبيض اللي كان بيظهر.
+  */
   return [
-    'هوية المتجر البصرية — التزم بيها:',
+    'هوية المتجر البصرية:',
     `- اللون الأساسي: ${id.primary}`,
     `- اللون المساعد: ${id.accent}`,
-    `- خلفية المتجر: ${id.background}`,
-    `- لون النص: ${id.text}`,
-    `- الحواف: ${id.radius === 'none' ? 'حادّة' : id.radius === 'full' ? 'دايرية جدًا' : 'مستديرة'}`,
-    '',
-    'استخدم اللونين دول في الخلفية والعناصر والنص المكتوب على الصورة.',
-    'الصورة لازم تبان إنها من نفس المتجر لو اتحطّت جنب صورة تانية منه.',
+    usage[style],
+    'ولو صاحب المتجر حدّد ألوانًا في كلامه، كلامه بيغلب الهوية.',
   ].join('\n')
 }
 
@@ -458,7 +488,15 @@ function parseCopy(raw: string): CopyResult {
    ══════════════════════════════════════════════════════════════ */
 
 export type ArtConcept = {
-  /** المكان والمشهد — ده اللي بيفرّق بين إعلان وبطاقة بيانات */
+  /**
+   * شكل الصورة المحسوم — مش `auto` أبدًا.
+   *
+   * بيتحسم في الفكرة لا في الرسم: قواعد موديل الصور (ممنوع مكان /
+   * ممنوع خلفية سادة) لازم تطابق الفكرة، والكاروسيل بيشاركها بين
+   * الشرايح كلها.
+   */
+  style: FixedStyle
+  /** المكان والمشهد أو الخلفية — ده اللي بيفرّق بين إعلان وبطاقة بيانات */
   scene: string
   /** الإضاءة والكاميرا */
   look: string
@@ -504,10 +542,13 @@ async function artDirection(input: {
   /** كلام التاجر — نبرة الجدول أو وصفه في الاستوديو */
   direction: string
   preset: PresetKey
+  /** محسوم من `resolveStyle` — `auto` يعني المدير الفني بيختار */
+  style: ImageStyle
   merchantBrief?: string | null
 }): Promise<ArtConcept> {
   const brief = await getStoreBrief(input.storeId, input.merchantBrief)
   const p = input.product
+  const fixed = input.style === 'auto' ? null : styleOf(input.style)
 
   const prompt = [
     'إنت مدير فني بتشتغل لعلامات تجارية، وبتصمّم إعلان واحد.',
@@ -527,31 +568,47 @@ async function artDirection(input: {
           .join('\n')
       : 'الإعلان عن المتجر كله لا عن منتج بعينه.',
     '',
-    'توجيه صاحب المتجر — **التزم بيه حرفيًا**:',
+    'توجيه صاحب المتجر — **ده أمر، التزم بيه حرفيًا**:',
     input.direction.trim() || '(ما حدّدش حاجة — إنت اللي تختار اللي يليق بالمنتج)',
     '',
-    'فكّر الأول: المنتج ده بيتباع لمين؟ بيتستخدم فين وإمتى؟ إيه',
-    'المشهد اللي بيخلّي اللي شايفه يتخيّل نفسه فيه؟',
+    /*
+      الشكل إلزامي لما يكون محدَّد، واختيار لما يكون «لوحده».
+
+      التوجيه القديم كان بيفرض «مكان حقيقي» على كل منتج، فالتاجر اللي
+      قال «خلفية سادة» كان بيطلب الممنوع — والممنوع كان بيكسب.
+    */
+    fixed
+      ? 'شكل الصورة — **إلزامي**: ' + fixed.label + '\n' + fixed.director
+      : [
+          'اختار شكل الصورة اللي يليق بالمنتج ده وبكلام صاحب المتجر — واحد من دول بس:',
+          ...STYLES.filter((s) => s.key !== 'auto').map(
+            (s) => '- ' + s.key + ': ' + s.label + ' — ' + s.director,
+          ),
+        ].join('\n'),
     '',
-    'وبعدين صمّم لقطة **واحدة** واقعية سينمائية:',
+    'فكّر الأول: المنتج ده بيتباع لمين؟ بيتستخدم فين وإمتى؟ وإيه اللي',
+    'يخلّي اللي شايفه يوقف عنده؟',
     '',
+    'وبعدين صمّم لقطة **واحدة** احترافية:',
+    '',
+    fixed ? '' : '[نمط]\nمفتاح الشكل اللي اخترته بس (زي scene أو plain) — كلمة واحدة.\n',
     '[مشهد]',
-    'المكان والسياق بالتفصيل — مكان حقيقي بتفاصيله، لا خلفية لون واحد.',
-    'اذكر العناصر اللي حوالين المنتج وليه هي موجودة.',
+    'الخلفية والمكان والعناصر بالتفصيل — ملتزم بشكل الصورة بالحرف.',
+    'لو الشكل خلفية سادة: اذكر لون الخلفية بس، ومفيش أي عناصر ولا مكان.',
     '',
     '[إضاءة]',
-    'نوع الإضاءة واتجاهها ووقت اليوم، ونوع العدسة والعمق.',
+    'نوع الإضاءة واتجاهها، ونوع العدسة والعمق.',
     '',
     '[تكوين]',
-    'المنتج فين في الكادر، والفراغ فين، وإيه اللي بيوجّه العين له.',
+    'المنتج فين في الكادر وحجمه، والفراغ فين، وإيه اللي بيوجّه العين له.',
     '',
     '[نص]',
     'من كلمتين لأربعة بالعربي بس — جملة بتشدّ، مش اسم المنتج ولا وصفه.',
     'أو اكتب «مفيش» لو الصورة أقوى من غير كلام.',
     '',
-    'ممنوع تمامًا: خلفية لون واحد أو تدرّج، منتج مقصوص طاير في الفراغ،',
-    'قوايم مواصفات أو مقاسات أو أسعار مكتوبة على الصورة، أيقونات ومستطيلات',
-    'حوالين المنتج. دي بتخلّي الإعلان يبان كتالوج.',
+    'ممنوع في كل الأشكال: قوايم مواصفات أو مقاسات أو أسعار مكتوبة على الصورة،',
+    'وأيقونات ومستطيلات حوالين المنتج، وأي إطار أو حدود حوالين الصورة.',
+    'ولو صاحب المتجر طلب حاجة، هي اللي تمشي حتى لو إنت شايف غيرها أحلى.',
   ]
     .filter(Boolean)
     .join('\n')
@@ -573,20 +630,64 @@ async function artDirection(input: {
     التاجر مستنّي صورة. لو خطوة التفكير وقعت (شبكة، حصّة)، أحسن
     حاجة نرسم بفكرة عامة محترمة من إننا نرجّع خطأ ونضيّع الطلب.
   */
-  if (!res.ok) return fallbackConcept(input.product, input.direction)
+  if (!res.ok) {
+    return fallbackConcept(input.product, input.direction, input.style === 'auto' ? 'scene' : input.style)
+  }
 
-  return parseConcept(res.data, input.product, input.direction)
+  return parseConcept(res.data, input.product, input.direction, input.style)
 }
 
-/** فكرة محترمة لما التفكير يقع — أحسن من الخلفية السادة */
-function fallbackConcept(product: ProductBrief | null, direction: string): ArtConcept {
+/**
+ * فكرة محترمة لما التفكير يقع — بنفس الشكل المطلوب.
+ *
+ * البديل القديم كان «مشهد واقعي» دايمًا، فالتاجر اللي طالب خلفية
+ * سادة كان بياخد مكان لما خطوة التفكير تقع.
+ */
+function fallbackConcept(
+  product: ProductBrief | null,
+  direction: string,
+  style: FixedStyle,
+): ArtConcept {
+  const name = product ? ' — ' + product.name : ''
+
+  const byStyle: Record<FixedStyle, Omit<ArtConcept, 'style' | 'overlay'>> = {
+    scene: {
+      scene: 'مشهد واقعي في مكان طبيعي بيتستخدم فيه المنتج، بتفاصيل حقيقية حواليه' + name,
+      look: 'إضاءة طبيعية ناعمة جنبية، عدسة ٥٠ملم، عمق ميدان ضحل والخلفية مموّهة بهدوء',
+      composition: 'المنتج في التلت السفلي، ومساحة فاضية فوقه، والضوء بيوجّه العين له',
+    },
+    plain: {
+      scene: 'خلفية سادة بلون واحد ناعم ممتد، من غير أي عناصر ولا مكان' + name,
+      look: 'إضاءة استوديو ناعمة من الجنبين، عدسة ٨٥ملم، وظل ناعم تحت المنتج',
+      composition: 'المنتج في نص الكادر وواخد حوالي تلتين المساحة',
+    },
+    minimal: {
+      scene: 'خلفية فاتحة هادية وبوديوم بسيط تحت المنتج' + name,
+      look: 'ضوء شباك ناعم بظل هادي، عدسة ٥٠ملم',
+      composition: 'المنتج في النص، ومساحة فاضية واسعة حواليه',
+    },
+    '3d': {
+      scene: 'مشهد 3D مصمَّم بأشكال هندسية وبوديوم وخامات لامعة' + name,
+      look: 'إضاءة استوديو ملوّنة ناعمة، رندر عالي الجودة',
+      composition: 'المنتج على البوديوم في نص الكادر',
+    },
+    flatlay: {
+      scene: 'سطح خشب أو قماش، والمنتج وحواليه حاجات بتكمّله مترتّبة' + name,
+      look: 'إضاءة طبيعية ناعمة من فوق، ظلال خفيفة',
+      composition: 'لقطة من فوق عمودي، والمنتج في النص',
+    },
+    dark: {
+      scene: 'خلفية غامقة ناعمة، ولمعة هادية تحت المنتج' + name,
+      look: 'إضاءة درامية جنبية مركّزة على المنتج، ظلال عميقة',
+      composition: 'المنتج في النص، والضوء بيحدّد حوافه',
+    },
+  }
+
   return {
-    scene:
-      direction.trim() ||
-      'مشهد واقعي في مكان طبيعي بيستخدم فيه المنتج، بتفاصيل حقيقية حواليه' +
-        (product ? ' تناسب ' + product.name : ''),
-    look: 'إضاءة طبيعية ناعمة جنبية، عدسة ٥٠ملم، عمق ميدان ضحل والخلفية مموّهة بهدوء',
-    composition: 'المنتج في التلت السفلي، ومساحة فاضية فوقه، والضوء بيوجّه العين له',
+    style,
+    ...byStyle[style],
+    /* كلام التاجر هو المشهد لو كتبه — أدق من أي وصف عام */
+    scene: direction.trim() ? direction.trim() + '\n' + byStyle[style].scene : byStyle[style].scene,
     overlay: '',
   }
 }
@@ -595,6 +696,7 @@ function parseConcept(
   raw: string,
   product: ProductBrief | null,
   direction: string,
+  requested: ImageStyle,
 ): ArtConcept {
   const text = raw.replace(/```+/g, '').trim()
 
@@ -603,10 +705,25 @@ function parseConcept(
     return text.match(re)?.[1]?.trim() ?? ''
   }
 
-  const base = fallbackConcept(product, direction)
+  /*
+    الشكل المحدَّد ما بيتغيّرش مهما الموديل كتب.
+
+    ولو «لوحده»، بناخد اللي الموديل اختاره — والمفاتيح ما فيهاش واحد
+    جوّه التاني، فالبحث بالاحتواء آمن. ولو ما اختارش، المكان الحقيقي
+    زي ما كان قبل كده.
+  */
+  const picked = grab('نمط').toLowerCase()
+  const style: FixedStyle =
+    requested !== 'auto'
+      ? requested
+      : ((STYLES.find((s) => s.key !== 'auto' && picked.includes(s.key))?.key as FixedStyle) ??
+        'scene')
+
+  const base = fallbackConcept(product, direction, style)
   const overlay = grab('نص')
 
   return {
+    style,
     scene: grab('مشهد') || base.scene,
     look: grab('إضاءة') || base.look,
     composition: grab('تكوين') || base.composition,
@@ -617,10 +734,20 @@ function parseConcept(
 
 /** الفكرة كوصف لموديل الصور */
 function conceptToPrompt(c: ArtConcept, preset: { aspect: string; label: string }): string {
+  /* «واقعية وسينمائية» على رندر 3D بتطلّع صورة فوتوغرافية — الوصف بيتبع الشكل */
+  const kind: Record<FixedStyle, string> = {
+    scene: 'صوّر لقطة إعلانية واحدة، واقعية وسينمائية',
+    plain: 'صوّر صورة منتج احترافية واحدة على خلفية سادة',
+    minimal: 'صوّر صورة منتج مينيمال واحدة',
+    '3d': 'اعمل رندر ثلاثي الأبعاد إعلاني واحد',
+    flatlay: 'صوّر لقطة فلات لاي واحدة من فوق',
+    dark: 'صوّر لقطة إعلانية فخمة واحدة على خلفية غامقة',
+  }
+
   return [
-    'صوّر لقطة إعلانية واحدة، واقعية وسينمائية، بنسبة ' + preset.aspect + '.',
+    kind[c.style] + '، بنسبة ' + preset.aspect + '.',
     '',
-    'المشهد: ' + c.scene,
+    (c.style === 'scene' ? 'المشهد: ' : 'الخلفية والعناصر: ') + c.scene,
     'الإضاءة والكاميرا: ' + c.look,
     'التكوين: ' + c.composition,
     c.overlay
@@ -668,6 +795,17 @@ export async function makeImage(input: {
    * كل شريحة بتفكّر لوحدها والخمسة يبانوا خمس إعلانات.
    */
   concept?: ArtConcept
+  /** شكل الصورة — محسوم من المنادي بـ`resolveStyle`، والمكتبة ما بتفهمش من `prompt` */
+  style?: ImageStyle | null
+  /**
+   * `seedUrl` صورة المنتج ولا الشريحة اللي قبلها؟
+   *
+   * صورة المنتج مرجع للمنتج بس وخلفيتها بتتشال. والشريحة السابقة
+   * العكس: خلفيتها هي اللي لازم تتكرر.
+   */
+  seedKind?: 'product' | 'slide'
+  /** دور الشريحة في الكاروسيل — بيوصل للرسم مع الفكرة المشتركة */
+  slide?: string
 }): Promise<StudioImage | StudioError> {
   const key = await studioKey(input.storeId)
   if ('error' in key) return key
@@ -733,20 +871,64 @@ export async function makeImage(input: {
         product,
         direction: input.prompt,
         preset: input.preset,
+        /*
+          الشكل بييجي محسوم من المنادي — مش بيتفهم من `prompt` هنا.
+
+          وصف الجدول فيه اسم المنتج، و«طابعة 3D» كانت هتقلب الصورة
+          رندر. الفهم من كلام التاجر بيحصل في الفعل وفي الجدول بس.
+        */
+        style: styleOf(input.style).key,
         merchantBrief: input.merchantBrief,
       }))
 
+    const look = styleOf(concept.style)
+
     prompt = [
-      await brandBlock(input.storeId),
+      await brandBlock(input.storeId, concept.style),
       '',
       conceptToPrompt(concept, preset),
+      /*
+        دور الشريحة بيوصل للرسم.
+
+        الفكرة المشتركة كانت بتتبعت لوحدها، وكلام الشريحة («غلاف»،
+        «تفصيلة»، «دعوة») ما كانش بيوصل — فالشرايح بتطلع نفس الصورة.
+      */
+      input.slide ? '\n' + input.slide : '',
       '',
       'قواعد:',
-      '- **ممنوع** خلفية بلون واحد أو تدرّج، وممنوع منتج مقصوص طاير في الفراغ.',
+      /* قواعد الشكل نفسه — «ممنوع خلفية سادة» بقت للمكان الحقيقي بس */
+      ...look.rules.map((r) => '- ' + r),
       '- **ممنوع** أي قايمة مواصفات أو مقاسات أو أسعار أو أيقونات في مستطيلات.',
-      '- المنتج لازم يبان زي ما هو في الصورة المرفقة — نفس الشكل واللون والتفاصيل.',
-      '- سيب مساحة فاضية حوالين الحواف — المنصات بتقصّها.',
-    ].join('\n')
+      base
+        ? input.seedKind === 'slide'
+          ? '- الصورة المرفقة هي الشريحة اللي قبلها: نفس المنتج ونفس الخلفية والإضاءة والألوان بالظبط.'
+          : /*
+              صورة المنتج مرجع مش كادر.
+
+              من غير الجملة دي الموديل كان بياخد صورة المنتج بخلفيتها
+              ويحطّها جوّه الكادر الجديد — ولما نسبتها تختلف، بيملا
+              الباقي أبيض. ده الإطار اللي كان بيظهر.
+            */
+            '- الصورة المرفقة **مرجع للمنتج بس**: خد المنتج منها بنفس شكله ولونه وتفاصيله، ' +
+            'وحطّه في الصورة الجديدة. ما تحتفظش بخلفيتها، وما تحطّهاش جوّه الكادر زي ما هي.'
+        : '',
+      /*
+        الكادر مليان من الحافة للحافة.
+
+        السطر القديم «سيب مساحة فاضية حوالين الحواف» كان بيتنفّذ حرفيًا:
+        هامش أبيض حوالين الصورة كلها.
+      */
+      '- الصورة تملا الكادر كله من الحافة للحافة. ممنوع أي إطار أو حدود أو هامش أبيض ' +
+        'أو صورة جوّه صورة. خلّي المنتج بعيد شوية عن الحواف بس.',
+      '',
+      look.en,
+      'Full-bleed ' +
+        preset.aspect +
+        ' image that fills the entire canvas edge to edge. No border, no frame, no white margins, ' +
+        'no letterboxing, no picture-in-picture, no collage, no mockup card.',
+    ]
+      .filter((l, i, all) => l !== '' || all[i - 1] !== '')
+      .join('\n')
   }
 
   const res = await editImage({
@@ -880,6 +1062,7 @@ export async function makeCarousel(input: {
   productId?: string | null
   seedUrl?: string | null
   merchantBrief?: string | null
+  style?: ImageStyle | null
 }): Promise<CarouselResult> {
   const count = Math.max(2, Math.min(10, input.count))
   const images: StudioImage[] = []
@@ -896,6 +1079,11 @@ export async function makeCarousel(input: {
 
   const product = input.productId ? await productBrief(input.storeId, input.productId) : null
 
+  /*
+    الشكل بيتحسم مرة واحدة للسِت كله — من كلام التاجر لا من كلام
+    الشرايح. «مساحة فاضية» في دور الشريحة الأخيرة ما يصحّش يقلب
+    الكاروسيل مينيمال.
+  */
   const concept = await artDirection({
     storeId: input.storeId,
     apiKey: key.apiKey,
@@ -903,6 +1091,7 @@ export async function makeCarousel(input: {
     product,
     direction: input.prompt,
     preset: input.preset,
+    style: styleOf(input.style).key,
     merchantBrief: input.merchantBrief,
   })
 
@@ -918,17 +1107,25 @@ export async function makeCarousel(input: {
     const res = await makeImage({
       storeId: input.storeId,
       userId: input.userId,
-      prompt: [
-        input.prompt,
-        '',
+      prompt: input.prompt,
+      slide: [
         'دي شريحة ' + (i + 1) + ' من ' + count + ' في كاروسيل واحد.',
         slideBrief(i, count),
-        previous
-          ? 'خلّي الأسلوب والإضاءة والخلفية والألوان **نفسها بالظبط** زي الصورة المرفقة — دي الشريحة اللي قبلها في نفس الكاروسيل.'
-          : '',
+        /*
+          الدور جوّه الشكل مش بدله.
+
+          «المنتج في موقف حقيقي» على كاروسيل خلفية سادة كان هيطلّع
+          شريحة في مطبخ وسط شرايح سادة.
+        */
+        concept.style === 'scene'
+          ? ''
+          : 'نفّذ الدور ده جوّه نفس شكل الصورة («' +
+            styleOf(concept.style).label +
+            '») ونفس خلفيتها — ما تضيفش مكان ولا عناصر مش من الشكل ده.',
       ]
         .filter(Boolean)
         .join('\n'),
+      seedKind: previous ? 'slide' : 'product',
       preset: input.preset,
       productId: input.productId,
       concept,
@@ -987,7 +1184,12 @@ export async function startProductVideo(input: {
   /** صورة يتحرّك منها — صورة المنتج أو ناتج الاستوديو */
   seedUrl?: string | null
   merchantBrief?: string | null
+  style?: ImageStyle | null
 }): Promise<VideoJob | StudioError> {
+  /* «يختار لوحده» في الفيديو مكان حقيقي — مفيش خطوة تفكير قبله */
+  const picked = styleOf(input.style).key
+  const style: FixedStyle = picked === 'auto' ? 'scene' : picked
+
   const key = await studioKey(input.storeId)
   if ('error' in key) return key
 
@@ -1005,12 +1207,14 @@ export async function startProductVideo(input: {
   const prompt = [
     await storeContext(input.storeId, input.merchantBrief),
     '',
-    await brandBlock(input.storeId),
+    await brandBlock(input.storeId, style),
     '',
-    'اعمل فيديو إعلاني قصير:',
+    'اعمل فيديو إعلاني قصير — ' + styleOf(style).label + ':',
     input.prompt,
+    styleOf(style).director,
     '',
     'قواعد:',
+    ...styleOf(style).rules.map((r) => '- ' + r),
     '- حركة كاميرا هادية وبسيطة — الزوم السريع والدوران بيبانوا رخاص.',
     '- المنتج في وسط الكادر وواضح طول الفيديو.',
     '- من غير أي كلام مكتوب على الفيديو، والنص بيتحط في البوست نفسه.',

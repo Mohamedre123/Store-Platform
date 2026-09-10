@@ -274,6 +274,14 @@ export const contentSchedules = pgTable(
     media: text('media').$type<'image' | 'carousel' | 'video'>().notNull().default('image'),
     /** عدد شرايح الكاروسيل — بيتقرا لما `media = 'carousel'` بس */
     slides: integer('slides').notNull().default(5),
+    /**
+     * شكل الصورة — `STYLES` في `studio-meta`.
+     *
+     * `auto` افتراضي: المدير الفني بيختار على حسب المنتج. والكلام
+     * المكتوب في `style` بيغلبه لو فيه شكل صريح («خلفية سادة») — عشان
+     * الجداول اللي اتعملت قبل العمود ده تمشي بكلام التاجر.
+     */
+    imageStyle: text('image_style').notNull().default('auto'),
 
     /**
      * ينشر لوحده ولا يستنّى موافقة؟

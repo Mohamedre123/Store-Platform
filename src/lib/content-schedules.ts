@@ -13,7 +13,7 @@ import {
   writeCopy,
 } from './studio'
 import { publishToAccount, type PublishOutcome } from './social'
-import { nextRun, type PresetKey } from './studio-meta'
+import { nextRun, resolveStyle, styleOf, type ImageStyle, type PresetKey } from './studio-meta'
 
 /**
  * النشر المجدوَل — «كل يوم الساعة كذا».
@@ -103,6 +103,41 @@ export async function createPost(input: {
     .returning({ id: socialPosts.id })
 
   return row.id
+}
+
+/**
+ * تعديل بوست لسه ما اتنشرش — بيرجّع المعرّف أو `null`.
+ *
+ * ## اللي اتنشر ما بيتعدّلش
+ * البوست المنشور نزل على صفحة التاجر خلاص. تعديل صفّه كان هيخلّي
+ * «البوستات» تعرض كلامًا غير اللي الناس شافته، وإعادة نشره تنزّل
+ * نسخة تانية على نفس الصفحة. `null` بتقول للمنادي يعمل بوست جديد.
+ */
+export async function updatePost(
+  storeId: string,
+  postId: string,
+  fields: Partial<{
+    caption: string
+    hashtags: string[]
+    imageUrls: string[]
+    videoUrl: string | null
+    productId: string | null
+    targets: string[]
+  }>,
+): Promise<string | null> {
+  const rows = await db
+    .update(socialPosts)
+    .set({ ...fields, updatedAt: new Date() })
+    .where(
+      and(
+        eq(socialPosts.id, postId),
+        eq(socialPosts.storeId, storeId),
+        inArray(socialPosts.status, ['draft', 'ready', 'failed']),
+      ),
+    )
+    .returning({ id: socialPosts.id })
+
+  return rows[0]?.id ?? null
 }
 
 /**
@@ -213,6 +248,7 @@ export type ScheduleRow = {
   preset: string
   media: 'image' | 'carousel' | 'video'
   slides: number
+  imageStyle: ImageStyle
   autoPublish: boolean
   lastRunAt: Date | null
   nextRunAt: Date | null
@@ -240,6 +276,7 @@ export async function listSchedules(storeId: string): Promise<ScheduleRow[]> {
     preset: r.preset,
     media: r.media,
     slides: r.slides,
+    imageStyle: styleOf(r.imageStyle).key,
     autoPublish: r.autoPublish,
     lastRunAt: r.lastRunAt,
     nextRunAt: r.nextRunAt,
@@ -269,6 +306,7 @@ export async function saveSchedule(input: {
   preset: PresetKey
   media: 'image' | 'carousel' | 'video'
   slides?: number
+  imageStyle?: ImageStyle | null
   autoPublish: boolean
   isActive: boolean
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
@@ -303,6 +341,8 @@ export async function saveSchedule(input: {
       هتخلّي الجدول اليومي يولّد ٥٠٠ صورة على مفتاح التاجر.
     */
     slides: Math.max(2, Math.min(10, Math.round(input.slides ?? 5))),
+    /* نفس الفكرة: أي نص غير معروف بيرجع «يختار لوحده» */
+    imageStyle: styleOf(input.imageStyle).key,
     autoPublish: input.autoPublish,
     isActive: input.isActive,
     nextRunAt: next,
@@ -485,6 +525,15 @@ export async function runSchedule(scheduleId: string): Promise<{ ok: boolean; er
     .filter(Boolean)
     .join(' ')
 
+  /*
+    شكل الصورة: كلام التاجر المكتوب، وبعده اختيار الجدول.
+
+    الجدول اللي فيه «خلّي المنتج على خلفية سادة» كان بيطلع مكان حقيقي
+    جوّه إطار أبيض. دلوقتي الجملة دي بتحسم الشكل حتى لو الجدول قديم
+    وعموده `auto`.
+  */
+  const style = resolveStyle(s.imageStyle, s.style)
+
   /* قايمة لا صورة واحدة — الكاروسيل بيملاها بشرايحه بترتيبها */
   let imageUrls: string[] = []
   let videoUrl: string | null = null
@@ -505,6 +554,7 @@ export async function runSchedule(scheduleId: string): Promise<{ ok: boolean; er
       count: s.slides,
       productId,
       seedUrl: seed,
+      style,
     })
     if ('error' in set) return fail(set.error)
 
@@ -525,6 +575,7 @@ export async function runSchedule(scheduleId: string): Promise<{ ok: boolean; er
       prompt: brief,
       preset: s.preset as PresetKey,
       seedUrl: seed,
+      style,
     })
     if ('error' in job) return fail(job.error)
 
@@ -554,6 +605,7 @@ export async function runSchedule(scheduleId: string): Promise<{ ok: boolean; er
       preset: s.preset as PresetKey,
       productId,
       seedUrl: seed,
+      style,
     })
     if ('error' in image) return fail(image.error)
     imageUrls = [image.url]

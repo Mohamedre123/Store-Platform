@@ -7,7 +7,7 @@ import { getDashboardContext } from '@/lib/store-context'
 import { guard } from '@/lib/permissions'
 import { getAiConfig, GEMINI_PRO_SLUG, GEMINI_SLUG } from '@/lib/ai/settings'
 import { recentAssets } from '@/lib/studio'
-import { listAccounts } from '@/lib/social'
+import { listAccounts, publishingEnabled } from '@/lib/social'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { Card } from '@/components/ui'
@@ -15,6 +15,15 @@ import { StudioClient } from './studio-client'
 import { searchProductsAction } from './actions'
 
 export const metadata = { title: 'استوديو المحتوى' }
+
+/*
+  الأفعال بتاخد مهلة الصفحة اللي بتناديها.
+
+  كاروسيل من عشر شرايح = فكرة + عشر صور متتابعة، والنشر بعده بيحمّل
+  الشرايح ويرفعها للخدمة. المهلة الافتراضية كانت بتقطع ده في النص،
+  والتاجر بيدفع تمن توليد ما وصلوش. نفس مهلة عامل المهام.
+*/
+export const maxDuration = 300
 
 /**
  * استوديو المحتوى.
@@ -80,11 +89,13 @@ export default async function StudioPage() {
       <Reveal>
         <StudioClient
           hasKey={hasKey}
+          publishing={publishingEnabled()}
           products={products}
           accounts={accounts.map((a) => ({
             id: a.id,
             platform: a.platform,
             name: a.name,
+            avatar: a.avatar,
             status: a.status,
           }))}
           assets={assets.map((a) => ({

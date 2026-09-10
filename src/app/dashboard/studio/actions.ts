@@ -20,9 +20,10 @@ import {
   deleteSchedule,
   publishPost,
   saveSchedule,
+  updatePost,
 } from '@/lib/content-schedules'
 import { disconnectAccount } from '@/lib/social'
-import type { PresetKey, ToneKey } from '@/lib/studio-meta'
+import { resolveStyle, type ImageStyle, type PresetKey, type ToneKey } from '@/lib/studio-meta'
 
 /**
  * أفعال الاستوديو.
@@ -62,6 +63,8 @@ export async function generateImageAction(input: {
   productId?: string | null
   parentId?: string | null
   useProductPhoto?: boolean
+  /** شكل الصورة — الكلام المكتوب بيغلبه لو فيه شكل صريح */
+  style?: ImageStyle | null
 }): Promise<ImageState> {
   const { store, user } = await studioContext()
 
@@ -90,6 +93,13 @@ export async function generateImageAction(input: {
     productId: input.productId ?? null,
     parentId: input.parentId ?? null,
     seedUrl,
+    /*
+      الشكل بيتحسم هنا: كلام التاجر، وبعده الاختيار.
+
+      والتعديل مالوش شكل — «خلّي الخلفية أغمق» تعليمة على صورة موجودة.
+      و`resolveStyle` بيرجّع المعروف بس، فأي نص جاي من الشبكة بيبقى «لوحده».
+    */
+    style: input.parentId ? null : resolveStyle(input.style, prompt),
   })
 
   if ('error' in res) return { ok: false, error: res.error }
@@ -116,6 +126,7 @@ export async function generateCarouselAction(input: {
   count: number
   productId?: string | null
   useProductPhoto?: boolean
+  style?: ImageStyle | null
 }): Promise<CarouselState> {
   const { store, user } = await studioContext()
 
@@ -137,6 +148,7 @@ export async function generateCarouselAction(input: {
     count: input.count,
     productId: input.productId ?? null,
     seedUrl,
+    style: resolveStyle(input.style, prompt),
   })
 
   if ('error' in res) return { ok: false, error: res.error }
@@ -195,6 +207,7 @@ export async function startVideoAction(input: {
   useProductPhoto?: boolean
   /** صورة من الاستوديو تتحرّك — بتغلب صورة المنتج */
   seedAssetUrl?: string | null
+  style?: ImageStyle | null
 }): Promise<VideoStartState> {
   const { store } = await studioContext()
 
@@ -213,6 +226,7 @@ export async function startVideoAction(input: {
     prompt,
     preset: input.preset,
     seedUrl,
+    style: resolveStyle(input.style, prompt),
   })
 
   if ('error' in res) return { ok: false, error: res.error }
@@ -253,9 +267,27 @@ export async function checkVideoAction(input: {
    البوستات
    ══════════════════════════════════════════════════════════════ */
 
-export type SaveState = { ok?: true; id?: string; error?: string }
+export type SaveState = {
+  ok?: true
+  id?: string
+  error?: string
+  /** نتيجة كل حساب — الشاشة بتعلّم اللي نزل عليه واللي فشل وسببه */
+  results?: Array<{ accountId: string; ok: boolean; error?: string }>
+}
+
+/** أول سبب حقيقي — «فشل» لوحدها ما بتقولش للتاجر يعمل إيه */
+function firstFailure(res: { results: Array<{ ok: boolean; error?: string }>; error?: string }) {
+  return res.results.find((r) => !r.ok)?.error ?? res.error ?? 'فشل النشر'
+}
 
 export async function savePostAction(input: {
+  /**
+   * البوست اللي اتحفظ قبل كده من نفس الشاشة.
+   *
+   * التاجر بيحفظ، ويعدّل الهوك، ويدوس نشر. من غير المعرّف كل ضغطة
+   * كانت بتعمل بوست جديد — فيلاقي نفس البوست تلات مرات في «البوستات».
+   */
+  id?: string | null
   caption: string
   hashtags: string[]
   imageUrls: string[]
@@ -272,39 +304,52 @@ export async function savePostAction(input: {
     return { error: 'محتاج صورة أو فيديو' }
   }
 
-  const id = await createPost({
-    storeId: store.id,
-    userId: user.id,
+  const fields = {
     caption,
     hashtags: (input.hashtags ?? []).slice(0, 12),
-    imageUrls: input.imageUrls.slice(0, 4),
+    /* عشرة: حد الكاروسيل عند إنستجرام — الأربعة القديمة كانت بتقصّ الشرايح */
+    imageUrls: input.imageUrls.slice(0, 10),
     videoUrl: input.videoUrl ?? null,
     productId: input.productId ?? null,
     targets: input.targets ?? [],
-    status: 'ready',
-  })
+  }
+
+  const id =
+    (input.id && (await updatePost(store.id, input.id, fields))) ||
+    (await createPost({ storeId: store.id, userId: user.id, ...fields, status: 'ready' }))
 
   if (input.publishNow) {
+    if (fields.targets.length === 0) return { id, error: 'اختار الحساب اللي هتنشر عليه' }
+
     const res = await publishPost(store.id, id)
     revalidatePath('/dashboard/studio/posts')
-    if (!res.ok) return { id, error: res.error ?? 'البوست اتحفظ بس النشر فشل' }
+    if (!res.ok) return { id, error: firstFailure(res), results: res.results }
+    return { ok: true, id, results: res.results }
   }
 
   revalidatePath('/dashboard/studio/posts')
   return { ok: true, id }
 }
 
-export async function publishPostAction(postId: string): Promise<SaveState> {
+/**
+ * نشر بوست محفوظ.
+ *
+ * `targets` اختياري: البوست اللي اتحفظ من غير حسابات كان مالوش زرار
+ * نشر خالص في «البوستات»، والتاجر يرجع للاستوديو يعمله من الأول.
+ */
+export async function publishPostAction(postId: string, targets?: string[]): Promise<SaveState> {
   const { store } = await studioContext()
+
+  if (targets?.length) {
+    const updated = await updatePost(store.id, postId, { targets: targets.slice(0, 20) })
+    if (!updated) return { error: 'البوست ده اتنشر خلاص — اعمل نسخة جديدة من الاستوديو' }
+  }
+
   const res = await publishPost(store.id, postId)
   revalidatePath('/dashboard/studio/posts')
 
-  if (!res.ok) {
-    /* أول سبب حقيقي — «فشل» لوحدها ما بتقولش للتاجر يعمل إيه */
-    const reason = res.results.find((r) => !r.ok)?.error
-    return { error: reason ?? res.error ?? 'فشل النشر' }
-  }
-  return { ok: true }
+  if (!res.ok) return { error: firstFailure(res), results: res.results }
+  return { ok: true, results: res.results }
 }
 
 export async function deletePostAction(postId: string): Promise<void> {
@@ -330,6 +375,7 @@ export async function saveScheduleAction(input: {
   preset: PresetKey
   media: 'image' | 'carousel' | 'video'
   slides?: number
+  imageStyle?: ImageStyle | null
   autoPublish: boolean
   isActive: boolean
 }): Promise<SaveState> {
@@ -361,6 +407,7 @@ export async function saveScheduleAction(input: {
     preset: input.preset,
     media: input.media,
     slides: input.slides,
+    imageStyle: input.imageStyle,
     autoPublish: input.autoPublish,
     isActive: input.isActive,
   })

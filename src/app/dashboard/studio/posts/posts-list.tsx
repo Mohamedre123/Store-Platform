@@ -45,11 +45,21 @@ export function PostsList({
   accounts,
 }: {
   posts: Post[]
-  accounts: Array<{ id: string; name: string; platform: string }>
+  accounts: Array<{ id: string; name: string; platform: string; status: string }>
 }) {
   const [busy, setBusy] = useState<string | null>(null)
   const [, start] = useTransition()
   const byId = new Map(accounts.map((a) => [a.id, a]))
+  const live = accounts.filter((a) => a.status === 'active')
+
+  /*
+    اختيار الحسابات للبوست اللي اتحفظ من غيرها.
+
+    البوست ده كان مالوش زرار نشر خالص — والتاجر اللي حفظ وهو لسه
+    ما ربطش، وربط بعدها، كان بيرجع للاستوديو يعمله من الأول.
+  */
+  const [picking, setPicking] = useState<string | null>(null)
+  const [chosen, setChosen] = useState<string[]>([])
 
   return (
     <div className="flex flex-col gap-3">
@@ -143,7 +153,97 @@ export function PostsList({
                 </div>
               )}
 
+              {picking === p.id && (
+                <div className="flex flex-col gap-2 rounded-lg border border-[var(--border)] p-3">
+                  <span className="text-xs font-medium text-[var(--fg-muted)]">
+                    هتنشره على أنهي حساب؟
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {live.map((a) => {
+                      const on = chosen.includes(a.id)
+                      return (
+                        <button
+                          key={a.id}
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() =>
+                            setChosen((c) => (on ? c.filter((x) => x !== a.id) : [...c, a.id]))
+                          }
+                          className={cn(
+                            'flex h-11 items-center gap-2 rounded-lg border px-3 text-sm transition-colors',
+                            on
+                              ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]'
+                              : 'border-[var(--border-strong)] text-[var(--fg-muted)]',
+                          )}
+                        >
+                          <span
+                            className="h-2.5 w-2.5 shrink-0 rounded-full"
+                            style={{ background: platformOf(a.platform).color }}
+                            aria-hidden="true"
+                          />
+                          <span className="max-w-[10rem] truncate">{a.name}</span>
+                          <span className="text-[11px] opacity-60">{platformOf(a.platform).label}</span>
+                          {on && <Check className="h-3.5 w-3.5" aria-hidden="true" />}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={chosen.length === 0 || busy === p.id}
+                      onClick={() => {
+                        const names = live
+                          .filter((a) => chosen.includes(a.id))
+                          .map((a) => a.name)
+                          .join('، ')
+                        if (!confirm(`هتنشر البوست دلوقتي على: ${names}؟`)) return
+                        setBusy(p.id)
+                        start(async () => {
+                          const res = await publishPostAction(p.id, chosen)
+                          setBusy(null)
+                          if (!res.error) setPicking(null)
+                          toast(res.error ?? 'اتنشر')
+                        })
+                      }}
+                      className="flex h-10 items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-fg)] disabled:opacity-50"
+                    >
+                      {busy === p.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                      ) : (
+                        <Send className="h-4 w-4" aria-hidden="true" />
+                      )}
+                      انشر
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPicking(null)}
+                      className="flex h-10 items-center rounded-lg border border-[var(--border-strong)] px-3 text-sm text-[var(--fg-muted)]"
+                    >
+                      إلغاء
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="flex flex-wrap gap-2">
+                {p.targets.length === 0 &&
+                  p.status !== 'published' &&
+                  live.length > 0 &&
+                  picking !== p.id && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPicking(p.id)
+                        setChosen(live.length === 1 ? [live[0].id] : [])
+                      }}
+                      className="flex h-10 items-center gap-1.5 rounded-lg bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-fg)]"
+                    >
+                      <Send className="h-4 w-4" aria-hidden="true" />
+                      انشر على حساباتك
+                    </button>
+                  )}
+
                 {p.targets.length > 0 && p.status !== 'published' && (
                   <button
                     type="button"
