@@ -221,7 +221,7 @@ export function SeoForm({
         </Group>
       </Card>
 
-      <div className="safe-bottom sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-3 border-t border-[var(--border)] bg-[var(--surface)]/95 px-4 py-3 backdrop-blur-md sm:mx-0 sm:rounded-xl sm:border sm:px-4">
+      <div className="sticky bottom-[var(--dash-nav)] z-10 lg:bottom-0 -mx-4 flex flex-wrap items-center gap-3 border-t border-[var(--border)] bg-[var(--surface)]/95 px-4 py-3 backdrop-blur-md sm:mx-0 sm:rounded-xl sm:border sm:px-4">
         <button
           type="button"
           onClick={() => {

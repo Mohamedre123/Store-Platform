@@ -256,7 +256,7 @@ export function AssistantPanel() {
           `bottom-24` بيرفعها فوق الشريط على الفون، و`lg:bottom-5`
           بيرجّعها مكانها على الديسكتوب اللي مفيهوش شريط سفلي أصلًا.
         */
-        className={`group fixed bottom-24 end-5 z-40 flex h-14 items-center justify-center gap-2 rounded-full bg-gradient-to-br from-[#8b5cf6] to-[#ec4899] text-white shadow-xl ring-1 ring-white/20 transition-all hover:shadow-2xl active:scale-95 lg:bottom-5 ${
+        className={`group fixed bottom-[calc(var(--dash-nav)+1rem)] end-5 z-40 flex h-14 items-center justify-center gap-2 rounded-full bg-gradient-to-br from-[#8b5cf6] to-[#ec4899] text-white shadow-xl ring-1 ring-white/20 transition-all hover:shadow-2xl active:scale-95 lg:bottom-5 ${
           open ? 'w-14' : 'w-14 lg:w-auto lg:ps-5 lg:pe-4'
         }`}
       >
@@ -282,7 +282,7 @@ export function AssistantPanel() {
         <div
           role="dialog"
           aria-label="مساعد المتجر"
-          className="fixed inset-x-3 bottom-40 top-16 z-50 flex flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl sm:inset-x-auto sm:end-5 sm:top-auto sm:h-[min(38rem,calc(100vh-8rem))] sm:w-[26rem] lg:bottom-24"
+          className="fixed inset-x-3 bottom-[calc(var(--dash-nav)+5rem)] top-16 z-50 flex flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-2xl sm:inset-x-auto sm:end-5 sm:top-auto sm:h-[min(38rem,calc(100vh-8rem))] sm:w-[26rem] lg:bottom-24"
         >
           <header className="flex shrink-0 items-center gap-2 bg-gradient-to-l from-[#8b5cf6] to-[#ec4899] px-4 py-3 text-white">
             <Sparkles className="h-4 w-4" />

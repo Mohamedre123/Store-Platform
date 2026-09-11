@@ -297,7 +297,7 @@ export function PageBuilder({
         زوّد قسم
       </button>
 
-      <div className="sticky bottom-4 z-10 flex items-center gap-3">
+      <div className="sticky bottom-[calc(var(--dash-nav)+1rem)] z-10 lg:bottom-4 flex items-center gap-3">
         <Button onClick={save} loading={pending} disabled={!dirty}>
           <Save className="h-4 w-4" aria-hidden="true" />
           حفظ الصفحة

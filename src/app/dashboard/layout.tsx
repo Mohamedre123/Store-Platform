@@ -102,11 +102,16 @@ export default async function DashboardLayout({ children }: { children: React.Re
         </header>
 
         {/*
-          `pb-24` على الفون عشان الشريط السفلي ما يغطّيش آخر الصفحة.
+          مسافة آخر الصفحة على الفون = الشريط السفلي + شريط الآيفون + هامش.
 
           من غيرها، آخر زرار في أي صفحة بيقع تحت الشريط — والتاجر
           بيفضل يسحب لتحت ومش لاقي حاجة، لأن اللي هو بيدوّر عليه
           موجود بس متغطّي.
+
+          كانت `pb-24` ثابتة: ما بتحسبش شريط الآيفون، و`sm:py-8` كانت
+          بتلغيها من ٦٤٠ لـ١٠٢٣ بكسل والشريط السفلي لسه ظاهر. ولما زرار
+          المساعد العائم يكون موجود، المسافة بتكبر بارتفاعه — كان قاعد
+          فوق آخر كارت في الصفحة وبيغطّي زرار «تعديل».
         */}
         {/*
           مفيش شريط تبويبات — **لا على الفون ولا على الديسكتوب**.
@@ -121,7 +126,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
           فالمعلومة اللي الشريط كان بيقولها موجودة قبله. وعلى الفون
           التنقّل من الشريط السفلي و«المزيد».
         */}
-        <main className="mx-auto max-w-6xl px-4 pb-24 pt-6 sm:px-6 sm:py-8 lg:pb-8">
+        <main
+          className={`mx-auto max-w-6xl px-4 pt-6 sm:px-6 sm:pt-8 lg:pb-8 ${
+            assistantReady ? 'pb-[calc(var(--dash-nav)+6rem)]' : 'pb-[calc(var(--dash-nav)+1.5rem)]'
+          }`}
+        >
           {children}
           {assistantReady && <AssistantPanel />}
           {hasAnyKey && <AssistBubble />}

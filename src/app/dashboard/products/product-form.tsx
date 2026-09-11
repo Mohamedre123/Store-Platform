@@ -413,7 +413,7 @@ export function ProductForm({
         </div>
       </div>
 
-      <div className="sticky bottom-0 -mx-4 flex items-center gap-3 border-t border-[var(--border)] bg-[var(--surface)]/95 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6">
+      <div className="sticky bottom-[var(--dash-nav)] z-10 -mx-4 lg:bottom-0 flex items-center gap-3 border-t border-[var(--border)] bg-[var(--surface)]/95 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6">
         <Button type="submit" loading={pending}>
           <Save className="h-4 w-4" aria-hidden="true" />
           {product ? 'حفظ التعديلات' : 'إضافة المنتج'}

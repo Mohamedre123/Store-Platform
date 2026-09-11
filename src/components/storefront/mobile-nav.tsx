@@ -41,8 +41,13 @@ export function MobileNav({
 
   return (
     <>
-      {/* مساحة تعويضية — من غيرها الشريط بيغطّي آخر المحتوى */}
-      <div className="h-16 md:hidden" aria-hidden="true" />
+      {/*
+        مساحة تعويضية — من غيرها الشريط بيغطّي آخر المحتوى.
+
+        بشريط الآيفون السفلي: الشريط نفسه بياخد `safe-area-inset-bottom`
+        زيادة، والمساحة الثابتة (`h-16`) كانت أقصر منه بالرقم ده.
+      */}
+      <div className="h-[calc(4rem+env(safe-area-inset-bottom))] md:hidden" aria-hidden="true" />
 
       <nav
         /*
