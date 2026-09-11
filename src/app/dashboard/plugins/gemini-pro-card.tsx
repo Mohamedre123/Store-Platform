@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { Bot, Check, Sparkles, TriangleAlert, Wand2 } from 'lucide-react'
 import { Alert, Card } from '@/components/ui'
 import type { PluginDef } from '@/lib/plugins'
 import { AI_PROVIDERS, type AiIssue, type AiProvider } from '@/lib/ai/providers-meta'
 import { saveGeminiProAction, verifyAiKeyAction } from './ai-actions'
-import { IssueBanner, KeyField, ModelSelect, ProviderSwitch } from './ai-fields'
+import { IssueBanner, KeyField, ModelSelect, ProviderSwitch, type KeyCheck } from './ai-fields'
 
 export type GeminiProSaved = {
   enabled: boolean
@@ -71,6 +71,15 @@ export function GeminiProCard({
   const [verifying, startVerify] = useTransition()
   const [saving, startSave] = useTransition()
 
+  /* نتيجة التحقّق لكل مفتاح — بتظهر تحت خانته هو */
+  const [checks, setChecks] = useState<Partial<Record<AiProvider, KeyCheck>>>({})
+  const [checking, setChecking] = useState<AiProvider | null>(null)
+
+  const msgRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (msg) msgRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [msg])
+
   const base = saved?.baseProviders ?? []
   const ownGemini = (Boolean(saved?.hasOwnKey) && !removed.includes('gemini')) || geminiModels.length > 0
   const ownOpenai = (Boolean(saved?.hasOwnOpenaiKey) && !removed.includes('openai')) || openaiModels.length > 0
@@ -91,13 +100,15 @@ export function GeminiProCard({
 
   const verify = (which: AiProvider) =>
     startVerify(async () => {
-      setMsg(null)
+      setChecking(which)
+      setChecks((c) => ({ ...c, [which]: null }))
       const res = await verifyAiKeyAction({
         provider: which,
         apiKey: which === 'openai' ? openaiKey : geminiKey,
       })
+      setChecking(null)
       if (!res.ok) {
-        setMsg({ tone: 'danger', text: res.error })
+        setChecks((c) => ({ ...c, [which]: { tone: 'danger', text: res.error } }))
         return
       }
       if (which === 'openai') {
@@ -109,12 +120,12 @@ export function GeminiProCard({
       }
       setRemoved((r) => r.filter((p) => p !== which))
 
-      const label = which === 'openai' ? OPENAI.label : GEMINI.label
-      setMsg(
-        res.warning
-          ? { tone: 'warning', text: `مفتاح ${label} اتقبل، بس: ${res.warning}` }
-          : { tone: 'success', text: `مفتاح ${label} شغّال — ${res.models.length} موديل متاح.` },
-      )
+      setChecks((c) => ({
+        ...c,
+        [which]: res.warning
+          ? { tone: 'warning', text: 'المفتاح اتقبل، بس: ' + res.warning }
+          : { tone: 'success', text: 'المفتاح شغّال ✓ — ' + res.models.length + ' موديل متاح عليه. اختار الموديل ودوس «حفظ».' },
+      }))
     })
 
   const save = (nextEnabled?: boolean) =>
@@ -194,7 +205,11 @@ export function GeminiProCard({
       </div>
 
       <div className="flex flex-col gap-4 border-t border-[var(--border)] pt-4">
-        {msg && <Alert tone={msg.tone}>{msg.text}</Alert>}
+        {msg && (
+          <div ref={msgRef}>
+            <Alert tone={msg.tone}>{msg.text}</Alert>
+          </div>
+        )}
         <IssueBanner issue={saved?.lastIssue} />
 
         {/*
@@ -238,11 +253,15 @@ export function GeminiProCard({
           id="pro-gemini"
           label={GEMINI.keyLabel}
           value={geminiKey}
-          onChange={setGeminiKey}
+          onChange={(v) => {
+            setGeminiKey(v)
+            setChecks((c) => ({ ...c, gemini: null }))
+          }}
           saved={Boolean(saved?.hasOwnKey) && !removed.includes('gemini')}
           placeholder={GEMINI.keyPlaceholder}
           docHref={GEMINI.keyHref}
-          busy={verifying}
+          busy={verifying && checking === 'gemini'}
+          result={checks.gemini}
           onVerify={() => verify('gemini')}
           onRemove={() => setRemoved((r) => [...r, 'gemini'])}
           optional
@@ -252,11 +271,15 @@ export function GeminiProCard({
           id="pro-openai"
           label={OPENAI.keyLabel}
           value={openaiKey}
-          onChange={setOpenaiKey}
+          onChange={(v) => {
+            setOpenaiKey(v)
+            setChecks((c) => ({ ...c, openai: null }))
+          }}
           saved={Boolean(saved?.hasOwnOpenaiKey) && !removed.includes('openai')}
           placeholder={OPENAI.keyPlaceholder}
           docHref={OPENAI.keyHref}
-          busy={verifying}
+          busy={verifying && checking === 'openai'}
+          result={checks.openai}
           onVerify={() => verify('openai')}
           onRemove={() => setRemoved((r) => [...r, 'openai'])}
           optional

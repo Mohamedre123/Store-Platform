@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { Bot, Check, Sparkles, TriangleAlert } from 'lucide-react'
 import { Alert, Card } from '@/components/ui'
 import type { PluginDef } from '@/lib/plugins'
 import { AI_PROVIDERS, type AiIssue, type AiProvider } from '@/lib/ai/providers-meta'
 import { saveGeminiAction, verifyAiKeyAction } from './ai-actions'
-import { IssueBanner, KeyField, ModelSelect, ProviderSwitch } from './ai-fields'
+import { IssueBanner, KeyField, ModelSelect, ProviderSwitch, type KeyCheck } from './ai-fields'
 import { RefreshBriefButton } from './refresh-brief'
 
 export type GeminiSaved = {
@@ -80,6 +80,16 @@ export function GeminiCard({
   const [verifying, startVerify] = useTransition()
   const [saving, startSave] = useTransition()
 
+  /* نتيجة التحقّق لكل مفتاح — بتظهر تحت خانته هو */
+  const [checks, setChecks] = useState<Partial<Record<AiProvider, KeyCheck>>>({})
+  const [checking, setChecking] = useState<AiProvider | null>(null)
+
+  /* رسالة الحفظ فوق الكارت — الشاشة بتنزل لها بدل ما تتعرض برّه النظر */
+  const msgRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (msg) msgRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [msg])
+
   const hasGemini = (Boolean(saved?.hasKey) && !removed.includes('gemini')) || geminiModels.length > 0
   const hasOpenai = (Boolean(saved?.hasOpenaiKey) && !removed.includes('openai')) || openaiModels.length > 0
   const configured = hasGemini || hasOpenai
@@ -98,13 +108,15 @@ export function GeminiCard({
 
   const verify = (provider: AiProvider) =>
     startVerify(async () => {
-      setMsg(null)
+      setChecking(provider)
+      setChecks((c) => ({ ...c, [provider]: null }))
       const res = await verifyAiKeyAction({
         provider,
         apiKey: provider === 'openai' ? openaiKey : geminiKey,
       })
+      setChecking(null)
       if (!res.ok) {
-        setMsg({ tone: 'danger', text: res.error })
+        setChecks((c) => ({ ...c, [provider]: { tone: 'danger', text: res.error } }))
         return
       }
 
@@ -118,12 +130,12 @@ export function GeminiCard({
       setRemoved((r) => r.filter((p) => p !== provider))
       setBrief((b) => b || res.brief)
 
-      const label = provider === 'openai' ? OPENAI.label : GEMINI.label
-      setMsg(
-        res.warning
-          ? { tone: 'warning', text: `مفتاح ${label} اتقبل، بس: ${res.warning}` }
-          : { tone: 'success', text: `مفتاح ${label} شغّال — ${res.models.length} موديل متاح عليه.` },
-      )
+      setChecks((c) => ({
+        ...c,
+        [provider]: res.warning
+          ? { tone: 'warning', text: 'المفتاح اتقبل، بس: ' + res.warning }
+          : { tone: 'success', text: 'المفتاح شغّال ✓ — ' + res.models.length + ' موديل متاح عليه. اختار الموديل ودوس «حفظ».' },
+      }))
     })
 
   const save = (nextEnabled?: boolean) =>
@@ -201,24 +213,33 @@ export function GeminiCard({
       </div>
 
       <div className="flex flex-col gap-4 border-t border-[var(--border)] pt-4">
-        {msg && <Alert tone={msg.tone}>{msg.text}</Alert>}
+        {msg && (
+          <div ref={msgRef}>
+            <Alert tone={msg.tone}>{msg.text}</Alert>
+          </div>
+        )}
         <IssueBanner issue={saved?.lastIssue} />
 
         <p className="rounded-lg bg-[var(--color-info-soft)] px-3 py-2.5 text-xs leading-relaxed text-[var(--color-info)]">
           <strong>حط مفتاح واحد أو الاتنين.</strong> البوت بيرد على زوّارك بالمزوّد اللي تختاره، ولو
           رصيده خلص في نص اليوم بيكمّل بالتاني بدل ما يقف قدام عميل بيسأل. مفتاح ChatGPT محتاج
-          رصيد مشحون من الأول — اشتراك ChatGPT Plus مش بيشغّله.
+          رصيد API مشحون من platform.openai.com — أي اشتراك في تطبيق ChatGPT (مجاني أو Go أو Plus أو
+          Pro) حاجة منفصلة ومش بيشغّل المفتاح.
         </p>
 
         <KeyField
           id="bot-gemini"
           label={GEMINI.keyLabel}
           value={geminiKey}
-          onChange={setGeminiKey}
+          onChange={(v) => {
+            setGeminiKey(v)
+            setChecks((c) => ({ ...c, gemini: null }))
+          }}
           saved={Boolean(saved?.hasKey) && !removed.includes('gemini')}
           placeholder={GEMINI.keyPlaceholder}
           docHref={GEMINI.keyHref}
-          busy={verifying}
+          busy={verifying && checking === 'gemini'}
+          result={checks.gemini}
           onVerify={() => verify('gemini')}
           onRemove={() => setRemoved((r) => [...r, 'gemini'])}
           optional
@@ -228,11 +249,15 @@ export function GeminiCard({
           id="bot-openai"
           label={OPENAI.keyLabel}
           value={openaiKey}
-          onChange={setOpenaiKey}
+          onChange={(v) => {
+            setOpenaiKey(v)
+            setChecks((c) => ({ ...c, openai: null }))
+          }}
           saved={Boolean(saved?.hasOpenaiKey) && !removed.includes('openai')}
           placeholder={OPENAI.keyPlaceholder}
           docHref={OPENAI.keyHref}
-          busy={verifying}
+          busy={verifying && checking === 'openai'}
+          result={checks.openai}
           onVerify={() => verify('openai')}
           onRemove={() => setRemoved((r) => [...r, 'openai'])}
           optional

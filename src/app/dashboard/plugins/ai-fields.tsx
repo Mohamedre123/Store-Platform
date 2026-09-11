@@ -1,7 +1,10 @@
 'use client'
 
-import { ExternalLink, TriangleAlert } from 'lucide-react'
+import { Check, ExternalLink, Loader2, TriangleAlert, X } from 'lucide-react'
 import { providerLabel, type AiIssue } from '@/lib/ai/providers-meta'
+
+/** نتيجة «تحقّق» لمفتاح بعينه */
+export type KeyCheck = { tone: 'success' | 'warning' | 'danger'; text: string } | null | undefined
 
 /**
  * قطع مشتركة لكروت إضافات الذكاء.
@@ -33,6 +36,7 @@ export function KeyField({
   onVerify,
   onRemove,
   optional,
+  result,
 }: {
   id: string
   label: string
@@ -46,6 +50,13 @@ export function KeyField({
   /** مسح المفتاح المحفوظ — الفاضي معناه «سيبه»، فالمسح لازم يبقى زرار */
   onRemove?: () => void
   optional?: boolean
+  /**
+   * نتيجة «تحقّق» — بتظهر تحت الخانة نفسها.
+   *
+   * كانت بتظهر فوق أول الكارت، والخانة تحت في نص نافذة بتتمرّر —
+   * فالتاجر بيدوس تحقّق وما يشوفش أي حاجة، ويفتكر الزرار مش شغّال.
+   */
+  result?: KeyCheck
 }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -89,6 +100,34 @@ export function KeyField({
         >
           {busy ? 'بيتأكّد…' : 'تحقّق'}
         </button>
+      </div>
+
+      <div role="status" aria-live="polite">
+        {busy ? (
+          <p className="flex items-center gap-1.5 text-xs text-[var(--fg-muted)]">
+            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden="true" />
+            بنجرّب المفتاح بنداء حقيقي — ممكن ياخد لحد ٢٠ ثانية.
+          </p>
+        ) : result ? (
+          <p
+            className={`flex items-start gap-1.5 rounded-lg px-3 py-2 text-xs leading-relaxed ${
+              result.tone === 'success'
+                ? 'bg-[var(--color-success-soft)] text-[var(--color-success)]'
+                : result.tone === 'warning'
+                  ? 'bg-[var(--color-warning-soft)] text-[var(--color-warning)]'
+                  : 'bg-[var(--color-danger-soft)] text-[var(--color-danger)]'
+            }`}
+          >
+            {result.tone === 'success' ? (
+              <Check className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            ) : result.tone === 'warning' ? (
+              <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            ) : (
+              <X className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            )}
+            <span className="min-w-0">{result.text}</span>
+          </p>
+        ) : null}
       </div>
 
       <a

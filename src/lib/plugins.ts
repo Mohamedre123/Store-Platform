@@ -139,7 +139,7 @@ export const PLUGINS: PluginDef[] = [
     where:
       'Gemini من aistudio.google.com ← Get API key، وChatGPT من platform.openai.com ← API keys. ' +
       'بنتحقق من كل مفتاح بنداء حقيقي مش بشكله. **الاتنين محتاجين رصيد أو فوترة** عشان البوت ما يقفش ' +
-      'قدام عميل بيسأل — واشتراك ChatGPT Plus مش بيشغّل مفتاح الـAPI.',
+      'قدام عميل بيسأل — وأي اشتراك في تطبيق ChatGPT (مجاني أو Go أو Plus أو Pro) منفصل عن رصيد الـAPI.',
   },
 
   {

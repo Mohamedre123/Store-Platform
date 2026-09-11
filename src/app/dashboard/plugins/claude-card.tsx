@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { Check, Palette, ShieldCheck, TriangleAlert } from 'lucide-react'
 import { Alert, Card } from '@/components/ui'
 import type { PluginDef } from '@/lib/plugins'
 import type { AiIssue } from '@/lib/ai/providers-meta'
 import { saveClaudeAction, verifyDesignerKeyAction } from './ai-actions'
-import { IssueBanner, KeyField, ModelSelect, ProviderSwitch } from './ai-fields'
+import { IssueBanner, KeyField, ModelSelect, ProviderSwitch, type KeyCheck } from './ai-fields'
 
 type Provider = 'claude' | 'gemini' | 'openai'
 
@@ -60,6 +60,15 @@ export function ClaudeCard({
   const [verifying, startVerify] = useTransition()
   const [saving, startSave] = useTransition()
 
+  /* نتيجة التحقّق لكل مفتاح — بتظهر تحت خانته هو */
+  const [checks, setChecks] = useState<Partial<Record<Provider, KeyCheck>>>({})
+  const [checking, setChecking] = useState<Provider | null>(null)
+
+  const msgRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (msg) msgRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [msg])
+
   const has: Record<Provider, boolean> = {
     claude: Boolean(saved?.hasKey) || models.claude.length > 0,
     gemini: Boolean(saved?.hasGeminiKey) || models.gemini.length > 0,
@@ -70,21 +79,24 @@ export function ClaudeCard({
 
   const verify = (which: Provider) =>
     startVerify(async () => {
-      setMsg(null)
+      setChecking(which)
+      setChecks((c) => ({ ...c, [which]: null }))
       const res = await verifyDesignerKeyAction({ provider: which, apiKey: keys[which] })
+      setChecking(null)
       if (!res.ok) {
-        setMsg({ tone: 'danger', text: res.error })
+        setChecks((c) => ({ ...c, [which]: { tone: 'danger', text: res.error } }))
         return
       }
 
       setModels((m) => ({ ...m, [which]: res.models }))
       setProvider(which)
       setModel(res.suggested)
-      setMsg(
-        res.warning
-          ? { tone: 'warning', text: `مفتاح ${LABELS[which]} اتقبل، بس: ${res.warning}` }
-          : { tone: 'success', text: `مفتاح ${LABELS[which]} شغّال — ${res.models.length} موديل متاح.` },
-      )
+      setChecks((c) => ({
+        ...c,
+        [which]: res.warning
+          ? { tone: 'warning', text: 'المفتاح اتقبل، بس: ' + res.warning }
+          : { tone: 'success', text: 'المفتاح شغّال ✓ — ' + res.models.length + ' موديل متاح عليه. اختار الموديل ودوس «حفظ».' },
+      }))
     })
 
   const save = (nextEnabled?: boolean) =>
@@ -158,7 +170,11 @@ export function ClaudeCard({
       </div>
 
       <div className="flex flex-col gap-4 border-t border-[var(--border)] pt-4">
-        {msg && <Alert tone={msg.tone}>{msg.text}</Alert>}
+        {msg && (
+          <div ref={msgRef}>
+            <Alert tone={msg.tone}>{msg.text}</Alert>
+          </div>
+        )}
         <IssueBanner issue={saved?.lastIssue} />
 
         {/* الحدّ الأمني — التاجر لازم يعرف الأداة بتوصل لفين */}
@@ -181,11 +197,15 @@ export function ClaudeCard({
           id="designer-claude"
           label="مفتاح Claude (Anthropic)"
           value={keys.claude}
-          onChange={(v) => setKeys((k) => ({ ...k, claude: v }))}
+          onChange={(v) => {
+            setKeys((k) => ({ ...k, claude: v }))
+            setChecks((c) => ({ ...c, claude: null }))
+          }}
           saved={Boolean(saved?.hasKey)}
           placeholder="sk-ant-…"
           docHref="https://console.anthropic.com/settings/keys"
-          busy={verifying}
+          busy={verifying && checking === 'claude'}
+          result={checks.claude}
           onVerify={() => verify('claude')}
           optional
         />
@@ -194,11 +214,15 @@ export function ClaudeCard({
           id="designer-gemini"
           label="مفتاح Gemini (Google)"
           value={keys.gemini}
-          onChange={(v) => setKeys((k) => ({ ...k, gemini: v }))}
+          onChange={(v) => {
+            setKeys((k) => ({ ...k, gemini: v }))
+            setChecks((c) => ({ ...c, gemini: null }))
+          }}
           saved={Boolean(saved?.hasGeminiKey)}
           placeholder="مفتاحك من Google AI Studio"
           docHref="https://aistudio.google.com/app/apikey"
-          busy={verifying}
+          busy={verifying && checking === 'gemini'}
+          result={checks.gemini}
           onVerify={() => verify('gemini')}
           optional
         />
@@ -207,11 +231,15 @@ export function ClaudeCard({
           id="designer-openai"
           label="مفتاح ChatGPT (OpenAI)"
           value={keys.openai}
-          onChange={(v) => setKeys((k) => ({ ...k, openai: v }))}
+          onChange={(v) => {
+            setKeys((k) => ({ ...k, openai: v }))
+            setChecks((c) => ({ ...c, openai: null }))
+          }}
           saved={Boolean(saved?.hasOpenaiKey)}
           placeholder="sk-…"
           docHref="https://platform.openai.com/api-keys"
-          busy={verifying}
+          busy={verifying && checking === 'openai'}
+          result={checks.openai}
           onVerify={() => verify('openai')}
           optional
         />
