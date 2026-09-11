@@ -282,6 +282,13 @@ export const contentSchedules = pgTable(
      * الجداول اللي اتعملت قبل العمود ده تمشي بكلام التاجر.
      */
     imageStyle: text('image_style').notNull().default('auto'),
+    /**
+     * Gemini أو ChatGPT — فاضي يعني اختيار التاجر المحفوظ في المساعد.
+     *
+     * نص مش enum: المزوّد اللي ما بقاش ليه مفتاح بيرجع للموجود بدل ما
+     * الجدول يقع.
+     */
+    aiProvider: text('ai_provider'),
 
     /**
      * ينشر لوحده ولا يستنّى موافقة؟

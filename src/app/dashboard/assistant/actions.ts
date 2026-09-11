@@ -7,9 +7,10 @@ import { db } from '@/db'
 import { aiConversations, aiMessages, type AiToolCall } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { recordAudit } from '@/lib/audit'
-import { aiAllowed, getAiConfig, isReady, GEMINI_PRO_SLUG, GEMINI_SLUG } from '@/lib/ai/settings'
+import { getAiConfig, resolveEngines, GEMINI_PRO_SLUG, type Engine } from '@/lib/ai/settings'
 import { getStoreBrief, briefLine } from '@/lib/ai/store-context'
-import { agentTurn, type AgentMessage } from '@/lib/ai/gemini'
+import type { AgentMessage } from '@/lib/ai/gemini'
+import { agentStep } from '@/lib/ai/llm'
 import { AGENT_TOOLS, executeTool, getTool } from '@/lib/ai/agent-tools'
 
 export type AgentMsg = {
@@ -25,33 +26,25 @@ export type AgentState =
   | { ok: false; error: string; needsSetup?: boolean }
 
 /**
- * مفتاح المساعد.
+ * محرّك المساعد — Gemini أو ChatGPT.
  *
- * لو إضافة Pro مالهاش مفتاح خاص، بتستخدم مفتاح Gemini العادي.
- * التاجر اللي حط مفتاحه مرة ما يصحّش نطلبه منه تاني — واللي عايز
- * مفتاحًا منفصل للفوترة يقدر يحطّه.
+ * لو إضافة المساعد مالهاش مفتاح خاص، بتستخدم مفتاح إضافة الرد على
+ * العملاء. التاجر اللي حط مفتاحه مرة ما يصحّش نطلبه منه تاني — واللي
+ * عايز مفتاحًا منفصلًا للفوترة يقدر يحطّه.
+ *
+ * و`prefer` اختيار التاجر من الشات: بيغلب المحفوظ لو المزوّد ده ليه مفتاح.
  */
-type KeyResult =
-  | { ok: true; apiKey: string; model: string }
-  | { ok: false; error: string; needsSetup: boolean }
+type KeyResult = { ok: true; engine: Engine } | { ok: false; error: string; needsSetup: boolean }
 
-async function resolveKey(storeId: string): Promise<KeyResult> {
-  if (!(await aiAllowed(storeId))) {
-    return { ok: false, error: 'الميزة دي للمشتركين — اشترك من صفحة الاشتراك وهتتفتح على طول.', needsSetup: false }
-  }
-
+async function resolveKey(storeId: string, prefer?: string): Promise<KeyResult> {
   const pro = await getAiConfig(storeId, GEMINI_PRO_SLUG)
   if (!pro.enabled) {
-    return { ok: false, error: 'فعّل إضافة Gemini Pro الأول.', needsSetup: true }
+    return { ok: false, error: 'فعّل إضافة «مساعدك في إدارة المتجر» الأول.', needsSetup: true }
   }
 
-  if (pro.apiKey && pro.model) return { ok: true, apiKey: pro.apiKey, model: pro.model }
-
-  const base = await getAiConfig(storeId, GEMINI_SLUG)
-  const model = pro.model ?? base.model
-  if (base.apiKey && model) return { ok: true, apiKey: base.apiKey, model }
-
-  return { ok: false, error: 'محتاج مفتاح Gemini في الإضافات.', needsSetup: true }
+  const engines = await resolveEngines(storeId, 'tools', prefer)
+  if (!engines.ok) return engines
+  return { ok: true, engine: engines.engine }
 }
 
 /** تعليمات المساعد */
@@ -102,6 +95,7 @@ function toAgentMessages(rows: AgentMsg[]): AgentMessage[] {
             name: c.name,
             args: c.args,
             thoughtSignature: c.thoughtSignature,
+            id: c.callId,
           }))
         : undefined,
     })
@@ -157,6 +151,8 @@ const sendSchema = z.object({
    * والمفتاح بتاعه، فالتكلفة والاختيار بتوعه هو.
    */
   model: z.string().trim().max(80).optional(),
+  /** Gemini أو ChatGPT — التبديل من الشات نفسه */
+  provider: z.enum(['gemini', 'openai']).optional(),
 })
 
 /**
@@ -171,13 +167,19 @@ export async function sendToAssistantAction(raw: unknown): Promise<AgentState> {
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? 'بيانات ناقصة' }
 
   const { store, user } = await getDashboardContext()
-  const key = await resolveKey(store.id)
+  const key = await resolveKey(store.id, parsed.data.provider)
   if (!key.ok) return { ok: false, error: key.error, needsSetup: key.needsSetup }
 
   const pro = await getAiConfig(store.id, GEMINI_PRO_SLUG)
 
-  /* اختيار التاجر للمحادثة دي يغلب المحفوظ */
-  const model = parsed.data.model || key.model
+  /*
+    اختيار التاجر للمحادثة دي يغلب المحفوظ — بس لو من نفس المزوّد.
+    موديل Gemini مبعوت مع مفتاح ChatGPT (بعد تبديل المزوّد) كان هيرجع ٤٠٤.
+  */
+  const engine: Engine =
+    parsed.data.model && (!parsed.data.provider || parsed.data.provider === key.engine.provider)
+      ? { ...key.engine, model: parsed.data.model }
+      : key.engine
 
   // محادثة جديدة لو مفيش — عنوانها أول ٤٠ حرف من رسالته
   let conversationId = parsed.data.conversationId
@@ -222,16 +224,18 @@ export async function sendToAssistantAction(raw: unknown): Promise<AgentState> {
   let pendingCalls: AiToolCall[] = []
 
   for (let round = 0; round < 4; round++) {
-    const res = await agentTurn({
-      apiKey: key.apiKey,
-      model,
+    const res = await agentStep(engine, {
       system,
       messages,
       tools: AGENT_TOOLS,
     })
 
     if (!res.ok) {
-      return { ok: false, error: res.error.message, needsSetup: res.error.kind === 'invalid_key' }
+      return {
+        ok: false,
+        error: res.error.message,
+        needsSetup: res.error.kind === 'invalid_key' || res.error.kind === 'no_credit',
+      }
     }
 
     finalText = res.data.text || finalText
@@ -262,6 +266,8 @@ export async function sendToAssistantAction(raw: unknown): Promise<AgentState> {
         args: c.args,
         /* بيترجّع لجوجل لما المحادثة تكمّل — من غيره بترفض الطلب */
         thoughtSignature: c.thoughtSignature,
+        /* وده لـChatGPT: النتيجة بتترد على النداء بمعرّفه */
+        callId: c.id,
         status: 'pending' as const,
       }))
       break

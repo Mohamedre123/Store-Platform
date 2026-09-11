@@ -13,12 +13,13 @@ import {
   STYLES,
   WEEKDAYS,
   describeSchedule,
-  inferStyle,
   platformOf,
+  resolveStyle,
   styleOf,
   type ImageStyle,
   type PresetKey,
 } from '@/lib/studio-meta'
+import { AI_PROVIDERS, type AiProvider } from '@/lib/ai/providers-meta'
 import { Alert, Button, Card, Field, Input, Textarea } from '@/components/ui'
 import { Toggle } from '@/components/dashboard/controls'
 import { toast } from '@/components/dashboard/toast'
@@ -39,6 +40,7 @@ type Schedule = {
   media: 'image' | 'carousel' | 'video'
   slides: number
   imageStyle: ImageStyle
+  aiProvider: AiProvider | null
   autoPublish: boolean
   lastRunAt: string | null
   nextRunAt: string | null
@@ -63,6 +65,7 @@ const empty = (): Draft => ({
   media: 'image',
   slides: 5,
   imageStyle: 'auto',
+  aiProvider: null,
   autoPublish: false,
 })
 
@@ -81,12 +84,15 @@ const SOURCES = [
  * والتاجر بيفتح المفتاح بعد ما يشوف الناتج مرة أو اتنين.
  */
 export function SchedulesManager({
+  providers,
   storeTimezone,
   schedules,
   accounts,
   categories,
   products,
 }: {
+  /** المزوّدين اللي ليهم مفتاح — الاختيار بيظهر لما يبقوا اتنين */
+  providers: AiProvider[]
   storeTimezone: string
   schedules: Schedule[]
   accounts: Array<{ id: string; name: string; platform: string }>
@@ -116,6 +122,7 @@ export function SchedulesManager({
         media: draft.media,
         slides: draft.slides,
         imageStyle: draft.imageStyle,
+        aiProvider: draft.aiProvider,
         autoPublish: draft.autoPublish,
         isActive: draft.isActive,
       })
@@ -374,6 +381,36 @@ export function SchedulesManager({
             </div>
           </Field>
 
+          {providers.length > 1 && (
+            <Field label="بيولّد بـ" hint="«زي المساعد» يعني نفس المزوّد اللي مختاره في شات المساعد">
+              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="مزوّد الذكاء">
+                {[
+                  { key: null, label: 'زي المساعد' },
+                  ...providers.map((p) => ({
+                    key: p,
+                    label: AI_PROVIDERS.find((x) => x.key === p)?.label ?? p,
+                  })),
+                ].map((o) => (
+                  <button
+                    key={o.key ?? 'default'}
+                    type="button"
+                    role="radio"
+                    aria-checked={draft.aiProvider === o.key}
+                    onClick={() => setDraft({ ...draft, aiProvider: o.key })}
+                    className={cn(
+                      'flex h-10 items-center rounded-lg border px-3 text-sm transition-colors',
+                      draft.aiProvider === o.key
+                        ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]'
+                        : 'border-[var(--border-strong)] text-[var(--fg-muted)]',
+                    )}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </Field>
+          )}
+
           {/*
             شكل الصورة.
 
@@ -382,8 +419,9 @@ export function SchedulesManager({
             فعلًا بدل ما يتفاجئ بالناتج.
           */}
           {(() => {
-            const typed = inferStyle(draft.style)
-            const overridden = typed && typed !== draft.imageStyle ? styleOf(typed) : null
+            /* نفس دالة الخادم — «زي ما أنا كاتب» بيغلب الكلام */
+            const resolved = resolveStyle(draft.imageStyle, draft.style)
+            const overridden = resolved !== draft.imageStyle ? styleOf(resolved) : null
             return (
               <Field
                 label="شكل الصورة"
@@ -605,6 +643,7 @@ export function SchedulesManager({
                     media: s.media,
                     slides: s.slides,
                     imageStyle: s.imageStyle,
+                    aiProvider: s.aiProvider,
                     autoPublish: s.autoPublish,
                   })
                 }

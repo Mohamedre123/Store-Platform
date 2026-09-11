@@ -1,4 +1,5 @@
 import 'server-only'
+import { CREDIT_HELP } from './providers-meta'
 
 /**
  * عميل Claude.
@@ -38,11 +39,9 @@ function classify(status: number, body: string): ClaudeError {
   if (status === 403) {
     return { kind: 'invalid_key', message: 'المفتاح مرفوض — يمكن مقفول أو صلاحياته ناقصة.' }
   }
-  if (status === 400 && lower.includes('credit')) {
-    return {
-      kind: 'credit',
-      message: 'رصيد حسابك خلص. اشحنه من console.anthropic.com ← Billing.',
-    }
+  if (status === 400 && (lower.includes('credit') || lower.includes('billing'))) {
+    /* نفس جملة الرصيد في كل المنصة — المكان اللي بيتشحن منه بالظبط */
+    return { kind: 'credit', message: CREDIT_HELP.claude }
   }
   if (status === 429) {
     return {

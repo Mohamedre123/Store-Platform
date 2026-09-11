@@ -9,7 +9,7 @@ import type { AiToolCall } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { featureBlock } from '@/lib/entitlements'
 import { recordAudit } from '@/lib/audit'
-import { aiAllowed, designerKey, getClaudeConfig, isClaudeReady } from '@/lib/ai/settings'
+import { aiAllowed, designerKey, getClaudeConfig, isClaudeReady, noteAiOutcome, CLAUDE_SLUG } from '@/lib/ai/settings'
 import { getStoreBrief } from '@/lib/ai/store-context'
 import { generateLanding, type ProductContext } from '@/lib/ai/landing-generator'
 import { landingPlanSchema, type LandingPlan } from '@/lib/ai/landing-schema'
@@ -147,7 +147,7 @@ export async function sendLandingRequestAction(raw: unknown): Promise<LandingCha
 
   const cfg = await getClaudeConfig(store.id)
 
-  if (!cfg.enabled) return { ok: false, error: 'فعّل إضافة Claude الأول.', needsSetup: true }
+  if (!cfg.enabled) return { ok: false, error: 'فعّل إضافة «مصمّم الثيمات وصفحات الهبوط» الأول.', needsSetup: true }
   if (!isClaudeReady(cfg)) {
     return { ok: false, error: 'الإضافة ناقصها المفتاح أو الموديل.', needsSetup: true }
   }
@@ -213,6 +213,16 @@ export async function sendLandingRequestAction(raw: unknown): Promise<LandingCha
     history,
     request: parsed.data.message,
   })
+
+  /*
+    «مالوش رصيد» بتتسجّل على كارت المصمّم — والنجاح بيمسحها.
+  */
+  await noteAiOutcome(
+    { storeId: store.id, slug: CLAUDE_SLUG, provider: cfg.provider, issue: cfg.lastIssue?.message ?? null },
+    result.ok
+      ? { ok: true }
+      : { ok: false, error: { kind: result.needsSetup ? 'credit' : 'unknown', message: result.error } },
+  )
 
   if (!result.ok) return { ok: false, error: result.error, needsSetup: result.needsSetup }
 

@@ -14,6 +14,7 @@ import {
 } from './studio'
 import { publishToAccount, type PublishOutcome } from './social'
 import { nextRun, resolveStyle, styleOf, type ImageStyle, type PresetKey } from './studio-meta'
+import { isProvider, type AiProvider } from './ai/providers-meta'
 
 /**
  * النشر المجدوَل — «كل يوم الساعة كذا».
@@ -249,6 +250,7 @@ export type ScheduleRow = {
   media: 'image' | 'carousel' | 'video'
   slides: number
   imageStyle: ImageStyle
+  aiProvider: AiProvider | null
   autoPublish: boolean
   lastRunAt: Date | null
   nextRunAt: Date | null
@@ -277,6 +279,7 @@ export async function listSchedules(storeId: string): Promise<ScheduleRow[]> {
     media: r.media,
     slides: r.slides,
     imageStyle: styleOf(r.imageStyle).key,
+    aiProvider: isProvider(r.aiProvider) ? r.aiProvider : null,
     autoPublish: r.autoPublish,
     lastRunAt: r.lastRunAt,
     nextRunAt: r.nextRunAt,
@@ -307,6 +310,7 @@ export async function saveSchedule(input: {
   media: 'image' | 'carousel' | 'video'
   slides?: number
   imageStyle?: ImageStyle | null
+  aiProvider?: string | null
   autoPublish: boolean
   isActive: boolean
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
@@ -343,6 +347,7 @@ export async function saveSchedule(input: {
     slides: Math.max(2, Math.min(10, Math.round(input.slides ?? 5))),
     /* نفس الفكرة: أي نص غير معروف بيرجع «يختار لوحده» */
     imageStyle: styleOf(input.imageStyle).key,
+    aiProvider: isProvider(input.aiProvider) ? input.aiProvider : null,
     autoPublish: input.autoPublish,
     isActive: input.isActive,
     nextRunAt: next,
@@ -511,6 +516,7 @@ export async function runSchedule(scheduleId: string): Promise<{ ok: boolean; er
     productId,
     tone: tones[runs % tones.length],
     extra: s.style,
+    provider: s.aiProvider,
   })
   if ('error' in copy) return fail(copy.error)
 
@@ -555,6 +561,7 @@ export async function runSchedule(scheduleId: string): Promise<{ ok: boolean; er
       productId,
       seedUrl: seed,
       style,
+      provider: s.aiProvider,
     })
     if ('error' in set) return fail(set.error)
 
@@ -576,6 +583,7 @@ export async function runSchedule(scheduleId: string): Promise<{ ok: boolean; er
       preset: s.preset as PresetKey,
       seedUrl: seed,
       style,
+      provider: s.aiProvider,
     })
     if ('error' in job) return fail(job.error)
 
@@ -606,6 +614,7 @@ export async function runSchedule(scheduleId: string): Promise<{ ok: boolean; er
       productId,
       seedUrl: seed,
       style,
+      provider: s.aiProvider,
     })
     if ('error' in image) return fail(image.error)
     imageUrls = [image.url]

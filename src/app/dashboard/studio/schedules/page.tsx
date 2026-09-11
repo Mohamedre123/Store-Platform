@@ -5,6 +5,7 @@ import { getDashboardContext } from '@/lib/store-context'
 import { guard } from '@/lib/permissions'
 import { listSchedules } from '@/lib/content-schedules'
 import { listAccounts } from '@/lib/social'
+import { resolveEngines } from '@/lib/ai/settings'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { SchedulesManager } from './schedules-manager'
@@ -24,7 +25,7 @@ export default async function SchedulesPage() {
   const { store, actor } = await getDashboardContext()
   guard(actor, 'marketing.manage')
 
-  const [schedules, accounts, cats, products] = await Promise.all([
+  const [schedules, accounts, cats, products, engines] = await Promise.all([
     listSchedules(store.id),
     listAccounts(store.id),
     db
@@ -33,6 +34,7 @@ export default async function SchedulesPage() {
       .where(and(eq(categories.storeId, store.id), eq(categories.isActive, true)))
       .limit(100),
     searchProductsAction(''),
+    resolveEngines(store.id, 'tools'),
   ])
 
   return (
@@ -45,6 +47,7 @@ export default async function SchedulesPage() {
       <Reveal>
         <SchedulesManager
           storeTimezone={store.timezone}
+          providers={engines.ok ? engines.available : []}
           schedules={schedules.map((s) => ({
             ...s,
             lastRunAt: s.lastRunAt ? s.lastRunAt.toISOString() : null,

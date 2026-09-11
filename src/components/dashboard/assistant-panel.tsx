@@ -20,7 +20,13 @@ import {
   type AgentMsg,
   type AgentState,
 } from '@/app/dashboard/assistant/actions'
-import { assistImageAction, listChatModelsAction } from '@/app/dashboard/assist-actions'
+import {
+  assistImageAction,
+  listChatModelsAction,
+  setAssistantProviderAction,
+  type ProviderModels,
+} from '@/app/dashboard/assist-actions'
+import type { AiProvider } from '@/lib/ai/providers-meta'
 import { TOOL_LABELS } from '@/lib/ai/tool-labels'
 
 type Conversation = { id: string; title: string; updatedAt: Date }
@@ -52,9 +58,16 @@ export function AssistantPanel() {
   const [error, setError] = useState<{ text: string; setup?: boolean } | null>(null)
   const [pending, start] = useTransition()
 
-  /** الموديل المختار للمحادثة دي — فاضي يعني المحفوظ في الإعدادات */
+  /**
+   * المزوّد والموديل للمحادثة دي.
+   *
+   * التاجر اللي حاطط مفتاح Gemini ومفتاح ChatGPT بيبدّل من هنا — مش
+   * من صفحة الإضافات. والموديل الفاضي يعني المحفوظ في الإعدادات.
+   */
+  const [providers, setProviders] = useState<ProviderModels[]>([])
+  const [provider, setProvider] = useState<AiProvider | null>(null)
   const [model, setModel] = useState('')
-  const [models, setModels] = useState<Array<{ id: string; label: string }>>([])
+  const models = providers.find((p) => p.provider === provider)?.models ?? []
   /** وضع الصور: نفس الخانة بتوصف صورة بدل ما تسأل */
   const [imageMode, setImageMode] = useState(false)
 
@@ -112,7 +125,7 @@ export function AssistantPanel() {
         المفتاح، والناتج بيترفع للتخزين ويرجع كرابط جاهز للمنتج.
       */
       if (imageMode) {
-        const res = await assistImageAction({ instruction: text })
+        const res = await assistImageAction({ instruction: text, provider: provider ?? undefined })
         if (!res.ok) {
           setError({ text: res.error, setup: res.needsSetup })
           setFailed(true)
@@ -145,6 +158,7 @@ export function AssistantPanel() {
           message: text,
           images: sent,
           model: model || undefined,
+          provider: provider ?? undefined,
         }),
       })
         .then((r) => r.json() as Promise<AgentState>)
@@ -168,14 +182,17 @@ export function AssistantPanel() {
     })
   }
 
-  /* قايمة الموديلات بتتجاب مرة واحدة أول ما اللوحة تتفتح */
+  /* قايمة المزوّدين والموديلات بتتجاب مرة واحدة أول ما اللوحة تتفتح */
   useEffect(() => {
     listChatModelsAction()
       .then((res) => {
-        setModels(res.models)
+        setProviders(res.providers)
+        const current = res.current?.provider ?? res.providers[0]?.provider ?? null
+        setProvider(current)
         try {
           const saved = localStorage.getItem('zw_assist_model')
-          if (saved && res.models.some((m) => m.id === saved)) setModel(saved)
+          const list = res.providers.find((p) => p.provider === current)?.models ?? []
+          if (saved && list.some((m) => m.id === saved)) setModel(saved)
         } catch {}
       })
       .catch(() => {
@@ -449,6 +466,42 @@ export function AssistantPanel() {
             بمفتاحه هو، مش قايمة مكتوبة عندنا بتبقى قديمة بعد شهرين.
           */}
           <div className="flex shrink-0 flex-wrap items-center gap-2 border-t border-[var(--border)] px-3 pt-2.5">
+            {/*
+              Gemini ولا ChatGPT — بيظهر لما يبقى فيه مفتاحين فعلًا.
+
+              التبديل بيتحفظ على الإضافة كمان: زرار «تحسين» و«حدّد واسأل»
+              والاستوديو بيمشوا وراه، فالتاجر اللي بدّل عشان رصيد واحد خلص
+              ما يلاقيش باقي الأدوات واقفة.
+            */}
+            {providers.length > 1 && (
+              <div className="flex h-9 shrink-0 rounded-lg border border-[var(--border-strong)] p-0.5" role="radiogroup" aria-label="مزوّد الذكاء">
+                {providers.map((p) => (
+                  <button
+                    key={p.provider}
+                    type="button"
+                    role="radio"
+                    aria-checked={provider === p.provider}
+                    onClick={() => {
+                      if (provider === p.provider) return
+                      setProvider(p.provider)
+                      setModel('')
+                      try {
+                        localStorage.removeItem('zw_assist_model')
+                      } catch {}
+                      void setAssistantProviderAction(p.provider)
+                    }}
+                    className={`rounded-md px-2.5 text-xs font-medium transition-colors ${
+                      provider === p.provider
+                        ? 'bg-[var(--primary)] text-[var(--primary-fg)]'
+                        : 'text-[var(--fg-muted)]'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
             <select
               value={model}
               onChange={(e) => {
@@ -458,7 +511,7 @@ export function AssistantPanel() {
                 } catch {}
               }}
               aria-label="موديل الذكاء الاصطناعي"
-              className="h-9 min-w-0 max-w-[60%] flex-1 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-2 text-xs text-[var(--fg-muted)] outline-none focus:border-[var(--primary)]"
+              className="h-9 min-w-0 flex-1 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-2 text-xs text-[var(--fg-muted)] outline-none focus:border-[var(--primary)]"
             >
               <option value="">الموديل الافتراضي</option>
               {models.map((m) => (

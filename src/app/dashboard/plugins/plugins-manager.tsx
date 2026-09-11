@@ -101,9 +101,13 @@ export function PluginsManager({
     if (slug === 'whatsapp') {
       return whatsapp.settings.provider !== 'off' && whatsapp.settings.hasKey
     }
-    if (slug === 'gemini') return gemini.enabled && gemini.hasKey
-    if (slug === 'gemini_pro') return pro.enabled && (pro.hasOwnKey || pro.baseReady)
-    if (slug === 'claude') return claude.enabled && claude.hasKey
+    if (slug === 'gemini') return gemini.enabled && (gemini.hasKey || gemini.hasOpenaiKey)
+    if (slug === 'gemini_pro') {
+      return pro.enabled && (pro.hasOwnKey || pro.hasOwnOpenaiKey || pro.baseProviders.length > 0)
+    }
+    if (slug === 'claude') {
+      return claude.enabled && (claude.hasKey || claude.hasGeminiKey || claude.hasOpenaiKey)
+    }
     const row = bySlug.get(slug)
     if (!row?.enabled) return false
 
@@ -123,9 +127,9 @@ export function PluginsManager({
 
   /** فيه إعدادات محفوظة؟ بيغيّر نص الزرار من «فعّل» لـ«تفاصيل» */
   const initialConfigured = (slug: string) => {
-    if (slug === 'gemini') return gemini.hasKey
-    if (slug === 'gemini_pro') return pro.hasOwnKey || pro.baseReady
-    if (slug === 'claude') return claude.hasKey
+    if (slug === 'gemini') return gemini.hasKey || gemini.hasOpenaiKey
+    if (slug === 'gemini_pro') return pro.hasOwnKey || pro.hasOwnOpenaiKey || pro.baseProviders.length > 0
+    if (slug === 'claude') return claude.hasKey || claude.hasGeminiKey || claude.hasOpenaiKey
     /* مالهاش حقول = مفيش «تفاصيل» تتعرض، والتفعيل وحده كافي */
     const def = PLUGINS.find((d) => d.slug === slug)
     if (def && def.fields.length === 0) return Boolean(bySlug.get(slug)?.enabled)

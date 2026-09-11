@@ -1,9 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { getStore } from '@/lib/storefront'
-import { aiAllowed, getAiConfig, isReady, GEMINI_PRO_SLUG } from '@/lib/ai/settings'
+import { getAiConfig, resolveEngines } from '@/lib/ai/settings'
 import { getStoreBrief } from '@/lib/ai/store-context'
 import { buildBotSystem, checkLimits, logBotMessage, splitWhatsappMarker } from '@/lib/ai/bot'
-import { generate, type ChatMessage } from '@/lib/ai/gemini'
+import { generateText, isAccountProblem } from '@/lib/ai/llm'
+import type { ChatMessage } from '@/lib/ai/gemini'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 45
@@ -35,6 +36,9 @@ function whatsappLink(phone: string | null, storeName: string, question: string)
  * المتصفح مُدخل غير موثوق:
  *
  * - المفتاح بيتقرا من الخادم، ما بيوصلش للمتصفح ولا بيتقبل منه.
+ * - **المزوّد كمان**: التاجر هو اللي بيحدد البوت بيرد بـGemini ولا
+ *   ChatGPT، ومفيش حقل في الطلب يغيّره. زائر يختار المزوّد الأغلى
+ *   كان هيصرف رصيد التاجر بقراره هو.
  * - الحدود بتتفرض هنا لا في الواجهة: إخفاء الزرار مش حماية، وأي حد
  *   يقدر ينده المسار مباشرة.
  * - سجل المحادثة اللي جاي من المتصفح بيتقص ونوعه بيتفلتر — عميل
@@ -65,7 +69,13 @@ export async function POST(req: NextRequest) {
   if (!store) return NextResponse.json({ error: 'المتجر مش موجود' }, { status: 404 })
 
   const cfg = await getAiConfig(store.id)
-  if (!cfg.botEnabled || !isReady(cfg) || !(await aiAllowed(store.id))) {
+  if (!cfg.enabled || !cfg.botEnabled) {
+    return NextResponse.json({ error: 'المساعد مش مفعّل' }, { status: 404 })
+  }
+
+  /* الاشتراك والمفتاح والمزوّد اللي التاجر اختاره — من مكان واحد */
+  const engines = await resolveEngines(store.id, 'bot')
+  if (!engines.ok) {
     return NextResponse.json({ error: 'المساعد مش مفعّل' }, { status: 404 })
   }
 
@@ -100,51 +110,36 @@ export async function POST(req: NextRequest) {
   const system = buildBotSystem(brief, store.name, Boolean(store.whatsapp))
   const messages: ChatMessage[] = [...history, { role: 'user', text: message }]
 
-  let res = await generate({
-    apiKey: cfg.apiKey,
-    model: cfg.model,
-    system,
-    messages,
-    // حرارة منخفضة: الرد لازم يلتزم بالأسعار المكتوبة لا يبدع فيها
-    temperature: 0.4,
-    /*
-      الحد كان ٤٠٠ توكن، والرد العربي بياكل توكنز أكتر من الإنجليزي
-      بكتير — فالبوت كان بيقف في نص الجملة («لو محتاج أي مساعدة
-      تانية بخصوص»). الرد المقطوع أسوأ من رد قصير: العميل بيفتكر
-      إن الموقع باظ.
-    */
-    maxTokens: 1200,
-  })
+  const ask = (engine: typeof engines.engine) =>
+    generateText(engine, {
+      system,
+      messages,
+      // حرارة منخفضة: الرد لازم يلتزم بالأسعار المكتوبة لا يبدع فيها
+      temperature: 0.4,
+      /*
+        الحد كان ٤٠٠ توكن، والرد العربي بياكل توكنز أكتر من الإنجليزي
+        بكتير — فالبوت كان بيقف في نص الجملة. الرد المقطوع أسوأ من رد
+        قصير: العميل بيفتكر إن الموقع باظ.
+      */
+      maxTokens: 1200,
+    })
+
+  let res = await ask(engines.engine)
 
   /**
-   * الرجوع لمفتاح المساعد لو كوته البوت خلصت.
+   * الرجوع لمفتاح تاني لو الحساب وقف.
    *
-   * **المتجر ما يصحّش يقف قدام العميل عشان حصّة مجانية خلصت.**
-   * التاجر اللي حاطط مفتاحًا عليه فوترة للمساعد، بيستخدمه هنا كشبكة
-   * أمان — رسالة عميل واحدة أرخص بكتير من بيعة ضايعة.
+   * **المتجر ما يصحّش يقف قدام العميل عشان رصيد خلص.** بنجرّب مفتاح
+   * المساعد لنفس المزوّد، وبعدين المزوّد التاني لو التاجر حاطط مفتاحه —
+   * رسالة عميل واحدة أرخص بكتير من بيعة ضايعة. والمشكلة نفسها بتتسجّل
+   * على كارت الإضافة، فالتاجر بيعرف إن مزوّده الأساسي وقف.
    *
-   * بيحصل على الكوته بس: المفتاح الباطل والمحتوى الممنوع مش هيتصلّحوا
-   * بمفتاح تاني، وإعادة المحاولة بيهم بتستهلك المفتاح المدفوع على
-   * الفاضي.
+   * على مشاكل الحساب بس: المحتوى الممنوع مش هيتصلّح بمفتاح تاني،
+   * وإعادته بتستهلك المفتاح التاني على الفاضي.
    */
-  if (!res.ok && res.error.kind === 'quota') {
-    const pro = await getAiConfig(store.id, GEMINI_PRO_SLUG)
-    if (pro.apiKey && pro.apiKey !== cfg.apiKey) {
-      res = await generate({
-        apiKey: pro.apiKey,
-        model: pro.model ?? cfg.model,
-        system,
-        messages,
-        temperature: 0.4,
-        /*
-      الحد كان ٤٠٠ توكن، والرد العربي بياكل توكنز أكتر من الإنجليزي
-      بكتير — فالبوت كان بيقف في نص الجملة («لو محتاج أي مساعدة
-      تانية بخصوص»). الرد المقطوع أسوأ من رد قصير: العميل بيفتكر
-      إن الموقع باظ.
-    */
-    maxTokens: 1200,
-      })
-    }
+  for (const fallback of engines.fallbacks) {
+    if (res.ok || !isAccountProblem(res.error)) break
+    res = await ask(fallback)
   }
 
   if (!res.ok) {
@@ -157,12 +152,12 @@ export async function POST(req: NextRequest) {
     })
 
     /*
-      الرسالة الحقيقية للتاجر في سجل الرسايل، والعميل بياخد رسالة
-      مفيدة. «مفتاحك خلص رصيده» مش كلام يتقال لعميل بيسأل عن مقاس.
+      الرسالة الحقيقية للتاجر في سجل الرسايل وعلى كارت الإضافة، والعميل
+      بياخد رسالة مفيدة. «مفتاحك خلص رصيده» مش كلام يتقال لعميل بيسأل
+      عن مقاس.
 
       و**بنرجّع رقم الواتساب مع الرد**: العميل اللي البوت وقف معاه
-      لازم يلاقي طريقًا لبني آدم في نفس الفقاعة. «كلّمنا على واتساب»
-      من غير رابط بتخلّيه يدوّر — وأغلبهم بيسيب.
+      لازم يلاقي طريقًا لبني آدم في نفس الفقاعة.
     */
     return NextResponse.json({
       reply: 'معلش، مقدرتش أجاوبك دلوقتي. كلّمنا على واتساب وهنساعدك فورًا.',

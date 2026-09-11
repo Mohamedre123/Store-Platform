@@ -320,6 +320,13 @@ export type AiToolCall = {
    * بترفض الطلب لو النداء رجع من غيره. إحنا مش بنقراه ولا بنفسّره.
    */
   thoughtSignature?: string
+  /**
+   * معرّف النداء عند ChatGPT.
+   *
+   * OpenAI بترفض المحادثة لو نتيجة الأداة مش مربوطة بمعرّف النداء —
+   * والإجراء اللي مستنّي موافقة التاجر بيكمّل في رسالة تانية.
+   */
+  callId?: string
   /** pending = مستنية موافقة التاجر · done = اتنفّذت · rejected = رفضها */
   status: 'pending' | 'done' | 'rejected' | 'failed'
   result?: string

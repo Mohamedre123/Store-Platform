@@ -1,32 +1,45 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Bot, Check, ExternalLink, KeyRound, Sparkles, TriangleAlert } from 'lucide-react'
+import { Bot, Check, Sparkles, TriangleAlert } from 'lucide-react'
 import { Alert, Card } from '@/components/ui'
 import type { PluginDef } from '@/lib/plugins'
-import { saveGeminiAction, verifyGeminiKeyAction } from './ai-actions'
+import { AI_PROVIDERS, type AiIssue, type AiProvider } from '@/lib/ai/providers-meta'
+import { saveGeminiAction, verifyAiKeyAction } from './ai-actions'
+import { IssueBanner, KeyField, ModelSelect, ProviderSwitch } from './ai-fields'
 import { RefreshBriefButton } from './refresh-brief'
 
 export type GeminiSaved = {
   enabled: boolean
+  /** مفتاح Gemini محفوظ */
   hasKey: boolean
+  hasOpenaiKey: boolean
   model: string | null
+  openaiModel: string | null
+  botProvider: AiProvider | null
   brief: string | null
   botEnabled: boolean
   botGreeting: string | null
   botDailyLimit: number
   botVisitorLimit: number
+  lastIssue: AiIssue | null
 }
 
 type Model = { id: string; label: string }
 
+const GEMINI = AI_PROVIDERS[0]
+const OPENAI = AI_PROVIDERS[1]
+
 /**
- * شاشة إعداد Gemini.
+ * شاشة إعداد الرد على العملاء — Gemini أو ChatGPT أو الاتنين.
  *
  * مش «الصق معرّفًا واقفل» زي البكسلات — دي محتاجة تحقّق واختيار
- * موديل ووصف للمتجر. والترتيب مقصود: المفتاح الأول، وباقي الخيارات
- * ما تظهرش غير بعد ما يتأكّد إنه شغّال. التاجر اللي بيملا ٦ حقول
- * وبعدين يكتشف إن المفتاح غلط بيسيب الصفحة.
+ * موديل ووصف للمتجر. والترتيب مقصود: المفاتيح الأول، وباقي الخيارات
+ * ما تظهرش غير بعد ما يتأكّد إن فيه واحد شغّال.
+ *
+ * ## والتاجر هو اللي بيحدد مين يكلّم عملاءه
+ * لو حاطط المفتاحين، بيختار واحد يرد على الزوّار. التاني بيفضل شغّال
+ * لأدوات اللوحة، وبيبقى احتياطي للبوت لو رصيد الأول خلص.
  */
 export function GeminiCard({
   def,
@@ -47,37 +60,70 @@ export function GeminiCard({
   onToggle?: (slug: string, active: boolean) => void
 }) {
   const [enabled, setEnabled] = useState(saved?.enabled ?? false)
-  const [apiKey, setApiKey] = useState('')
-  const [models, setModels] = useState<Model[]>([])
+
+  const [geminiKey, setGeminiKey] = useState('')
+  const [openaiKey, setOpenaiKey] = useState('')
+  const [geminiModels, setGeminiModels] = useState<Model[]>([])
+  const [openaiModels, setOpenaiModels] = useState<Model[]>([])
   const [model, setModel] = useState(saved?.model ?? '')
+  const [openaiModel, setOpenaiModel] = useState(saved?.openaiModel ?? '')
+  const [removed, setRemoved] = useState<AiProvider[]>([])
+
+  const [botProvider, setBotProvider] = useState<AiProvider | null>(saved?.botProvider ?? null)
   const [brief, setBrief] = useState(saved?.brief ?? '')
   const [botEnabled, setBotEnabled] = useState(saved?.botEnabled ?? false)
   const [botGreeting, setBotGreeting] = useState(saved?.botGreeting ?? '')
   const [dailyLimit, setDailyLimit] = useState(String(saved?.botDailyLimit ?? 200))
   const [visitorLimit, setVisitorLimit] = useState(String(saved?.botVisitorLimit ?? 15))
 
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [msg, setMsg] = useState<{ tone: 'success' | 'danger' | 'warning'; text: string } | null>(null)
   const [verifying, startVerify] = useTransition()
   const [saving, startSave] = useTransition()
 
-  // المفتاح محفوظ ومتحقَّق منه قبل كده، أو اتحقّقنا منه دلوقتي
-  const configured = (saved?.hasKey && Boolean(saved.model)) || models.length > 0
+  const hasGemini = (Boolean(saved?.hasKey) && !removed.includes('gemini')) || geminiModels.length > 0
+  const hasOpenai = (Boolean(saved?.hasOpenaiKey) && !removed.includes('openai')) || openaiModels.length > 0
+  const configured = hasGemini || hasOpenai
 
-  const verify = () =>
+  /* المزوّد الفعلي للعملاء: المختار لو ليه مفتاح، وإلا الموجود */
+  const effectiveBot: AiProvider | null =
+    botProvider === 'openai' && hasOpenai
+      ? 'openai'
+      : botProvider === 'gemini' && hasGemini
+        ? 'gemini'
+        : hasGemini
+          ? 'gemini'
+          : hasOpenai
+            ? 'openai'
+            : null
+
+  const verify = (provider: AiProvider) =>
     startVerify(async () => {
       setMsg(null)
-      const res = await verifyGeminiKeyAction(apiKey)
+      const res = await verifyAiKeyAction({
+        provider,
+        apiKey: provider === 'openai' ? openaiKey : geminiKey,
+      })
       if (!res.ok) {
-        setMsg({ ok: false, text: res.error })
+        setMsg({ tone: 'danger', text: res.error })
         return
       }
-      setModels(res.models)
-      setModel((m) => m || res.suggested)
+
+      if (provider === 'openai') {
+        setOpenaiModels(res.models)
+        setOpenaiModel((m) => m || res.suggested)
+      } else {
+        setGeminiModels(res.models)
+        setModel((m) => m || res.suggested)
+      }
+      setRemoved((r) => r.filter((p) => p !== provider))
       setBrief((b) => b || res.brief)
-      setMsg({
-        ok: true,
-        text: `المفتاح شغّال — ${res.models.length} موديل متاح عليه.`,
-      })
+
+      const label = provider === 'openai' ? OPENAI.label : GEMINI.label
+      setMsg(
+        res.warning
+          ? { tone: 'warning', text: `مفتاح ${label} اتقبل، بس: ${res.warning}` }
+          : { tone: 'success', text: `مفتاح ${label} شغّال — ${res.models.length} موديل متاح عليه.` },
+      )
     })
 
   const save = (nextEnabled?: boolean) =>
@@ -85,8 +131,12 @@ export function GeminiCard({
       setMsg(null)
       const res = await saveGeminiAction({
         enabled: nextEnabled ?? enabled,
-        apiKey: apiKey || undefined,
-        model,
+        apiKey: geminiKey || undefined,
+        openaiKey: openaiKey || undefined,
+        model: model || undefined,
+        openaiModel: openaiModel || undefined,
+        removeKeys: removed.length ? removed : undefined,
+        botProvider: effectiveBot ?? undefined,
         brief,
         botEnabled,
         botGreeting,
@@ -94,12 +144,13 @@ export function GeminiCard({
         botVisitorLimit: Number(visitorLimit) || 15,
       })
       if (res?.error) {
-        setMsg({ ok: false, text: res.error })
+        setMsg({ tone: 'danger', text: res.error })
         setEnabled(saved?.enabled ?? false)
       } else {
-        setApiKey('')
+        setGeminiKey('')
+        setOpenaiKey('')
         onToggle?.(def.slug, nextEnabled ?? enabled)
-        setMsg({ ok: true, text: (nextEnabled ?? enabled) ? 'اتفعّلت وشغّالة' : 'اتوقفت' })
+        setMsg({ tone: 'success', text: (nextEnabled ?? enabled) ? 'اتفعّلت وشغّالة' : 'اتوقفت' })
       }
     })
 
@@ -115,7 +166,7 @@ export function GeminiCard({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-semibold">{def.name}</h3>
-            {enabled && saved?.hasKey && (
+            {enabled && configured && (
               <span className="rounded-md bg-[var(--color-success-soft)] px-2 py-0.5 text-xs font-medium text-[var(--color-success)]">
                 شغّالة
               </span>
@@ -128,7 +179,7 @@ export function GeminiCard({
           type="button"
           role="switch"
           aria-checked={enabled}
-          aria-label={enabled ? 'إيقاف Gemini' : 'تفعيل Gemini'}
+          aria-label={enabled ? 'إيقاف الرد على العملاء' : 'تفعيل الرد على العملاء'}
           aria-busy={saving}
           disabled={!configured && !enabled}
           onClick={() => {
@@ -150,77 +201,72 @@ export function GeminiCard({
       </div>
 
       <div className="flex flex-col gap-4 border-t border-[var(--border)] pt-4">
-        {msg && <Alert tone={msg.ok ? 'success' : 'danger'}>{msg.text}</Alert>}
+        {msg && <Alert tone={msg.tone}>{msg.text}</Alert>}
+        <IssueBanner issue={saved?.lastIssue} />
 
         <p className="rounded-lg bg-[var(--color-info-soft)] px-3 py-2.5 text-xs leading-relaxed text-[var(--color-info)]">
-          <strong>الحصّة المجانية محدودة.</strong> البوت بيرد على زوّارك، ولو خلصت حصّته
-          في نص اليوم بيقف قدام عميل بيسأل. فعّل الفوترة من Google AI Studio —
-          ولو حطّيت مفتاحًا مدفوعًا في «مساعدك في الإدارة»، البوت بيرجعله تلقائي بدل ما يقف.
+          <strong>حط مفتاح واحد أو الاتنين.</strong> البوت بيرد على زوّارك بالمزوّد اللي تختاره، ولو
+          رصيده خلص في نص اليوم بيكمّل بالتاني بدل ما يقف قدام عميل بيسأل. مفتاح ChatGPT محتاج
+          رصيد مشحون من الأول — اشتراك ChatGPT Plus مش بيشغّله.
         </p>
 
-        {/* المفتاح */}
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="gemini-key" className="flex items-center gap-1.5 text-sm font-medium">
-            <KeyRound className="h-3.5 w-3.5 text-[var(--fg-subtle)]" aria-hidden="true" />
-            مفتاح Gemini API
-          </label>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <input
-              id="gemini-key"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              type="password"
-              autoComplete="off"
-              dir="ltr"
-              placeholder={saved?.hasKey ? '•••••••••• (محفوظ)' : def.fields[0].placeholder}
-              className="min-h-11 flex-1 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-start font-mono text-sm focus:border-[var(--primary)] focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={verify}
-              disabled={verifying || !apiKey.trim()}
-              className="min-h-11 shrink-0 rounded-lg border border-[var(--border-strong)] px-4 text-sm font-medium transition-colors hover:bg-[var(--surface-2)] disabled:opacity-50"
-            >
-              {verifying ? 'بيتأكّد…' : 'تحقّق'}
-            </button>
-          </div>
-          <p className="text-xs text-[var(--fg-subtle)]">
-            المفتاح بيتخزّن مشفّر وما بيتبعتش للمتصفح تاني أبدًا.
+        <KeyField
+          id="bot-gemini"
+          label={GEMINI.keyLabel}
+          value={geminiKey}
+          onChange={setGeminiKey}
+          saved={Boolean(saved?.hasKey) && !removed.includes('gemini')}
+          placeholder={GEMINI.keyPlaceholder}
+          docHref={GEMINI.keyHref}
+          busy={verifying}
+          onVerify={() => verify('gemini')}
+          onRemove={() => setRemoved((r) => [...r, 'gemini'])}
+          optional
+        />
+
+        <KeyField
+          id="bot-openai"
+          label={OPENAI.keyLabel}
+          value={openaiKey}
+          onChange={setOpenaiKey}
+          saved={Boolean(saved?.hasOpenaiKey) && !removed.includes('openai')}
+          placeholder={OPENAI.keyPlaceholder}
+          docHref={OPENAI.keyHref}
+          busy={verifying}
+          onVerify={() => verify('openai')}
+          onRemove={() => setRemoved((r) => [...r, 'openai'])}
+          optional
+        />
+
+        {removed.length > 0 && (
+          <p className="text-xs text-[var(--color-danger)]">
+            هيتمسح مفتاح {removed.map((p) => (p === 'openai' ? OPENAI.label : GEMINI.label)).join(' و')} لما
+            تدوس حفظ.
           </p>
-          {def.where && (
-            <a
-              href="https://aistudio.google.com/apikey"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs font-medium text-[var(--primary)] hover:underline"
-            >
-              اجيب المفتاح منين؟
-              <ExternalLink className="h-3 w-3" aria-hidden="true" />
-            </a>
-          )}
-        </div>
+        )}
 
         {configured && (
           <>
-            {/* الموديل */}
-            <label className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium">الموديل</span>
-              <select
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                className="min-h-11 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-sm focus:border-[var(--primary)] focus:outline-none"
-              >
-                {models.length === 0 && model && <option value={model}>{model}</option>}
-                {models.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-              <span className="text-xs text-[var(--fg-subtle)]">
-                القايمة جاية من جوجل على مفتاحك — الأحدث فوق. اللي فيه «Flash» أسرع وأرخص.
-              </span>
-            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {hasGemini && (
+                <ModelSelect
+                  label="موديل Gemini"
+                  value={model}
+                  onChange={setModel}
+                  models={geminiModels}
+                  hint="القايمة جاية من جوجل على مفتاحك — اللي فيه «Flash» أسرع وأرخص."
+                />
+              )}
+              {hasOpenai && (
+                <ModelSelect
+                  label="موديل ChatGPT"
+                  value={openaiModel}
+                  onChange={setOpenaiModel}
+                  models={openaiModels}
+                  hint="القايمة جاية من OpenAI على مفتاحك — اللي فيه «mini» أسرع وأرخص."
+                />
+              )}
+            </div>
 
             {/* وصف المتجر */}
             <label className="flex flex-col gap-1.5">
@@ -237,7 +283,7 @@ export function GeminiCard({
               />
               <span className="text-xs text-[var(--fg-subtle)]">
                 ملّيناها لك من بيانات متجرك — عدّلها زي ما تحب. دي اللي بتفرّق بين
-                تحسين مفيد وكلام عام.
+                رد مفيد وكلام عام.
               </span>
             </label>
 
@@ -264,6 +310,30 @@ export function GeminiCard({
 
               {botEnabled && (
                 <div className="mt-4 flex flex-col gap-3 border-t border-[var(--border)] pt-4">
+                  {/*
+                    مين بيكلّم العميل — قرار التاجر لوحده.
+
+                    ومفيش أي حقل في طلب البوت يغيّره: زائر يختار المزوّد
+                    الأغلى كان هيصرف رصيد التاجر بقراره هو.
+                  */}
+                  {hasGemini && hasOpenai ? (
+                    <ProviderSwitch
+                      label="مين يرد على عملائك؟"
+                      hint="التاني بيبقى احتياطي لو رصيد ده خلص — عشان البوت ما يقفش."
+                      options={[
+                        { key: 'gemini' as const, label: GEMINI.label },
+                        { key: 'openai' as const, label: OPENAI.label },
+                      ]}
+                      value={effectiveBot}
+                      onChange={setBotProvider}
+                    />
+                  ) : (
+                    <p className="text-xs text-[var(--fg-muted)]">
+                      البوت هيرد بـ<strong>{effectiveBot === 'openai' ? OPENAI.label : GEMINI.label}</strong>
+                      . حط المفتاح التاني لو عايز تختار أو يبقى احتياطي.
+                    </p>
+                  )}
+
                   <label className="flex flex-col gap-1.5">
                     <span className="text-sm font-medium">رسالة الترحيب</span>
                     <input
@@ -300,9 +370,8 @@ export function GeminiCard({
                   <div className="flex items-start gap-2 rounded-lg bg-[var(--color-warning-soft)] px-3 py-2.5 text-xs text-[var(--color-warning)]">
                     <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     <span>
-                      كل رسالة من أي زائر بتتحسب على رصيد مفتاحك. المفتاح المجاني بيقف
-                      بسرعة على متجر عليه حركة — لما الحد يخلص، العميل بيتحوّل لواتساب
-                      بدل ما البوت يقف ميت.
+                      كل رسالة من أي زائر بتتحسب على رصيد مفتاحك. لما الحد يخلص، العميل
+                      بيتحوّل لواتساب بدل ما البوت يقف ميت.
                     </span>
                   </div>
                 </div>
@@ -315,8 +384,8 @@ export function GeminiCard({
           <button
             type="button"
             onClick={() => save()}
-            disabled={saving || !configured}
-            className="flex min-h-11 items-center gap-2 rounded-lg bg-[var(--primary)] px-5 text-sm font-semibold text-[var(--primary-fg)] transition-opacity hover:opacity-90 disabled:opacity-50"
+            disabled={saving || (!configured && removed.length === 0)}
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-5 text-sm font-semibold text-[var(--primary-fg)] transition-opacity hover:opacity-90 disabled:opacity-50 sm:w-auto"
           >
             <Check className="h-4 w-4" aria-hidden="true" />
             {saving ? 'بيتحفظ…' : 'حفظ'}

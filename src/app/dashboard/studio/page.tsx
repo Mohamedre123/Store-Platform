@@ -5,7 +5,7 @@ import { db } from '@/db'
 import { storePlugins } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { guard } from '@/lib/permissions'
-import { getAiConfig, GEMINI_PRO_SLUG, GEMINI_SLUG } from '@/lib/ai/settings'
+import { getAiConfig, GEMINI_PRO_SLUG, GEMINI_SLUG, resolveEngines } from '@/lib/ai/settings'
 import { recentAssets } from '@/lib/studio'
 import { listAccounts, publishingEnabled } from '@/lib/social'
 import { PageHeader } from '@/components/dashboard/page-shell'
@@ -77,7 +77,12 @@ export default async function StudioPage() {
     searchProductsAction(''),
   ])
 
-  const hasKey = Boolean(pro.apiKey?.trim() || basic.apiKey?.trim())
+  const hasKey = Boolean(
+    pro.apiKey?.trim() || basic.apiKey?.trim() || pro.openaiKey?.trim() || basic.openaiKey?.trim(),
+  )
+
+  /* المزوّدين اللي ليهم مفتاح — الاختيار بيظهر لما يبقوا اتنين */
+  const engines = await resolveEngines(store.id, 'tools')
 
   return (
     <div className="flex flex-col gap-6">
@@ -89,6 +94,8 @@ export default async function StudioPage() {
       <Reveal>
         <StudioClient
           hasKey={hasKey}
+          providers={engines.ok ? engines.available : []}
+          defaultProvider={engines.ok ? engines.engine.provider : null}
           publishing={publishingEnabled()}
           products={products}
           accounts={accounts.map((a) => ({

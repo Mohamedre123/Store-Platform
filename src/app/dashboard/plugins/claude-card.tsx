@@ -1,21 +1,30 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Check, ExternalLink, Palette, ShieldCheck, TriangleAlert } from 'lucide-react'
+import { Check, Palette, ShieldCheck, TriangleAlert } from 'lucide-react'
 import { Alert, Card } from '@/components/ui'
 import type { PluginDef } from '@/lib/plugins'
+import type { AiIssue } from '@/lib/ai/providers-meta'
 import { saveClaudeAction, verifyDesignerKeyAction } from './ai-actions'
+import { IssueBanner, KeyField, ModelSelect, ProviderSwitch } from './ai-fields'
+
+type Provider = 'claude' | 'gemini' | 'openai'
 
 export type ClaudeSaved = {
   enabled: boolean
   hasKey: boolean
-  /** مفتاح جوجل محفوظ؟ نفس الإضافة بتقبل الاتنين */
+  /** مفتاح جوجل محفوظ؟ نفس الإضافة بتقبل التلاتة */
   hasGeminiKey: boolean
-  provider: 'claude' | 'gemini'
+  hasOpenaiKey: boolean
+  provider: Provider
   model: string | null
+  lastIssue: AiIssue | null
 }
 
 type Model = { id: string; label: string }
+
+const LABELS: Record<Provider, string> = { claude: 'Claude', gemini: 'Gemini', openai: 'ChatGPT' }
+const VENDORS: Record<Provider, string> = { claude: 'Anthropic', gemini: 'Google', openai: 'OpenAI' }
 
 export function ClaudeCard({
   def,
@@ -36,48 +45,46 @@ export function ClaudeCard({
   onToggle?: (slug: string, active: boolean) => void
 }) {
   const [enabled, setEnabled] = useState(saved?.enabled ?? false)
-  const [apiKey, setApiKey] = useState('')
-  const [geminiKey, setGeminiKey] = useState('')
+  const [keys, setKeys] = useState<Record<Provider, string>>({ claude: '', gemini: '', openai: '' })
   /**
    * قايمة موديلات لكل مزوّد.
    *
-   * التاجر اللي حاطط المفتاحين لازم يشوف الاتنين ويختار — مش نجبره
+   * التاجر اللي حاطط أكتر من مفتاح لازم يشوفهم ويختار — مش نجبره
    * على واحد. والقايمة بتيجي من المزوّد نفسه على مفتاحه هو، فبتفضل
    * صح مع كل إصدار جديد من غير ما نعدّل سطر.
    */
-  const [claudeModels, setClaudeModels] = useState<Model[]>([])
-  const [geminiModels, setGeminiModels] = useState<Model[]>([])
-  const [provider, setProvider] = useState<'claude' | 'gemini'>(saved?.provider ?? 'claude')
+  const [models, setModels] = useState<Record<Provider, Model[]>>({ claude: [], gemini: [], openai: [] })
+  const [provider, setProvider] = useState<Provider>(saved?.provider ?? 'claude')
   const [model, setModel] = useState(saved?.model ?? '')
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [msg, setMsg] = useState<{ tone: 'success' | 'danger' | 'warning'; text: string } | null>(null)
   const [verifying, startVerify] = useTransition()
   const [saving, startSave] = useTransition()
 
-  const hasClaude = Boolean(saved?.hasKey) || claudeModels.length > 0
-  const hasGemini = Boolean(saved?.hasGeminiKey) || geminiModels.length > 0
-  const configured = (hasClaude || hasGemini) && Boolean(model)
+  const has: Record<Provider, boolean> = {
+    claude: Boolean(saved?.hasKey) || models.claude.length > 0,
+    gemini: Boolean(saved?.hasGeminiKey) || models.gemini.length > 0,
+    openai: Boolean(saved?.hasOpenaiKey) || models.openai.length > 0,
+  }
+  const available = (Object.keys(has) as Provider[]).filter((p) => has[p])
+  const configured = available.length > 0 && Boolean(model)
 
-  const activeModels = provider === 'gemini' ? geminiModels : claudeModels
-
-  const verify = (which: 'claude' | 'gemini') =>
+  const verify = (which: Provider) =>
     startVerify(async () => {
       setMsg(null)
-      const key = which === 'gemini' ? geminiKey : apiKey
-      const res = await verifyDesignerKeyAction({ provider: which, apiKey: key })
+      const res = await verifyDesignerKeyAction({ provider: which, apiKey: keys[which] })
       if (!res.ok) {
-        setMsg({ ok: false, text: res.error })
+        setMsg({ tone: 'danger', text: res.error })
         return
       }
 
-      if (which === 'gemini') setGeminiModels(res.models)
-      else setClaudeModels(res.models)
-
+      setModels((m) => ({ ...m, [which]: res.models }))
       setProvider(which)
       setModel(res.suggested)
-      setMsg({
-        ok: true,
-        text: `المفتاح شغّال — ${res.models.length} موديل متاح.`,
-      })
+      setMsg(
+        res.warning
+          ? { tone: 'warning', text: `مفتاح ${LABELS[which]} اتقبل، بس: ${res.warning}` }
+          : { tone: 'success', text: `مفتاح ${LABELS[which]} شغّال — ${res.models.length} موديل متاح.` },
+      )
     })
 
   const save = (nextEnabled?: boolean) =>
@@ -85,20 +92,20 @@ export function ClaudeCard({
       setMsg(null)
       const res = await saveClaudeAction({
         enabled: nextEnabled ?? enabled,
-        apiKey: apiKey || undefined,
-        geminiKey: geminiKey || undefined,
+        apiKey: keys.claude || undefined,
+        geminiKey: keys.gemini || undefined,
+        openaiKey: keys.openai || undefined,
         provider,
         model: model || undefined,
       })
       if (res?.error) {
-        setMsg({ ok: false, text: res.error })
+        setMsg({ tone: 'danger', text: res.error })
         setEnabled(saved?.enabled ?? false)
       } else {
         onToggle?.(def.slug, nextEnabled ?? enabled)
-        setApiKey('')
-        setGeminiKey('')
+        setKeys({ claude: '', gemini: '', openai: '' })
         setMsg({
-          ok: true,
+          tone: 'success',
           text: (nextEnabled ?? enabled) ? 'اتفعّلت — هتلاقيها في صفحة المتجر' : 'اتوقفت',
         })
       }
@@ -129,7 +136,7 @@ export function ClaudeCard({
           type="button"
           role="switch"
           aria-checked={enabled}
-          aria-label={enabled ? 'إيقاف Claude' : 'تفعيل Claude'}
+          aria-label={enabled ? 'إيقاف المصمّم' : 'تفعيل المصمّم'}
           aria-busy={saving}
           disabled={!configured && !enabled}
           onClick={() => {
@@ -151,103 +158,94 @@ export function ClaudeCard({
       </div>
 
       <div className="flex flex-col gap-4 border-t border-[var(--border)] pt-4">
-        {msg && <Alert tone={msg.ok ? 'success' : 'danger'}>{msg.text}</Alert>}
+        {msg && <Alert tone={msg.tone}>{msg.text}</Alert>}
+        <IssueBanner issue={saved?.lastIssue} />
 
         {/* الحدّ الأمني — التاجر لازم يعرف الأداة بتوصل لفين */}
         <div className="flex items-start gap-2 rounded-lg bg-[var(--color-success-soft)] px-3 py-2.5 text-xs text-[var(--color-success)]">
           <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           <span>
-            كلود بيختار <strong>إعدادات</strong> (ألوان، خطوط، تخطيطات) — مش بيكتب كود
+            المصمّم بيختار <strong>إعدادات</strong> (ألوان، خطوط، تخطيطات) — مش بيكتب كود
             بيتنفّذ في متجرك. والنتيجة بتروح للمسوّدة، تعاينها وتنشرها لما تعجبك.
           </span>
         </div>
 
         {/*
-          مفتاحان في إضافة واحدة.
+          تلات مفاتيح في إضافة واحدة.
 
-          الاتنين بيعرفوا يصمّموا، والتاجر بيحطّ اللي معاه. اللي عنده
-          مفتاح جيميني للبوت أصلًا ما ينفعش نجبره يفتح حسابًا عند
-          أنثروبيك ويشحنه عشان يولّد ثيم.
+          التلاتة بيعرفوا يصمّموا، والتاجر بيحطّ اللي معاه. اللي عنده
+          مفتاح للبوت أصلًا ما ينفعش نجبره يفتح حسابًا تانيًا ويشحنه
+          عشان يولّد ثيم.
         */}
         <KeyField
           id="designer-claude"
-          label="مفتاح Anthropic (Claude)"
-          value={apiKey}
-          onChange={setApiKey}
+          label="مفتاح Claude (Anthropic)"
+          value={keys.claude}
+          onChange={(v) => setKeys((k) => ({ ...k, claude: v }))}
           saved={Boolean(saved?.hasKey)}
           placeholder="sk-ant-…"
           docHref="https://console.anthropic.com/settings/keys"
           busy={verifying}
           onVerify={() => verify('claude')}
+          optional
         />
 
         <KeyField
           id="designer-gemini"
-          label="مفتاح Google (Gemini)"
-          value={geminiKey}
-          onChange={setGeminiKey}
+          label="مفتاح Gemini (Google)"
+          value={keys.gemini}
+          onChange={(v) => setKeys((k) => ({ ...k, gemini: v }))}
           saved={Boolean(saved?.hasGeminiKey)}
           placeholder="مفتاحك من Google AI Studio"
           docHref="https://aistudio.google.com/app/apikey"
           busy={verifying}
           onVerify={() => verify('gemini')}
+          optional
         />
 
-        {(hasClaude || hasGemini) && (
+        <KeyField
+          id="designer-openai"
+          label="مفتاح ChatGPT (OpenAI)"
+          value={keys.openai}
+          onChange={(v) => setKeys((k) => ({ ...k, openai: v }))}
+          saved={Boolean(saved?.hasOpenaiKey)}
+          placeholder="sk-…"
+          docHref="https://platform.openai.com/api-keys"
+          busy={verifying}
+          onVerify={() => verify('openai')}
+          optional
+        />
+
+        {available.length > 0 && (
           <div className="flex flex-col gap-3">
-            {/* الاختيار بين المزوّدين — بيظهر لما يبقى فيه اتنين فعلًا */}
-            {hasClaude && hasGemini && (
-              <div className="flex gap-2">
-                {(['claude', 'gemini'] as const).map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    aria-pressed={provider === key}
-                    onClick={() => {
-                      setProvider(key)
-                      const list = key === 'gemini' ? geminiModels : claudeModels
-                      if (list.length) setModel(list[0].id)
-                    }}
-                    className={`min-h-10 flex-1 rounded-lg text-sm font-medium transition-colors ${
-                      provider === key
-                        ? 'bg-[var(--primary)] text-[var(--primary-fg)]'
-                        : 'bg-[var(--surface-2)] text-[var(--fg-muted)]'
-                    }`}
-                  >
-                    {key === 'gemini' ? 'Gemini' : 'Claude'}
-                  </button>
-                ))}
-              </div>
+            {/* الاختيار بين المزوّدين — بيظهر لما يبقى فيه أكتر من واحد فعلًا */}
+            {available.length > 1 && (
+              <ProviderSwitch
+                label="بيصمّم بـ"
+                options={available.map((p) => ({ key: p, label: LABELS[p] }))}
+                value={provider}
+                onChange={(key) => {
+                  setProvider(key)
+                  if (models[key].length) setModel(models[key][0].id)
+                }}
+              />
             )}
 
-            <label className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium">الموديل</span>
-              <select
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                className="min-h-11 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-sm focus:border-[var(--primary)] focus:outline-none"
-              >
-                {activeModels.length === 0 && model && <option value={model}>{model}</option>}
-                {activeModels.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-              <span className="text-xs text-[var(--fg-subtle)]">
-                القايمة جاية من {provider === 'gemini' ? 'Google' : 'Anthropic'} على مفتاحك —
-                الأحدث فوق. دوس «تحقّق» جنب المفتاح عشان تحدّثها.
-              </span>
-            </label>
+            <ModelSelect
+              label="الموديل"
+              value={model}
+              onChange={setModel}
+              models={models[provider]}
+              hint={`القايمة جاية من ${VENDORS[provider]} على مفتاحك — الأحدث فوق. دوس «تحقّق» جنب المفتاح عشان تحدّثها.`}
+            />
           </div>
         )}
 
         <div className="flex items-start gap-2 rounded-lg bg-[var(--color-warning-soft)] px-3 py-2.5 text-xs text-[var(--color-warning)]">
           <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           <span>
-            <strong>الاتنين محتاجين رصيد.</strong> Anthropic مفيهوش خطة مجانية خالص،
-            وGemini حصّته المجانية بتقف بسرعة مع التوليد الطويل — فعّل الفوترة على
-            اللي هتستخدمه.
+            <strong>التلاتة محتاجين رصيد.</strong> Anthropic وOpenAI مفيهمش خطة مجانية للـAPI،
+            وحصّة Gemini المجانية بتقف بسرعة مع التوليد الطويل.
           </span>
         </div>
 
@@ -256,7 +254,7 @@ export function ClaudeCard({
             type="button"
             onClick={() => save()}
             disabled={saving || !configured}
-            className="flex min-h-11 items-center gap-2 rounded-lg bg-[var(--primary)] px-5 text-sm font-semibold text-[var(--primary-fg)] transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-5 text-sm font-semibold text-[var(--primary-fg)] transition-opacity hover:opacity-90 disabled:opacity-50 sm:w-auto"
           >
             <Check className="h-4 w-4" aria-hidden="true" />
             {saving ? 'بيتحفظ…' : 'حفظ'}
@@ -264,78 +262,5 @@ export function ClaudeCard({
         </div>
       </div>
     </Wrapper>
-  )
-}
-
-/**
- * خانة مفتاح مع زرار تحقّق.
- *
- * **التحقّق بنداء حقيقي لا بشكل المفتاح.** صيغ المفاتيح بتتغيّر عند
- * المزوّدين، وأي فحص بالشكل بيرفض مفاتيح سليمة والتاجر يفضل يحاول
- * ومش فاهم.
- */
-function KeyField({
-  id,
-  label,
-  value,
-  onChange,
-  saved,
-  placeholder,
-  docHref,
-  busy,
-  onVerify,
-}: {
-  id: string
-  label: string
-  value: string
-  onChange: (v: string) => void
-  saved: boolean
-  placeholder: string
-  docHref: string
-  busy: boolean
-  onVerify: () => void
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
-        {label}
-        {saved && (
-          <span className="rounded-md bg-[var(--color-success-soft)] px-1.5 py-0.5 text-[11px] font-medium text-[var(--color-success)]">
-            محفوظ
-          </span>
-        )}
-      </label>
-
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <input
-          id={id}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          type="password"
-          autoComplete="off"
-          dir="ltr"
-          placeholder={saved ? '•••••••••• (محفوظ)' : placeholder}
-          className="min-h-11 min-w-0 flex-1 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-start font-mono text-sm focus:border-[var(--primary)] focus:outline-none"
-        />
-        <button
-          type="button"
-          onClick={onVerify}
-          disabled={busy || !value.trim()}
-          className="min-h-11 shrink-0 rounded-lg border border-[var(--border-strong)] px-4 text-sm font-medium transition-colors hover:bg-[var(--surface-2)] disabled:opacity-50"
-        >
-          {busy ? 'بيتأكّد…' : 'تحقّق'}
-        </button>
-      </div>
-
-      <a
-        href={docHref}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-1 text-xs font-medium text-[var(--primary)] hover:underline"
-      >
-        اجيب المفتاح منين؟
-        <ExternalLink className="h-3 w-3" aria-hidden="true" />
-      </a>
-    </div>
   )
 }

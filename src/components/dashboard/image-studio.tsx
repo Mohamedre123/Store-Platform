@@ -3,7 +3,12 @@
 import { useEffect, useRef, useState, useTransition } from 'react'
 import Image from 'next/image'
 import { Check, ImagePlus, Loader2, Sparkles, TriangleAlert, Wand2, X } from 'lucide-react'
-import { assistImageAction, listImageModelsAction } from '@/app/dashboard/assist-actions'
+import {
+  assistImageAction,
+  listImageModelsAction,
+  type ProviderModels,
+} from '@/app/dashboard/assist-actions'
+import type { AiProvider } from '@/lib/ai/providers-meta'
 import { Portal } from '@/components/ui/portal'
 
 /**
@@ -34,8 +39,12 @@ export function ImageStudio({
   onClose: () => void
 }) {
   const [instruction, setInstruction] = useState('')
-  const [models, setModels] = useState<Array<{ id: string; label: string }>>([])
+  /* مزوّد الصور — Gemini أو ChatGPT، ولكل واحد موديلاته */
+  const [providers, setProviders] = useState<ProviderModels[]>([])
+  const [provider, setProvider] = useState<AiProvider | null>(null)
   const [model, setModel] = useState('')
+  const models = providers.find((p) => p.provider === provider)?.models ?? []
+  const providerLabel = providers.find((p) => p.provider === provider)?.label ?? 'الذكاء الاصطناعي'
   const [result, setResult] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
@@ -76,8 +85,10 @@ export function ImageStudio({
   useEffect(() => {
     void listImageModelsAction().then((res) => {
       if (res.ok) {
-        setModels(res.models)
-        setModel((m) => m || res.models[0]?.id || '')
+        setProviders(res.providers)
+        setProvider(res.current)
+        const list = res.providers.find((p) => p.provider === res.current)?.models ?? []
+        setModel((m) => m || list[0]?.id || '')
       } else {
         setError(res.error)
       }
@@ -103,6 +114,7 @@ export function ImageStudio({
         sourceUrl: base || undefined,
         instruction: text,
         model: model || undefined,
+        provider: provider ?? undefined,
       })
       if (res.ok) setResult(res.url)
       else setError(res.error)
@@ -135,7 +147,7 @@ export function ImageStudio({
           <div className="min-w-0 flex-1">
             <h3 className="font-semibold">{base ? 'عدّل الصورة' : 'ولّد صورة'}</h3>
             <p className="text-xs text-[var(--fg-subtle)]">
-              بمفتاح Gemini بتاعك — كل تعديل بيتحاسب على حسابك.
+              بمفتاح {providerLabel} بتاعك — كل تعديل بيتحاسب على حسابك.
             </p>
           </div>
           <button
@@ -238,6 +250,33 @@ export function ImageStudio({
               placeholder="اوصف التعديل اللي عايزه…"
               className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2.5 text-sm leading-relaxed focus:border-[var(--primary)] focus:outline-none"
             />
+
+            {providers.length > 1 && (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-[var(--fg-muted)]">بيولّد بـ</span>
+                <div className="flex gap-2" role="radiogroup" aria-label="مزوّد الصور">
+                  {providers.map((p) => (
+                    <button
+                      key={p.provider}
+                      type="button"
+                      role="radio"
+                      aria-checked={provider === p.provider}
+                      onClick={() => {
+                        setProvider(p.provider)
+                        setModel(p.models[0]?.id ?? '')
+                      }}
+                      className={`min-h-10 flex-1 rounded-lg text-sm font-medium transition-colors ${
+                        provider === p.provider
+                          ? 'bg-[var(--primary)] text-[var(--primary-fg)]'
+                          : 'bg-[var(--surface-2)] text-[var(--fg-muted)]'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {models.length > 1 && (
               <label className="flex flex-col gap-1.5">

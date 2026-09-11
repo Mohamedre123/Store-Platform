@@ -65,6 +65,8 @@ export async function generateImageAction(input: {
   useProductPhoto?: boolean
   /** شكل الصورة — الكلام المكتوب بيغلبه لو فيه شكل صريح */
   style?: ImageStyle | null
+  /** Gemini أو ChatGPT */
+  provider?: string | null
 }): Promise<ImageState> {
   const { store, user } = await studioContext()
 
@@ -100,6 +102,7 @@ export async function generateImageAction(input: {
       و`resolveStyle` بيرجّع المعروف بس، فأي نص جاي من الشبكة بيبقى «لوحده».
     */
     style: input.parentId ? null : resolveStyle(input.style, prompt),
+    provider: input.provider ?? null,
   })
 
   if ('error' in res) return { ok: false, error: res.error }
@@ -116,8 +119,7 @@ export type CarouselState =
  * كاروسيل — صور مترابطة في نداء واحد.
  *
  * ## بياخد وقت أطول من صورة واحدة بعدد الشرايح
- * خمس شرايح = خمس نداءات متتابعة، مش متوازية: كل واحدة محتاجة
- * اللي قبلها كمرجع عشان الشكل يفضل واحد. الشاشة بتقول ده قبل
+ * خطة للشرايح كلها، وبعدها خمس صور متتابعة. الشاشة بتقول ده قبل
  * الضغط عشان التاجر ما يفتكرش إنها وقفت.
  */
 export async function generateCarouselAction(input: {
@@ -127,6 +129,7 @@ export async function generateCarouselAction(input: {
   productId?: string | null
   useProductPhoto?: boolean
   style?: ImageStyle | null
+  provider?: string | null
 }): Promise<CarouselState> {
   const { store, user } = await studioContext()
 
@@ -149,6 +152,7 @@ export async function generateCarouselAction(input: {
     productId: input.productId ?? null,
     seedUrl,
     style: resolveStyle(input.style, prompt),
+    provider: input.provider ?? null,
   })
 
   if ('error' in res) return { ok: false, error: res.error }
@@ -168,6 +172,7 @@ export async function generateCopyAction(input: {
   productId?: string | null
   tone: ToneKey
   extra?: string | null
+  provider?: string | null
 }): Promise<CopyState> {
   const { store } = await studioContext()
 
@@ -176,6 +181,7 @@ export async function generateCopyAction(input: {
     productId: input.productId ?? null,
     tone: input.tone,
     extra: input.extra ?? null,
+    provider: input.provider ?? null,
   })
 
   if ('error' in res) return { ok: false, error: res.error }
@@ -208,6 +214,7 @@ export async function startVideoAction(input: {
   /** صورة من الاستوديو تتحرّك — بتغلب صورة المنتج */
   seedAssetUrl?: string | null
   style?: ImageStyle | null
+  provider?: string | null
 }): Promise<VideoStartState> {
   const { store } = await studioContext()
 
@@ -227,6 +234,7 @@ export async function startVideoAction(input: {
     preset: input.preset,
     seedUrl,
     style: resolveStyle(input.style, prompt),
+    provider: input.provider ?? null,
   })
 
   if ('error' in res) return { ok: false, error: res.error }
@@ -376,6 +384,7 @@ export async function saveScheduleAction(input: {
   media: 'image' | 'carousel' | 'video'
   slides?: number
   imageStyle?: ImageStyle | null
+  aiProvider?: string | null
   autoPublish: boolean
   isActive: boolean
 }): Promise<SaveState> {
@@ -408,6 +417,7 @@ export async function saveScheduleAction(input: {
     media: input.media,
     slides: input.slides,
     imageStyle: input.imageStyle,
+    aiProvider: input.aiProvider,
     autoPublish: input.autoPublish,
     isActive: input.isActive,
   })

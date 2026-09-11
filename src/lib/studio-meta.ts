@@ -67,27 +67,51 @@ export function presetOf(key: string) {
    شكل الصورة
    ══════════════════════════════════════════════════════════════ */
 
-export type ImageStyle = 'auto' | 'scene' | 'plain' | 'minimal' | '3d' | 'flatlay' | 'dark'
+export type ImageStyle =
+  | 'auto'
+  | 'literal'
+  | 'scene'
+  | 'plain'
+  | 'model'
+  | 'poster'
+  | '3d'
+  | 'flatlay'
+  | 'macro'
+  | 'outdoor'
+  | 'occasion'
+  | 'dark'
+  | 'ugc'
+
+/**
+ * نوع الجودة اللي الشكل محتاجها.
+ *
+ * «تصوير فوتوغرافي حقيقي فائق الوضوح» على رندر 3D بتطلّع صورة، وعلى
+ * بوستر بتشيل التصميم. كل شكل بياخد معايير الجودة اللي تناسبه.
+ */
+export type Craft = 'photo' | 'render' | 'design' | 'phone'
 
 /**
  * أشكال الصورة.
  *
  * ## ليه قايمة مش توجيه واحد ثابت
  * التوجيه الثابت كان «مكان حقيقي، وممنوع خلفية سادة» لكل المنتجات.
- * فالتاجر اللي كتب «خلفية سادة» كان بيطلب حاجة ممنوعة في نفس
- * الوصف — والممنوع كان بيغلب، وطلعت صورة في مكان جوّه إطار أبيض.
- * كل شكل ليه قواعده هو، ومفيش شكل بيمنع التاني.
+ * فالتاجر اللي كتب «خلفية سادة» كان بيطلب حاجة ممنوعة في نفس الوصف —
+ * والممنوع كان بيغلب. كل شكل ليه قواعده هو، ومفيش شكل بيمنع التاني.
  *
  * - `director` بيروح للمدير الفني: الفكرة لازم تبقى من النوع ده.
  * - `rules` بتروح لموديل الصور مع الفكرة: القيود اللي ما تتكسرش.
  * - `en` سطر إنجليزي لنفس القيد — موديلات الصور بتلتزم بالمصطلح
- *   التقني الإنجليزي («seamless backdrop»، «flat lay») أدق من
- *   ترجمته.
+ *   التقني الإنجليزي («seamless backdrop»، «flat lay») أدق من ترجمته.
+ *
+ * ## و«زي ما أنا كاتب» مالوش مدير فني
+ * التاجر اللي عارف هو عايز إيه بالظبط ما يصحّش موديل يضيف له فكرة من
+ * عنده. الشكل ده بيبعت كلامه للرسم زي ما هو، ومعاه معايير الجودة بس.
  */
 export const STYLES: Array<{
   key: ImageStyle
   label: string
   hint: string
+  craft: Craft
   director: string
   rules: string[]
   en: string
@@ -96,6 +120,16 @@ export const STYLES: Array<{
     key: 'auto',
     label: 'يختار لوحده',
     hint: 'على حسب المنتج وكلامك',
+    craft: 'photo',
+    director: '',
+    rules: [],
+    en: '',
+  },
+  {
+    key: 'literal',
+    label: 'زي ما أنا كاتب',
+    hint: 'بينفّذ وصفك بالحرف — من غير أفكار من عنده',
+    craft: 'photo',
     director: '',
     rules: [],
     en: '',
@@ -104,56 +138,74 @@ export const STYLES: Array<{
     key: 'scene',
     label: 'مكان حقيقي',
     hint: 'المنتج في مكان استخدامه',
+    craft: 'photo',
     director:
       'مشهد واقعي في مكان حقيقي بيتستخدم فيه المنتج — اذكر المكان بتفاصيله والعناصر اللي حوالين المنتج وليه موجودة.',
     rules: [
       'مكان حقيقي بتفاصيله — ممنوع خلفية لون واحد أو تدرّج.',
       'ممنوع منتج مقصوص طاير في الفراغ — المنتج حاطط على سطح أو مستخدَم في المكان.',
     ],
-    en: 'Photorealistic lifestyle advertising photograph of the product in a real, detailed location.',
+    en: 'Lifestyle advertising photograph of the product in a real, detailed location.',
   },
   {
     key: 'plain',
     label: 'خلفية سادة',
     hint: 'لون واحد نضيف — شكل الكتالوج الاحترافي',
+    craft: 'photo',
     director:
       'خلفية سادة بلون واحد نضيف ممتد من غير أي مكان ولا ديكور ولا عناصر حوالين المنتج. ' +
       'اختار لون الخلفية اللي يبرز المنتج — ولو صاحب المتجر قال لون، يبقى هو.',
     rules: [
       'الخلفية لون واحد سادة ممتد (seamless) — ممنوع أي مكان أو أوضة أو ترابيزة أو ديكور أو نباتات أو عناصر جنب المنتج.',
       'ظل ناعم طبيعي تحت المنتج بس، عشان ما يبانش طاير.',
-      'إضاءة استوديو ناعمة ومتوازنة، والمنتج هو الحاجة الوحيدة في الصورة.',
+      'المنتج هو الحاجة الوحيدة في الصورة.',
     ],
-    en: 'Clean studio product shot on a seamless solid single-color backdrop. No room, no furniture, no props, no scenery — only the product and a soft contact shadow.',
+    en: 'Studio product shot on a seamless solid single-color backdrop. No room, no furniture, no props, no scenery — only the product and a soft contact shadow.',
   },
   {
-    key: 'minimal',
-    label: 'مينيمال',
-    hint: 'فاتح وهادي، وعنصر أو اتنين بس',
+    key: 'model',
+    label: 'موديل بيستخدمه',
+    hint: 'شخص لابس المنتج أو ماسكه',
+    craft: 'photo',
     director:
-      'تكوين مينيمال: خلفية هادية بألوان فاتحة، وعنصر أو اتنين بسطاء بس (بوديوم، ظل شباك، شكل هندسي)، ومساحة فاضية واسعة.',
+      'شخص حقيقي (موديل) لابس المنتج أو بيستخدمه في موقف طبيعي يناسب جمهور المنتج — المنتج واضح وهو محور الصورة، والشخص بيخدمه.',
     rules: [
-      'عنصر أو اتنين بالكتير جنب المنتج، ومساحة فاضية واسعة.',
-      'ألوان هادية ومتناسقة — من غير زحمة ولا تفاصيل كتير.',
+      'شخص حقيقي بملامح وبشرة وأيدي طبيعية وتشريح صحيح.',
+      'المنتج واضح بنفس شكله وتفاصيله — مش مستخبي ورا الشخص.',
     ],
-    en: 'Minimalist product photography, soft neutral palette, generous negative space, at most one or two simple props such as a podium or a soft window shadow.',
+    en: 'Advertising photograph with a real human model naturally wearing or using the product; the product is the clear focus.',
+  },
+  {
+    key: 'poster',
+    label: 'بوستر إعلاني',
+    hint: 'تصميم بعنوان وعناصر جرافيك',
+    craft: 'design',
+    director:
+      'بوستر إعلاني متصمَّم: المنتج بطل التصميم، مع عنوان قصير واضح وعناصر جرافيك وأشكال وألوان مدروسة — شكل حملات البراندات الكبيرة.',
+    rules: [
+      'تصميم نضيف بتسلسل بصري واضح: المنتج الأول وبعده العنوان.',
+      'كلام قليل جدًا ومقروء — عنوان واحد وسطر صغير بالكتير.',
+    ],
+    en: 'Professional advertising poster / key visual design with the product as the hero.',
   },
   {
     key: '3d',
     label: 'ثري دي',
     hint: 'رندر ثلاثي الأبعاد — شكل البراندات الكبيرة',
+    craft: 'render',
     director:
       'رندر ثلاثي الأبعاد احترافي: المنتج في مشهد 3D مصمَّم (أشكال هندسية، بوديوم، خامات لامعة، إضاءة استوديو ملوّنة) — مش صورة لمكان حقيقي.',
     rules: [
       'شكل رندر 3D نضيف وحديث — مش صورة فوتوغرافية لمكان حقيقي.',
       'المنتج نفسه يفضل بشكله وألوانه وتفاصيله الحقيقية جوّه المشهد.',
     ],
-    en: 'High-end 3D render (CGI) product visual: stylized geometric set, podiums, glossy materials, studio lighting. Not a real-world location photo.',
+    en: '3D render (CGI) product visual: stylized geometric set, podiums, glossy materials, studio lighting. Not a real-world location photo.',
   },
   {
     key: 'flatlay',
     label: 'من فوق',
     hint: 'فلات لاي — المنتج وحاجات بتكمّله',
+    craft: 'photo',
     director:
       'فلات لاي: لقطة من فوق عمودي تمامًا، المنتج على سطح (خشب، قماش، رخام) وحواليه حاجات بتكمّله مترتّبة بعناية.',
     rules: [
@@ -163,16 +215,69 @@ export const STYLES: Array<{
     en: 'Top-down flat lay photograph, camera directly overhead at 90 degrees, neatly arranged complementary items around the product.',
   },
   {
+    key: 'macro',
+    label: 'تفاصيل قريبة',
+    hint: 'ماكرو للخامة والتفاصيل',
+    craft: 'photo',
+    director:
+      'لقطة قريبة جدًا (ماكرو) بتبرز خامة المنتج وتفصيلة مميزة فيه — الخياطة، الملمس، اللمعة، النقوش.',
+    rules: [
+      'اللقطة قريبة على تفصيلة بعينها، والتفاصيل الدقيقة حادة جدًا.',
+      'المنتج لازم يتعرف من التفصيلة.',
+    ],
+    en: 'Extreme close-up macro product photography revealing texture and craftsmanship details.',
+  },
+  {
+    key: 'outdoor',
+    label: 'مكان خارجي',
+    hint: 'طبيعة أو شارع أو بحر',
+    craft: 'photo',
+    director:
+      'مشهد خارجي حقيقي (طبيعة، شارع، بحر، صحرا، جنينة) يناسب المنتج وجمهوره، بإضاءة طبيعية جميلة.',
+    rules: [
+      'مكان خارجي حقيقي بتفاصيله — مش خلفية مرسومة.',
+      'المنتج متدمج في المشهد بإضاءة وظلال متسقة معاه.',
+    ],
+    en: 'Outdoor advertising photograph in a real natural or urban location with beautiful natural light.',
+  },
+  {
+    key: 'occasion',
+    label: 'مناسبات وهدايا',
+    hint: 'رمضان، عيد، هدية، احتفال',
+    craft: 'photo',
+    director:
+      'مشهد مناسبة أو هدية (رمضان، عيد، عيد ميلاد، هدية متغلّفة، احتفال) بعناصر بتدل على المناسبة من غير زحمة — والمناسبة اللي صاحب المتجر قالها هي اللي تمشي.',
+    rules: [
+      'عناصر المناسبة واضحة بس المنتج هو الأهم.',
+      'إحساس دافي واحتفالي ومرتّب.',
+    ],
+    en: 'Festive gifting / seasonal occasion advertising photograph with tasteful themed elements; the product remains the hero.',
+  },
+  {
     key: 'dark',
     label: 'فخم غامق',
     hint: 'خلفية غامقة وإضاءة درامية',
+    craft: 'photo',
     director:
       'إعلان فخم: خلفية غامقة، وإضاءة درامية مركّزة على المنتج، ولمعة وانعكاسات هادية — شكل البراندات الفاخرة.',
     rules: [
       'خلفية غامقة وإضاءة درامية بتبرز المنتج.',
       'إحساس فخم وهادي، من غير زحمة عناصر.',
     ],
-    en: 'Luxury dark moody product shot: deep dark background, dramatic rim lighting, subtle reflections, premium feel.',
+    en: 'Luxury dark moody product shot: deep dark background, dramatic lighting, subtle reflections, premium feel.',
+  },
+  {
+    key: 'ugc',
+    label: 'عفوية بالموبايل',
+    hint: 'كأن عميل حقيقي صوّرها',
+    craft: 'phone',
+    director:
+      'صورة عفوية كأن عميل حقيقي صوّرها بموبايله في حياته اليومية — طبيعية ومن غير إحساس استوديو، بس نضيفة ومضاءة كويس.',
+    rules: [
+      'شكل طبيعي وعفوي من غير إحساس استوديو.',
+      'الصورة حادة ونضيفة والمنتج واضح.',
+    ],
+    en: 'Authentic user-generated style smartphone photo in everyday life.',
   },
 ]
 
@@ -190,25 +295,46 @@ function normalizeArabic(text: string): string {
     .replace(/ى/g, 'ي')
 }
 
+/** الأشكال اللي بتتفهم من الكلام — «لوحده» و«زي ما أنا كاتب» اختيار مش كلمة */
+type WordStyle = Exclude<ImageStyle, 'auto' | 'literal'>
+
 /*
   الترتيب مقصود: الأدق الأول.
 
-  «خلفية سادة سودا» خلفية سادة لونها أسود — مش «فخم غامق». و«من فوق
-  على خلفية سادة» خلفية سادة، والزاوية بتفضل في كلام التاجر اللي
-  المدير الفني بيقراه.
+  «خلفية سادة سودا» خلفية سادة لونها أسود — مش «فخم غامق». و«بوستر
+  للعيد» بوستر، والمناسبة بتفضل في كلام التاجر اللي المدير الفني
+  بيقراه. و«مينيمال» اتشال كشكل، فكلامه بيروح للخلفية السادة.
+
+  **الأنماط بتتكتب بعد التوحيد**: «علي» لا «على»، و«ساده» لا «سادة».
+  الكلام بيتوحّد قبل البحث، فالنمط المكتوب بالشكل الأصلي ما بيتلقطش
+  أبدًا — و«على البحر» كانت بتعدّي من غير ما تتفهم.
 */
-const STYLE_WORDS: Array<{ key: Exclude<ImageStyle, 'auto'>; re: RegExp }> = [
+const STYLE_WORDS: Array<{ key: WordStyle; re: RegExp }> = [
   {
     key: 'plain',
-    re: /ساد(ه|ا)|لون واحد|(بدون|من غير) خلفيه|خلفيه (بيضا|بيضاء|ابيض|سودا|سوداء|اسود|رمادي|ملونه)|ستوديو|استديو|studio|plain|solid (color|background)|white background|packshot/,
+    re: /ساد(ه|ا)|لون واحد|(بدون|من غير) خلفيه|خلفيه (بيضا|بيضاء|ابيض|سودا|سوداء|اسود|رمادي|ملونه|فاتحه)|ستوديو|استديو|studio|plain|solid (color|background)|white background|packshot|مينيمال|minimal/,
   },
+  { key: 'poster', re: /بوستر|poster|key visual|تصميم (اعلان|اعلاني|جرافيك)|جرافيك/ },
   { key: '3d', re: /3d|3 ?دي|ثري ?دي|ثلاثي(ه)? الابعاد|رندر|render|cgi/ },
   { key: 'flatlay', re: /فلات ?لاي|flat ?lay|من فوق|من اعلي|top ?(view|down)/ },
-  { key: 'minimal', re: /مينيمال|minimal|خلفيه فاتحه/ },
+  { key: 'macro', re: /ماكرو|macro|كلوز|close ?up|تفاصيل قريبه|قريب جدا/ },
+  {
+    key: 'model',
+    re: /موديل (لابس|لابسه|ماسك|ماسكه|بيستخدم)|(بنت|ولد|راجل|ست|شخص|شاب) (لابس|لابسه|ماسك|ماسكه)|لابسه موديل|on model|human model/,
+  },
+  { key: 'ugc', re: /عفوي|عفويه|بالموبايل|بالفون|ugc|كان عميل صور/ },
+  {
+    key: 'occasion',
+    re: /رمضان|عيد (ميلاد|الام|الحب|الفطر|الاضحي)|العيد|مناسبه|هديه متغلفه|تغليف هدايا|كريسماس|valentine/,
+  },
+  {
+    key: 'outdoor',
+    re: /(في|علي|عند) (البحر|الشط|الطبيعه|الجبل|الصحرا|الصحراء|الجنينه|الحديقه|الشارع)|خارجي|outdoor/,
+  },
   { key: 'dark', re: /فخم|فخامه|luxury|دارك|dark|خلفيه (غامقه|داكنه)/ },
   {
     key: 'scene',
-    re: /مكان (حقيقي|واقعي)|مشهد (حقيقي|واقعي)|صوره واقعيه|lifestyle|لايف ?ستايل|في (البيت|المطبخ|الشارع|الطبيعه|الاوضه|المكتب|الجيم)/,
+    re: /مكان (حقيقي|واقعي)|مشهد (حقيقي|واقعي)|صوره واقعيه|lifestyle|لايف ?ستايل|في (البيت|المطبخ|الاوضه|المكتب|الجيم|الصالون)/,
   },
 ]
 
@@ -224,7 +350,7 @@ const STYLE_WORDS: Array<{ key: Exclude<ImageStyle, 'auto'>; re: RegExp }> = [
  * «مش عايز خلفية سادة» عكس «خلفية سادة». بنبص على الكلمتين اللي
  * قبل الكلمة، ولو فيهم نفي بنعدّيها.
  */
-export function inferStyle(text: string | null | undefined): Exclude<ImageStyle, 'auto'> | null {
+export function inferStyle(text: string | null | undefined): WordStyle | null {
   if (!text?.trim()) return null
   const t = normalizeArabic(text)
 
@@ -251,7 +377,11 @@ export function inferStyle(text: string | null | undefined): Exclude<ImageStyle,
 }
 
 /**
- * الشكل النهائي — الكلام المكتوب، وبعده الاختيار.
+ * الشكل النهائي.
+ *
+ * «زي ما أنا كاتب» بيغلب أي حاجة: التاجر اختار إن كلامه يتنفّذ بالحرف،
+ * فكلمة «سادة» جوّه كلامه جزء من الوصف مش أمر بتغيير الشكل. وغير كده:
+ * الكلام المكتوب، وبعده الاختيار.
  *
  * بيتنادى على الخادم وقت التوليد وعلى الشاشة وقت الكتابة — بنفس
  * القواعد، فاللي التاجر شايفه متعلّم هو اللي بيتولّد.
@@ -260,7 +390,21 @@ export function resolveStyle(
   chosen: string | null | undefined,
   text: string | null | undefined,
 ): ImageStyle {
-  return inferStyle(text) ?? styleOf(chosen).key
+  const picked = styleOf(chosen).key
+  if (picked === 'literal') return 'literal'
+  return inferStyle(text) ?? picked
+}
+
+/**
+ * نوع الجودة للشكل.
+ *
+ * «زي ما أنا كاتب» بياخد نوع الجودة من كلام التاجر نفسه: لو كتب «رندر
+ * 3D» بياخد جودة رندر، ولو كتب «بوستر» بياخد جودة تصميم.
+ */
+export function craftOf(style: ImageStyle, text?: string | null): Craft {
+  if (style !== 'literal' && style !== 'auto') return styleOf(style).craft
+  const typed = inferStyle(text)
+  return typed ? styleOf(typed).craft : 'photo'
 }
 
 /* ══════════════════════════════════════════════════════════════

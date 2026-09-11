@@ -1,21 +1,31 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Bot, Check, ExternalLink, Sparkles, TriangleAlert, Wand2 } from 'lucide-react'
+import { Bot, Check, Sparkles, TriangleAlert, Wand2 } from 'lucide-react'
 import { Alert, Card } from '@/components/ui'
 import type { PluginDef } from '@/lib/plugins'
-import { saveGeminiProAction, verifyGeminiKeyAction } from './ai-actions'
+import { AI_PROVIDERS, type AiIssue, type AiProvider } from '@/lib/ai/providers-meta'
+import { saveGeminiProAction, verifyAiKeyAction } from './ai-actions'
+import { IssueBanner, KeyField, ModelSelect, ProviderSwitch } from './ai-fields'
 
 export type GeminiProSaved = {
   enabled: boolean
+  /** مفتاح Gemini خاص بالمساعد */
   hasOwnKey: boolean
+  hasOwnOpenaiKey: boolean
   model: string | null
+  openaiModel: string | null
+  provider: AiProvider | null
   brief: string | null
-  /** إضافة الردّ على العملاء متظبّطة؟ لو أيوه، المساعد يقدر يستعير مفتاحها */
-  baseReady: boolean
+  /** المزوّدين اللي ليهم مفتاح في إضافة الرد على العملاء — المساعد بيستعيرهم */
+  baseProviders: AiProvider[]
+  lastIssue: AiIssue | null
 }
 
 type Model = { id: string; label: string }
+
+const GEMINI = AI_PROVIDERS[0]
+const OPENAI = AI_PROVIDERS[1]
 
 /**
  * شاشة إعداد المساعد المنفّذ.
@@ -23,6 +33,11 @@ type Model = { id: string; label: string }
  * الفرق عن بوت العملاء متكتوب صراحة فوق: **ده بيغيّر في متجرك.**
  * تاجر مفتكر إنه بيكتب نصوص وبيلاقي منتج اتضاف مش هيثق في المنصة
  * تاني، حتى لو هو اللي وافق.
+ *
+ * ## المفاتيح هنا اختيارية
+ * المساعد بيستعير مفاتيح إضافة الرد على العملاء. المفتاح هنا بس لو
+ * التاجر عايز يفصل فاتورة المساعد، أو مفتاح البوت مجاني والمساعد
+ * محتاج فوترة.
  */
 export function GeminiProCard({
   def,
@@ -43,28 +58,63 @@ export function GeminiProCard({
   onToggle?: (slug: string, active: boolean) => void
 }) {
   const [enabled, setEnabled] = useState(saved?.enabled ?? false)
-  const [apiKey, setApiKey] = useState('')
-  const [models, setModels] = useState<Model[]>([])
+  const [geminiKey, setGeminiKey] = useState('')
+  const [openaiKey, setOpenaiKey] = useState('')
+  const [geminiModels, setGeminiModels] = useState<Model[]>([])
+  const [openaiModels, setOpenaiModels] = useState<Model[]>([])
   const [model, setModel] = useState(saved?.model ?? '')
-  const [brief, setBrief] = useState(saved?.brief ?? '')
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [openaiModel, setOpenaiModel] = useState(saved?.openaiModel ?? '')
+  const [provider, setProvider] = useState<AiProvider | null>(saved?.provider ?? null)
+  const [removed, setRemoved] = useState<AiProvider[]>([])
+  const [brief] = useState(saved?.brief ?? '')
+  const [msg, setMsg] = useState<{ tone: 'success' | 'danger' | 'warning'; text: string } | null>(null)
   const [verifying, startVerify] = useTransition()
   const [saving, startSave] = useTransition()
 
-  // شغّالة لو ليها مفتاحها أو لو مفتاح البوت متظبّط
-  const usable = saved?.hasOwnKey || saved?.baseReady || models.length > 0
+  const base = saved?.baseProviders ?? []
+  const ownGemini = (Boolean(saved?.hasOwnKey) && !removed.includes('gemini')) || geminiModels.length > 0
+  const ownOpenai = (Boolean(saved?.hasOwnOpenaiKey) && !removed.includes('openai')) || openaiModels.length > 0
+  const hasGemini = ownGemini || base.includes('gemini')
+  const hasOpenai = ownOpenai || base.includes('openai')
+  const usable = hasGemini || hasOpenai
 
-  const verify = () =>
+  const effective: AiProvider | null =
+    provider === 'openai' && hasOpenai
+      ? 'openai'
+      : provider === 'gemini' && hasGemini
+        ? 'gemini'
+        : hasGemini
+          ? 'gemini'
+          : hasOpenai
+            ? 'openai'
+            : null
+
+  const verify = (which: AiProvider) =>
     startVerify(async () => {
       setMsg(null)
-      const res = await verifyGeminiKeyAction(apiKey)
+      const res = await verifyAiKeyAction({
+        provider: which,
+        apiKey: which === 'openai' ? openaiKey : geminiKey,
+      })
       if (!res.ok) {
-        setMsg({ ok: false, text: res.error })
+        setMsg({ tone: 'danger', text: res.error })
         return
       }
-      setModels(res.models)
-      setModel((m) => m || res.suggested)
-      setMsg({ ok: true, text: `المفتاح شغّال — ${res.models.length} موديل متاح.` })
+      if (which === 'openai') {
+        setOpenaiModels(res.models)
+        setOpenaiModel((m) => m || res.suggested)
+      } else {
+        setGeminiModels(res.models)
+        setModel((m) => m || res.suggested)
+      }
+      setRemoved((r) => r.filter((p) => p !== which))
+
+      const label = which === 'openai' ? OPENAI.label : GEMINI.label
+      setMsg(
+        res.warning
+          ? { tone: 'warning', text: `مفتاح ${label} اتقبل، بس: ${res.warning}` }
+          : { tone: 'success', text: `مفتاح ${label} شغّال — ${res.models.length} موديل متاح.` },
+      )
     })
 
   const save = (nextEnabled?: boolean) =>
@@ -72,17 +122,25 @@ export function GeminiProCard({
       setMsg(null)
       const res = await saveGeminiProAction({
         enabled: nextEnabled ?? enabled,
-        apiKey: apiKey || undefined,
+        apiKey: geminiKey || undefined,
+        openaiKey: openaiKey || undefined,
         model: model || undefined,
+        openaiModel: openaiModel || undefined,
+        removeKeys: removed.length ? removed : undefined,
+        provider: effective ?? undefined,
         brief,
       })
       if (res?.error) {
-        setMsg({ ok: false, text: res.error })
+        setMsg({ tone: 'danger', text: res.error })
         setEnabled(saved?.enabled ?? false)
       } else {
-        setApiKey('')
+        setGeminiKey('')
+        setOpenaiKey('')
         onToggle?.(def.slug, nextEnabled ?? enabled)
-        setMsg({ ok: true, text: (nextEnabled ?? enabled) ? 'اتفعّل — هتلاقيه على الشمال' : 'اتوقف' })
+        setMsg({
+          tone: 'success',
+          text: (nextEnabled ?? enabled) ? 'اتفعّل — هتلاقيه تحت في اللوحة' : 'اتوقف',
+        })
       }
     })
 
@@ -136,9 +194,10 @@ export function GeminiProCard({
       </div>
 
       <div className="flex flex-col gap-4 border-t border-[var(--border)] pt-4">
-        {msg && <Alert tone={msg.ok ? 'success' : 'danger'}>{msg.text}</Alert>}
+        {msg && <Alert tone={msg.tone}>{msg.text}</Alert>}
+        <IssueBanner issue={saved?.lastIssue} />
 
-{/*
+        {/*
           الفرق بالوظيفة لا بالاسم.
 
           «عادي» و«برو» ما بيقولوش للتاجر حاجة — لازم يعرف ده بيكلّم
@@ -167,83 +226,80 @@ export function GeminiProCard({
           </div>
         </div>
 
-        <p className="rounded-lg bg-[var(--color-warning-soft)] px-3 py-2.5 text-xs leading-relaxed text-[var(--color-warning)]">
-          <strong>محتاج مفتاح عليه فوترة.</strong> المساعد ده بيقرا بيانات متجرك في كل
-          سؤال وبيعدّل الصور، فاستهلاكه أعلى بكتير من البوت — والمفتاح المجاني بيقف
-          معاه من أول شوية. فعّل الفوترة من Google AI Studio.
-        </p>
-
-        {saved?.baseReady && !saved.hasOwnKey && (
+        {base.length > 0 && !ownGemini && !ownOpenai && (
           <p className="rounded-lg bg-[var(--surface-2)] px-3 py-2.5 text-xs text-[var(--fg-muted)]">
-            هيشتغل بمفتاح «الردّ على عملائك». حط مفتاحًا هنا بس لو عايز تفصل فاتورة
-            المساعد — أو لو مفتاح البوت مجاني والمساعد محتاج فوترة.
+            هيشتغل بمفاتيح «الردّ على عملائك» (
+            {base.map((p) => (p === 'openai' ? OPENAI.label : GEMINI.label)).join(' و')}). حط مفتاحًا
+            هنا بس لو عايز تفصل فاتورة المساعد.
           </p>
         )}
 
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="gemini-pro-key" className="text-sm font-medium">
-            {def.fields[0].label}
-          </label>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <input
-              id="gemini-pro-key"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              type="password"
-              autoComplete="off"
-              dir="ltr"
-              placeholder={saved?.hasOwnKey ? '•••••••••• (محفوظ)' : def.fields[0].placeholder}
-              className="min-h-11 flex-1 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-start font-mono text-sm focus:border-[var(--primary)] focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={verify}
-              disabled={verifying || !apiKey.trim()}
-              className="min-h-11 shrink-0 rounded-lg border border-[var(--border-strong)] px-4 text-sm font-medium transition-colors hover:bg-[var(--surface-2)] disabled:opacity-50"
-            >
-              {verifying ? 'بيتأكّد…' : 'تحقّق'}
-            </button>
-          </div>
-          <a
-            href="https://aistudio.google.com/apikey"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-xs font-medium text-[var(--primary)] hover:underline"
-          >
-            اجيب المفتاح منين؟
-            <ExternalLink className="h-3 w-3" aria-hidden="true" />
-          </a>
-        </div>
+        <KeyField
+          id="pro-gemini"
+          label={GEMINI.keyLabel}
+          value={geminiKey}
+          onChange={setGeminiKey}
+          saved={Boolean(saved?.hasOwnKey) && !removed.includes('gemini')}
+          placeholder={GEMINI.keyPlaceholder}
+          docHref={GEMINI.keyHref}
+          busy={verifying}
+          onVerify={() => verify('gemini')}
+          onRemove={() => setRemoved((r) => [...r, 'gemini'])}
+          optional
+        />
 
-        {models.length > 0 && (
-          <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">الموديل</span>
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              className="min-h-11 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-sm focus:border-[var(--primary)] focus:outline-none"
-            >
-              {models.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-            <span className="text-xs text-[var(--fg-subtle)]">
-              المساعد بيقرا بيانات متجرك مع كل رسالة — الموديل الأقوى بيفهم أحسن
-              وبيكلّف أكتر.
-            </span>
-          </label>
-        )}
+        <KeyField
+          id="pro-openai"
+          label={OPENAI.keyLabel}
+          value={openaiKey}
+          onChange={setOpenaiKey}
+          saved={Boolean(saved?.hasOwnOpenaiKey) && !removed.includes('openai')}
+          placeholder={OPENAI.keyPlaceholder}
+          docHref={OPENAI.keyHref}
+          busy={verifying}
+          onVerify={() => verify('openai')}
+          onRemove={() => setRemoved((r) => [...r, 'openai'])}
+          optional
+        />
 
         {usable && (
-          <div className="flex items-start gap-2 rounded-lg bg-[var(--color-warning-soft)] px-3 py-2.5 text-xs text-[var(--color-warning)]">
-            <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-            <span>
-              المساعد بيستهلك أكتر من التحسين العادي لأنه بيقرا بيانات متجرك في كل
-              رسالة. <strong>المفتاح المجاني هيقف بسرعة</strong> — فعّل الفوترة في
-              Google AI Studio لو هتعتمد عليه.
-            </span>
+          <div className="flex flex-col gap-3">
+            {hasGemini && hasOpenai && (
+              <ProviderSwitch
+                label="المساعد يشتغل افتراضيًا بـ"
+                hint="وتقدر تبدّل بينهم من جوّه الشات نفسه في أي وقت."
+                options={[
+                  { key: 'gemini' as const, label: GEMINI.label },
+                  { key: 'openai' as const, label: OPENAI.label },
+                ]}
+                value={effective}
+                onChange={setProvider}
+              />
+            )}
+
+            {(geminiModels.length > 0 || openaiModels.length > 0) && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {geminiModels.length > 0 && (
+                  <ModelSelect label="موديل Gemini" value={model} onChange={setModel} models={geminiModels} />
+                )}
+                {openaiModels.length > 0 && (
+                  <ModelSelect
+                    label="موديل ChatGPT"
+                    value={openaiModel}
+                    onChange={setOpenaiModel}
+                    models={openaiModels}
+                  />
+                )}
+              </div>
+            )}
+
+            <div className="flex items-start gap-2 rounded-lg bg-[var(--color-warning-soft)] px-3 py-2.5 text-xs text-[var(--color-warning)]">
+              <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span>
+                المساعد بيستهلك أكتر من التحسين العادي لأنه بيقرا بيانات متجرك في كل
+                رسالة. <strong>محتاج مفتاح عليه رصيد أو فوترة</strong> لو هتعتمد عليه.
+              </span>
+            </div>
           </div>
         )}
 
@@ -251,8 +307,8 @@ export function GeminiProCard({
           <button
             type="button"
             onClick={() => save()}
-            disabled={saving || !usable}
-            className="flex min-h-11 items-center gap-2 rounded-lg bg-[var(--primary)] px-5 text-sm font-semibold text-[var(--primary-fg)] transition-opacity hover:opacity-90 disabled:opacity-50"
+            disabled={saving || (!usable && removed.length === 0)}
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-5 text-sm font-semibold text-[var(--primary-fg)] transition-opacity hover:opacity-90 disabled:opacity-50 sm:w-auto"
           >
             <Check className="h-4 w-4" aria-hidden="true" />
             {saving ? 'بيتحفظ…' : 'حفظ'}

@@ -59,26 +59,39 @@ export default async function PluginsPage() {
           gemini={{
             enabled: gemini.enabled,
             hasKey: Boolean(gemini.apiKey),
+            hasOpenaiKey: Boolean(gemini.openaiKey),
             model: gemini.model,
+            openaiModel: gemini.openaiModel,
+            botProvider: gemini.botProvider,
             brief: gemini.brief,
             botEnabled: gemini.botEnabled,
             botGreeting: gemini.botGreeting,
             botDailyLimit: gemini.botDailyLimit,
             botVisitorLimit: gemini.botVisitorLimit,
+            lastIssue: gemini.lastIssue,
           }}
           pro={{
             enabled: pro.enabled,
             hasOwnKey: Boolean(pro.apiKey),
+            hasOwnOpenaiKey: Boolean(pro.openaiKey),
             model: pro.model,
+            openaiModel: pro.openaiModel,
+            provider: pro.provider,
             brief: pro.brief,
-            baseReady: Boolean(gemini.apiKey && gemini.model),
+            baseProviders: [
+              ...(gemini.apiKey ? (['gemini'] as const) : []),
+              ...(gemini.openaiKey ? (['openai'] as const) : []),
+            ],
+            lastIssue: pro.lastIssue,
           }}
           claude={{
             enabled: claude.enabled,
             hasKey: Boolean(claude.apiKey),
             hasGeminiKey: Boolean(claude.geminiKey),
+            hasOpenaiKey: Boolean(claude.openaiKey),
             provider: claude.provider,
             model: claude.model,
+            lastIssue: claude.lastIssue,
           }}
         />
       </Reveal>

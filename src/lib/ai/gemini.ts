@@ -1,4 +1,5 @@
 import 'server-only'
+import { CREDIT_HELP } from './providers-meta'
 
 /**
  * عميل Gemini.
@@ -276,11 +277,18 @@ function classify(status: number, body: string): GeminiError {
       message: 'المفتاح مرفوض — يا إما باطل يا إما مقفول على مشروع تاني.',
     }
   }
-  if (status === 429) {
-    return {
-      kind: 'quota',
-      message: 'خلصت حصّتك على المفتاح ده. استنى شوية أو فعّل الفوترة في Google AI Studio.',
-    }
+  /*
+    الحصّة والفوترة بنفس جملة الرصيد في كل المنصة.
+
+    جوجل بترجّع ٤٢٩ للحصّة المجانية الخالصة وللضغط اللحظي الاتنين،
+    و٤٠٠ `FAILED_PRECONDITION` للموديل اللي محتاج فوترة. التلاتة ليهم
+    نفس الحل عند التاجر، فبياخدوا نفس الجملة ومكان الشحن.
+  */
+  if (
+    status === 429 ||
+    (status === 400 && (lower.includes('billing') || lower.includes('failed_precondition')))
+  ) {
+    return { kind: 'quota', message: CREDIT_HELP.gemini }
   }
   if (lower.includes('safety') || lower.includes('blocked')) {
     return { kind: 'blocked', message: 'المحتوى اتمنع من فلاتر جوجل. غيّر الصياغة وجرّب تاني.' }
@@ -588,6 +596,13 @@ export type ToolCall = {
   name: string
   args: Record<string, unknown>
   thoughtSignature?: string
+  /**
+   * معرّف النداء — ChatGPT بس.
+   *
+   * OpenAI بتربط نتيجة الأداة بالنداء بمعرّفه، وبترفض المحادثة كلها لو
+   * نداء مالوش رد. Gemini بتربط بالاسم وبتتجاهل الحقل.
+   */
+  id?: string
 }
 
 /**

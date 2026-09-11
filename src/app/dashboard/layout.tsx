@@ -50,7 +50,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
     اللي اشتراكه خلص بيلاقي أيقونة بتفتح صندوق كل إجابته «الميزة دي
     للمشتركين» — إعلان متنكّر في شكل أداة.
   */
-  const hasAnyKey = Boolean(gemini.apiKey || pro.apiKey) && (await aiAllowed(store.id))
+  const hasAnyKey =
+    Boolean(gemini.apiKey || pro.apiKey || gemini.openaiKey || pro.openaiKey) &&
+    (await aiAllowed(store.id))
 
   return (
     <div className="min-h-screen-safe">

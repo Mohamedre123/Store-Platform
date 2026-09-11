@@ -31,14 +31,15 @@ import {
   PRESETS,
   STYLES,
   TONES,
-  inferStyle,
   platformOf,
   presetOf,
+  resolveStyle,
   styleOf,
   type ImageStyle,
   type PresetKey,
   type ToneKey,
 } from '@/lib/studio-meta'
+import { AI_PROVIDERS, type AiProvider } from '@/lib/ai/providers-meta'
 import { Alert, Card } from '@/components/ui'
 import { SharePost } from '@/components/dashboard/share-post'
 import { toast } from '@/components/dashboard/toast'
@@ -71,12 +72,17 @@ type Asset = { id: string; url: string; prompt: string; preset: string; kind: st
  */
 export function StudioClient({
   hasKey,
+  providers,
+  defaultProvider,
   publishing,
   products,
   accounts,
   assets,
 }: {
   hasKey: boolean
+  /** المزوّدين اللي ليهم مفتاح — Gemini وChatGPT */
+  providers: AiProvider[]
+  defaultProvider: AiProvider | null
   /** خدمة النشر مضبوطة على المنصة — من غيرها الربط نفسه مش متاح */
   publishing: boolean
   products: Product[]
@@ -148,8 +154,17 @@ export function StudioClient({
     الجملة ويغلّبها، والشاشة بتعلّم نفس الشكل عشان يشوف اللي هيتنفّذ.
   */
   const [style, setStyle] = useState<ImageStyle>('auto')
-  const typedStyle = inferStyle(imagePrompt)
-  const effectiveStyle: ImageStyle = typedStyle ?? style
+  /*
+    نفس دالة الخادم بالظبط.
+
+    «زي ما أنا كاتب» بيغلب الكلام، والكلام بيغلب باقي الاختيارات. لو
+    الشاشة حسبتها بطريقتها، التاجر يشوف شكل متعلّم والخادم يولّد غيره.
+  */
+  const effectiveStyle = resolveStyle(style, imagePrompt)
+  const overridden = effectiveStyle !== style ? effectiveStyle : null
+
+  /* Gemini ولا ChatGPT — للصورة والكاروسيل والفيديو والكلام مع بعض */
+  const [provider, setProvider] = useState<AiProvider | null>(defaultProvider)
 
   /* النشر */
   const live = accounts.filter((a) => a.status === 'active')
@@ -210,6 +225,7 @@ export function StudioClient({
         parentId: edit ? (current?.id ?? null) : null,
         useProductPhoto: !edit && useProductPhoto,
         style,
+        provider,
       })
 
       if (!res.ok) {
@@ -244,6 +260,7 @@ export function StudioClient({
       /* الصورة المعروضة دلوقتي بتتحرّك — أدق من صورة المنتج الخام */
       seedAssetUrl: current?.url ?? null,
       style,
+      provider,
     })
 
     if (!started.ok) {
@@ -299,6 +316,7 @@ export function StudioClient({
       productId: product?.id ?? null,
       useProductPhoto,
       style,
+      provider,
     })
 
     if (!res.ok) setImgError(res.error)
@@ -324,6 +342,7 @@ export function StudioClient({
         productId: product?.id ?? null,
         tone,
         extra: extra.trim() || null,
+        provider,
       })
       if (!res.ok) setCopyError(res.error)
       else {
@@ -407,10 +426,10 @@ export function StudioClient({
     return (
       <Card className="flex flex-col items-center gap-3 px-6 py-10 text-center">
         <Sparkles className="h-7 w-7 text-[var(--primary)]" aria-hidden="true" />
-        <h2 className="font-bold">محتاج مفتاح Gemini</h2>
+        <h2 className="font-bold">محتاج مفتاح Gemini أو ChatGPT</h2>
         <p className="max-w-md text-sm leading-relaxed text-[var(--fg-muted)]">
-          الاستوديو بيشتغل بنفس المفتاح اللي في «الردّ على عملائك» أو «مساعدك في إدارة المتجر» —
-          مش محتاج مفتاح تالت. حطّه من الإضافات وارجع.
+          الاستوديو بيشتغل بنفس المفاتيح اللي في «الردّ على عملائك» أو «مساعدك في إدارة المتجر» —
+          Gemini أو ChatGPT، ومش محتاج مفتاح تالت. حطّه من الإضافات وارجع.
         </p>
         <Link
           href="/dashboard/plugins"
@@ -534,6 +553,37 @@ export function StudioClient({
           </div>
         </div>
 
+        {/*
+          المزوّد — بيظهر لما التاجر يبقى حاطط المفتاحين.
+
+          الاختيار واحد للصورة والكلام: صورة بـChatGPT وكلام بـGemini كان
+          هيخلّي التاجر يدفع لحسابين على بوست واحد من غير ما يقصد.
+        */}
+        {providers.length > 1 && (
+          <div className="flex flex-col gap-2">
+            <span className="text-xs font-medium text-[var(--fg-muted)]">بيولّد بـ</span>
+            <div className="flex gap-1.5" role="radiogroup" aria-label="مزوّد الذكاء">
+              {providers.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  role="radio"
+                  aria-checked={provider === p}
+                  onClick={() => setProvider(p)}
+                  className={cn(
+                    'flex h-10 flex-1 items-center justify-center rounded-lg border px-4 text-sm font-medium transition-colors sm:flex-none',
+                    provider === p
+                      ? 'border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]'
+                      : 'border-[var(--border-strong)] text-[var(--fg-muted)]',
+                  )}
+                >
+                  {AI_PROVIDERS.find((x) => x.key === p)?.label ?? p}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {media === 'video' && (
           <p className="rounded-lg bg-[var(--surface-2)] px-3.5 py-2.5 text-xs leading-relaxed text-[var(--fg-muted)]">
             {/*
@@ -585,13 +635,11 @@ export function StudioClient({
               <span
                 className={cn(
                   'text-xs',
-                  typedStyle && typedStyle !== style
-                    ? 'text-[var(--primary)]'
-                    : 'text-[var(--fg-subtle)]',
+                  overridden ? 'text-[var(--primary)]' : 'text-[var(--fg-subtle)]',
                 )}
               >
-                {typedStyle && typedStyle !== style
-                  ? `كلامك فيه «${styleOf(typedStyle).label}» — وده اللي هيتنفّذ`
+                {overridden
+                  ? `كلامك فيه «${styleOf(overridden).label}» — وده اللي هيتنفّذ`
                   : styleOf(effectiveStyle).hint}
               </span>
             </span>
@@ -786,9 +834,10 @@ export function StudioClient({
                 </div>
 
                 <p className="rounded-lg bg-[var(--surface-2)] px-3.5 py-2.5 text-xs leading-relaxed text-[var(--fg-muted)]">
-                  الشرايح بتتعمل واحدة ورا التانية عشان يطلعوا بنفس الشكل — يعني{' '}
-                  <strong className="text-[var(--fg)]">{slideCount} صور</strong> بتاخد وقت{' '}
-                  {slideCount} صور. الأولى غلاف، والأخيرة دعوة للطلب، واللي بينهم فوايد وتفاصيل.
+                  الأول بيتعمل خطة للشرايح كلها — كل شريحة لقطة مختلفة بنفس الإضاءة والألوان —
+                  وبعدين بتترسم واحدة ورا التانية، يعني{' '}
+                  <strong className="text-[var(--fg)]">{slideCount} صور</strong> بتاخد وقت {slideCount} صور.
+                  تقدر تكتب لكل شريحة عايزها إزاي: «الأولى كذا، والأخيرة كذا، واللي في النص كذا».
                 </p>
 
                 <button
