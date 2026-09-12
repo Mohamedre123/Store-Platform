@@ -26,6 +26,29 @@ const types = { '.js': 'text/javascript; charset=utf-8', '.html': 'text/html; ch
 createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', `http://localhost:${port}`)
 
+  /* بيانات وهمية للطلبات — القايمة والتفاصيل والأفعال (dev/mock-api.mjs) */
+  if (url.pathname.startsWith('/api/app/orders')) {
+    const mock = await import(new URL('../dev/mock-api.mjs', import.meta.url))
+    const send = (status, body) => {
+      res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
+      res.end(JSON.stringify(body))
+    }
+    const parts = url.pathname.split('/').filter(Boolean)
+    await new Promise((r) => setTimeout(r, 450))
+    if (parts.length === 3) return send(200, mock.list(url.searchParams.get('filter') ?? 'all'))
+    if (parts.length === 4 && req.method === 'GET') {
+      const d = mock.detail(parts[3])
+      return d ? send(200, d) : send(404, { error: 'not_found' })
+    }
+    if (parts.length === 5 && req.method === 'POST') {
+      let raw = ''
+      for await (const chunk of req) raw += chunk
+      const out = mock.act(parts[3], parts[4], raw ? JSON.parse(raw) : {})
+      return send(out.status, out.json)
+    }
+    return send(404, { error: 'not_found' })
+  }
+
   /* بيانات وهمية للرئيسية — نفس شكل /api/app/home بالظبط، بتأخير زي النت الحقيقي */
   if (url.pathname === '/api/app/home') {
     const body = await readFile(path.join(devRoot, 'home.json'))

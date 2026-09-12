@@ -1,21 +1,40 @@
 /**
- * التنقّل من الشاشات الأصلية لصفحات المنصة.
+ * التنقّل من الشاشات الأصلية.
  *
- * الأفضل تنقّل Next من غير تحميل صفحة: الراوتر لو متاح، وإلا نضغط رابط
- * Next موجود فعلًا في الصفحة لنفس العنوان (الشريط السفلي المخفي مثلًا
- * فيه روابط الأقسام). التحميل الكامل آخر احتياطي بس.
+ * ## الشاشة بتظهر قبل ما المنصة ترد
+ * تنقّل Next بيغيّر الرابط بعد ما الخادم يرد — يعني نص ثانية أو أكتر.
+ * لو الشاشة الأصلية استنت الرابط، التطبيق كان هيبان بطيء زي الموقع.
+ * فبنبلّغ الهيكل بالوجهة **لحظة الضغطة** (`onPendingNavigation`)،
+ * والشاشة بتترسم فورًا، والمنصة بتكمّل تحت في هدوء.
+ *
+ * ## والتنقّل نفسه بيعدّي على Next
+ * عشان سجل الرجوع يفضل سليم: زرار الرجوع والسحب من الطرف بيرجعوا
+ * لنفس الأماكن اللي Next عارفها. الراوتر لو متاح، وإلا رابط Next
+ * موجود في الصفحة لنفس العنوان، والتحميل الكامل آخر احتياطي.
  */
 import { progressStart } from '../navigation'
 
-type NextGlobal = { next?: { router?: { push?: (href: string) => void } } }
+type Router = { push?: (href: string) => void; replace?: (href: string) => void }
+type NextGlobal = { next?: { router?: Router } }
 
-export function navigate(href: string): void {
+const pendingListeners = new Set<(href: string) => void>()
+
+export function onPendingNavigation(listener: (href: string) => void): () => void {
+  pendingListeners.add(listener)
+  return () => {
+    pendingListeners.delete(listener)
+  }
+}
+
+export function navigate(href: string, options: { replace?: boolean } = {}): void {
   if (href === location.pathname + location.search) return
+  pendingListeners.forEach((listener) => listener(href))
   progressStart()
 
   const router = (window as unknown as NextGlobal).next?.router
-  if (typeof router?.push === 'function') {
-    router.push(href)
+  const method = options.replace ? router?.replace : router?.push
+  if (router && typeof method === 'function') {
+    method.call(router, href)
     return
   }
 
@@ -27,7 +46,8 @@ export function navigate(href: string): void {
     return
   }
 
-  location.assign(href)
+  if (options.replace) location.replace(href)
+  else location.assign(href)
 }
 
 /** المتجر والروابط الخارجية — الطبقة الأصلية بتفتحهم في متصفح داخلي */

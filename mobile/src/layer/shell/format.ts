@@ -51,6 +51,15 @@ export function greeting(date = new Date()): string {
   return 'مساء الخير'
 }
 
+/** نفس `formatDateTime` في المنصة: «١٣ سبتمبر ٢٠٢٦، ٣:٤٠ م» */
+export function formatDateTime(iso: string): string {
+  try {
+    return new Intl.DateTimeFormat('ar-EG', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso))
+  } catch {
+    return iso
+  }
+}
+
 export function initials(name: string | null | undefined): string {
   const parts = (name ?? '').trim().split(/\s+/).filter(Boolean)
   if (!parts.length) return '؟'

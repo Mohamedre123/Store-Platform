@@ -1,17 +1,14 @@
 import Link from 'next/link'
-import { and, count, desc, eq, ne } from 'drizzle-orm'
 import { Mail, MessageCircle, Package, Phone, Plus, ShoppingBag } from 'lucide-react'
-import { db } from '@/db'
-import { orders } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { loadOrdersList } from '@/lib/orders-data'
 import { guard } from '@/lib/permissions'
 import { formatMoney, formatDateTime } from '@/lib/utils'
-import { ORDER_STATUSES, statusMeta } from '@/lib/order-status'
+import { statusMeta } from '@/lib/order-status'
 import { formatOrderNumber } from '@/lib/order-number'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal, SpotlightCard } from '@/components/motion'
 import { TrustBadge } from '@/components/dashboard/trust-badge'
-import { loadTrustScores } from '@/lib/trust-score'
 import { Card } from '@/components/ui'
 import { cn } from '@/lib/utils'
 
@@ -26,62 +23,8 @@ export default async function OrdersPage({
   guard(actor, 'orders.view')
   const { filter } = await searchParams
 
-  const isIncomplete = filter === 'incomplete'
-  const where = isIncomplete
-    ? and(eq(orders.storeId, store.id), eq(orders.isIncomplete, true))
-    : filter && filter !== 'all'
-      ? and(eq(orders.storeId, store.id), eq(orders.status, filter as never))
-      : and(eq(orders.storeId, store.id), eq(orders.isIncomplete, false))
-
-  const [rows, counts] = await Promise.all([
-    db
-      .select({
-        id: orders.id,
-        orderNumber: orders.orderNumber,
-        status: orders.status,
-        isIncomplete: orders.isIncomplete,
-        customerName: orders.customerName,
-        customerPhone: orders.customerPhone,
-        customerEmail: orders.customerEmail,
-        total: orders.total,
-        createdAt: orders.createdAt,
-        shippingAddress: orders.shippingAddress,
-      })
-      .from(orders)
-      .where(where)
-      .orderBy(desc(orders.createdAt))
-      .limit(100),
-
-    db
-      .select({ status: orders.status, isIncomplete: orders.isIncomplete, n: count() })
-      .from(orders)
-      .where(eq(orders.storeId, store.id))
-      .groupBy(orders.status, orders.isIncomplete),
-  ])
-
-  /*
-    درجات الثقة لكل أرقام الصفحة في استعلامين.
-
-    التاجر بيمسح القايمة بعينه قبل ما يقرّر يشحن إيه — فالتحذير
-    لازم يبقى هنا، مش جوّه كل طلب على حدة.
-  */
-  const trust = await loadTrustScores(
-    store.id,
-    rows.map((r) => r.customerPhone),
-  )
-
-  const incompleteCount = counts.find((c) => c.isIncomplete)?.n ?? 0
-  const totalCount = counts.filter((c) => !c.isIncomplete).reduce((n, c) => n + c.n, 0)
-  const countFor = (key: string) => counts.find((c) => !c.isIncomplete && c.status === key)?.n ?? 0
-
-  const tabs = [
-    { key: 'all', label: 'الكل', n: totalCount },
-    ...ORDER_STATUSES.filter((s) => !['incomplete', 'returned'].includes(s.key)).map((s) => ({
-      key: s.key,
-      label: s.label,
-      n: countFor(s.key),
-    })),
-  ]
+  /* الاستعلامات في `loadOrdersList` — نفس المصدر اللي تطبيق الموبايل بيقرا منه */
+  const { rows, trust, isIncomplete, incompleteCount, totalCount, tabs } = await loadOrdersList(store, filter)
 
   return (
     <div className="flex flex-col gap-6">

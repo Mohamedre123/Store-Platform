@@ -1,11 +1,12 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { notFound } from 'next/navigation'
-import { and, asc, eq, inArray } from 'drizzle-orm'
 import { AlertTriangle, ArrowRight, Mail, MapPin, MessageCircle, Phone, StickyNote, User } from 'lucide-react'
+import { and, eq, inArray } from 'drizzle-orm'
 import { db } from '@/db'
-import { categories, couriers, orderEvents, orderItems, orders, productOptions, products, productVariants, shipments } from '@/db/schema'
+import { categories, productOptions, products, productVariants } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { loadOrderDetail } from '@/lib/orders-data'
 import { guard } from '@/lib/permissions'
 import { formatMoney, formatDateTime } from '@/lib/utils'
 import { statusMeta } from '@/lib/order-status'
@@ -17,7 +18,6 @@ import { Card } from '@/components/ui'
 import { Reveal } from '@/components/motion'
 import { TrustBadge } from '@/components/dashboard/trust-badge'
 import { ConfirmCard } from '../confirm-card'
-import { loadTrustScore } from '@/lib/trust-score'
 import { OrderNote, StatusControls } from '../status-controls'
 import { IncompleteActions } from '../incomplete-actions'
 import { ConvertCart } from '../convert-cart'
@@ -31,46 +31,10 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const { store, actor } = await getDashboardContext()
   guard(actor, 'orders.view')
 
-  const [order] = await db
-    .select()
-    .from(orders)
-    .where(and(eq(orders.id, id), eq(orders.storeId, store.id)))
-    .limit(1)
-
-  if (!order) notFound()
-
-  const [items, events, courierOptions, assignedRows] = await Promise.all([
-    db.select().from(orderItems).where(eq(orderItems.orderId, order.id)),
-    db
-      .select()
-      .from(orderEvents)
-      .where(eq(orderEvents.orderId, order.id))
-      .orderBy(asc(orderEvents.createdAt)),
-
-    /*
-      المندوبون الشغّالين — عشان الإسناد يتم من هنا مباشرةً.
-
-      استعلامان خفيفان على جدول صغير. التاجر اللي بيشحن بشركة
-      ما عندوش صفوف هنا، والكارت بيختفي عنده من غير أي إعداد.
-    */
-    db
-      .select({
-        id: couriers.id,
-        name: couriers.name,
-        phone: couriers.phone,
-        zones: couriers.zones,
-      })
-      .from(couriers)
-      .where(and(eq(couriers.storeId, store.id), eq(couriers.isActive, true)))
-      .orderBy(couriers.name),
-
-    db
-      .select({ name: couriers.name, phone: couriers.phone })
-      .from(shipments)
-      .innerJoin(couriers, eq(couriers.id, shipments.courierId))
-      .where(and(eq(shipments.storeId, store.id), eq(shipments.orderId, order.id)))
-      .limit(1),
-  ])
+  /* الطلب وبنوده وأحداثه ودرجة الثقة من `loadOrderDetail` — نفس مصدر تطبيق الموبايل */
+  const detail = await loadOrderDetail(store, id)
+  if (!detail) notFound()
+  const { order, items, events, courierOptions, assigned, trust } = detail
 
   /**
    * البنود اللي لسه محتاجة مقاس أو لون.
@@ -137,13 +101,6 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const meta = statusMeta(order.isIncomplete ? 'incomplete' : order.status)
   const address = order.shippingAddress
 
-  /*
-    درجة ثقة العميل — بتتحمّل مع الصفحة لا بضغطة زيادة.
-
-    استعلامين مجمّعين، والقرار اللي بتخدمه (أشحن ولا أتصل) بيتاخد
-    في نفس الفتحة دي.
-  */
-  const trust = await loadTrustScore(store.id, order.customerPhone)
 
   /** الربح الحقيقي بعد تكلفة البضاعة والشحن — مش الإيراد */
   const profit = order.total - order.costTotal - order.shippingTotal
@@ -415,7 +372,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               <CourierCard
                 orderId={order.id}
                 couriers={courierOptions as CourierOption[]}
-                assigned={assignedRows[0] ?? null}
+                assigned={assigned}
                 city={address?.city ?? null}
                 codAmount={
                   order.paymentStatus === 'paid'
