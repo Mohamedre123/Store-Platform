@@ -1,10 +1,8 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { and, desc, eq } from 'drizzle-orm'
 import { ImageOff, Layers, Package, Plus } from 'lucide-react'
-import { db } from '@/db'
-import { products, categories } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { loadProductsList } from '@/lib/products-data'
 import { guard } from '@/lib/permissions'
 import { formatMoney } from '@/lib/utils'
 import { PageHeader } from '@/components/dashboard/page-shell'
@@ -17,25 +15,11 @@ export default async function ProductsPage() {
   const { store, actor } = await getDashboardContext()
   guard(actor, 'products.view')
 
-  const rows = await db
-    .select({
-      id: products.id,
-      name: products.name,
-      price: products.price,
-      compareAtPrice: products.compareAtPrice,
-      stock: products.stock,
-      trackInventory: products.trackInventory,
-      status: products.status,
-      images: products.images,
-      categoryName: categories.name,
-    })
-    .from(products)
-    .leftJoin(categories, eq(categories.id, products.categoryId))
-    .where(eq(products.storeId, store.id))
-    .orderBy(desc(products.createdAt))
-
-  const active = rows.filter((r) => r.status === 'active').length
-  const lowStock = rows.filter((r) => r.trackInventory && r.stock <= 5).length
+  /*
+    الاستعلام في `loadProductsList` — نفس المصدر اللي تطبيق الموبايل بيقرا منه،
+    ومن غير المنتجات اللي في سلة المهملات.
+  */
+  const { rows, active, lowStock } = await loadProductsList(store)
 
   return (
     <div className="flex flex-col gap-8">

@@ -104,6 +104,7 @@ export function Screen({
   actions,
   onRefresh,
   resetKey,
+  overlay,
   children,
 }: {
   visible: boolean
@@ -114,6 +115,8 @@ export function Screen({
   onRefresh?: () => Promise<unknown>
   /** لما يتغيّر (طلب تاني مثلًا) الشاشة بترجع لأولها */
   resetKey?: string | null
+  /** عناصر ثابتة فوق المحتوى (زرار عائم) — برّه منطقة التمرير فما بتتحركش معاها */
+  overlay?: ComponentChildren
   children: ComponentChildren
 }) {
   const scroller = useRef<HTMLDivElement>(null)
@@ -152,6 +155,7 @@ export function Screen({
       >
         {children}
       </div>
+      {overlay}
     </div>
   )
 }

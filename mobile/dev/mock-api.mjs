@@ -154,3 +154,95 @@ export function act(id, action, body) {
   events.set(id, log)
   return { status: 200, json: { ok: true, detail: detail(id) } }
 }
+
+/* ─────────────── المنتجات ─────────────── */
+
+const productRows = [
+  ['قميص قطن بياقة', 45000, 59000, 18, 'active', 'رجالي', true],
+  ['بنطلون جينز سليم', 62000, null, 4, 'active', 'رجالي', true],
+  ['شنطة جلد يدوي', 89000, 110000, 0, 'active', 'إكسسوارات', true],
+  ['ساعة كلاسيك', 135000, null, 9, 'active', 'إكسسوارات', false],
+  ['فستان صيفي مشجّر', 54000, 72000, 2, 'active', 'حريمي', true],
+  ['كوتشي رياضي خفيف', 98000, null, 25, 'draft', 'أحذية', true],
+  ['طقم سلاسل فضة', 38000, null, 0, 'draft', 'إكسسوارات', true],
+  ['شراب قطن (٣ أزواج)', 12500, null, 140, 'active', null, true],
+]
+
+const productList = productRows.map(([name, price, compareAtPrice, stock, status, category, trackInventory], i) => ({
+  id: `00000000-0000-4000-8000-00000000000${i + 1}`,
+  name,
+  price,
+  compareAtPrice,
+  stock,
+  trackInventory,
+  status,
+  image: null,
+  category,
+}))
+
+export function productsList() {
+  const alive = productList.filter((p) => !p.deleted)
+  return {
+    currency: 'EGP',
+    total: alive.length,
+    active: alive.filter((p) => p.status === 'active').length,
+    lowStock: alive.filter((p) => p.trackInventory && p.stock <= 5).length,
+    products: alive.map(({ deleted, ...p }) => p),
+  }
+}
+
+export function productDetail(id) {
+  const p = productList.find((x) => x.id === id && !x.deleted)
+  if (!p) return null
+  const withVariants = p.name.includes('قميص') || p.name.includes('فستان')
+  const variants = withVariants
+    ? ['S', 'M', 'L', 'XL'].map((size, i) => ({
+        id: `${id}-v${i}`,
+        title: `كحلي / ${size}`,
+        price: p.price,
+        stock: [6, 0, 8, 4][i],
+        isActive: i !== 3 || p.stock > 0,
+      }))
+    : []
+  return {
+    currency: 'EGP',
+    product: {
+      id: p.id,
+      name: p.name,
+      status: p.status,
+      price: p.price,
+      compareAtPrice: p.compareAtPrice,
+      costPrice: Math.round(p.price * 0.55),
+      sku: `ZW-${id.slice(-3)}`,
+      stock: p.stock,
+      trackInventory: p.trackInventory,
+      images: [],
+      category: p.category,
+      description: 'خامة ممتازة ومريحة للاستخدام اليومي.\nمتاح التوصيل لكل المحافظات خلال ٢–٤ أيام.',
+      url: `https://www.zawyaeg.site/s/demo/products/demo-${id.slice(-1)}`,
+      createdAt: new Date(Date.now() - 86400e3 * 12).toISOString(),
+    },
+    options: withVariants
+      ? [
+          { name: 'اللون', values: [{ value: 'كحلي', hex: '#1f2a4d' }] },
+          { name: 'المقاس', values: ['S', 'M', 'L', 'XL'].map((v) => ({ value: v, hex: null })) },
+        ]
+      : [],
+    variants,
+    variantStock: variants.length ? variants.filter((v) => v.isActive).reduce((n, v) => n + v.stock, 0) : null,
+  }
+}
+
+export function productAct(id, action) {
+  const p = productList.find((x) => x.id === id && !x.deleted)
+  if (!p) return { status: 404, json: { ok: false, error: 'not_found' } }
+  if (action === 'status') {
+    p.status = p.status === 'active' ? 'draft' : 'active'
+    return { status: 200, json: { ok: true, detail: productDetail(id) } }
+  }
+  if (action === 'delete') {
+    p.deleted = true
+    return { status: 200, json: { ok: true } }
+  }
+  return { status: 404, json: { ok: false, error: 'not_found' } }
+}
