@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- نفس توكنات المنصة في src/app/globals.css -->
+    <color name="zawya_primary">#634B9A</color>
+    <color name="zawya_background">#F6F6F9</color>
+    <color name="zawya_splash">#F3F1F9</color>
+    <bool name="zawya_light_bars">true</bool>
+</resources>

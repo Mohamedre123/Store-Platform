@@ -1,0 +1,19 @@
+node_modules/
+
+# الناتج بيتبني من src/layer بـ`npm run build:layer`
+www/zawya-app.js
+
+# مفاتيح التوقيع — لو ضاعت أو اتسربت، التطبيق ما يقدرش يتحدّث على جوجل بلاي تاني
+*.jks
+*.keystore
+android/keystore.properties
+signing/
+
+# ناتج البناء
+dist/
+*.apk
+*.aab
+*.ipa
+
+# نسخة التطوير من الطبقة (npm run build:layer -- --dev)
+dev/*.dev.js

@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "zawya-app-www",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["mobile/scripts/serve-www.mjs"],
+      "port": 4455
     }
   ]
 }

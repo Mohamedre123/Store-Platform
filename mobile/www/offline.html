@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>زاوية — مفيش اتصال</title>
+    <!--
+      بتظهر لما أول تحميل للمنصة يفشل. محلية بالكامل (مفيش خط ولا صورة
+      من النت) لأنها بالتعريف بتشتغل من غير نت.
+
+      على أندرويد الصفحة دي ما بتوصلش لإضافات التطبيق، فكل حاجة هنا
+      بالمتصفح نفسه: حدث `online` + محاولة دورية.
+    -->
+    <style>
+      :root {
+        --bg-1: #faf9fd; --bg-2: #eceaf6; --bg-3: #e2def0;
+        --fg: #222540; --muted: #5c6890; --primary: #634b9a; --primary-fg: #fff;
+        --ring: rgba(99, 75, 154, 0.22); --card: rgba(255, 255, 255, 0.7);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg-1: #241f42; --bg-2: #171633; --bg-3: #101026;
+          --fg: #eceef6; --muted: #a8b0c8; --primary: #a08cd0; --primary-fg: #16182b;
+          --ring: rgba(160, 140, 208, 0.25); --card: rgba(28, 31, 54, 0.6);
+        }
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; }
+      body {
+        display: flex; align-items: center; justify-content: center;
+        padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+        background: linear-gradient(165deg, var(--bg-1) 0%, var(--bg-2) 55%, var(--bg-3) 100%);
+        color: var(--fg);
+        font-family: 'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent;
+        overflow: hidden; user-select: none; -webkit-user-select: none;
+      }
+      .wrap { width: 100%; max-width: 360px; text-align: center; animation: rise .6s cubic-bezier(.2,.8,.2,1) both; }
+      .orb { position: relative; width: 132px; height: 132px; margin: 0 auto 28px; }
+      .orb span {
+        position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--ring);
+        animation: pulse 2.4s cubic-bezier(.2,.6,.3,1) infinite;
+      }
+      .orb span:nth-child(2) { animation-delay: .8s; }
+      .orb span:nth-child(3) { animation-delay: 1.6s; }
+      .orb .core {
+        position: absolute; inset: 22px; border-radius: 30px; display: grid; place-items: center;
+        background: var(--card); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+        box-shadow: 0 18px 40px -18px rgba(34, 37, 64, .45);
+      }
+      .orb svg { width: 44px; height: 44px; color: var(--primary); }
+      .orb .slash { stroke-dasharray: 30; stroke-dashoffset: 30; animation: draw .7s .35s ease forwards; }
+      h1 { margin: 0 0 8px; font-size: 22px; font-weight: 700; }
+      p { margin: 0 0 28px; color: var(--muted); font-size: 15px; line-height: 1.8; }
+      button {
+        position: relative; width: 100%; min-height: 52px; border: 0; border-radius: 14px;
+        background: var(--primary); color: var(--primary-fg); font: inherit; font-size: 16px; font-weight: 600;
+        transition: transform .15s ease, opacity .2s ease;
+      }
+      button:active { transform: scale(.97); }
+      button[disabled] { opacity: .75; }
+      .spin {
+        display: none; width: 18px; height: 18px; margin-inline-end: 10px; vertical-align: -3px;
+        border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%;
+        animation: rot .8s linear infinite;
+      }
+      button[disabled] .spin { display: inline-block; }
+      .hint { margin-top: 16px; font-size: 13px; color: var(--muted); min-height: 1.5em; }
+      @keyframes pulse { 0% { transform: scale(.55); opacity: 1; } 100% { transform: scale(1.25); opacity: 0; } }
+      @keyframes draw { to { stroke-dashoffset: 0; } }
+      @keyframes rot { to { transform: rotate(360deg); } }
+      @keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+      @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } .orb .slash { stroke-dashoffset: 0; } }
+    </style>
+  </head>
+  <body>
+    <main class="wrap" role="alert">
+      <div class="orb" aria-hidden="true">
+        <span></span><span></span><span></span>
+        <div class="core">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 20h.01" />
+            <path d="M8.5 16.43a5 5 0 0 1 7 0" />
+            <path d="M5 12.86a10 10 0 0 1 5.17-2.69" />
+            <path d="M19 12.86a10 10 0 0 0-2.01-1.52" />
+            <path d="M2 8.82a15 15 0 0 1 4.18-2.64" />
+            <path d="M22 8.82a15 15 0 0 0-11.29-3.76" />
+            <path class="slash" d="m2 2 20 20" />
+          </svg>
+        </div>
+      </div>
+      <h1>مفيش اتصال بالإنترنت</h1>
+      <p>متجرك بخير وطلباتك محفوظة.<br />أول ما النت يرجع هنكمّل من مكان ما وقفت.</p>
+      <button id="retry" type="button"><span class="spin" aria-hidden="true"></span><span id="label">حاول تاني</span></button>
+      <div class="hint" id="hint" aria-live="polite"></div>
+    </main>
+
+    <script>
+      ;(function () {
+        var HOME = 'https://www.zawyaeg.site/dashboard'
+        var PING = 'https://www.zawyaeg.site/brand/zawya-mark.png'
+        var btn = document.getElementById('retry')
+        var label = document.getElementById('label')
+        var hint = document.getElementById('hint')
+        var busy = false
+
+        /*
+          `navigator.onLine` لوحده بيكدب: الموبايل ممكن يبقى متوصّل بواي فاي
+          من غير إنترنت فعلي. فبنجرّب نوصل للمنصة نفسها قبل ما نحمّلها —
+          وإلا المستخدم هيرجع لنفس الصفحة دي تاني.
+        */
+        function reachable() {
+          var ctrl = 'AbortController' in window ? new AbortController() : null
+          var timer = setTimeout(function () { if (ctrl) ctrl.abort() }, 6000)
+          return fetch(PING + '?t=' + Date.now(), { mode: 'no-cors', cache: 'no-store', signal: ctrl ? ctrl.signal : undefined })
+            .then(function () { clearTimeout(timer); return true })
+            .catch(function () { clearTimeout(timer); return false })
+        }
+
+        function attempt(manual) {
+          if (busy) return
+          busy = true
+          btn.disabled = true
+          label.textContent = 'بنحاول نوصل…'
+          hint.textContent = ''
+          reachable().then(function (ok) {
+            if (ok) {
+              label.textContent = 'رجع النت — ثانية واحدة'
+              location.replace(HOME)
+              return
+            }
+            busy = false
+            btn.disabled = false
+            label.textContent = 'حاول تاني'
+            if (manual) hint.textContent = 'لسه مش واصلين. اتأكد من الواي فاي أو باقة البيانات.'
+          })
+        }
+
+        btn.addEventListener('click', function () { attempt(true) })
+        window.addEventListener('online', function () { attempt(false) })
+        /* محاولة هادية كل شوية — التاجر مش لازم يفضل يدوس */
+        setInterval(function () { if (!document.hidden) attempt(false) }, 8000)
+      })()
+    </script>
+  </body>
+</html>

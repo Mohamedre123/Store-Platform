@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- نفس الثيم + أيقونات شريط التنقّل غامقة في الوضع الفاتح (متاح من أندرويد ٨.١) -->
+    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:background">@null</item>
+        <item name="android:windowBackground">@color/zawya_background</item>
+        <item name="android:statusBarColor">@color/zawya_background</item>
+        <item name="android:navigationBarColor">@color/zawya_background</item>
+        <item name="android:windowLightStatusBar">@bool/zawya_light_bars</item>
+        <item name="android:windowLightNavigationBar">@bool/zawya_light_bars</item>
+        <item name="colorPrimary">@color/zawya_primary</item>
+        <item name="colorAccent">@color/zawya_primary</item>
+    </style>
+</resources>

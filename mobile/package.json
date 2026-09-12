@@ -1,0 +1,31 @@
+{
+  "name": "zawya-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "زاوية — تطبيق أندرويد وiOS",
+  "type": "module",
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/browser": "^8.0.4",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/ios": "^8.5.2",
+    "@capacitor/network": "^8.0.1",
+    "@capacitor/share": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.2",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  },
+  "scripts": {
+    "build:layer": "node scripts/build-layer.mjs",
+    "assets": "node scripts/generate-assets.mjs",
+    "sync": "npm run build:layer && cap sync",
+    "android:open": "cap open android",
+    "ios:open": "cap open ios",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}

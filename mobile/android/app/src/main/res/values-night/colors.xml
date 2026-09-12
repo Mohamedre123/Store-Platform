@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="zawya_primary">#A08CD0</color>
+    <color name="zawya_background">#14162A</color>
+    <color name="zawya_splash">#171633</color>
+    <bool name="zawya_light_bars">false</bool>
+</resources>

@@ -1,0 +1,59 @@
+name: تطبيق iOS
+
+# بناء iOS محتاج ماك — والـrunner ده ماك على GitHub. بيبني نسخة للمحاكي
+# في كل تغيير (بيتأكد إن المشروع بيتبني من غير أخطاء).
+#
+# النسخة الموقّعة للآب ستور محتاجة حساب Apple Developer (٩٩ دولار/سنة).
+# بعد فتح الحساب: Xcode → Signing & Capabilities → اختار الفريق، ثم
+# Product → Archive → Distribute App. أو أضف أسرار التوقيع هنا وفعّل
+# خطوة الـarchive.
+
+on:
+  push:
+    branches: [main]
+    paths: ['mobile/**', '.github/workflows/mobile-ios.yml']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: تسطيب
+        run: npm ci
+
+      - name: بناء طبقة التطبيق ومزامنة المشروع
+        run: npm run sync
+
+      - name: بناء للمحاكي
+        working-directory: mobile/ios/App
+        run: |
+          xcodebuild \
+            -project App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: تجهيز نسخة المحاكي
+        run: |
+          cd ios/App/build/Build/Products/Debug-iphonesimulator
+          zip -qr "$GITHUB_WORKSPACE/zawya-ios-simulator.zip" App.app
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zawya-ios-simulator-${{ github.run_number }}
+          path: zawya-ios-simulator.zip

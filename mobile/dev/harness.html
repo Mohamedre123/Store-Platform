@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <!-- نفس الـviewport اللي المنصة بتبعته — الطبقة المفروض تشيل cover وتمنع التكبير -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
+    <title>تجربة طبقة التطبيق — زاوية</title>
+    <!-- بديل الحقن في أول الصفحة: أول سكربت قبل أي حاجة -->
+    <script src="/dev/zawya-app.dev.js"></script>
+    <!--
+      صفحة تجربة بتقلّد هيكل المنصة (الهيدر، main، الشريط السفلي، قايمة
+      «المزيد»، تصدير ملف، مشاركة) عشان تجربة الطبقة بصريًا من غير جهاز.
+      مش جزء من التطبيق.
+    -->
+    <style>
+      :root { --bg:#f6f6f9; --surface:#fff; --surface-2:#f1f2f6; --border:#e2e4ec; --fg:#222540; --fg-muted:#5c6890; --primary:#634b9a; --primary-soft:#ece8f5; --dash-nav:calc(4rem + env(safe-area-inset-bottom,0px)); }
+      @media (prefers-color-scheme: dark) { :root { --bg:#14162a; --surface:#1c1f36; --surface-2:#242844; --border:#2f3352; --fg:#eceef6; --fg-muted:#a8b0c8; --primary:#a08cd0; --primary-soft:#2a2547; } }
+      * { box-sizing: border-box; }
+      body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.7 'Segoe UI', Tahoma, system-ui, sans-serif; }
+      header { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:8px; height:56px; padding:env(safe-area-inset-top) 12px 0; background:var(--surface); border-bottom:1px solid var(--border); }
+      header b { flex:1; font-size:17px; }
+      header button { width:44px; height:44px; border:0; border-radius:50%; background:transparent; color:var(--fg-muted); font-size:20px; }
+      main { max-width:720px; margin:0 auto; padding:20px 16px calc(var(--dash-nav) + 24px); }
+      .card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px; margin-bottom:12px; }
+      .tiles { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+      .tile { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:14px; }
+      .tile small { color:var(--fg-muted); } .tile strong { display:block; font-size:22px; }
+      .btn { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:0 16px; border:0; border-radius:10px; background:var(--primary); color:#fff; font:inherit; font-weight:600; margin:4px; }
+      .btn--ghost { background:var(--surface-2); color:var(--fg); }
+      nav[aria-label="التنقّل السريع"] { position:fixed; inset-inline:0; bottom:0; z-index:40; display:flex; padding-bottom:env(safe-area-inset-bottom); background:var(--surface); border-top:1px solid var(--border); }
+      nav[aria-label="التنقّل السريع"] > * { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; padding:10px 0; font-size:12px; color:var(--fg-muted); text-decoration:none; background:none; border:0; font-family:inherit; }
+      nav[aria-label="التنقّل السريع"] > [aria-current="page"] { color:var(--primary); }
+      nav svg { width:22px; height:22px; }
+      .zw-sheet { position:fixed; inset:0; z-index:50; background:var(--bg); padding:env(safe-area-inset-top) 16px 16px; }
+      .zw-sheet header { position:static; padding:0; }
+      .login { max-width:420px; margin:0 auto; padding:24px 16px; }
+      .login input { width:100%; min-height:48px; margin:6px 0 14px; padding:0 12px; border:1px solid var(--border); border-radius:12px; background:var(--surface); color:var(--fg); font:inherit; }
+      .login .btn { width:100%; margin:8px 0; }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script>
+      const icon = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`
+      const home = icon('<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>')
+      const bag = icon('<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>')
+      const box = icon('<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>')
+      const grid = icon('<rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/>')
+
+      const pages = {
+        '/dashboard': { title: 'الرئيسية', body: '<div class="tiles"><div class="tile"><small>مبيعات النهارده</small><strong>12,450 ج.م</strong></div><div class="tile"><small>طلبات جديدة</small><strong>18</strong></div></div><div class="card"><b>آخر الطلبات</b><p>#1042 — أحمد علي — 750 ج.م</p><p>#1041 — سارة محمود — 1,200 ج.م</p></div><div class="card"><b>أدوات الطبقة</b><br><button class="btn" id="export">تصدير CSV</button><button class="btn btn--ghost" id="share">مشاركة</button><button class="btn btn--ghost" id="print">طباعة</button></div>' },
+        '/dashboard/orders': { title: 'الطلبات', body: Array.from({ length: 8 }, (_, i) => `<div class="card"><b>طلب #${1042 - i}</b><p>قيد التجهيز — ${(i + 3) * 150} ج.م</p></div>`).join('') },
+        '/dashboard/products': { title: 'المنتجات', body: Array.from({ length: 6 }, (_, i) => `<div class="card"><b>منتج ${i + 1}</b><p>المخزون: ${20 - i * 3}</p></div>`).join('') },
+      }
+
+      function render() {
+        const path = location.pathname
+        const app = document.getElementById('app')
+        if (path === '/login' || path === '/signup') {
+          app.innerHTML = `<header><b>زاوية</b></header><div class="login"><h2>أهلًا بيك تاني</h2><label>البريد الإلكتروني</label><input dir="ltr" placeholder="you@example.com"><label>كلمة المرور</label><input type="password"><button class="btn" onclick="go('/dashboard')">دخول</button></div>`
+          return
+        }
+        const page = pages[path] || pages['/dashboard']
+        const navItem = (href, label, svg) => `<a href="${href}" ${path === href ? 'aria-current="page"' : ''} onclick="event.preventDefault();go('${href}')">${svg}${label}</a>`
+        app.innerHTML = `
+          <header><b>${page.title}</b><button aria-label="ابحث">⌕</button></header>
+          <main>${page.body}</main>
+          <nav aria-label="التنقّل السريع">${navItem('/dashboard', 'الرئيسية', home)}${navItem('/dashboard/orders', 'الطلبات', bag)}${navItem('/dashboard/products', 'المنتجات', box)}<button type="button" onclick="openSheet()">${grid}المزيد</button></nav>`
+        document.getElementById('export')?.addEventListener('click', () => {
+          const blob = new Blob(['رقم,العميل,المبلغ\n1042,أحمد,750\n'], { type: 'text/csv' })
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.href = url
+          a.download = 'orders.csv'
+          a.click()
+          URL.revokeObjectURL(url)
+        })
+        document.getElementById('share')?.addEventListener('click', () => navigator.share?.({ text: 'متجري على زاوية', url: location.href }).catch(() => {}))
+        document.getElementById('print')?.addEventListener('click', () => window.print())
+      }
+
+      window.go = (href) => {
+        history.pushState({}, '', href)
+        render()
+      }
+      window.openSheet = () => {
+        const sheet = document.createElement('div')
+        sheet.className = 'zw-sheet'
+        sheet.innerHTML = '<header><b>المزيد</b><button aria-label="إغلاق" onclick="this.closest(\'.zw-sheet\').remove()">✕</button></header><div class="card">العملاء</div><div class="card">التسويق</div><div class="card">الإعدادات</div>'
+        document.body.appendChild(sheet)
+      }
+      addEventListener('popstate', render)
+      render()
+    </script>
+  </body>
+</html>

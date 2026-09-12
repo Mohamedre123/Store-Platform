@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "site.zawyaeg.app",
+      "sha256_cert_fingerprints": [
+        "8D:F2:2D:B7:57:B0:CA:B2:53:C9:CE:02:22:89:3B:5E:D5:E4:D7:6A:2D:EE:4B:F1:EF:0B:E8:D2:98:CF:61:BE"
+      ]
+    }
+  }
+]
