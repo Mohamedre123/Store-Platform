@@ -15,7 +15,7 @@ export const SITE_ORIGIN = `https://${SITE_HOST}`
  * المضيفات اللي بتتفتح جوّه التطبيق — أي حاجة غيرها بره.
  * نسخة التطوير (`--dev`) بتقبل localhost عشان صفحة التجربة في `dev/`.
  */
-export const APP_HOSTS = new Set([SITE_HOST, 'zawyaeg.site', ...(__ZAWYA_DEV__ ? ['localhost'] : [])])
+export const APP_HOSTS = new Set([SITE_HOST, 'zawyaeg.site', ...(__ZAWYA_DEV__ ? ['localhost', '10.0.2.2'] : [])])
 
 export const IS_ANDROID = /android/i.test(navigator.userAgent)
 export const PLATFORM: 'android' | 'ios' = IS_ANDROID ? 'android' : 'ios'

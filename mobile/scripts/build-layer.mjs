@@ -33,6 +33,9 @@ const result = await build({
   entryPoints: [path.join(root, 'src', 'layer', 'index.ts')],
   outfile,
   bundle: true,
+  /* الشاشات الأصلية بـPreact — نفس React في الكتابة وأخف بعشر مرات */
+  jsx: 'automatic',
+  jsxImportSource: 'preact',
   format: 'iife',
   /* أندرويد ٧ بـWebView قديم وiOS ١٥ — الصياغة الحديثة بتتحوّل لهم */
   target: ['chrome70', 'safari15'],

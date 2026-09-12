@@ -31,27 +31,53 @@ export type DashboardContext = {
  * بيانات لازم تمر من هنا وتستخدم `store.id` في الفلترة — مفيش
  * استثناءات، لأن ده الحاجز الوحيد ضد تسريب بيانات متجر لمتجر تاني.
  */
-export const getDashboardContext = cache(async (): Promise<DashboardContext> => {
+type ContextResult =
+  | { ok: true; context: DashboardContext }
+  | { ok: false; redirectTo: '/login' | '/verify' | '/signup' }
+
+/**
+ * حلّ السياق من غير أي تحويل — القرار للّي بينادي.
+ *
+ * صفحات اللوحة بتحوّل، ومسارات التطبيق (JSON) بترد ٤٠١. الاتنين لازم
+ * يمشوا بنفس الشروط بالحرف: لو شرط «البريد متأكّد» اتضاف في مكان واحد
+ * بس، التطبيق كان هيفتح بيانات متجر لحساب اللوحة نفسها قافلاه.
+ */
+const resolveDashboardContext = cache(async (): Promise<ContextResult> => {
   const user = await getCurrentUser()
-  if (!user) redirect('/login')
+  if (!user) return { ok: false, redirectTo: '/login' }
   // لا دخول للوحة قبل تأكيد البريد — الحساب بيمسك متجرًا وفلوس عملاء
-  if (!user.emailVerifiedAt) redirect('/verify')
+  if (!user.emailVerifiedAt) return { ok: false, redirectTo: '/verify' }
 
   // استعلام واحد بيرجّع كل متاجر المستخدم كاملة + دوره، فبنختار النشط من
   // الكوكي في الذاكرة — من غير رحلة تانية للخادم زي ما كان قبل كده.
   const memberships = await getMemberStoresFull(user.id)
-  if (memberships.length === 0) redirect('/signup')
+  if (memberships.length === 0) return { ok: false, redirectTo: '/signup' }
 
   const jar = await cookies()
   const requested = jar.get(ACTIVE_STORE_COOKIE)?.value
   const chosen = memberships.find((m) => m.id === requested) ?? memberships[0]
 
   return {
-    user,
-    store: chosen,
-    actor: { role: chosen.role, permissions: chosen.permissions },
+    ok: true,
+    context: {
+      user,
+      store: chosen,
+      actor: { role: chosen.role, permissions: chosen.permissions },
+    },
   }
 })
+
+export const getDashboardContext = cache(async (): Promise<DashboardContext> => {
+  const result = await resolveDashboardContext()
+  if (!result.ok) redirect(result.redirectTo)
+  return result.context
+})
+
+/** نفس السياق لمسارات بترد JSON — `null` بدل التحويل */
+export async function getOptionalDashboardContext(): Promise<DashboardContext | null> {
+  const result = await resolveDashboardContext()
+  return result.ok ? result.context : null
+}
 
 /** المتجر النشط فقط — اختصار للصفحات اللي مش محتاجة بيانات المستخدم */
 export async function getActiveStore(): Promise<ActiveStore> {

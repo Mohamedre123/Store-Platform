@@ -37,6 +37,9 @@ html.zw-app ${NAV}>* svg{transition:transform .28s cubic-bezier(.34,1.56,.64,1)}
 html.zw-app ${NAV}>[aria-current="page"] svg{transform:translateY(-1px) scale(1.07)}
 html.zw-app ${NAV}>*:active svg{transform:scale(.84)}
 
+/* شريط التبويبات الأصلي بياخد مكان شريط الموقع — نفس الارتفاع فمسافات الصفحة ما بتتغيّرش */
+html.zw-app.zw-native-tabs ${NAV}{display:none!important}
+
 @media (prefers-reduced-motion:reduce){
   html.zw-app main[class*="zw-enter"]>*,html.zw-app ${NAV}>*::before{animation:none!important}
 }

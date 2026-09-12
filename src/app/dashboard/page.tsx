@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { and, count, desc, eq, gte, sum } from 'drizzle-orm'
 import {
   ArrowLeft,
   CreditCard,
@@ -12,21 +11,12 @@ import {
   Truck,
   Users,
 } from 'lucide-react'
-import { db } from '@/db'
-import {
-  customers,
-  orderItems,
-  orders,
-  paymentMethods,
-  products,
-  shippingZones,
-} from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { publicStoreUrl } from '@/lib/domain'
 import { formatMoney, formatBps } from '@/lib/utils'
 import { ORDER_STATUSES } from '@/lib/order-status'
-import { getEntitlements, getOrderQuota } from '@/lib/entitlements'
-import { loadDashboardStats, pctChange } from '@/lib/dashboard-stats'
+import { pctChange } from '@/lib/dashboard-stats'
+import { loadHomeData } from '@/lib/home-data'
 import { formatOrderNumber } from '@/lib/order-number'
 import { getPlan } from '@/lib/plans'
 import { Card } from '@/components/ui'
@@ -35,95 +25,23 @@ import { Reveal } from '@/components/motion'
 import { PublishBanner } from './publish-banner'
 import { QuotaBanner } from './quota-banner'
 import { Greeting } from './greeting'
-import { SetupGuide, type SetupStep } from './setup-guide'
+import { SetupGuide } from './setup-guide'
 import { PlanCard } from './plan-card'
 import { StatTiles, type StatTile } from './stat-tiles'
 import { NoticeCards } from '@/components/dashboard/notice-cards'
-import { noticesFor, storeStats } from '@/lib/notices'
 import { OverviewChart, type OverviewSeries } from './overview-chart'
 
 export const metadata = { title: 'لوحة التحكم' }
 
 export default async function DashboardHome() {
   const { store } = await getDashboardContext()
-  /* آخر تلاتين يوم — نافذة «الأكتر مبيعًا» */
-  const last30 = new Date(Date.now() - 30 * 24 * 3600_000)
 
   /*
-    حالة الاشتراك في أول الصفحة.
-
-    الحد اللي بيوقف الطلبات لازم يوصل للتاجر **قبل** ما يقف — لو
-    اكتشفه لما عميل قاله «مش عارف أطلب»، الرسالة وصلت متأخرة يوم
-    كامل من البيع.
+    البيانات كلها من `loadHomeData` — نفس المصدر اللي تطبيق الموبايل
+    بيقرا منه (`/api/app/home`)، فالرقم واحد في المكانين.
   */
-  const ent = await getEntitlements(store)
-  const quota = await getOrderQuota(store)
-
-  /*
-    كل حاجة في دفعة واحدة متوازية.
-
-    الصفحة دي بيفتحها التاجر كل صباح، وأي استعلام متتالي بيتحوّل
-    لثانية إضافية بيقعد يبصّ فيها على شاشة فاضية.
-  */
-  const [stats, [pending], [incomplete], [productCount], [customerCount], [hasPayment], [hasShipping]] =
-    await Promise.all([
-      loadDashboardStats(store.id),
-      db
-        .select({ n: count() })
-        .from(orders)
-        .where(and(eq(orders.storeId, store.id), eq(orders.status, 'pending'))),
-      db
-        .select({ n: count() })
-        .from(orders)
-        .where(and(eq(orders.storeId, store.id), eq(orders.isIncomplete, true))),
-      db
-        .select({ n: count() })
-        .from(products)
-        .where(and(eq(products.storeId, store.id), eq(products.status, 'active'))),
-      db.select({ n: count() }).from(customers).where(eq(customers.storeId, store.id)),
-      db
-        .select({ n: count() })
-        .from(paymentMethods)
-        .where(and(eq(paymentMethods.storeId, store.id), eq(paymentMethods.enabled, true))),
-      db
-        .select({ n: count() })
-        .from(shippingZones)
-        .where(and(eq(shippingZones.storeId, store.id), eq(shippingZones.enabled, true))),
-    ])
-
-  const [latestOrders, topProducts] = await Promise.all([
-    db
-      .select({
-        id: orders.id,
-        number: orders.orderNumber,
-        name: orders.customerName,
-        total: orders.total,
-        status: orders.status,
-      })
-      .from(orders)
-      .where(and(eq(orders.storeId, store.id), eq(orders.isIncomplete, false)))
-      .orderBy(desc(orders.createdAt))
-      .limit(5),
-    db
-      .select({
-        productId: orderItems.productId,
-        name: orderItems.name,
-        image: orderItems.image,
-        sold: sum(orderItems.quantity),
-      })
-      .from(orderItems)
-      .innerJoin(orders, eq(orders.id, orderItems.orderId))
-      .where(
-        and(
-          eq(orderItems.storeId, store.id),
-          eq(orders.isIncomplete, false),
-          gte(orders.createdAt, last30),
-        ),
-      )
-      .groupBy(orderItems.productId, orderItems.name, orderItems.image)
-      .orderBy(desc(sum(orderItems.quantity)))
-      .limit(5),
-  ])
+  const { ent, quota, stats, counts, setup, notices, latestOrders, topProducts } =
+    await loadHomeData(store)
 
   const { current, previous, series } = stats
 
@@ -158,75 +76,7 @@ export default async function DashboardHome() {
     },
   ]
 
-  /**
-   * خطوات التجهيز — بترتيب الاحتياج لا بترتيب الشاشات.
-   *
-   * من غير منتج مفيش حاجة تتشحن، ومن غير شحن مفيش سعر يتحسب،
-   * ومن غير دفع الطلب ما بيقفلش. والنشر آخر خطوة لأنه بيفتح الباب
-   * للعملاء — وفتحه قبل ما الباقي يجهز بيوصّل زائرًا لمتجر ناقص.
-   */
-  const setup: SetupStep[] = [
-    {
-      key: 'product',
-      label: 'ضيف أول منتج',
-      hint: 'من غير منتج مفيش حاجة تتباع',
-      href: '/dashboard/products/new',
-      done: (productCount?.n ?? 0) > 0,
-      icon: 'product',
-    },
-    {
-      key: 'logo',
-      label: 'ارفع شعار متجرك',
-      hint: 'بيظهر في الهيدر والفاتورة ورسايل العملاء',
-      href: '/dashboard/settings',
-      done: Boolean(store.logoLight),
-      icon: 'logo',
-    },
-    {
-      key: 'shipping',
-      label: 'ظبّط مناطق الشحن',
-      hint: 'السعر اللي العميل بيشوفه في الشيك أوت',
-      href: '/dashboard/shipping',
-      done: (hasShipping?.n ?? 0) > 0,
-      icon: 'shipping',
-    },
-    {
-      key: 'payment',
-      label: 'فعّل طريقة دفع',
-      hint: 'الدفع عند الاستلام أو بوابة بمفاتيحك',
-      href: '/dashboard/payments',
-      done: (hasPayment?.n ?? 0) > 0,
-      icon: 'payment',
-    },
-    {
-      key: 'theme',
-      label: 'اختار شكل متجرك',
-      hint: 'الألوان والخطوط والصفحة الرئيسية',
-      href: '/dashboard/storefront',
-      done: Boolean(store.logoLight) && (productCount?.n ?? 0) > 0,
-      icon: 'theme',
-    },
-    {
-      key: 'publish',
-      label: 'انشر المتجر',
-      hint: 'آخر خطوة — بعدها العملاء يقدروا يطلبوا',
-      href: '/dashboard/settings',
-      done: store.isPublished,
-      icon: 'publish',
-    },
-  ]
-
   const plan = ent.plan ?? getPlan(store.plan)
-
-  /*
-    رسايل المنصة الموجَّهة للمتجر ده.
-
-    استعلامين خفيفين: أرقام المتجر (طلبات مسلَّمة وإحالات) والرسايل
-    اللي شروطها متحقّقة. الشرط بيتقاس هنا لا وقت الكتابة — التاجر
-    اللي بيوصل للرقم بكرة بيشوف العرض بكرة لوحده.
-  */
-  const rewardStats = await storeStats(store.id)
-  const notices = await noticesFor(store.id, rewardStats)
 
   return (
     <div className="flex flex-col gap-8">
@@ -322,22 +172,22 @@ export default async function DashboardHome() {
         التاجر بالظبط دلوقتي. عشان كده بيبانوا كأفعال لا كمربّعات،
         وبيختفوا لما يبقوا صفر.
       */}
-      {((pending?.n ?? 0) > 0 || (incomplete?.n ?? 0) > 0) && (
+      {(counts.pending > 0 || counts.incomplete > 0) && (
         <Reveal delay={200}>
           <div className="grid gap-3 sm:grid-cols-2">
-            {(pending?.n ?? 0) > 0 && (
+            {counts.pending > 0 && (
               <ActionCard
                 href="/dashboard/orders?filter=pending"
                 icon={Package}
-                title={`${pending.n} طلب مستني تأكيدك`}
+                title={`${counts.pending} طلب مستني تأكيدك`}
                 hint="أكّدهم عشان يتشحنوا"
               />
             )}
-            {(incomplete?.n ?? 0) > 0 && (
+            {counts.incomplete > 0 && (
               <ActionCard
                 href="/dashboard/orders?filter=incomplete"
                 icon={Users}
-                title={`${incomplete.n} سلة متروكة`}
+                title={`${counts.incomplete} سلة متروكة`}
                 hint="كلّمهم على واتساب — أسرع فلوس ترجّعها"
                 tone="warning"
               />
@@ -424,7 +274,7 @@ export default async function DashboardHome() {
                   </span>
                   <span className="min-w-0 flex-1 truncate text-sm font-medium">{p.name}</span>
                   <span className="tabular shrink-0 text-sm text-[var(--fg-muted)]">
-                    {Number(p.sold ?? 0)} مبيع
+                    {p.sold} مبيع
                   </span>
                 </div>
               ))}
@@ -435,7 +285,7 @@ export default async function DashboardHome() {
 
       <Reveal delay={340}>
         <p className="text-sm text-[var(--fg-subtle)]">
-          عندك {productCount?.n ?? 0} منتج نشط و{customerCount?.n ?? 0} عميل مسجّل.
+          عندك {counts.products} منتج نشط و{counts.customers} عميل مسجّل.
         </p>
       </Reveal>
     </div>

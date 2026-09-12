@@ -40,7 +40,8 @@ function blocked(): boolean {
   if ((active as HTMLElement | null)?.isContentEditable) return true
   if (document.querySelector('.zw-sheet, [role="dialog"], [aria-modal="true"], dialog[open]')) return true
   const layerHost = document.querySelector('zawya-app-layer')
-  if (layerHost?.shadowRoot?.querySelector('.launch, .ob')) return true
+  /* الشاشات الأصلية ليها سحب للتحديث خاص بيها — بيحدّث البيانات من غير تحميل الصفحة */
+  if (layerHost?.shadowRoot?.querySelector('.launch, .ob, .home:not(.home--hidden)')) return true
   const bodyStyle = document.body ? getComputedStyle(document.body) : null
   return bodyStyle?.overflow === 'hidden' || bodyStyle?.overflowY === 'hidden'
 }

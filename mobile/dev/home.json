@@ -1,0 +1,77 @@
+{
+  "store": {
+    "id": "demo-store",
+    "name": "متجر الأناقة",
+    "currency": "EGP",
+    "logo": null,
+    "url": "https://www.zawyaeg.site/s/demo",
+    "published": false
+  },
+  "user": { "name": "محمد أحمد" },
+  "subscription": {
+    "active": true,
+    "isAdmin": false,
+    "onTrial": true,
+    "expired": false,
+    "daysLeft": 9,
+    "endsAt": "2026-09-21T00:00:00.000Z",
+    "planName": "تجربة مجانية",
+    "periodDays": 14,
+    "quota": { "used": 95, "limit": null, "blocked": false }
+  },
+  "counts": { "pending": 3, "incomplete": 2, "products": 24, "customers": 186 },
+  "stats": {
+    "series": [
+      { "day": "2026-08-30", "label": "30/8", "sessions": 140, "revenue": 185000, "orders": 4, "conversion": 286 },
+      { "day": "2026-08-31", "label": "31/8", "sessions": 166, "revenue": 242000, "orders": 6, "conversion": 361 },
+      { "day": "2026-09-01", "label": "1/9", "sessions": 120, "revenue": 98000, "orders": 2, "conversion": 167 },
+      { "day": "2026-09-02", "label": "2/9", "sessions": 210, "revenue": 310500, "orders": 7, "conversion": 333 },
+      { "day": "2026-09-03", "label": "3/9", "sessions": 190, "revenue": 276000, "orders": 6, "conversion": 316 },
+      { "day": "2026-09-04", "label": "4/9", "sessions": 150, "revenue": 150000, "orders": 3, "conversion": 200 },
+      { "day": "2026-09-05", "label": "5/9", "sessions": 172, "revenue": 205000, "orders": 5, "conversion": 291 },
+      { "day": "2026-09-06", "label": "6/9", "sessions": 260, "revenue": 388000, "orders": 9, "conversion": 346 },
+      { "day": "2026-09-07", "label": "7/9", "sessions": 290, "revenue": 412500, "orders": 10, "conversion": 345 },
+      { "day": "2026-09-08", "label": "8/9", "sessions": 205, "revenue": 265000, "orders": 6, "conversion": 293 },
+      { "day": "2026-09-09", "label": "9/9", "sessions": 180, "revenue": 198000, "orders": 5, "conversion": 278 },
+      { "day": "2026-09-10", "label": "10/9", "sessions": 320, "revenue": 455000, "orders": 11, "conversion": 344 },
+      { "day": "2026-09-11", "label": "11/9", "sessions": 300, "revenue": 390000, "orders": 9, "conversion": 300 },
+      { "day": "2026-09-12", "label": "12/9", "sessions": 350, "revenue": 520000, "orders": 12, "conversion": 343 }
+    ],
+    "current": { "sessions": 3053, "revenue": 4095000, "orders": 95, "conversionBps": 311 },
+    "previous": { "sessions": 2810, "revenue": 3420000, "orders": 81, "conversionBps": 288 }
+  },
+  "setup": [
+    { "key": "product", "label": "ضيف أول منتج", "hint": "من غير منتج مفيش حاجة تتباع", "href": "/dashboard/products/new", "done": true, "icon": "product" },
+    { "key": "logo", "label": "ارفع شعار متجرك", "hint": "بيظهر في الهيدر والفاتورة ورسايل العملاء", "href": "/dashboard/settings", "done": false, "icon": "logo" },
+    { "key": "shipping", "label": "ظبّط مناطق الشحن", "hint": "السعر اللي العميل بيشوفه في الشيك أوت", "href": "/dashboard/shipping", "done": true, "icon": "shipping" },
+    { "key": "payment", "label": "فعّل طريقة دفع", "hint": "الدفع عند الاستلام أو بوابة بمفاتيحك", "href": "/dashboard/payments", "done": true, "icon": "payment" },
+    { "key": "theme", "label": "اختار شكل متجرك", "hint": "الألوان والخطوط والصفحة الرئيسية", "href": "/dashboard/storefront", "done": false, "icon": "theme" },
+    { "key": "publish", "label": "انشر المتجر", "hint": "آخر خطوة — بعدها العملاء يقدروا يطلبوا", "href": "/dashboard/settings", "done": false, "icon": "publish" }
+  ],
+  "notices": [
+    {
+      "id": "n1",
+      "title": "هدية ٧ أيام مجانًا",
+      "body": "وصلت لأول ١٠ طلبات متسلّمة — فعّل أسبوع زيادة على اشتراكك.",
+      "ctaLabel": "فعّل المكافأة",
+      "ctaHref": null,
+      "tone": "offer",
+      "rewardKind": "free_days",
+      "redeemed": false
+    }
+  ],
+  "latestOrders": [
+    { "id": "o1", "number": "1042", "name": "أحمد علي", "total": 75000, "status": "pending", "statusLabel": "قيد الانتظار" },
+    { "id": "o2", "number": "1041", "name": "سارة محمود", "total": 120000, "status": "confirmed", "statusLabel": "مؤكّد" },
+    { "id": "o3", "number": "1040", "name": "كريم حسن", "total": 48500, "status": "shipped", "statusLabel": "اتشحن" },
+    { "id": "o4", "number": "1039", "name": "منى إبراهيم", "total": 210000, "status": "delivered", "statusLabel": "اتسلّم" },
+    { "id": "o5", "number": "1038", "name": "يوسف سمير", "total": 33000, "status": "cancelled", "statusLabel": "ملغي" }
+  ],
+  "topProducts": [
+    { "productId": "p1", "name": "قميص قطن بياقة", "image": null, "sold": 38 },
+    { "productId": "p2", "name": "بنطلون جينز سليم", "image": null, "sold": 27 },
+    { "productId": "p3", "name": "شنطة جلد يدوي", "image": null, "sold": 19 },
+    { "productId": "p4", "name": "ساعة كلاسيك", "image": null, "sold": 12 }
+  ],
+  "generatedAt": "2026-09-12T20:00:00.000Z"
+}

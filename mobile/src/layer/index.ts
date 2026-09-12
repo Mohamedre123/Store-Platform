@@ -18,6 +18,7 @@ import { installNavigation, onRouteChange } from './navigation'
 import { installFileSupport } from './files'
 import { installGestures } from './gestures'
 import { installNetworkWatch } from './network'
+import { installShell } from './shell'
 
 declare global {
   interface Window {
@@ -71,6 +72,8 @@ function boot(): void {
   installFileSupport()
   installNavigation()
   installSystemBars()
+  /* قبل شاشة الافتتاح: الرئيسية بتترسم من الكاش تحتها، فلما الافتتاح يختفي تكون جاهزة */
+  installShell()
   onRouteChange(() => {
     requestChromeSync(60)
     requestChromeSync(420)

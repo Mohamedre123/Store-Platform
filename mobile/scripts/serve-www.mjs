@@ -25,6 +25,16 @@ const types = { '.js': 'text/javascript; charset=utf-8', '.html': 'text/html; ch
 
 createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', `http://localhost:${port}`)
+
+  /* بيانات وهمية للرئيسية — نفس شكل /api/app/home بالظبط، بتأخير زي النت الحقيقي */
+  if (url.pathname === '/api/app/home') {
+    const body = await readFile(path.join(devRoot, 'home.json'))
+    setTimeout(() => {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
+      res.end(body)
+    }, 700)
+    return
+  }
   const file = harnessRoutes.test(url.pathname)
     ? path.join(devRoot, 'harness.html')
     : url.pathname.startsWith('/dev/')
