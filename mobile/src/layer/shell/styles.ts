@@ -60,7 +60,7 @@ export const SHELL_CSS = `
 .spark{width:56px;height:24px;flex:none;overflow:visible}
 
 .ring{position:relative;flex:none;display:inline-flex}
-.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring>svg{width:100%;height:100%;transform:rotate(-90deg)}
 .ring-value{transition:stroke-dashoffset 1s cubic-bezier(.16,1,.3,1)}
 .ring b{position:absolute;top:0;right:0;bottom:0;left:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;direction:ltr}
 .ring b .ic{width:20px;height:20px;color:var(--fg-muted,#5c6890)}

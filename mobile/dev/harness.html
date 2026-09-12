@@ -13,8 +13,9 @@
       مش جزء من التطبيق.
     -->
     <style>
-      :root { --bg:#f6f6f9; --surface:#fff; --surface-2:#f1f2f6; --border:#e2e4ec; --fg:#222540; --fg-muted:#5c6890; --primary:#634b9a; --primary-soft:#ece8f5; --dash-nav:calc(4rem + env(safe-area-inset-bottom,0px)); }
-      @media (prefers-color-scheme: dark) { :root { --bg:#14162a; --surface:#1c1f36; --surface-2:#242844; --border:#2f3352; --fg:#eceef6; --fg-muted:#a8b0c8; --primary:#a08cd0; --primary-soft:#2a2547; } }
+      /* نفس توكنات المنصة (src/app/globals.css) — بما فيها ألوان الحالات في الوضعين */
+      :root { --bg:#f6f6f9; --surface:#fff; --surface-2:#f1f2f6; --border:#e2e4ec; --border-strong:#cdd1de; --fg:#222540; --fg-muted:#5c6890; --fg-subtle:#8a92ad; --primary:#634b9a; --primary-fg:#fff; --primary-soft:#ece8f5; --color-success:#15803d; --color-success-soft:#dcfce7; --color-warning:#a16207; --color-warning-soft:#fef3c7; --color-danger:#b91c1c; --color-danger-soft:#fee2e2; --color-info:#1d4ed8; --color-info-soft:#dbeafe; --dash-nav:calc(4rem + env(safe-area-inset-bottom,0px)); }
+      @media (prefers-color-scheme: dark) { :root { --bg:#14162a; --surface:#1c1f36; --surface-2:#242844; --border:#2f3352; --border-strong:#414669; --fg:#eceef6; --fg-muted:#a8b0c8; --fg-subtle:#7b87ab; --primary:#a08cd0; --primary-fg:#16182b; --primary-soft:#2a2547; --color-success:#4ade80; --color-success-soft:#14321f; --color-warning:#fbbf24; --color-warning-soft:#33270a; --color-danger:#f87171; --color-danger-soft:#3a1a1a; --color-info:#7aa2f7; --color-info-soft:#16233f; } }
       * { box-sizing: border-box; }
       body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.7 'Segoe UI', Tahoma, system-ui, sans-serif; }
       header { position:sticky; top:0; z-index:40; display:flex; align-items:center; gap:8px; height:56px; padding:env(safe-area-inset-top) 12px 0; background:var(--surface); border-bottom:1px solid var(--border); }
