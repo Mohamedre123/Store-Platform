@@ -62,7 +62,11 @@ export function ProductDetailScreen({
   }, [onUnavailable])
 
   useEffect(() => {
-    if (visible && productId) void load()
+    if (!visible || !productId) return
+    /* راجع من «تعديل المنتج» — النسخة المحفوظة جاهزة قبل ما الخادم يرد */
+    const cached = productDetails.get(productId)
+    if (cached) setDetail(cached)
+    void load()
   }, [visible, productId])
 
   const goBack = () => {
@@ -70,8 +74,9 @@ export function ProductDetailScreen({
     else navigate('/dashboard/products')
   }
 
+  /* التعديل شاشة أصلية بالكاميرا — ولو مسارها مش منشور، نفس الرابط بيفتح فورم المنصة */
   const edit = () => {
-    if (productId) navigate(`/dashboard/products/${productId}?web=1`)
+    if (productId) navigate(`/dashboard/products/${productId}?edit=1`)
   }
 
   const toggle = async () => {

@@ -50,15 +50,20 @@ import { InventoryScreen } from './inventory'
 import { MessagesScreen } from './messages'
 import { SubscriptionScreen } from './subscription'
 import { SettingsScreen } from './settings'
-import { NewProductScreen } from './product-new'
+import { EditProductScreen, NewProductScreen } from './product-new'
 import { ReviewsScreen } from './reviews'
 import { ReturnsScreen } from './returns'
 import { ComplaintsScreen } from './complaints'
+import { clearOpsCaches } from './ops-api'
+import { OPS_CSS } from './styles-ops'
+import { BlockedScreen } from './blocked'
+import { CouriersScreen } from './couriers'
+import { BookingsScreen } from './bookings'
 
 const ORDER_DETAIL = /^\/dashboard\/orders\/([^/]+)$/
 /* صفحات جوّه المنتجات مش منتجات — new وcategories وimport وtrash بيفضلوا صفحات المنصة */
 const PRODUCT_DETAIL = /^\/dashboard\/products\/([0-9a-f-]{36})$/i
-/* «blocked» صفحة المنصة — العميل معرّفه uuid بس */
+/* «blocked» شاشة الحظر — العميل معرّفه uuid بس */
 const CUSTOMER_DETAIL = /^\/dashboard\/customers\/([0-9a-f-]{36})$/i
 
 function useLocation(): URL {
@@ -78,6 +83,7 @@ type ScreenKey =
   | 'order'
   | 'products'
   | 'product'
+  | 'productEdit'
   | 'customers'
   | 'customer'
   | 'analytics'
@@ -90,6 +96,33 @@ type ScreenKey =
   | 'reviews'
   | 'returns'
   | 'complaints'
+  | 'blocked'
+  | 'couriers'
+  | 'bookings'
+
+const SCREEN_KEYS: ScreenKey[] = [
+  'home',
+  'orders',
+  'order',
+  'products',
+  'product',
+  'productEdit',
+  'customers',
+  'customer',
+  'analytics',
+  'shipments',
+  'marketing',
+  'inventory',
+  'messages',
+  'subscription',
+  'newProduct',
+  'reviews',
+  'returns',
+  'complaints',
+  'blocked',
+  'couriers',
+  'bookings',
+]
 
 function Shell() {
   const url = useLocation()
@@ -107,47 +140,17 @@ function Shell() {
   const effective = pending ? new URL(pending, location.origin) : url
   const path = effective.pathname.replace(/\/+$/, '') || '/'
   const web = effective.searchParams.get('web') === '1'
+  const editMode = effective.searchParams.get('edit') === '1'
   const onDashboard = path === '/dashboard' || path.startsWith('/dashboard/')
 
-  const [unavailable, setUnavailable] = useState<Record<ScreenKey, boolean>>({
-    home: false,
-    orders: false,
-    order: false,
-    products: false,
-    product: false,
-    customers: false,
-    customer: false,
-    analytics: false,
-    shipments: false,
-    marketing: false,
-    inventory: false,
-    messages: false,
-    subscription: false,
-    newProduct: false,
-    reviews: false,
-    returns: false,
-    complaints: false,
-  })
+  const [unavailable, setUnavailable] = useState<Record<ScreenKey, boolean>>(
+    () => Object.fromEntries(SCREEN_KEYS.map((k) => [k, false])) as Record<ScreenKey, boolean>,
+  )
   const markUnavailable = useMemo(
-    () => ({
-      home: () => setUnavailable((u) => ({ ...u, home: true })),
-      orders: () => setUnavailable((u) => ({ ...u, orders: true })),
-      order: () => setUnavailable((u) => ({ ...u, order: true })),
-      products: () => setUnavailable((u) => ({ ...u, products: true })),
-      product: () => setUnavailable((u) => ({ ...u, product: true })),
-      customers: () => setUnavailable((u) => ({ ...u, customers: true })),
-      customer: () => setUnavailable((u) => ({ ...u, customer: true })),
-      analytics: () => setUnavailable((u) => ({ ...u, analytics: true })),
-      shipments: () => setUnavailable((u) => ({ ...u, shipments: true })),
-      marketing: () => setUnavailable((u) => ({ ...u, marketing: true })),
-      inventory: () => setUnavailable((u) => ({ ...u, inventory: true })),
-      messages: () => setUnavailable((u) => ({ ...u, messages: true })),
-      subscription: () => setUnavailable((u) => ({ ...u, subscription: true })),
-      newProduct: () => setUnavailable((u) => ({ ...u, newProduct: true })),
-      reviews: () => setUnavailable((u) => ({ ...u, reviews: true })),
-      returns: () => setUnavailable((u) => ({ ...u, returns: true })),
-      complaints: () => setUnavailable((u) => ({ ...u, complaints: true })),
-    }),
+    () =>
+      Object.fromEntries(
+        SCREEN_KEYS.map((k) => [k, () => setUnavailable((u) => ({ ...u, [k]: true }))]),
+      ) as Record<ScreenKey, () => void>,
     [],
   )
 
@@ -183,6 +186,7 @@ function Shell() {
       clearAnalyticsCache()
       clearShipmentsCache()
       clearBusinessCaches()
+      clearOpsCaches()
       clearMeCache()
     }
   }, [path])
@@ -209,9 +213,14 @@ function Shell() {
         onUnavailable={markUnavailable.products}
       />
       <ProductDetailScreen
-        visible={Boolean(productId) && !unavailable.product && !web}
+        visible={Boolean(productId) && !editMode && !unavailable.product && !web}
         productId={productId ?? lastProductId}
         onUnavailable={markUnavailable.product}
+      />
+      <EditProductScreen
+        visible={Boolean(productId) && editMode && !unavailable.productEdit && !web}
+        productId={productId ?? lastProductId}
+        onUnavailable={markUnavailable.productEdit}
       />
       <CustomersScreen
         visible={path === '/dashboard/customers' && !unavailable.customers && !web}
@@ -264,6 +273,18 @@ function Shell() {
         visible={path === '/dashboard/complaints' && !unavailable.complaints && !web}
         onUnavailable={markUnavailable.complaints}
       />
+      <BlockedScreen
+        visible={path === '/dashboard/customers/blocked' && !unavailable.blocked && !web}
+        onUnavailable={markUnavailable.blocked}
+      />
+      <CouriersScreen
+        visible={path === '/dashboard/couriers' && !unavailable.couriers && !web}
+        onUnavailable={markUnavailable.couriers}
+      />
+      <BookingsScreen
+        visible={path === '/dashboard/bookings' && !unavailable.bookings && !web}
+        onUnavailable={markUnavailable.bookings}
+      />
       <VerifyBar visible={path === '/verify'} />
       <TabBar path={path} active={onDashboard} />
       {onDashboard && <MoreSheet path={path} search={effective.searchParams.toString()} />}
@@ -274,7 +295,8 @@ function Shell() {
 export function installShell(): void {
   const root = layer()
   const style = document.createElement('style')
-  style.textContent = SHELL_CSS + ORDERS_CSS + PRODUCTS_CSS + CUSTOMERS_CSS + MORE_CSS + VERIFY_CSS + ANALYTICS_CSS + BUSINESS_CSS
+  style.textContent =
+    SHELL_CSS + ORDERS_CSS + PRODUCTS_CSS + CUSTOMERS_CSS + MORE_CSS + VERIFY_CSS + ANALYTICS_CSS + BUSINESS_CSS + OPS_CSS
   root.appendChild(style)
   const mount = document.createElement('div')
   mount.className = 'shell'

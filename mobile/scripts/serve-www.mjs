@@ -53,6 +53,31 @@ createServer(async (req, res) => {
     return
   }
 
+  /* تعديل المنتج والحظر والمندوبين والحجوزات (dev/mock-ops.mjs) */
+  if (/^\/api\/app\/(blocked|couriers|bookings)(\/|$)/.test(url.pathname) || /^\/api\/app\/products\/[^/]+\/edit$/.test(url.pathname)) {
+    const mock = await import(new URL('../dev/mock-ops.mjs', import.meta.url))
+    await new Promise((r) => setTimeout(r, 450))
+    const send = (status, body) => {
+      res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
+      res.end(JSON.stringify(body))
+    }
+    let raw = ''
+    if (req.method === 'POST') for await (const chunk of req) raw += chunk
+    const parts = url.pathname.split('/').filter(Boolean)
+    if (parts[2] === 'products') {
+      const api = await import(new URL('../dev/mock-api.mjs', import.meta.url))
+      const d = api.productDetail(parts[3])
+      if (!d) return send(404, { error: 'not_found' })
+      return send(200, req.method === 'POST' ? { ok: true, detail: d } : mock.productEdit(d))
+    }
+    if (req.method === 'POST') {
+      const body = raw ? JSON.parse(raw) : {}
+      if (url.pathname.endsWith('/blocked/add') && !String(body.value ?? '').trim()) return send(400, { ok: false, error: 'اكتب القيمة' })
+      return send(200, { ok: true, count: 3 })
+    }
+    return send(200, mock[parts[2]]())
+  }
+
   /* منتج جديد والمراجعات والمرتجعات والشكاوى (dev/mock-care.mjs) */
   if (/^\/api\/app\/(products\/form|products\/new|reviews|returns|complaints)(\/|$)/.test(url.pathname)) {
     const mock = await import(new URL('../dev/mock-care.mjs', import.meta.url))

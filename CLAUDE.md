@@ -128,7 +128,12 @@ git push origin main                              # ده اللي بينشر ا�
 | المراجعات (مستنية موافقتك/منشورة، نجوم، وافق/اخفي، رد، امسح بتأكيد) | `reviews.tsx` | `/api/app/reviews`، `POST /api/app/reviews/:id/{approve,reply,delete}` |
 | المرتجعات (محتاجة إجراء/الكل، تغيير الحالة من لوحة، ملاحظة داخلية، اتصال) | `returns.tsx` | `/api/app/returns`، `POST /api/app/returns/:id/{status,note}` |
 | الشكاوى (مستنية ردّك/الكل، محادثة في لوحة طويلة، رد، اتحلّت/اقفلها/افتحها تاني) | `complaints.tsx` | `/api/app/complaints`، `/api/app/complaints/:id` (الرسايل)، `POST /api/app/complaints/:id/{reply,status}` |
+| **تعديل منتج** `/dashboard/products/:uuid?edit=1` (نفس فورم «منتج جديد» — `ProductEditor` في `product-new.tsx` بـ`editing`: بيتعبّى من الخادم كل مرة يتفتح، «خليها الغلاف» لأي صورة، المنتج اللي ليه مقاسات الكمية بتاعته مش بتتعدّل هنا) — زرار «تعديل المنتج» في تفاصيل المنتج بيفتحه؛ لو المسار مش منشور نفس الرابط بيفتح فورم المنصة | `product-new.tsx` (`EditProductScreen`) | `GET/POST /api/app/products/:id/edit` — **الـPOST بيقرا المنتج ومتغيّراته من القاعدة ويعبّي كل خانات الفورم** (التكلفة، الكود، الماركة، السيو، المقترحات، `variants`) قبل `saveProductAction`، لأن الفعل بيكتب المنتج كله وأي خانة ناقصة بتتمسح. بيرجّع `detail` |
+| الحظر `/dashboard/customers/blocked` (رفضوا الاستلام أكتر من مرة + احظره/فُكّ، قايمة الحظر بعدّاد المنع وشيل، «ضيف للحظر» في لوحة: النوع/القيمة/ارفض أو علّم/السبب) | `blocked.tsx` | `/api/app/blocked`، `POST /api/app/blocked/add`، `POST /api/app/blocked/:id/{remove,block,unblock}` (block/unblock = معرّف عميل) |
+| المندوبون `/dashboard/couriers` (أرقام، طلبات مستنية مندوب ← «اسند» بلوحة مرتّبة بالمنطقة، كارت لكل مندوب بحسابه + «اقفل الحساب» بتأكيد، «ابعتله الرابط» على واتساب، انسخ، ⋯ = اتصل/عدّل/وقّفه/رابط جديد، إضافة وتعديل في لوحة) | `couriers.tsx` | `/api/app/couriers`، `POST /api/app/couriers/{save,assign}`، `POST /api/app/couriers/:id/{toggle,settle,rotate}` |
+| الحجوزات `/dashboard/bookings` (مواعيد العمل كارت ← لوحة تعديل: تشغيل/أيام/من-لحد/مدة المعاد، الجاية واللي فات متقسّمين بالأيام «النهارده/بكرة»، تغيير الحالة، اتصال) | `bookings.tsx` | `/api/app/bookings`، `POST /api/app/bookings/hours`، `POST /api/app/bookings/:id/status` |
 
+شاشات الحظر والمندوبين والحجوزات بياناتهم في `shell/ops-api.ts` (فيه كمان `waNumber` لرقم واتساب دولي) وستايلهم في `shell/styles-ops.ts`.
 الشاشات دي كلها بيقروا بياناتهم من `shell/business-api.ts` (أنواع البيانات + `cachedResource`)، والطلبات من
 `shell/http.ts` (`useResource` = كاش + تحديث + رجوع لصفحة المنصة لو المسار مش منشور، و`postAppJson` = POST برسايل عربي)،
 والستايل في `shell/styles-business.ts`. **أي شاشة جديدة استخدم `cachedResource` + `useResource` بدل ما تكرر الكود.**
@@ -252,7 +257,10 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
 | `src/lib/reviews-data.ts` (`loadReviews`) + `reviews/actions.ts` | `src/app/dashboard/reviews/page.tsx` | `/api/app/reviews*` ← `src/lib/app-reviews.ts` ← `shell/reviews.tsx` |
 | `src/lib/returns-data.ts` (`loadReturns`) + `returns/actions.ts` + `src/lib/returns-meta.ts` | `src/app/dashboard/returns/page.tsx` | `/api/app/returns*` ← `src/lib/app-returns.ts` ← `shell/returns.tsx` |
 | `src/lib/tickets.ts` (`listTickets`, `ticketMessages`) + `complaints/actions.ts` + `tickets-meta.ts` | `src/app/dashboard/complaints/page.tsx` | `/api/app/complaints*` ← `src/lib/app-complaints.ts` ← `shell/complaints.tsx` |
-| `src/app/dashboard/products/actions.ts` (`saveProductAction`) + `/api/upload` | فورم المنتج في اللوحة | `POST /api/app/products/new` ← `shell/product-new.tsx` (لو اتغيّرت أسماء حقول الفورم، الـroute ده يتعدّل) |
+| `src/app/dashboard/products/actions.ts` (`saveProductAction`) + `/api/upload` | فورم المنتج في اللوحة | `POST /api/app/products/new` و`/api/app/products/:id/edit` ← `shell/product-new.tsx` (**لو اتضافت خانة جديدة لفورم المنتج في اللوحة، لازم تتضاف في `edit/route.ts` كمان وإلا التعديل من التطبيق هيمسحها**) |
+| `src/lib/blocked-data.ts` (`loadBlocked`) + `customers/block-actions.ts` | `src/app/dashboard/customers/blocked/page.tsx` | `/api/app/blocked*` ← `src/lib/app-blocked.ts` ← `shell/blocked.tsx` |
+| `src/lib/couriers-data.ts` (`loadCouriers`) + `couriers/actions.ts` + `src/lib/couriers-meta.ts` | `src/app/dashboard/couriers/page.tsx` | `/api/app/couriers*` ← `src/lib/app-couriers.ts` ← `shell/couriers.tsx` |
+| `src/lib/bookings-data.ts` (`loadBookings`) + `bookings/actions.ts` + `src/lib/bookings-meta.ts` | `src/app/dashboard/bookings/page.tsx` | `/api/app/bookings*` ← `src/lib/app-bookings.ts` ← `shell/bookings.tsx` |
 
 ⚠ **ما تصدّرش ثوابت من ملف `page.tsx`** (Next بيرفض أي export غير المعروفين) — الثوابت المشتركة مكانها `src/lib/*-data.ts`.
 و**ما تستوردش قيم (مش أنواع) من ملف فيه `'use client'` في كود الخادم** — بتوصل كمرجع مش كقيمة. `import type` بس.
@@ -385,9 +393,13 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
   «فاضل ٧ أيام» هيتبعت يوم 2026-09-21 تقريبًا.
 - **آخر نشر للموقع بعده:** commit `f20bed6` (لودرات التحليلات والشحنات المشتركة + `/api/app/analytics` و`/api/app/shipments`).
   اتختبر على الحي: المسارين الجداد 401 من غير جلسة، والصفحات 200/307 زي ما هي.
-- **التطبيق:** آخر نسخة مبنية **2.0 (versionCode 11)** في `H:\for claude\zawya-release\zawya-2.0.apk` و`.aab`
-  (منتج جديد بالكاميرا، المراجعات، المرتجعات، الشكاوى، قفل البصمة — فوق 1.9: الكوبونات والمخزون والرسايل والاشتراك
-  والإعدادات، وفوق 1.8: التحليلات والشحنات والهيكل الفوري وشاشة الافتتاح المتحركة). النسخة الجاية **2.1 / versionCode 12**.
+- **التطبيق:** آخر نسخة مبنية **2.1 (versionCode 12)** في `H:\for claude\zawya-release\zawya-2.1.apk` و`.aab`
+  (تعديل منتج بالكاميرا، الحظر، المندوبون، الحجوزات — فوق 2.0: منتج جديد بالكاميرا، المراجعات، المرتجعات، الشكاوى،
+  قفل البصمة — فوق 1.9: الكوبونات والمخزون والرسايل والاشتراك والإعدادات، وفوق 1.8: التحليلات والشحنات والهيكل الفوري
+  وشاشة الافتتاح المتحركة). النسخة الجاية **2.2 / versionCode 13**.
+- **درس من 2.1:** في صفحة التجربة (`serve-www`) مفيش راوتر Next، فـ`navigate()` بيعمل تحميل كامل — أي سكربت اختبار بيدوس
+  زرار بيتنقّل بيتقطع. اختبر على خطوات: دوس في سكربت، استنى، واقرا النتيجة في سكربت تاني.
+- **درس من 2.1:** الأرقام جنب كلام عربي في نفس السطر لازم `<bdi dir="ltr">` — من غيرها علامة `+` بتروح آخر الرقم.
 - **درس من 2.0:** أي حركة بتبدأ بـ`requestAnimationFrame` بتقف لو نافذة الـWebView مش ظاهرة (والاختبار في المتصفح
   المستخبي بيبان كأنه باظ) — لفتح لوحة بعد أول رسم استخدم `setTimeout(…, 30)`.
 - **دروس من 1.9 (خليك فاكرها):**
@@ -426,15 +438,12 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
 
 ## 9) اللي لسه (بالترتيب)
 
-1. صاحب المشروع يثبّت 1.7 ويجرّب: صفحة تأكيد البريد (غيّر البريد / الغِ التسجيل) + إحساس السلاسة.
+1. صاحب المشروع يثبّت **2.1** ويجرّب على موبايله الحقيقي: الكاميرا (منتج جديد + تعديل منتج)، قفل البصمة، الحظر،
+   المندوبين («ابعتله الرابط» بيفتح واتساب)، الحجوزات — بالبيانات الحقيقية (اتجرّبوا ببيانات وهمية بس).
 2. صاحب المشروع يربط واتساب متجر الإدارة (atlosa) من «الإعدادات ← واتساب» عشان رسايل الاشتراك توصل واتساب كمان،
    ويجرّب «جدّد الاشتراك» من «إدارة المنصة» على متجر تجريبي ويتأكد الإيميل وصل الوارد.
-3. لو لسه في تقطيع في صفحات معيّنة من الموقع جوّه التطبيق: افحص الصفحة دي بالذات (رسوم بيانية/قوايم طويلة) —
-   الحل الجذري تحويلها لشاشة أصلية.
-4. الشاشات الأصلية الجاية بالترتيب: الكوبونات والعروض (`/dashboard/marketing`)، المخزون (`/dashboard/inventory`)،
-   الإعدادات (`/dashboard/settings` كقايمة أصلية بتفتح صفحات المنصة)، الاشتراك (`/dashboard/subscription`)،
-   سجل الرسايل (`/dashboard/messages`)، وإضافة/تعديل منتج بالكاميرا.
+3. شاشات أصلية جاية (اللي لسه صفحات موقع): المصروفات `/dashboard/expenses`، الموردين `/dashboard/suppliers`،
+   الولاء `/dashboard/loyalty`، الإحالات/المسوّقين `/dashboard/affiliates` و`referrals`، الأقسام `/dashboard/products/categories`،
+   سلة المهملات `/dashboard/products/trash`، وإنشاء كوبون/شحنة من التطبيق بدل `?web=1`.
+4. iOS: Face ID للقفل + إشعارات APNs (محتاج حساب Apple Developer + ماك).
 5. **جوجل بلاي مؤجّل** (صاحب المشروع قال مفيش ميزانية دلوقتي) — ما تفتحش الموضوع غير لو طلبه.
-3. شاشات أصلية تانية: التحليلات، التسويق، الشحن، الإعدادات، وإضافة/تعديل منتج بالكاميرا.
-4. قفل بالبصمة.
-5. الرفع على جوجل بلاي (حساب مطوّر 25$ — هو اللي يعمله) و App Store (حساب Apple + ماك).
