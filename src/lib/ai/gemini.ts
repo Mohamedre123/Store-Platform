@@ -103,7 +103,9 @@ function isDeadModel(e: GeminiError): boolean {
     */
     (e.kind === 'network' && e.message.includes('مش متاح دلوقتي')) ||
     /* الموديل مش موجود أصلًا على المفتاح ده (404) */
-    (e.kind === 'unknown' && /\(404\)/.test(e.message))
+    (e.kind === 'unknown' && /\(404\)/.test(e.message)) ||
+    /* مالوش حصّة خالص على المفتاح ده — موديل تاني من نفس المفتاح ممكن يكون عليه حصّة */
+    (e.kind === 'quota' && e.noFreeQuota === true)
   )
 }
 
@@ -125,6 +127,22 @@ async function callWithRetry(
         signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
       })
       /* 503 = الموديل مش متاح: الإعادة عليه بتضيّع الوقت، والبديل هو الحل */
+      /*
+        ٤٢٩ بمدة استنّى قصيرة = ضغط لحظي، مش حصّة خالصة.
+
+        الجدول بيشتغل في مهمة خلفية مالهاش حد يدوس «جرّب تاني»، فكان
+        بيفشل ويستنّى الميعاد الجاي — يعني يوم كامل من غير بوست بسبب
+        ٢٠ ثانية. الحصّة الصفر واليومية ما بتتعادش: الاستنّى مش هيصلّحهم.
+      */
+      if (res.status === 429 && i < attempts - 1) {
+        const q = readQuota(await res.clone().text())
+        const wait = q.retryAfterMs
+        if (!q.noFreeQuota && !q.perDay && wait !== null && wait <= 20_000) {
+          await new Promise((r) => setTimeout(r, wait + 250))
+          continue
+        }
+        return res
+      }
       if (res.status < 500 || res.status === 503) return res
       last = res
     } catch (e) {
@@ -252,7 +270,14 @@ function networkError(e: unknown): GeminiError {
 
 export type GeminiError =
   | { kind: 'invalid_key'; message: string }
-  | { kind: 'quota'; message: string }
+  | {
+      kind: 'quota'
+      message: string
+      /** الموديل ده مالوش حصّة خالص على المفتاح (limit: 0) — موديل تاني ممكن يشتغل */
+      noFreeQuota?: boolean
+      /** جوجل بتقول استنّى المدة دي وجرّب — ضغط لحظي مش حصّة خالصة */
+      retryAfterMs?: number
+    }
   | { kind: 'blocked'; message: string }
   | { kind: 'network'; message: string }
   | { kind: 'unknown'; message: string }
@@ -265,7 +290,7 @@ export type GeminiResult<T> = { ok: true; data: T } | { ok: false; error: Gemini
  * «فشل الاتصال» مش معلومة يتصرّف على أساسها. «مفتاحك خلص رصيده» أو
  * «المفتاح باطل» بيقولوا له يعمل إيه بالظبط.
  */
-function classify(status: number, body: string): GeminiError {
+function classify(status: number, body: string, model?: string): GeminiError {
   const lower = body.toLowerCase()
 
   if (status === 400 && lower.includes('api key not valid')) {
@@ -288,7 +313,7 @@ function classify(status: number, body: string): GeminiError {
     status === 429 ||
     (status === 400 && (lower.includes('billing') || lower.includes('failed_precondition')))
   ) {
-    return { kind: 'quota', message: CREDIT_HELP.gemini }
+    return quotaError(status, body, model)
   }
   if (lower.includes('safety') || lower.includes('blocked')) {
     return { kind: 'blocked', message: 'المحتوى اتمنع من فلاتر جوجل. غيّر الصياغة وجرّب تاني.' }
@@ -338,6 +363,104 @@ function extractReason(body: string): string | null {
   }
   const text = body.trim()
   return text && !text.startsWith('<') ? text.slice(0, 200) : null
+}
+
+type QuotaInfo = { noFreeQuota: boolean; perDay: boolean; retryAfterMs: number | null; reason: string | null }
+
+/**
+ * قراءة رد الحصّة من جوجل.
+ *
+ * ## ليه مش رسالة واحدة
+ * جوجل بترجّع ٤٢٩ لتلات حاجات مختلفة تمامًا، وكانوا كلهم بيتقروا
+ * «الحصّة المجانية خلصت»:
+ * - **`limit: 0`** — الموديل ده مالوش حصّة خالص على المشروع اللي طلع
+ *   منه المفتاح (أغلب موديلات الصور كده من غير فوترة). الاستنّى مش
+ *   هيصلّحه أبدًا، وموديل تاني ممكن يشتغل.
+ * - **حصّة يومية** خلصت — بترجع بكرة.
+ * - **ضغط لحظي** — جوجل نفسها بتقول «استنّى ٣٠ ثانية».
+ *
+ * والتاجر اللي عنده رصيد كان بيقرا «الحصّة خلصت» ويفتكر إن المنصة
+ * بتكدب عليه — والمشكلة الحقيقية إن الرصيد على مشروع والمفتاح من
+ * مشروع تاني، أو إن الموديل نفسه مالوش حصّة.
+ */
+function readQuota(body: string): QuotaInfo {
+  let message = ''
+  let details: Array<Record<string, unknown>> = []
+  try {
+    const parsed = JSON.parse(body) as { error?: { message?: string; details?: Array<Record<string, unknown>> } }
+    message = parsed.error?.message ?? ''
+    details = parsed.error?.details ?? []
+  } catch {
+    message = body
+  }
+
+  const violations = details.flatMap((d) => {
+    const v = (d as { violations?: unknown }).violations
+    return Array.isArray(v) ? (v as Array<{ quotaId?: string; quotaValue?: string }>) : []
+  })
+  const quotaIds = violations.map((v) => v.quotaId ?? '').join(' ')
+
+  const retryDelay = details.map((d) => (d as { retryDelay?: string }).retryDelay).find(Boolean)
+  const seconds = retryDelay
+    ? Number.parseFloat(retryDelay)
+    : Number.parseFloat(message.match(/retry in ([\d.]+)\s*s/i)?.[1] ?? '')
+
+  return {
+    noFreeQuota: /limit:\s*0\b/i.test(message) || violations.some((v) => v.quotaValue === '0'),
+    perDay: /PerDay/i.test(quotaIds) || /per day|daily/i.test(message),
+    retryAfterMs: Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds * 1000) : null,
+    reason: extractReason(body),
+  }
+}
+
+function quotaError(status: number, body: string, model?: string): GeminiError {
+  const name = model ? `«${model}»` : 'ده'
+
+  /* الموديل محتاج فوترة (٤٠٠) */
+  if (status === 400) {
+    return {
+      kind: 'quota',
+      noFreeQuota: true,
+      message:
+        `موديل ${name} محتاج فوترة مفعّلة على مشروع مفتاح Gemini. ` +
+        'فعّلها من aistudio.google.com ← API keys ← المشروع ← Billing، أو اختار موديل تاني.',
+    }
+  }
+
+  const q = readQuota(body)
+
+  if (q.noFreeQuota) {
+    return {
+      kind: 'quota',
+      noFreeQuota: true,
+      message:
+        `موديل ${name} مالوش حصّة على مفتاح Gemini ده — جوجل شايفة المشروع اللي طلع منه المفتاح من غير فوترة، ` +
+        'والموديلات دي مالهاش حصّة مجانية خالص. لو عندك رصيد، اتأكد إنه مربوط بنفس المشروع: ' +
+        'aistudio.google.com ← API keys ← المشروع ← Billing.',
+    }
+  }
+
+  if (q.perDay) {
+    return {
+      kind: 'quota',
+      message:
+        `الحصّة اليومية لموديل ${name} خلصت على مفتاح Gemini ده، وبترجع تلقائيًا بكرة. ` +
+        'عشان ما تقفش تاني، فعّل الفوترة على نفس مشروع المفتاح من aistudio.google.com ← Billing.',
+    }
+  }
+
+  if (q.retryAfterMs !== null) {
+    return {
+      kind: 'quota',
+      retryAfterMs: q.retryAfterMs,
+      message: `جوجل عليها ضغط على موديل ${name} دلوقتي — جرّب تاني بعد ${Math.ceil(q.retryAfterMs / 1000)} ثانية.`,
+    }
+  }
+
+  return {
+    kind: 'quota',
+    message: q.reason ? `${CREDIT_HELP.gemini} (رد جوجل: ${q.reason})` : CREDIT_HELP.gemini,
+  }
 }
 
 export type GeminiModel = {
@@ -482,7 +605,7 @@ async function generateWith(input: GenerateInput): Promise<GeminiResult<string>>
       input.model,
     )
 
-    if (!res.ok) return { ok: false, error: classify(res.status, await res.text()) }
+    if (!res.ok) return { ok: false, error: classify(res.status, await res.text(), input.model) }
 
     const data = (await res.json()) as {
       candidates?: Array<{
@@ -756,7 +879,7 @@ async function agentTurnWith(input: AgentTurnInput): Promise<GeminiResult<AgentT
       input.model,
     )
 
-    if (!res.ok) return { ok: false, error: classify(res.status, await res.text()) }
+    if (!res.ok) return { ok: false, error: classify(res.status, await res.text(), input.model) }
 
     const data = (await res.json()) as {
       candidates?: Array<{ content?: { parts?: Part[] } }>
@@ -901,7 +1024,7 @@ export async function editImage(input: {
       },
     )
 
-    if (!res.ok) return { ok: false, error: classify(res.status, await res.text()) }
+    if (!res.ok) return { ok: false, error: classify(res.status, await res.text(), input.model) }
 
     const data = (await res.json()) as {
       candidates?: Array<{
@@ -933,4 +1056,67 @@ export async function editImage(input: {
   } catch (e) {
     return { ok: false, error: networkError(e) }
   }
+}
+
+/**
+ * توليد صورة بأي موديل صور شغّال على المفتاح.
+ *
+ * ## المشكلة اللي بيحلّها
+ * كنا بناخد أحدث موديل صور في قايمة جوجل ونقف لو فشل. والأحدث غالبًا
+ * معاينة **مالهاش حصّة** على مفاتيح كتير (`limit: 0`) — فالجدول كان
+ * بيقف كل يوم برسالة «الحصّة خلصت» والمفتاح عليه موديل صور تاني شغّال.
+ *
+ * دلوقتي بنجرّب لحد تلات موديلات بالترتيب، وبنعدّي بس على الموديل اللي
+ * مالوش حصّة أو مش متاح. أي خطأ تاني (المحتوى اتمنع، المفتاح غلط)
+ * بيرجع على طول: موديل تاني مش هيصلّحه.
+ */
+export async function generateImage(input: {
+  apiKey: string
+  prompt: string
+  image?: InlineImage
+  aspectRatio?: string
+}): Promise<GeminiResult<GeneratedImage>> {
+  const list = await listImageModels(input.apiKey)
+  if (!list.ok) return list
+  if (list.data.length === 0) {
+    return {
+      ok: false,
+      error: {
+        kind: 'quota',
+        noFreeQuota: true,
+        message:
+          'مفتاح Gemini ده مافيهوش موديل بيولّد صور. فعّل الفوترة على مشروع المفتاح، أو استخدم مفتاح ChatGPT للصور من صفحة الإضافات.',
+      },
+    }
+  }
+
+  const alive = list.data.filter((m) => !deadModels.has(m.id))
+  const candidates = (alive.length ? alive : list.data).slice(0, 3)
+  const tried: string[] = []
+  let first: GeminiResult<GeneratedImage> | null = null
+
+  for (const candidate of candidates) {
+    tried.push(candidate.id)
+    const res = await editImage({ ...input, model: candidate.id })
+    if (res.ok) return res
+    first ??= res
+    if (!isDeadModel(res.error)) return res
+    deadModels.add(candidate.id)
+  }
+
+  /* كل الموديلات اللي اتجرّبت مالهاش حصّة — الرسالة بتقول ده صراحةً */
+  if (first && !first.ok && first.error.kind === 'quota' && first.error.noFreeQuota) {
+    return {
+      ok: false,
+      error: {
+        kind: 'quota',
+        noFreeQuota: true,
+        message:
+          `مفيش موديل صور عليه حصّة في مفتاح Gemini ده (جرّبنا: ${tried.join('، ')}). ` +
+          'موديلات الصور عند جوجل محتاجة فوترة مفعّلة على نفس المشروع اللي طلع منه المفتاح — ' +
+          'aistudio.google.com ← API keys ← المشروع ← Billing. أو استخدم مفتاح ChatGPT للصور من صفحة الإضافات.',
+      },
+    }
+  }
+  return first ?? { ok: false, error: { kind: 'unknown', message: 'ما قدرناش نولّد الصورة.' } }
 }

@@ -2,7 +2,7 @@ import 'server-only'
 import { and, desc, eq, isNull, ne, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import { products, studioAssets } from '@/db/schema'
-import { editImage, isImageModel, listImageModels } from './ai/gemini'
+import { generateImage } from './ai/gemini'
 import {
   checkVideo as checkSora,
   downloadVideo as downloadSora,
@@ -66,26 +66,6 @@ async function studioEngine(storeId: string, prefer?: string | null): Promise<En
   const res = await resolveEngines(storeId, 'tools', prefer)
   if (!res.ok) return { error: res.error }
   return res.engine
-}
-
-/**
- * موديل صور Gemini — بيتلقّط من حساب التاجر لا مكتوب عندنا.
- *
- * أسماء موديلات الصور عند جوجل بتتغيّر وبتتشال. الاسم المكتوب في
- * الكود بيقف يومها، والتاجر بيشوف «الموديل مش موجود» ومش عارف ليه
- * — والقايمة الحيّة بتاخد اللي متاح فعلًا في حسابه هو.
- */
-async function imageModel(apiKey: string): Promise<string | StudioError> {
-  const res = await listImageModels(apiKey)
-  if (!res.ok) return { error: res.error.message }
-
-  const usable = res.data.filter((m) => m.usable && isImageModel(m.id))
-  if (usable.length === 0) {
-    return { error: 'مفتاح Gemini مافيهوش موديل بيولّد صور. جرّب مفتاحًا عليه فوترة.' }
-  }
-
-  /* الأحدث الأول — جوجل بترتّب القايمة كده وبتحطّ المستقرّ فوق */
-  return usable[0].id
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -1062,11 +1042,9 @@ export async function makeImage(input: {
       aspect: preset.aspect,
     })
   } else {
-    const model = await imageModel(engine.apiKey)
-    if (typeof model !== 'string') return model
-    res = await editImage({
+    /* موديل الصور بيتختار من المفتاح، ولو واحد مالوش حصّة بيتجرّب اللي بعده */
+    res = await generateImage({
       apiKey: engine.apiKey,
-      model,
       prompt,
       image: base,
       aspectRatio: preset.aspect,
