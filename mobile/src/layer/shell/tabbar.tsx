@@ -11,6 +11,7 @@ import { useEffect, useState } from 'preact/hooks'
 import { haptic } from '../bridge'
 import { icons } from '../icons'
 import { navigate } from './navigate'
+import { openMore } from './more'
 import { Icon } from './ui'
 
 type Tab = { key: string; label: string; href: string | null; more: boolean; icon: string; source: HTMLElement | null }
@@ -118,7 +119,11 @@ export function TabBar({ path, active }: { path: string; active: boolean }) {
   const press = (tab: Tab, i: number) => {
     haptic('LIGHT')
     if (tab.more) {
-      tab.source?.click()
+      /*
+        قايمة المنصة بتفتح تحت الشاشات الأصلية فمش بتبان — «المزيد»
+        بقت لوحة أصلية فوق أي شاشة (more.tsx).
+      */
+      openMore()
       return
     }
     if (!tab.href) return

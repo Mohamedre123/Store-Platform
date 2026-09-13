@@ -26,6 +26,24 @@ const types = { '.js': 'text/javascript; charset=utf-8', '.html': 'text/html; ch
 createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', `http://localhost:${port}`)
 
+  /* قايمة «المزيد»: المستخدم وصلاحياته، وتسجيل الخروج */
+  if (url.pathname === '/api/app/me' || url.pathname === '/api/app/logout') {
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
+    res.end(
+      JSON.stringify(
+        url.pathname === '/api/app/logout'
+          ? { ok: true }
+          : {
+              user: { name: 'محمد أحمد', email: 'owner@mail.com', isPlatformAdmin: false },
+              store: { name: 'متجر الأناقة', slug: 'elanaka', logo: null, url: 'https://www.zawyaeg.site/s/demo' },
+              role: url.searchParams.get('role') ?? 'owner',
+              permissions: [],
+            },
+      ),
+    )
+    return
+  }
+
   /* بيانات وهمية للعملاء (dev/mock-api.mjs) */
   if (url.pathname.startsWith('/api/app/customers')) {
     const mock = await import(new URL('../dev/mock-api.mjs', import.meta.url))

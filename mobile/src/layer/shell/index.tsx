@@ -32,6 +32,8 @@ import { CUSTOMERS_CSS } from './styles-customers'
 import { CustomersScreen } from './customers'
 import { CustomerDetailScreen } from './customer-detail'
 import { clearCustomersCache } from './customers-api'
+import { MORE_CSS } from './styles-more'
+import { clearMeCache, MoreSheet } from './more'
 import { SHELL_CSS } from './styles'
 import { TabBar } from './tabbar'
 
@@ -123,6 +125,7 @@ function Shell() {
       clearOrdersCache()
       clearProductsCache()
       clearCustomersCache()
+      clearMeCache()
     }
   }, [path])
 
@@ -163,6 +166,7 @@ function Shell() {
         onUnavailable={markUnavailable.customer}
       />
       <TabBar path={path} active={onDashboard} />
+      {onDashboard && <MoreSheet path={path} search={effective.searchParams.toString()} />}
     </>
   )
 }
@@ -170,7 +174,7 @@ function Shell() {
 export function installShell(): void {
   const root = layer()
   const style = document.createElement('style')
-  style.textContent = SHELL_CSS + ORDERS_CSS + PRODUCTS_CSS + CUSTOMERS_CSS
+  style.textContent = SHELL_CSS + ORDERS_CSS + PRODUCTS_CSS + CUSTOMERS_CSS + MORE_CSS
   root.appendChild(style)
   const mount = document.createElement('div')
   mount.className = 'shell'

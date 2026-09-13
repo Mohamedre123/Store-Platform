@@ -79,6 +79,11 @@ let lastUrl = location.href
 function handleUrlChange(kind: RouteKind): void {
   const next = location.href
   if (next === lastUrl) return
+  /* أي طريق تاني وصّل للصفحة التعريفية (تحويل من الخادم مثلًا) — نرجع للوحة */
+  if (location.pathname === '/') {
+    location.replace(HOME_PATH)
+    return
+  }
   const prev = new URL(lastUrl)
   const now = new URL(next)
   lastUrl = next
@@ -118,6 +123,20 @@ function watchLinkClicks(): void {
         return
       }
       if (!APP_HOSTS.has(url.hostname)) return
+      /*
+        شعار «زاوية» في صفحات الدخول والتسجيل بيودّي للصفحة التعريفية.
+        جوّه التطبيق مالهاش لازمة (وهيدرها معمول للمتصفح)، فالضغطة
+        بتروح للوحة — واللي مش مسجّل بيتحوّل لصفحة الدخول من الخادم.
+      */
+      if (url.pathname === '/') {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        if (location.pathname !== '/login') {
+          progressStart()
+          location.assign(HOME_PATH)
+        }
+        return
+      }
       if (url.pathname.startsWith('/s/') || url.pathname.startsWith('/api/')) return
       if (url.pathname === location.pathname && url.search === location.search) return
       progressStart()

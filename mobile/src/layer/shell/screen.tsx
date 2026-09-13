@@ -169,11 +169,14 @@ export function Screen({
 export function Sheet({
   open,
   title,
+  tall,
   onClose,
   children,
 }: {
   open: boolean
   title?: string
+  /** لوحة طويلة (قايمة «المزيد») — بتاخد معظم الشاشة */
+  tall?: boolean
   onClose: () => void
   children: ComponentChildren
 }) {
@@ -191,7 +194,7 @@ export function Sheet({
   return (
     <div class={`sheet${open ? ' sheet--open' : ''}`} aria-hidden={!open}>
       <div class="sheet-backdrop" onClick={onClose} />
-      <div class="sheet-panel" role="dialog" aria-modal="true" aria-label={title}>
+      <div class={`sheet-panel${tall ? ' sheet-panel--tall' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
         <span class="sheet-grip" aria-hidden="true" />
         {title && <h3 class="sheet-title">{title}</h3>}
         {children}
