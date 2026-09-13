@@ -7,6 +7,7 @@ import { decrypt } from './crypto'
 import { isEmailConfigured, sendEmail } from './email'
 import { dashboardUrl } from './domain'
 import { formatMoney } from './utils'
+import { pushOrderPlaced } from './push'
 import type { AutomationEvent } from '@/db/schema'
 
 /**
@@ -110,6 +111,11 @@ function background(work: Promise<unknown>, label: string) {
 
 export function notifyTeam(event: TeamEvent, ctx: TeamContext): void {
   background(deliver(event, ctx), 'فشل إشعار الفريق:')
+  /*
+    إشعار تطبيق الموبايل مستقل عن المستقبلين: اللي نزّل التطبيق وسمح
+    بالإشعارات بيوصله الطلب الجديد من غير أي إعداد تاني.
+  */
+  if (event === 'order_placed') background(pushOrderPlaced(ctx), 'فشل إشعار التطبيق:')
 }
 
 async function deliver(event: TeamEvent, ctx: TeamContext): Promise<void> {

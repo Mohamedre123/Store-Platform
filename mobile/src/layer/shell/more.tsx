@@ -14,6 +14,7 @@ import { useEffect, useMemo, useState } from 'preact/hooks'
 import { haptic } from '../bridge'
 import { toast } from '../dom'
 import { icons } from '../icons'
+import { unregisterPush } from '../push'
 import { assetUrl, clearHomeCache } from './api'
 import { clearCustomersCache } from './customers-api'
 import { initials } from './format'
@@ -119,6 +120,7 @@ export function MoreSheet({ path, search }: { path: string; search: string }) {
   const logout = async () => {
     if (loggingOut) return
     setLoggingOut(true)
+    await unregisterPush()
     try {
       const res = await fetch('/api/app/logout', {
         method: 'POST',

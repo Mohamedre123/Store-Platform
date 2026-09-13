@@ -19,6 +19,7 @@ import { installFileSupport } from './files'
 import { installGestures } from './gestures'
 import { installNetworkWatch } from './network'
 import { installShell } from './shell'
+import { installPush } from './push'
 
 declare global {
   interface Window {
@@ -86,6 +87,7 @@ function boot(): void {
   const start = () => {
     installGestures()
     installNetworkWatch()
+    installPush()
   }
   if (document.body) start()
   else document.addEventListener('DOMContentLoaded', start, { once: true })

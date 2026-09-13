@@ -17,3 +17,7 @@ dist/
 
 # نسخة التطوير من الطبقة (npm run build:layer -- --dev)
 dev/*.dev.js
+
+# إعداد Firebase — نسخته في H:or claude\google-services.json
+android/app/google-services.json
+ios/App/App/GoogleService-Info.plist

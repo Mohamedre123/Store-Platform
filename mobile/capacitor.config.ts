@@ -66,6 +66,10 @@ const config: CapacitorConfig = {
   },
 
   plugins: {
+    /* iOS: الإشعار يظهر حتى والتطبيق مفتوح (أندرويد بتعرضه الطبقة كرسالة صغيرة) */
+    PushNotifications: {
+      presentationOptions: ['badge', 'sound', 'alert'],
+    },
     SplashScreen: {
       /*
         الطبقة بتخفي الشاشة الأصلية أول ما شاشة الافتتاح المتحركة ترسم.

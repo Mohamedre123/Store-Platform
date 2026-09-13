@@ -53,6 +53,17 @@
 
         </activity>
 
+        <!-- إشعارات الطلبات: الأيقونة الصغيرة ولونها والقناة الافتراضية -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_zawya" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/zawya_primary" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="orders" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -78,6 +89,8 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- أندرويد ١٣+: إذن إشعارات الطلبات الجديدة -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- «صوّر» جنب «اختار من المعرض» لما التاجر يرفع صورة منتج -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
