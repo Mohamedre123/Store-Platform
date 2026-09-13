@@ -143,6 +143,97 @@ export type TrashPayload = {
   products: Array<{ id: string; name: string; price: number; image: string | null; deletedAt: string }>
 }
 
+export type Reward = {
+  id: string
+  name: string
+  description: string | null
+  type: string
+  typeLabel: string
+  value: number
+  pointsCost: number
+  minTier: string | null
+  minTierLabel: string | null
+  stock: number | null
+  redeemedCount: number
+  isActive: boolean
+}
+
+export type LoyaltySettings = {
+  pointsPerPound: number
+  pointValue: number
+  minPointsToRedeem: number
+  welcomePoints: number
+  reviewPoints: number
+  referralPoints: number
+}
+
+export type LoyaltyPayload = {
+  currency: string
+  enabled: boolean
+  settings: LoyaltySettings
+  tiers: Array<{ key: string; name: string; minPoints: number; color: string; discountBps: number }>
+  stats: { members: number; outstanding: number }
+  rewardTypes: Array<{ key: string; label: string; unit: string | null }>
+  tierOptions: Array<{ key: string; label: string }>
+  rewards: Reward[]
+  wheel: { enabled: boolean; title: string; prizes: Array<{ label: string; color: string; chance: number }> }
+  recent: Array<{ id: string; points: number; reason: string | null; customerName: string | null; createdAt: string }>
+}
+
+export type Affiliate = {
+  id: string
+  name: string
+  phone: string | null
+  email: string | null
+  code: string
+  commissionType: 'percent' | 'fixed'
+  commissionInput: string
+  commissionLabel: string
+  balance: number
+  totalEarned: number
+  totalPaid: number
+  clicks: number
+  conversions: number
+  isActive: boolean
+  link: string
+}
+
+export type AffiliatesPayload = {
+  currency: string
+  stats: { balance: number; earned: number; conversions: number }
+  affiliates: Affiliate[]
+}
+
+export type ReferralsPayload = {
+  storeName: string
+  link: string
+  code: string
+  signups: number
+  subscribed: number
+  deliveredOrders: number
+}
+
+export const loyaltyData = cachedResource<LoyaltyPayload>('zw-loyalty:v1', '/api/app/loyalty')
+export const affiliatesData = cachedResource<AffiliatesPayload>('zw-affiliates:v1', '/api/app/affiliates')
+export const referralsData = cachedResource<ReferralsPayload>('zw-referrals:v1', '/api/app/referrals')
+
+export const COPY_ICON =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>'
+export const WALLET_ICON =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>'
+
+/** نسخ نص مع رسالة — ولو المتصفح رفض، النص نفسه بيظهر في الرسالة */
+export async function copyText(text: string, done: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(text)
+    const { toast } = await import('../dom')
+    toast(done, { tone: 'success', duration: 1800 })
+  } catch {
+    const { toast } = await import('../dom')
+    toast(text)
+  }
+}
+
 export const blockedData = cachedResource<BlockedPayload>('zw-blocked:v1', '/api/app/blocked')
 export const couriersData = cachedResource<CouriersPayload>('zw-couriers:v1', '/api/app/couriers')
 export const bookingsData = cachedResource<BookingsPayload>('zw-bookings:v1', '/api/app/bookings')
@@ -159,6 +250,9 @@ export function clearOpsCaches(): void {
   suppliersData.clear()
   categoriesData.clear()
   trashData.clear()
+  loyaltyData.clear()
+  affiliatesData.clear()
+  referralsData.clear()
 }
 
 /** أرقام عربي وفواصل ← أرقام لاتيني بنقطة عشرية */

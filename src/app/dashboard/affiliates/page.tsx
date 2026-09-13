@@ -1,8 +1,6 @@
-import { desc, eq } from 'drizzle-orm'
-import { db } from '@/db'
-import { affiliates } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { guard } from '@/lib/permissions'
+import { loadAffiliates } from '@/lib/affiliates-data'
 import { publicStoreUrl } from '@/lib/domain'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
@@ -14,12 +12,7 @@ export default async function AffiliatesPage() {
   const { store, actor } = await getDashboardContext()
   guard(actor, 'marketing.manage')
 
-  const rows = await db
-    .select()
-    .from(affiliates)
-    .where(eq(affiliates.storeId, store.id))
-    .orderBy(desc(affiliates.createdAt))
-    .limit(200)
+  const rows = await loadAffiliates(store.id)
 
   return (
     <div className="flex flex-col gap-6">

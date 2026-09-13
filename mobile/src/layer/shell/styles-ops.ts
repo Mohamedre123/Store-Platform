@@ -110,6 +110,36 @@ export const OPS_CSS = `
 .ct-image-actions{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
 .ct-image-actions b{font-size:13px;color:var(--fg-muted,#5c6890)}
 
+/* ─── الولاء والنقاط ─── */
+.ly-sec{margin-top:12px}
+.ly-rules{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.ly-rules span{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 4px;border-radius:14px;background:var(--surface-2,#f1f2f6);text-align:center}
+.ly-rules b{font-size:18px;font-variant-numeric:tabular-nums}
+.ly-rules small{font-size:11px;color:var(--fg-subtle,#8a92ad)}
+.ly-tiers{display:flex;flex-direction:column;gap:6px}
+.ly-tier{display:flex;align-items:center;gap:8px;font-size:13px}
+.ly-tier i{width:12px;height:12px;flex:none;border-radius:50%}
+.ly-tier small{margin-inline-start:auto;font-size:12px;color:var(--fg-subtle,#8a92ad)}
+.ly-cost{flex:none;font-size:13px;color:var(--primary,#634b9a)}
+.ly-prizes{display:flex;flex-wrap:wrap;gap:6px}
+.ly-prize{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:12px;background:var(--surface-2,#f1f2f6)}
+.ly-prize i{width:9px;height:9px;border-radius:50%}
+.ly-prize small{color:var(--fg-subtle,#8a92ad)}
+.switch--busy{opacity:.55}
+
+/* ─── المسوّقون والإحالة ─── */
+.aff-list{margin-top:12px}
+.aff-code{padding:1px 8px;border-radius:8px;font-family:'SFMono-Regular',Consolas,monospace;font-size:11.5px;font-weight:700;letter-spacing:.4px;color:var(--primary,#634b9a);background:var(--primary-soft,#ece8f5)}
+.aff-stats{grid-template-columns:repeat(3,1fr)}
+.aff-input-code{font-family:'SFMono-Regular',Consolas,monospace;letter-spacing:1px;text-transform:uppercase}
+.ref-card{display:flex;flex-direction:column;gap:12px;padding:18px}
+.ref-link{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:0 14px;border:1.5px dashed var(--primary,#634b9a);border-radius:14px;background:var(--primary-soft,#ece8f5);color:var(--primary,#634b9a)!important;text-align:start}
+.ref-link bdi{flex:1;min-width:0;font-size:13px!important;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ref-link .ic{width:18px;height:18px}
+.ref-code{font-family:'SFMono-Regular',Consolas,monospace;font-weight:700;letter-spacing:1px}
+.ref-good{color:var(--color-success,#15803d)}
+.ref-note{margin-top:12px}
+
 /* ─── فورم المنتج: خلّيها الغلاف ─── */
 .np-makecover{position:absolute;right:6px;bottom:6px;padding:2px 8px;border:0;border-radius:999px;font-size:10.5px!important;font-weight:700;color:#fff!important;background:rgba(22,24,43,.62)}
 .np-note{margin:0;padding:10px 12px;border-radius:12px;font-size:13px;line-height:1.7;color:var(--fg-muted,#5c6890);background:var(--surface-2,#f1f2f6)}

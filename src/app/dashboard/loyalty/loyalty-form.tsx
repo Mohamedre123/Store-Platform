@@ -6,6 +6,7 @@ import { saveLoyaltyAction } from './actions'
 import { Alert, Card } from '@/components/ui'
 import { Toggle } from '@/components/dashboard/controls'
 import type { TierConfig } from '@/db/schema'
+import { DEFAULT_TIERS } from '@/lib/loyalty-meta'
 
 const TIER_KEYS: TierConfig['key'][] = ['bronze', 'silver', 'gold', 'platinum']
 const TIER_LABEL: Record<TierConfig['key'], string> = {
@@ -14,12 +15,6 @@ const TIER_LABEL: Record<TierConfig['key'], string> = {
   gold: 'ذهبي',
   platinum: 'بلاتيني',
 }
-
-const DEFAULT_TIERS: TierConfig[] = [
-  { key: 'bronze', name: 'برونزي', minPoints: 0, color: '#a1662f', perks: [], discountBps: 0 },
-  { key: 'silver', name: 'فضي', minPoints: 500, color: '#8a8f98', perks: [], discountBps: 300 },
-  { key: 'gold', name: 'ذهبي', minPoints: 2000, color: '#c9a227', perks: [], discountBps: 700 },
-]
 
 const field =
   'h-11 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-sm tabular-nums focus:border-[var(--primary)] focus:outline-none'

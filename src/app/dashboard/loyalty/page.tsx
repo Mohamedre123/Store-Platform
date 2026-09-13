@@ -1,9 +1,6 @@
-import { asc, desc, eq, sql } from 'drizzle-orm'
-import { db } from '@/db'
-import { customers, loyaltyTransactions, rewards, wheelPrizes, wheelSettings } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { guard } from '@/lib/permissions'
-import { getLoyaltySettings } from '@/lib/loyalty'
+import { loadLoyalty, wheelPrizeInputs } from '@/lib/loyalty-data'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { Card } from '@/components/ui'
@@ -17,37 +14,7 @@ export default async function LoyaltyPage() {
   const { store, actor } = await getDashboardContext()
   guard(actor, 'customers.view')
 
-  const [settings, [stats], recent, [wheelCfg], wheelPrizeRows, rewardRows] = await Promise.all([
-    getLoyaltySettings(store.id),
-    db
-      .select({
-        members: sql<number>`count(*) filter (where ${customers.points} > 0)::int`,
-        outstanding: sql<number>`coalesce(sum(${customers.points}), 0)::int`,
-      })
-      .from(customers)
-      .where(eq(customers.storeId, store.id)),
-    db
-      .select({
-        id: loyaltyTransactions.id,
-        points: loyaltyTransactions.points,
-        type: loyaltyTransactions.type,
-        reason: loyaltyTransactions.reason,
-        createdAt: loyaltyTransactions.createdAt,
-        customerName: customers.name,
-      })
-      .from(loyaltyTransactions)
-      .leftJoin(customers, eq(customers.id, loyaltyTransactions.customerId))
-      .where(eq(loyaltyTransactions.storeId, store.id))
-      .orderBy(desc(loyaltyTransactions.createdAt))
-      .limit(20),
-    db.select().from(wheelSettings).where(eq(wheelSettings.storeId, store.id)).limit(1),
-    db.select().from(wheelPrizes).where(eq(wheelPrizes.storeId, store.id)).orderBy(wheelPrizes.position),
-    db
-      .select()
-      .from(rewards)
-      .where(eq(rewards.storeId, store.id))
-      .orderBy(asc(rewards.sortOrder), asc(rewards.pointsCost)),
-  ])
+  const { settings, stats, recent, wheel, prizes, rewards } = await loadLoyalty(store.id)
 
   return (
     <div className="flex flex-col gap-6">
@@ -61,15 +28,13 @@ export default async function LoyaltyPage() {
           <Reveal>
             <Card className="flex flex-col gap-1 p-4">
               <span className="text-xs text-[var(--fg-muted)]">عملاء عندهم نقاط</span>
-              <span className="tabular text-xl font-bold">{stats?.members ?? 0}</span>
+              <span className="tabular text-xl font-bold">{stats.members}</span>
             </Card>
           </Reveal>
           <Reveal delay={60}>
             <Card className="flex flex-col gap-1 p-4">
               <span className="text-xs text-[var(--fg-muted)]">نقاط لسه ما اتصرفتش</span>
-              <span className="tabular text-xl font-bold">
-                {(stats?.outstanding ?? 0).toLocaleString('ar-EG')}
-              </span>
+              <span className="tabular text-xl font-bold">{stats.outstanding.toLocaleString('ar-EG')}</span>
             </Card>
           </Reveal>
         </div>
@@ -81,7 +46,7 @@ export default async function LoyaltyPage() {
 
       <Reveal delay={110}>
         <section className="border-t border-[var(--border)] pt-6">
-          <RewardsForm rewards={rewardRows as RewardItem[]} currency={store.currency} />
+          <RewardsForm rewards={rewards as RewardItem[]} currency={store.currency} />
         </section>
       </Reveal>
 
@@ -93,22 +58,7 @@ export default async function LoyaltyPage() {
               الزائر بياخد كود خصم مقابل رقمه — بتجمعلك أرقام وتزوّد التحويل.
             </p>
           </div>
-          <WheelForm
-            settings={wheelCfg}
-            prizes={wheelPrizeRows.map((p) => ({
-              id: p.id,
-              label: p.label,
-              color: p.color,
-              type: p.type,
-              value:
-                p.type === 'coupon_percent'
-                  ? String(p.value / 100)
-                  : p.type === 'coupon_fixed'
-                    ? String(p.value / 100)
-                    : String(p.value),
-              chance: String(p.probabilityBps / 100),
-            }))}
-          />
+          <WheelForm settings={wheel} prizes={wheelPrizeInputs(prizes)} />
         </section>
       </Reveal>
 

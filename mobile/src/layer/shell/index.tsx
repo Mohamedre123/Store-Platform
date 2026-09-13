@@ -63,6 +63,9 @@ import { ExpensesScreen } from './expenses'
 import { SuppliersScreen } from './suppliers'
 import { CategoriesScreen } from './categories'
 import { TrashScreen } from './trash'
+import { LoyaltyScreen } from './loyalty'
+import { AffiliatesScreen } from './affiliates'
+import { ReferralsScreen } from './referrals'
 
 const ORDER_DETAIL = /^\/dashboard\/orders\/([^/]+)$/
 /* صفحات جوّه المنتجات مش منتجات — new وcategories وimport وtrash بيفضلوا صفحات المنصة */
@@ -107,8 +110,14 @@ type ScreenKey =
   | 'suppliers'
   | 'categories'
   | 'trash'
+  | 'loyalty'
+  | 'affiliates'
+  | 'referrals'
 
 const SCREEN_KEYS: ScreenKey[] = [
+  'loyalty',
+  'affiliates',
+  'referrals',
   'expenses',
   'suppliers',
   'categories',
@@ -312,6 +321,18 @@ function Shell() {
       <TrashScreen
         visible={path === '/dashboard/products/trash' && !unavailable.trash && !web}
         onUnavailable={markUnavailable.trash}
+      />
+      <LoyaltyScreen
+        visible={path === '/dashboard/loyalty' && !unavailable.loyalty && !web}
+        onUnavailable={markUnavailable.loyalty}
+      />
+      <AffiliatesScreen
+        visible={path === '/dashboard/affiliates' && !unavailable.affiliates && !web}
+        onUnavailable={markUnavailable.affiliates}
+      />
+      <ReferralsScreen
+        visible={path === '/dashboard/referrals' && !unavailable.referrals && !web}
+        onUnavailable={markUnavailable.referrals}
       />
       <VerifyBar visible={path === '/verify'} />
       <TabBar path={path} active={onDashboard} />

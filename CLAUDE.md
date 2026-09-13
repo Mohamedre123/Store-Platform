@@ -138,7 +138,11 @@ git push origin main                              # ده اللي بينشر ا�
 | الأقسام `/dashboard/products/categories` (رئيسي وتحته الفرعي بمسافة، صورة وعدد منتجات، دوسة = لوحة: صورة بالكاميرا/المعرض على `/api/upload` فولدر `categories`، الاسم، «تحت قسم» (القسم اللي ليه فرعيين بيفضل رئيسي)، الوصف، الظهور، «امسح القسم» بتأكيد) | `categories.tsx` | `/api/app/categories` (`products.view`)، `POST /api/app/categories/save` (FormData ← `saveCategoryAction` + `NEXT_REDIRECT` = نجاح)، `POST /api/app/categories/:id/delete` (`products.manage`) |
 | سلة المهملات `/dashboard/products/trash` («رجّعه» = مسوّدة + زرار «افتحه»، امسح نهائي بتأكيد) | `trash.tsx` | `/api/app/trash` (`products.manage`)، `POST /api/app/trash/:id/{restore,purge}` |
 
-شاشات الحظر والمندوبين والحجوزات والمصروفات والموردين والأقسام والسلة بياناتهم في `shell/ops-api.ts` (فيه كمان `waNumber` لرقم واتساب دولي و`toLatin` للأرقام العربي) وستايلهم في `shell/styles-ops.ts`. رفع الصور (`shrink` و`upload(file, folder)`) متصدّر من `shell/product-new.tsx`.
+| الولاء والنقاط `/dashboard/loyalty` (أرقام، مفتاح تشغيل النقاط، القواعد بمثال حي في لوحة، المستويات للقراءة ← `?web=1`، متجر المكافآت إضافة/تعديل/حذف، مفتاح تشغيل عجلة الحظ + الجوايز للقراءة ← `?web=1`، آخر الحركات) | `loyalty.tsx` | `/api/app/loyalty` (`customers.view`)، `POST /api/app/loyalty/{settings,wheel}`، `POST /api/app/loyalty/rewards/save`، `POST /api/app/loyalty/rewards/:id/delete` — **`settings` بيبعت المستويات الموجودة (أو `DEFAULT_TIERS` من `src/lib/loyalty-meta.ts`) و`wheel` بيبعت العنوان والجوايز الموجودين**، لأن الأفعال بتكتب كل حاجة من الأول |
+| المسوّقون بالعمولة `/dashboard/affiliates` (مستحق/بيعات، كارت لكل مسوّق بكوده وضغطاته وبيعاته ومستحقه، «سجّل صرف» بتأكيد، «ابعتله رابطه» واتساب، انسخ، ⋯ = اتصل/عدّل/وقّفه/احذف، إضافة وتعديل في لوحة) | `affiliates.tsx` | `/api/app/affiliates` (`marketing.manage`)، `POST /api/app/affiliates/save`، `POST /api/app/affiliates/:id/{pay,delete}` |
+| حِيل صاحبك `/dashboard/referrals` (رابط الإحالة بنسخة، واتساب برسالة جاهزة، شارك، انسخ الرسالة، الكود، سجّلوا/اشتركوا/طلبات وصّلتها) | `referrals.tsx` | `/api/app/referrals` (من غير صلاحية — زي الصفحة) |
+
+شاشات الحظر والمندوبين والحجوزات والمصروفات والموردين والأقسام والسلة والولاء والمسوّقين والإحالة بياناتهم في `shell/ops-api.ts` (فيه كمان `copyText` و`COPY_ICON`/`WALLET_ICON`) (فيه كمان `waNumber` لرقم واتساب دولي و`toLatin` للأرقام العربي) وستايلهم في `shell/styles-ops.ts`. رفع الصور (`shrink` و`upload(file, folder)`) متصدّر من `shell/product-new.tsx`.
 الشاشات دي كلها بيقروا بياناتهم من `shell/business-api.ts` (أنواع البيانات + `cachedResource`)، والطلبات من
 `shell/http.ts` (`useResource` = كاش + تحديث + رجوع لصفحة المنصة لو المسار مش منشور، و`postAppJson` = POST برسايل عربي)،
 والستايل في `shell/styles-business.ts`. **أي شاشة جديدة استخدم `cachedResource` + `useResource` بدل ما تكرر الكود.**
@@ -270,6 +274,9 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
 | `src/lib/suppliers-data.ts` (`loadSuppliers`) + `suppliers/actions.ts` | `src/app/dashboard/suppliers/page.tsx` | `/api/app/suppliers*` ← `src/lib/app-suppliers.ts` ← `shell/suppliers.tsx` |
 | `src/lib/categories-data.ts` (`loadCategories`) + `products/actions.ts` (`saveCategoryAction`, `deleteCategoryAction`) | `src/app/dashboard/products/categories/page.tsx` | `/api/app/categories*` ← `src/lib/app-categories.ts` ← `shell/categories.tsx` |
 | `src/lib/trash-data.ts` (`loadTrash`) + `products/actions.ts` (`restoreProductAction`, `purgeProductAction`) | `src/app/dashboard/products/trash/page.tsx` | `/api/app/trash*` ← `shell/trash.tsx` |
+| `src/lib/loyalty-data.ts` (`loadLoyalty`, `wheelPrizeInputs`) + `src/lib/loyalty-meta.ts` (`DEFAULT_TIERS` — فورم اللوحة بيستوردها منه) + `loyalty/{actions,rewards-actions,wheel-actions}.ts` + `src/lib/rewards-meta.ts` | `src/app/dashboard/loyalty/page.tsx` | `/api/app/loyalty*` ← `src/lib/app-loyalty.ts` ← `shell/loyalty.tsx` |
+| `src/lib/affiliates-data.ts` (`loadAffiliates`) + `affiliates/actions.ts` | `src/app/dashboard/affiliates/page.tsx` | `/api/app/affiliates*` ← `src/lib/app-affiliates.ts` ← `shell/affiliates.tsx` |
+| `src/lib/merchant-referrals.ts` (`referralSummary`) + `src/lib/notices.ts` (`storeStats`) | `src/app/dashboard/referrals/page.tsx` | `/api/app/referrals` ← `shell/referrals.tsx` |
 
 ⚠ **ما تصدّرش ثوابت من ملف `page.tsx`** (Next بيرفض أي export غير المعروفين) — الثوابت المشتركة مكانها `src/lib/*-data.ts`.
 و**ما تستوردش قيم (مش أنواع) من ملف فيه `'use client'` في كود الخادم** — بتوصل كمرجع مش كقيمة. `import type` بس.
@@ -407,10 +414,12 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
 - **نشر الموقع (2.1):** commit `4cb078c` + commit فاضي `977556c` (Vercel ما نشرش الأول لوحده — حصلت مرتين، لو المسارات
   الجديدة فضلت 404 بعد ١٠ دقايق ارفع commit فاضي). اتختبر على الحي: `/api/app/{blocked,bookings,couriers}` و`products/:id/edit`
   = 401، والـPOST من غير Origin = 403، والصفحات 200/307 زي ما هي.
-- **التطبيق:** آخر نسخة مبنية **2.2 (versionCode 13)** في `H:\for claude\zawya-release\zawya-2.2.apk` و`.aab`
-  (المصروفات والأرباح، الموردون، الأقسام، سلة المهملات — فوق 2.1: تعديل منتج بالكاميرا، الحظر، المندوبون، الحجوزات —
+- **التطبيق:** آخر نسخة مبنية **2.3 (versionCode 14)** في `H:\for claude\zawya-release\zawya-2.3.apk` و`.aab`
+  (الولاء والنقاط، المسوّقون بالعمولة، حِيل صاحبك — فوق 2.2: المصروفات والأرباح، الموردون، الأقسام، سلة المهملات — فوق 2.1: تعديل منتج بالكاميرا، الحظر، المندوبون، الحجوزات —
   فوق 2.0: منتج جديد بالكاميرا، المراجعات، المرتجعات، الشكاوى، قفل البصمة — فوق 1.9: الكوبونات والمخزون والرسايل
-  والاشتراك والإعدادات، وفوق 1.8: التحليلات والشحنات والهيكل الفوري وشاشة الافتتاح المتحركة). النسخة الجاية **2.3 / versionCode 14**.
+  والاشتراك والإعدادات، وفوق 1.8: التحليلات والشحنات والهيكل الفوري وشاشة الافتتاح المتحركة). النسخة الجاية **2.4 / versionCode 15**.
+- **درايف `Z:`** مش بارتشن — اختصار `subst` لفولدر المشروع عشان Gradle ما يقعش من المسار العربي. صاحب المشروع لاحظه وسأل؛
+  اتشرحله إنه بيختفي مع الريستارت وبيتشال بـ`subst Z: /d` من غير ما يمسح حاجة.
 - **درس من 2.2:** الشاشات الأصلية المخفية بتفضل في الـDOM (`visibility:hidden`) — أي سكربت اختبار بيدوّر على زرار لازم
   يدوّر جوّه الشاشة الظاهرة بس (`[...r.querySelectorAll('.screen')].filter(s => getComputedStyle(s).visibility !== 'hidden')`)،
   وإلا بيدوس زرار في شاشة تانية مستخبية.
@@ -459,7 +468,7 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
    المندوبين («ابعتله الرابط» بيفتح واتساب)، الحجوزات — بالبيانات الحقيقية (اتجرّبوا ببيانات وهمية بس).
 2. صاحب المشروع يربط واتساب متجر الإدارة (atlosa) من «الإعدادات ← واتساب» عشان رسايل الاشتراك توصل واتساب كمان،
    ويجرّب «جدّد الاشتراك» من «إدارة المنصة» على متجر تجريبي ويتأكد الإيميل وصل الوارد.
-3. شاشات أصلية جاية (اللي لسه صفحات موقع): الولاء والنقاط `/dashboard/loyalty` (فورم إعدادات كبير + المكافآت + العجلة)،
-   المسوّقين بالعمولة `/dashboard/affiliates`، الإحالات `/dashboard/referrals`، وإنشاء كوبون/شحنة من التطبيق بدل `?web=1`.
+3. الجاي في التطبيق: إنشاء كوبون من التطبيق (بدل `?web=1` في الكوبونات)، تسجيل شحنة، تعديل مستويات الولاء وجوايز العجلة،
+   وباقي صفحات اللوحة اللي لسه موقع (الاستوديو، الإضافات، واجهة المتجر، الأسواق، التجارب، المساعد، الأتمتة، المدونة، الوسائط، المطوّرين).
 4. iOS: Face ID للقفل + إشعارات APNs (محتاج حساب Apple Developer + ماك).
 5. **جوجل بلاي مؤجّل** (صاحب المشروع قال مفيش ميزانية دلوقتي) — ما تفتحش الموضوع غير لو طلبه.

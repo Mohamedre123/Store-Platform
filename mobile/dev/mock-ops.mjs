@@ -167,6 +167,64 @@ export function trash() {
   }
 }
 
+export function loyalty() {
+  return {
+    currency: 'EGP',
+    enabled: true,
+    settings: { pointsPerPound: 1, pointValue: 5, minPointsToRedeem: 100, welcomePoints: 50, reviewPoints: 20, referralPoints: 100 },
+    tiers: [
+      { key: 'bronze', name: 'برونزي', minPoints: 0, color: '#a1662f', discountBps: 0 },
+      { key: 'silver', name: 'فضي', minPoints: 500, color: '#8a8f98', discountBps: 300 },
+      { key: 'gold', name: 'ذهبي', minPoints: 2000, color: '#c9a227', discountBps: 700 },
+    ],
+    stats: { members: 184, outstanding: 23650 },
+    rewardTypes: [
+      { key: 'coupon_percent', label: 'خصم بنسبة', unit: '٪' },
+      { key: 'coupon_fixed', label: 'خصم بمبلغ', unit: 'ج' },
+      { key: 'free_shipping', label: 'شحن مجاني', unit: null },
+      { key: 'free_product', label: 'منتج مجاني', unit: null },
+    ],
+    tierOptions: [
+      { key: 'bronze', label: 'برونزي' },
+      { key: 'silver', label: 'فضّي' },
+      { key: 'gold', label: 'ذهبي' },
+      { key: 'platinum', label: 'بلاتيني' },
+    ],
+    rewards: [
+      { id: 'rw1', name: 'خصم ١٠٪', description: null, type: 'coupon_percent', typeLabel: 'خصم بنسبة', value: 1000, pointsCost: 300, minTier: null, minTierLabel: null, stock: null, redeemedCount: 12, isActive: true },
+      { id: 'rw2', name: 'شحن مجاني', description: 'أي طلب', type: 'free_shipping', typeLabel: 'شحن مجاني', value: 0, pointsCost: 150, minTier: 'silver', minTierLabel: 'فضّي', stock: 40, redeemedCount: 3, isActive: false },
+    ],
+    wheel: {
+      enabled: false,
+      title: 'جرّب حظك',
+      prizes: [
+        { label: 'خصم ١٠٪', color: '#634b9a', chance: 25 },
+        { label: 'حظ أوفر', color: '#0f4c81', chance: 35 },
+        { label: 'شحن مجاني', color: '#15803d', chance: 20 },
+      ],
+    },
+    recent: [
+      { id: 'lt1', points: 450, reason: 'طلب #1041', customerName: 'سارة محمود', createdAt: hoursAgo(3) },
+      { id: 'lt2', points: -300, reason: 'استبدال خصم ١٠٪', customerName: 'كريم حسن', createdAt: hoursAgo(26) },
+    ],
+  }
+}
+
+export function affiliates() {
+  return {
+    currency: 'EGP',
+    stats: { balance: 42000, earned: 128000, conversions: 23 },
+    affiliates: [
+      { id: 'af1', name: 'أحمد المؤثّر', phone: '+201001112233', email: null, code: 'AHMED', commissionType: 'percent', commissionInput: '10', commissionLabel: '10٪', balance: 42000, totalEarned: 98000, totalPaid: 56000, clicks: 1840, conversions: 19, isActive: true, link: 'https://www.zawyaeg.site/s/demo?ref=AHMED' },
+      { id: 'af2', name: 'نورا', phone: null, email: 'noura@mail.com', code: 'NOURA', commissionType: 'fixed', commissionInput: '50', commissionLabel: '٥٠ ج.م.', balance: 0, totalEarned: 30000, totalPaid: 30000, clicks: 320, conversions: 4, isActive: false, link: 'https://www.zawyaeg.site/s/demo?ref=NOURA' },
+    ],
+  }
+}
+
+export function referrals() {
+  return { storeName: 'متجر الأناقة', link: 'https://www.zawyaeg.site/signup?ref=ELANAKA', code: 'ELANAKA', signups: 3, subscribed: 1, deliveredOrders: 412 }
+}
+
 /** فورم التعديل من تفاصيل المنتج الوهمية (mock-api.mjs) */
 export function productEdit(detail) {
   const p = detail.product
