@@ -167,6 +167,8 @@ export type LoyaltySettings = {
   referralPoints: number
 }
 
+export type WheelPrize = { label: string; color: string; type: string; value: string; chance: string }
+
 export type LoyaltyPayload = {
   currency: string
   enabled: boolean
@@ -176,7 +178,16 @@ export type LoyaltyPayload = {
   rewardTypes: Array<{ key: string; label: string; unit: string | null }>
   tierOptions: Array<{ key: string; label: string }>
   rewards: Reward[]
-  wheel: { enabled: boolean; title: string; prizes: Array<{ label: string; color: string; chance: number }> }
+  wheel: {
+    enabled: boolean
+    title: string
+    prizes: Array<{ label: string; color: string; chance: number }>
+    subtitle?: string
+    triggerAfterSeconds?: number
+    freeSpinsPerDay?: number
+    prizeInputs?: WheelPrize[]
+  }
+  editsTiers?: boolean
   recent: Array<{ id: string; points: number; reason: string | null; customerName: string | null; createdAt: string }>
 }
 

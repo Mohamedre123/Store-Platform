@@ -69,7 +69,9 @@ export async function marketingPayload(store: ActiveStore) {
       }
     }),
     /* للاختيار في «ينطبق على» */
-    pickProducts: data.products.map((p) => ({ id: p.id, name: p.name })),
+    pickProducts: data.products.map((p) => ({ id: p.id, name: p.name, price: p.price })),
+    /* التطبيق من 2.5 بيعمل ويعدّل عروض الكمية والباقات لو ده موجود */
+    editsOffers: true,
     pickCategories: data.categories,
     offers: data.quantityOffers.map((o) => ({
       id: o.id,
@@ -80,6 +82,13 @@ export async function marketingPayload(store: ActiveStore) {
         .join(' · '),
       productsLabel: o.productIds.length ? `على ${n(o.productIds.length)} منتج` : 'على كل المنتجات',
       isActive: o.isActive,
+      /* خانات فورم التعديل في التطبيق — نفس `rowToInput` في فورم اللوحة */
+      form: {
+        name: o.name,
+        badge: o.badge ?? '',
+        tiers: (o.config.tiers ?? []).map((t) => ({ qty: String(t.qty), percent: String(t.discountBps / 100) })),
+        productIds: o.productIds,
+      },
     })),
     bundles: data.bundles.map((b) => {
       const ids = b.config.productIds ?? []
@@ -90,6 +99,12 @@ export async function marketingPayload(store: ActiveStore) {
         badge: b.badge,
         productsLabel: names.length ? names.join(' + ') : `${n(ids.length)} منتجات`,
         priceLabel: b.config.bundlePrice ? money(b.config.bundlePrice) : '',
+        form: {
+          name: b.name,
+          badge: b.badge ?? '',
+          productIds: ids,
+          bundlePrice: String((b.config.bundlePrice ?? 0) / 100),
+        },
         isActive: b.isActive,
       }
     }),

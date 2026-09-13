@@ -153,6 +153,25 @@ export const OPS_CSS = `
 .mk-edit{display:inline-flex;align-items:center;gap:6px;padding:4px 0;border:0;background:none;font-size:12.5px!important;color:var(--fg-muted,#5c6890)!important}
 .mk-edit .ic{width:14px;height:14px;color:var(--primary,#634b9a)}
 
+/* ─── تعديل المستويات والعجلة ─── */
+.ly-edit{display:flex;flex-direction:column;gap:10px;padding:12px}
+.ly-edit-head{display:flex;align-items:center;gap:10px}
+.ly-edit-head>i{width:14px;height:14px;flex:none;border-radius:50%}
+.ly-edit-head>b{flex:1;font-size:14px}
+.ly-prize-name{flex:1;min-width:0;min-height:44px}
+.ly-colors{display:flex;flex-wrap:wrap;gap:8px}
+.ly-color{width:30px;height:30px;padding:0;border:3px solid transparent;border-radius:50%;box-shadow:0 0 0 1px var(--border,#e2e4ec)}
+.ly-color--on{border-color:var(--surface,#fff);box-shadow:0 0 0 2px var(--fg,#222540)}
+.ly-total-warn{color:var(--color-warning,#a16207)!important;font-weight:700}
+
+/* ─── عروض الكمية والباقات ─── */
+.of-tiers{display:flex;flex-direction:column;gap:8px}
+.of-tier{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:var(--fg,#222540)}
+.of-tier .of-num{width:72px;min-height:44px;padding:0 10px;text-align:center}
+.of-add{align-self:flex-start;padding:0 14px}
+.of-warn{color:var(--color-warning,#a16207);background:var(--color-warning-soft,#fef3c7)}
+.mk-row .ops-icon{width:36px;height:36px}
+
 /* ─── الشحنات: اللوحات ─── */
 .sh-order{display:flex;align-items:center;gap:10px;padding:12px;border-radius:14px;background:var(--surface-2,#f1f2f6)}
 .sh-next{margin:0 4px 8px}

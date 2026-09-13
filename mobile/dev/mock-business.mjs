@@ -24,11 +24,14 @@ export function marketing() {
     cp3: { type: 'free_shipping', value: '', maxDiscount: '', minOrder: '', appliesTo: 'products', targetIds: ['p1', 'p3', 'p4'], eligibility: 'all', usageLimit: '', usageLimitPerCustomer: '2', startsAt: '', endsAt: '2026-09-01' },
   }
   data.coupons = data.coupons.map((c) => ({ ...c, form: forms[c.id] }))
+  data.offers = data.offers.map((o) => ({ ...o, form: { name: o.name, badge: o.badge ?? '', tiers: [{ qty: '2', percent: '10' }, { qty: '3', percent: '15' }], productIds: [] } }))
+  data.bundles = data.bundles.map((b) => ({ ...b, form: { name: b.name, badge: b.badge ?? '', productIds: ['p1', 'p3'], bundlePrice: '1400' } }))
+  data.editsOffers = true
   data.pickProducts = [
-    { id: 'p1', name: 'فستان سهرة ستان' },
-    { id: 'p2', name: 'بلوزة قطن مطرّزة' },
-    { id: 'p3', name: 'شنطة جلد يد' },
-    { id: 'p4', name: 'طرحة شيفون' },
+    { id: 'p1', name: 'فستان سهرة ستان', price: 95000 },
+    { id: 'p2', name: 'بلوزة قطن مطرّزة', price: 42000 },
+    { id: 'p3', name: 'شنطة جلد يد', price: 65000 },
+    { id: 'p4', name: 'طرحة شيفون', price: 18000 },
   ]
   data.pickCategories = [
     { id: 'c1', name: 'فساتين' },

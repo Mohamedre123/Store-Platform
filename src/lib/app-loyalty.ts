@@ -1,6 +1,6 @@
 import 'server-only'
 import type { ActiveStore } from '@/lib/store-context'
-import { loadLoyalty } from '@/lib/loyalty-data'
+import { loadLoyalty, wheelPrizeInputs } from '@/lib/loyalty-data'
 import { DEFAULT_TIERS } from '@/lib/loyalty-meta'
 import { REWARD_TYPES, TIER_LABELS, TIER_ORDER, rewardTypeLabel } from '@/lib/rewards-meta'
 
@@ -42,7 +42,14 @@ export async function loyaltyPayload(store: ActiveStore) {
       enabled: wheel?.enabled ?? false,
       title: wheel?.title ?? 'جرّب حظك',
       prizes: prizes.map((p) => ({ label: p.label, color: p.color, chance: p.probabilityBps / 100 })),
+      /* فورم العجلة في التطبيق (من 2.5) — نفس خانات فورم اللوحة */
+      subtitle: wheel?.subtitle ?? '',
+      triggerAfterSeconds: wheel?.triggerAfterSeconds ?? 15,
+      freeSpinsPerDay: wheel?.freeSpinsPerDay ?? 1,
+      prizeInputs: wheelPrizeInputs(prizes).map(({ label, color, type, value, chance }) => ({ label, color, type, value, chance })),
     },
+    /* التطبيق من 2.5 بيعدّل المستويات والعجلة لو ده موجود */
+    editsTiers: true,
     recent: recent.map((t) => ({
       id: t.id,
       points: t.points,

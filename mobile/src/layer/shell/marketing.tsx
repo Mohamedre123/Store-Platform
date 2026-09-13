@@ -12,6 +12,7 @@ import { toast } from '../dom'
 import { icons } from '../icons'
 import { marketingData, type MarketingPayload } from './business-api'
 import { CouponEditor, emptyCoupon, type CouponForm } from './coupon-editor'
+import { BundleEditor, OfferEditor, emptyBundle, emptyOffer, type BundleForm, type OfferForm } from './offer-editor'
 import { formatNumber } from './format'
 import { postAppJson, useResource } from './http'
 import { navigate } from './navigate'
@@ -66,6 +67,29 @@ export function MarketingScreen({ visible, onUnavailable }: { visible: boolean; 
     haptic('LIGHT')
     setEditing(emptyCoupon())
   }
+  /* عروض الكمية والباقات — من 2.5 */
+  const [editingOffer, setEditingOffer] = useState<OfferForm | null>(null)
+  const [editingBundle, setEditingBundle] = useState<BundleForm | null>(null)
+  const canOffers = Boolean(data?.editsOffers)
+  const openOffer = (o?: MarketingPayload['offers'][number]) => {
+    if (!canOffers || (o && !o.form)) return manage()
+    haptic('LIGHT')
+    setEditingOffer(o?.form ? { ...o.form, id: o.id, isActive: o.isActive } : emptyOffer())
+  }
+  const openBundle = (b?: MarketingPayload['bundles'][number]) => {
+    if (!canOffers || (b && !b.form)) return manage()
+    haptic('LIGHT')
+    setEditingBundle(b?.form ? { ...b.form, id: b.id, isActive: b.isActive } : emptyBundle())
+  }
+  const saved = async (message: string) => {
+    await load()
+    hapticNotify('SUCCESS')
+    toast(message, { tone: 'success', duration: 2400 })
+    setEditing(null)
+    setEditingOffer(null)
+    setEditingBundle(null)
+  }
+
   const editCoupon = (c: MarketingPayload['coupons'][number]) => {
     if (!c.form) return manage()
     haptic('LIGHT')
@@ -193,12 +217,18 @@ export function MarketingScreen({ visible, onUnavailable }: { visible: boolean; 
               </div>
             )}
 
-            <div class="mk-sec rise">
-              <b>عروض الكمية</b>
-              <small>كل ما يشتري أكتر، يوفّر أكتر — من غير كود</small>
+            <div class="mk-sec cr-head rise">
+              <span>
+                <b>عروض الكمية</b>
+                <small>كل ما يشتري أكتر، يوفّر أكتر — من غير كود</small>
+              </span>
+              <button type="button" class="act press cr-add" onClick={() => openOffer()}>
+                <Icon svg={icons.plus()} />
+                عرض
+              </button>
             </div>
             {data.offers.length === 0 ? (
-              <p class="fine">مافيش عروض كمية — اعملها من «+ كوبون».</p>
+              <p class="fine">مافيش عروض كمية. «اشترِ ٣ ووفّر ١٥٪» بترفع قيمة الطلب — اعمله من «+ عرض».</p>
             ) : (
               <div class="card list rise">
                 {data.offers.map((o) => {
@@ -213,6 +243,9 @@ export function MarketingScreen({ visible, onUnavailable }: { visible: boolean; 
                         <small>{o.tiersLabel}</small>
                         <small>{o.productsLabel}</small>
                       </span>
+                      <button type="button" class="ops-icon press" aria-label={`تعديل ${o.name}`} onClick={() => openOffer(o)}>
+                        <Icon svg={icons.pencil()} />
+                      </button>
                       <button
                         type="button"
                         class="switch-btn"
@@ -231,12 +264,18 @@ export function MarketingScreen({ visible, onUnavailable }: { visible: boolean; 
               </div>
             )}
 
-            <div class="mk-sec rise">
-              <b>الباقات</b>
-              <small>منتجات مع بعض بسعر واحد</small>
+            <div class="mk-sec cr-head rise">
+              <span>
+                <b>الباقات</b>
+                <small>منتجات مع بعض بسعر واحد</small>
+              </span>
+              <button type="button" class="act press cr-add" onClick={() => openBundle()}>
+                <Icon svg={icons.plus()} />
+                باقة
+              </button>
             </div>
             {data.bundles.length === 0 ? (
-              <p class="fine">مافيش باقات — اعملها من «+ كوبون».</p>
+              <p class="fine">مافيش باقات. الباقة بتبيع منتجات مختلفة مع بعض بسعر واحد — اعملها من «+ باقة».</p>
             ) : (
               <div class="card list rise">
                 {data.bundles.map((b) => {
@@ -251,6 +290,9 @@ export function MarketingScreen({ visible, onUnavailable }: { visible: boolean; 
                         <small>{b.productsLabel}</small>
                         {b.priceLabel && <small>بسعر {b.priceLabel}</small>}
                       </span>
+                      <button type="button" class="ops-icon press" aria-label={`تعديل ${b.name}`} onClick={() => openBundle(b)}>
+                        <Icon svg={icons.pencil()} />
+                      </button>
                       <button
                         type="button"
                         class="switch-btn"
@@ -269,31 +311,17 @@ export function MarketingScreen({ visible, onUnavailable }: { visible: boolean; 
               </div>
             )}
 
-            <button type="button" class="an-link press rise" onClick={manage}>
-              <Icon svg={icons.layers()} />
-              <span>
-                اعمل عرض كمية أو باقة
-                <small>من صفحة التسويق الكاملة</small>
-              </span>
-              <Icon svg={icons.chevronLeft()} className="ic an-chev" />
-            </button>
-            <p class="fine center">دوس على الكود عشان تنسخه، وعلى القلم عشان تعدّل الكوبون.</p>
+            <p class="fine center">دوس على الكود عشان تنسخه، وعلى القلم عشان تعدّل.</p>
           </>
         )}
       </div>
 
       {data && (
-        <CouponEditor
-          initial={editing}
-          data={data}
-          onClose={() => setEditing(null)}
-          onDone={async (message) => {
-            await load()
-            hapticNotify('SUCCESS')
-            toast(message, { tone: 'success', duration: 2400 })
-            setEditing(null)
-          }}
-        />
+        <>
+          <CouponEditor initial={editing} data={data} onClose={() => setEditing(null)} onDone={saved} />
+          <OfferEditor initial={editingOffer} data={data} onClose={() => setEditingOffer(null)} onDone={saved} />
+          <BundleEditor initial={editingBundle} data={data} onClose={() => setEditingBundle(null)} onDone={saved} />
+        </>
       )}
     </Screen>
   )

@@ -202,7 +202,16 @@ export function loyalty() {
         { label: 'حظ أوفر', color: '#0f4c81', chance: 35 },
         { label: 'شحن مجاني', color: '#15803d', chance: 20 },
       ],
+      subtitle: 'لُف واكسب خصم',
+      triggerAfterSeconds: 15,
+      freeSpinsPerDay: 1,
+      prizeInputs: [
+        { label: 'خصم ١٠٪', color: '#634b9a', type: 'coupon_percent', value: '10', chance: '25' },
+        { label: 'حظ أوفر', color: '#0f4c81', type: 'nothing', value: '0', chance: '35' },
+        { label: 'شحن مجاني', color: '#15803d', type: 'free_shipping', value: '0', chance: '20' },
+      ],
     },
+    editsTiers: true,
     recent: [
       { id: 'lt1', points: 450, reason: 'طلب #1041', customerName: 'سارة محمود', createdAt: hoursAgo(3) },
       { id: 'lt2', points: -300, reason: 'استبدال خصم ١٠٪', customerName: 'كريم حسن', createdAt: hoursAgo(26) },

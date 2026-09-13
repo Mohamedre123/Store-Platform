@@ -17,6 +17,7 @@ import { formatMoney, formatNumber } from './format'
 import { postAppJson, useResource } from './http'
 import { navigate } from './navigate'
 import { loyaltyData, toLatin, type LoyaltySettings, type Reward } from './ops-api'
+import { TiersEditor, WheelEditor } from './loyalty-editors'
 import { Screen, Sheet } from './screen'
 import { Icon } from './ui'
 
@@ -45,6 +46,27 @@ export function LoyaltyScreen({ visible, onUnavailable }: { visible: boolean; on
 
   const currency = data?.currency ?? 'EGP'
   const unitLabel = currency === 'EGP' ? 'ج.م' : currency
+
+  /* المستويات والعجلة — في لوحة من 2.5، ولو الموقع أقدم صفحة المنصة */
+  const [tiersOpen, setTiersOpen] = useState(false)
+  const [wheelOpen, setWheelOpen] = useState(false)
+  const openTiers = () => {
+    if (!data?.editsTiers) return navigate('/dashboard/loyalty?web=1')
+    haptic('LIGHT')
+    setTiersOpen(true)
+  }
+  const openWheel = () => {
+    if (!data?.editsTiers) return navigate('/dashboard/loyalty?web=1')
+    haptic('LIGHT')
+    setWheelOpen(true)
+  }
+  const edited = async (message: string) => {
+    await load()
+    hapticNotify('SUCCESS')
+    toast(message, { tone: 'success', duration: 2000 })
+    setTiersOpen(false)
+    setWheelOpen(false)
+  }
 
   /* بيرجّع true لو نجح — واللوحة المفتوحة بتتقفل من برّه */
   const post = async (key: string, url: string, body: object, done: string, inline = false) => {
@@ -227,11 +249,11 @@ export function LoyaltyScreen({ visible, onUnavailable }: { visible: boolean; on
                       </span>
                     ))}
                   </div>
-                  <button type="button" class="an-link press" onClick={() => navigate('/dashboard/loyalty?web=1')}>
+                  <button type="button" class="an-link press" onClick={openTiers}>
                     <Icon svg={icons.crown()} />
                     <span>
-                      مستويات العملاء
-                      <small>تعديل المستويات من صفحة الولاء الكاملة</small>
+                      عدّل مستويات العملاء
+                      <small>الأسماء، من كام نقطة، والخصم الدائم</small>
                     </span>
                     <Icon svg={icons.chevronLeft()} className="ic an-chev" />
                   </button>
@@ -318,7 +340,7 @@ export function LoyaltyScreen({ visible, onUnavailable }: { visible: boolean; on
                   ))}
                 </div>
               )}
-              <button type="button" class="an-link press" onClick={() => navigate('/dashboard/loyalty?web=1')}>
+              <button type="button" class="an-link press" onClick={openWheel}>
                 <Icon svg={icons.sparkles()} />
                 <span>
                   عدّل العجلة
@@ -618,6 +640,12 @@ export function LoyaltyScreen({ visible, onUnavailable }: { visible: boolean; on
           </>
         )}
       </Sheet>
+      {data && (
+        <>
+          <TiersEditor open={tiersOpen} data={data} onClose={() => setTiersOpen(false)} onDone={edited} />
+          <WheelEditor open={wheelOpen} data={data} onClose={() => setWheelOpen(false)} onDone={edited} />
+        </>
+      )}
     </Screen>
   )
 }

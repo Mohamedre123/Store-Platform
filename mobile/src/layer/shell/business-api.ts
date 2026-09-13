@@ -31,10 +31,28 @@ export type MarketingPayload = {
       endsAt: string
     }
   }>
-  pickProducts?: Array<{ id: string; name: string }>
+  pickProducts?: Array<{ id: string; name: string; price?: number }>
   pickCategories?: Array<{ id: string; name: string }>
-  offers: Array<{ id: string; name: string; badge: string | null; tiersLabel: string; productsLabel: string; isActive: boolean }>
-  bundles: Array<{ id: string; name: string; badge: string | null; productsLabel: string; priceLabel: string; isActive: boolean }>
+  /* من 2.5 — عروض الكمية والباقات بتتعمل من التطبيق */
+  editsOffers?: boolean
+  offers: Array<{
+    id: string
+    name: string
+    badge: string | null
+    tiersLabel: string
+    productsLabel: string
+    isActive: boolean
+    form?: { name: string; badge: string; tiers: Array<{ qty: string; percent: string }>; productIds: string[] }
+  }>
+  bundles: Array<{
+    id: string
+    name: string
+    badge: string | null
+    productsLabel: string
+    priceLabel: string
+    isActive: boolean
+    form?: { name: string; badge: string; productIds: string[]; bundlePrice: string }
+  }>
 }
 
 export type InventoryItem = {
