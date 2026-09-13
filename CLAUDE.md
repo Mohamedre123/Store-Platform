@@ -409,7 +409,9 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
   «فاضل ٧ أيام» هيتبعت يوم 2026-09-21 تقريبًا.
 - **آخر نشر للموقع بعده:** commit `f20bed6` (لودرات التحليلات والشحنات المشتركة + `/api/app/analytics` و`/api/app/shipments`).
   اتختبر على الحي: المسارين الجداد 401 من غير جلسة، والصفحات 200/307 زي ما هي.
-- **آخر نشر للموقع (2.2):** commit `7f93584` — اتنشر لوحده المرة دي. اتختبر على الحي: `/api/app/{expenses,suppliers,categories,trash}`
+- **آخر نشر للموقع (2.3):** commit `3a16800` — اتنشر لوحده. اتختبر على الحي: `/api/app/{loyalty,affiliates,referrals}` = 401،
+  والـPOST من غير Origin = 403، والصفحات 200/307 زي ما هي.
+- **نشر الموقع (2.2):** commit `7f93584` — اتنشر لوحده المرة دي. اتختبر على الحي: `/api/app/{expenses,suppliers,categories,trash}`
   = 401، والـPOST من غير Origin = 403، والصفحات 200/307 زي ما هي.
 - **نشر الموقع (2.1):** commit `4cb078c` + commit فاضي `977556c` (Vercel ما نشرش الأول لوحده — حصلت مرتين، لو المسارات
   الجديدة فضلت 404 بعد ١٠ دقايق ارفع commit فاضي). اتختبر على الحي: `/api/app/{blocked,bookings,couriers}` و`products/:id/edit`
