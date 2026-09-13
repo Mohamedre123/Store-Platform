@@ -13,6 +13,8 @@
  * موجود في الصفحة لنفس العنوان، والتحميل الكامل آخر احتياطي.
  */
 import { progressStart } from '../navigation'
+import { isNativePath } from '../native-paths'
+import { showPagePlaceholder } from '../page-placeholder'
 
 type Router = { push?: (href: string) => void; replace?: (href: string) => void }
 type NextGlobal = { next?: { router?: Router } }
@@ -30,6 +32,8 @@ export function navigate(href: string, options: { replace?: boolean } = {}): voi
   if (href === location.pathname + location.search) return
   pendingListeners.forEach((listener) => listener(href))
   progressStart()
+  /* الوجهة صفحة من المنصة — هيكلها بيظهر فورًا لحد ما الخادم يرد */
+  if (!isNativePath(new URL(href, location.origin))) showPagePlaceholder(href)
 
   const router = (window as unknown as NextGlobal).next?.router
   const method = options.replace ? router?.replace : router?.push

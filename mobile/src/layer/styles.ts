@@ -87,13 +87,14 @@ img{display:block;-webkit-user-drag:none}
 .launch-stack{position:relative;display:flex;flex-direction:column;align-items:center;transition:transform .55s cubic-bezier(.4,0,.2,1),filter .55s ease}
 .launch--out .launch-stack{transform:scale(1.14);filter:blur(8px)}
 .launch-mark{position:relative;width:104px;animation:launch-mark 1s cubic-bezier(.16,1,.3,1) both}
-.launch-mark img{width:100%;height:auto}
-.launch-mark::after{content:"";position:absolute;top:0;right:0;bottom:0;left:0;background:linear-gradient(105deg,rgba(255,255,255,0) 30%,rgba(255,255,255,.6) 50%,rgba(255,255,255,0) 70%);background-size:260% 100%;background-position:130% 0;-webkit-mask:var(--mark) center/contain no-repeat;mask:var(--mark) center/contain no-repeat;animation:launch-shine 1.5s .75s ease-in-out both}
+.launch-mark img{width:100%;height:auto;animation:launch-breathe 2.2s 1.1s ease-in-out infinite}
+@keyframes launch-breathe{0%,100%{transform:none}50%{transform:translate3d(0,-4px,0) scale(1.06)}}
+.launch-mark::after{content:"";position:absolute;top:0;right:0;bottom:0;left:0;background:linear-gradient(105deg,rgba(255,255,255,0) 30%,rgba(255,255,255,.6) 50%,rgba(255,255,255,0) 70%);background-size:260% 100%;background-position:130% 0;-webkit-mask:var(--mark) center/contain no-repeat;mask:var(--mark) center/contain no-repeat;animation:launch-shine 2.6s .75s ease-in-out infinite}
 .launch-word{width:112px;height:auto;margin-top:22px;animation:rise .8s .32s cubic-bezier(.16,1,.3,1) both}
 .launch-bar{width:88px;height:3px;margin-top:30px;border-radius:3px;overflow:hidden;background:rgba(160,140,208,.18);animation:fade .5s .75s both}
 .launch-bar span{display:block;width:45%;height:100%;border-radius:3px;background:linear-gradient(90deg,rgba(160,140,208,0),#a08cd0,rgba(160,140,208,0));animation:launch-slide 1.15s ease-in-out infinite}
 @keyframes launch-mark{0%{opacity:0;transform:translateY(16px) scale(.7);filter:blur(10px)}60%{opacity:1;filter:blur(0)}100%{opacity:1;transform:none}}
-@keyframes launch-shine{from{background-position:130% 0}to{background-position:-30% 0}}
+@keyframes launch-shine{0%{background-position:130% 0}55%,100%{background-position:-30% 0}}
 @keyframes launch-slide{from{transform:translateX(-120%)}to{transform:translateX(260%)}}
 @keyframes launch-glow{from{transform:scale(.9);opacity:.75}to{transform:scale(1.08);opacity:1}}
 

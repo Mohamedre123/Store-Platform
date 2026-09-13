@@ -120,6 +120,26 @@ public class ZawyaShellPlugin extends Plugin {
         injectLayer(webView);
         configureWebView(webView);
         clearSharedCache();
+        /*
+         * احتياطي لشاشة الافتتاح: الطبقة بتقفلها أول ما اللوحة تجهز. لو ما قفلتهاش
+         * (صفحة «مفيش نت» مثلًا)، بتتقفل لوحدها بعد ما الصفحة تحمّل بشوية.
+         */
+        getBridge()
+            .addWebViewListener(
+                new WebViewListener() {
+                    @Override
+                    public void onPageLoaded(WebView view) {
+                        view.postDelayed(LaunchOverlay::hide, 6000);
+                    }
+                }
+            );
+    }
+
+    /** الطبقة: اللوحة جاهزة — شاشة الافتتاح الأصلية تختفي */
+    @PluginMethod
+    public void hideLaunch(PluginCall call) {
+        LaunchOverlay.hide();
+        call.resolve();
     }
 
     /* ─────────────── حقن طبقة التطبيق ─────────────── */

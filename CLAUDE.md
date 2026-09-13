@@ -116,6 +116,8 @@ git push origin main                              # ده اللي بينشر ا�
 | العملاء + صفحة عميل | `customers.tsx`, `customers-api.ts`, `customer-detail.tsx` | `/api/app/customers*` |
 | «المزيد» (لوحة سفلية بكل الأقسام + المستخدم + خروج) | `more.tsx`, `nav-data.ts` | `/api/app/me`, `/api/app/logout` |
 | شريط صفحة تأكيد البريد `/verify` (رجوع + «غيّر البريد» + «سجّل بحساب تاني» + «الغِ التسجيل») | `verify.tsx`, `styles-verify.ts` | `/api/app/account/change-email`, `/api/app/account/abandon` |
+| التحليلات (مؤشرات، رسم إيرادات بالسحب، قُمع، توزيع الطلبات، الأكثر مبيعًا) | `analytics.tsx`, `analytics-api.ts`, `styles-analytics.ts` | `/api/app/analytics` |
+| الشحنات (إحصائيات، مستني يتشحن، قايمة بفلاتر، تتبّع/نسخ بوليصة) — التسجيل والتعديل بزرار «شحنة» ← `?web=1` | `shipments.tsx`, `shipments-api.ts` (الستايل في `styles-analytics.ts`) | `/api/app/shipments` |
 
 باقي الملفات: `index.tsx` (التوجيه بين الشاشات + TabBar)، `screen.tsx` (`Screen` مع
 `overlay` للأزرار العايمة، و`Sheet` مع `tall`)، `tabbar.tsx`، `navigate.ts`، `ui.tsx`،
@@ -136,7 +138,8 @@ git push origin main                              # ده اللي بينشر ا�
 4. **الشاشة** `mobile/src/layer/shell/<x>.tsx`: كاش في localStorage، `previews` للانتقال
    السريع للتفاصيل، `Screen`/`Sheet`، سحب للتحديث، ولو الـAPI رجّع 404 مش JSON
    (`onUnavailable`) → ترجع لصفحة الموقع العادية. `?web=1` على أي رابط بيفتح صفحة الموقع.
-5. سجّلها في `shell/index.tsx` (regex للمسار) وستايلها في `styles-<x>.ts`.
+5. سجّلها في `shell/index.tsx` (regex للمسار + `ScreenKey` + `unavailable` + مسح الكاش عند الخروج) وستايلها في
+   `styles-<x>.ts`، **وضيف المسار في `mobile/src/layer/native-paths.ts`** (من غيره الهيكل المؤقت هيظهر فوق الشاشة الأصلية).
 6. أضف mock في `mobile/dev/mock-api.mjs` و`mobile/scripts/serve-www.mjs`، وجرّب في المتصفح
    (فاتح وداكن) وفي الإيموليتر.
 7. حدّث جدول «الملفات المشتركة» تحت.
@@ -222,6 +225,8 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
 | `/api/app/me` و `/api/app/logout` | — | قايمة «المزيد» في التطبيق (المستخدم وصلاحياته، وتسجيل الخروج) |
 | `src/lib/store-context.ts` (`getOptionalDashboardContext`) | — | سياق من غير redirect للـAPI |
 | `src/lib/otp.ts` (`issueEmailOtp`) | صفحة `/verify` | `/api/app/account/change-email` بيناديها بعد تغيير البريد |
+| `src/lib/analytics-data.ts` (`loadAnalytics`) | `src/app/dashboard/analytics/page.tsx` | `/api/app/analytics` ← `src/lib/app-analytics.ts` ← `shell/analytics.tsx` |
+| `src/lib/shipments-data.ts` (`loadShipments`) | `src/app/dashboard/shipments/page.tsx` | `/api/app/shipments` ← `src/lib/app-shipments.ts` ← `shell/shipments.tsx` |
 | `src/lib/subscription.ts` (`activateStore`/`deactivateStore`) | الإدارة + صفحة الاشتراك | بتبعت رسايل الاشتراك تلقائي (قسم 7ب) — ما تشيلش نداء `notifySubscription` |
 
 ## 6) القواعد
@@ -313,6 +318,25 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
   - `.launch,.ob{z-index:40}` عشان الافتتاح يفضل فوق أي شريط.
 - **قاعدة للجاي:** ما ترجعش `backdrop-filter` ولا `will-change` دايم ولا حركة على عناصر كتير جوّه التطبيق.
 
+## 7د) سرعة التنقّل وشاشة الافتتاح المتحركة — نسخة 1.8
+
+- **سبب البطء بين الصفحات:** صفحات اللوحة ديناميكية ومفيش `loading.tsx` — Next (16.3) ما بيغيّرش الصفحة غير لما
+  الخادم يرد (موثّق في `node_modules/next/dist/docs/01-app/01-getting-started/04-linking-and-navigating.md`).
+  **ما ضفناش `loading.tsx`** لأنه كان هيغيّر سلوك الموقع للمتصفح.
+- **الحل (تطبيق بس):** `mobile/src/layer/page-placeholder.ts` — لحظة الضغط على رابط لصفحة منصة (من `navigation.ts`
+  `watchLinkClicks` أو من `shell/navigate.ts`) بيظهر هيكل الصفحة الجاية بعنوانها الحقيقي (من `nav-data.ts`) وكتل بتنبض،
+  تحت شريط اللوحة العلوي (`.safe-top`)؛ بيظهر بعد ٧٠ms (مفيش وميض لو الخادم سريع) وبيتلاشى بعد تغيّر الرابط بفريمين
+  (`handleUrlChange`)، وسقف أمان ١٢ ثانية. الشاشات الأصلية مستثناة بـ`native-paths.ts`.
+- **الحل الجذري لأي صفحة لسه بطيئة:** تحويلها لشاشة أصلية (بتفتح فورًا من الكاش).
+- **شاشة الافتتاح (أندرويد):** `LaunchOverlay.java` — فوق الـWebView من `MainActivity.onCreate`: نفس `splash_icon`
+  (240dp زي أيقونة شاشة النظام بالظبط) بتتنفّس + هالة بتنبض + «زاوية» (`res/drawable-nodpi/splash_word.png` و
+  `drawable-night-nodpi` — منسوخين من `www/brand/zawya-typo*.png`) + شريط تحميل. `capacitor.config.ts`:
+  `launchShowDuration: 1` (شاشة النظام الثابتة بتختفي من أول فريم). **⚠ ما تخليهاش 0 أبدًا**: إضافة SplashScreen
+  بتخرج بدري لو المدة صفر ومش بتركّب شاشة أندرويد ١٢ — التطبيق بيقف على اللوجو الثابت للأبد (حصل في أول بناء 1.8). بتتقفل من الطبقة (`index.ts` `launchSequence` ←
+  `ZawyaShell.hideLaunch`) لما اللوحة/التعريف تجهز، واحتياطي بعد تحميل الصفحة بـ٦ ثواني، وسقف ١٥ ثانية.
+  على أندرويد الطبقة **ما بتركّبش** شاشة الافتتاح بتاعة الويب. iOS لسه بيستخدم شاشة الويب (`launch.ts`)، واللوجو فيها
+  بقى بيتنفّس ولمعته بتتكرر.
+
 ## 8) الحالة الحالية (آخر تحديث: 2026-09-13)
 
 - **الموقع:** آخر نشر = commit `51e8067` (رسايل الاشتراك + زرار «جدّد الاشتراك» + مسارات `/api/app/account/*`).
@@ -354,6 +378,10 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
    ويجرّب «جدّد الاشتراك» من «إدارة المنصة» على متجر تجريبي ويتأكد الإيميل وصل الوارد.
 3. لو لسه في تقطيع في صفحات معيّنة من الموقع جوّه التطبيق: افحص الصفحة دي بالذات (رسوم بيانية/قوايم طويلة) —
    الحل الجذري تحويلها لشاشة أصلية.
+4. الشاشات الأصلية الجاية بالترتيب: الكوبونات والعروض (`/dashboard/marketing`)، المخزون (`/dashboard/inventory`)،
+   الإعدادات (`/dashboard/settings` كقايمة أصلية بتفتح صفحات المنصة)، الاشتراك (`/dashboard/subscription`)،
+   سجل الرسايل (`/dashboard/messages`)، وإضافة/تعديل منتج بالكاميرا.
+5. **جوجل بلاي مؤجّل** (صاحب المشروع قال مفيش ميزانية دلوقتي) — ما تفتحش الموضوع غير لو طلبه.
 3. شاشات أصلية تانية: التحليلات، التسويق، الشحن، الإعدادات، وإضافة/تعديل منتج بالكاميرا.
 4. قفل بالبصمة.
 5. الرفع على جوجل بلاي (حساب مطوّر 25$ — هو اللي يعمله) و App Store (حساب Apple + ماك).

@@ -44,6 +44,15 @@ createServer(async (req, res) => {
     return
   }
 
+  /* التحليلات والشحنات (dev/mock-extra.mjs) */
+  if (url.pathname === '/api/app/analytics' || url.pathname === '/api/app/shipments') {
+    const mock = await import(new URL('../dev/mock-extra.mjs', import.meta.url))
+    await new Promise((r) => setTimeout(r, 500))
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
+    res.end(JSON.stringify(url.pathname.endsWith('/analytics') ? mock.analytics() : mock.shipments()))
+    return
+  }
+
   /* صفحة تأكيد البريد: تغيير البريد وإلغاء التسجيل */
   if (url.pathname.startsWith('/api/app/account/')) {
     let raw = ''

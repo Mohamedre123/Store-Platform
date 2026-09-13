@@ -8,6 +8,8 @@
 import { APP_HOSTS, HOME_PATH, IS_ANDROID, ROOT_PATHS, SITE_ORIGIN, prefersReducedMotion, session } from './env'
 import { listen, native } from './bridge'
 import { el, layer, toast } from './dom'
+import { isNativePath } from './native-paths'
+import { hidePagePlaceholder, placeholderShown, showPagePlaceholder } from './page-placeholder'
 
 type RouteKind = 'push' | 'replace' | 'pop'
 
@@ -89,6 +91,8 @@ function handleUrlChange(kind: RouteKind): void {
   lastUrl = next
 
   progressDone()
+  /* الصفحة الجديدة اترسمت — الهيكل المؤقت بيتلاشى فوقها بعد فريمين */
+  if (placeholderShown()) requestAnimationFrame(() => requestAnimationFrame(() => hidePagePlaceholder()))
   if (prev.pathname !== now.pathname) animatePage(kind === 'pop' ? 'back' : 'forward')
   else if (prev.search !== now.search) animatePage('soft')
   routeListeners.forEach((fn) => fn(kind))
@@ -140,6 +144,13 @@ function watchLinkClicks(): void {
       if (url.pathname.startsWith('/s/') || url.pathname.startsWith('/api/')) return
       if (url.pathname === location.pathname && url.search === location.search) return
       progressStart()
+      /*
+        صفحة من المنصة (مش شاشة أصلية): هيكلها بيظهر في نفس الفريم بدل ما
+        الصفحة القديمة تفضل واقفة لحد ما الخادم يرد (page-placeholder.ts).
+      */
+      if (url.pathname.startsWith('/dashboard') && anchor.target !== '_blank' && !isNativePath(url)) {
+        showPagePlaceholder(url.pathname + url.search, anchor.getAttribute('aria-label') || anchor.textContent)
+      }
     },
     true,
   )

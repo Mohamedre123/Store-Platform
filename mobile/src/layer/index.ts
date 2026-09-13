@@ -8,7 +8,7 @@
  * قاعدة: لا شيء هنا بيغيّر منطق المنصة أو بياناتها. لو الطبقة كلها
  * فشلت، التطبيق بيفضل شغّال كموقع كامل.
  */
-import { APP_HOSTS, HOME_PATH, PLATFORM, VERSION, nextFrame, session, wait } from './env'
+import { APP_HOSTS, HOME_PATH, IS_ANDROID, PLATFORM, VERSION, nextFrame, session, wait } from './env'
 import { native } from './bridge'
 import { injectPageStyles } from './dom'
 import { installSystemBars, installViewportFix, requestChromeSync } from './chrome'
@@ -37,6 +37,21 @@ function markDocument(): void {
 }
 
 async function launchSequence(cold: boolean): Promise<void> {
+  /*
+    أندرويد: شاشة الافتتاح المتحركة أصلية (`LaunchOverlay.java`) — بتبدأ من أول
+    فريم قبل ما الـWebView يصحى، فاللوجو ما بيقفش ثابت. هنا بنقفلها بس لما
+    اللوحة (أو شاشة التعريف) تبقى جاهزة تحتها.
+  */
+  if (IS_ANDROID) {
+    void native('SplashScreen', 'hide', { fadeOutDuration: 200 })
+    if (cold) await Promise.all([wait(900), pageReady()])
+    else await nextFrame()
+    if (needsOnboarding()) mountOnboarding()
+    await nextFrame()
+    void native('ZawyaShell', 'hideLaunch')
+    return
+  }
+
   const launch = cold ? mountLaunch() : null
 
   /* الشاشة الأصلية تتشال أول ما حاجة من عندنا (أو الصفحة) ترسم */

@@ -10,5 +10,7 @@ public class MainActivity extends BridgeActivity {
         /* لازم قبل super: الجسر بيتبني جوّاه وبيحمّل أول صفحة على طول */
         registerPlugin(ZawyaShellPlugin.class);
         super.onCreate(savedInstanceState);
+        /* شاشة الافتتاح المتحركة فوق الـWebView من أول فريم — الطبقة بتقفلها لما اللوحة تجهز */
+        LaunchOverlay.show(this);
     }
 }

@@ -76,7 +76,15 @@ const config: CapacitorConfig = {
         المدة هنا احتياطي بس — لو الصفحة ما حمّلتش، ما تفضلش واقفة.
       */
       launchAutoHide: true,
-      launchShowDuration: 3500,
+      /*
+        أندرويد: شاشة النظام الثابتة بتختفي من أول فريم، ومكانها شاشة متحركة
+        أصلية (LaunchOverlay.java) بنفس اللوجو في نفس المكان — فاللوجو ما بيقفش ثابت.
+
+        ⚠ ١ مش صفر: الإضافة بتخرج من غير ما تركّب شاشة أندرويد ١٢ لو المدة صفر
+        (`SplashScreen.showOnLaunch`)، فثيم شاشة البداية بيفضل على النشاط والتطبيق
+        بيقف على اللوجو الثابت للأبد. اتجرّبت على المحاكي.
+      */
+      launchShowDuration: 1,
       launchFadeOutDuration: 250,
       backgroundColor: '#171633',
       androidSplashResourceName: 'splash',

@@ -1,16 +1,12 @@
-import { and, desc, eq, inArray, isNull, notInArray, sql } from 'drizzle-orm'
 import { Truck } from 'lucide-react'
-import { db } from '@/db'
-import { orders, shipments } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { guard } from '@/lib/permissions'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { Card } from '@/components/ui'
 import { formatMoney } from '@/lib/utils'
-import { activeCarrier } from '@/lib/provider-store'
-import { carrierProvider } from '@/lib/providers'
-import { ShipmentsManager, type PendingOrder, type ShipmentRow } from './shipments-manager'
+import { loadShipments } from '@/lib/shipments-data'
+import { ShipmentsManager } from './shipments-manager'
 
 export const metadata = { title: 'الشحنات' }
 
@@ -18,96 +14,9 @@ export default async function ShipmentsPage() {
   const { store, actor } = await getDashboardContext()
   guard(actor, 'orders.view')
 
-  /*
-    الشركة المربوطة بربط تلقائي — اللي التاجر يقدر يبعتلها بضغطة.
-    اليدوية مش بتتحسب هنا: زرار «ابعت» عليها كان هيفشل كل مرة.
-  */
-  const carrier = await activeCarrier(store.id)
-  const autoCarrierName = carrier ? (carrierProvider(carrier.slug)?.name ?? null) : null
-
-  const rows = await db
-    .select({
-      id: shipments.id,
-      carrier: shipments.carrier,
-      trackingNumber: shipments.trackingNumber,
-      status: shipments.status,
-      codAmount: shipments.codAmount,
-      shippingCost: shipments.shippingCost,
-      isCodCollected: shipments.isCodCollected,
-      settledAt: shipments.settledAt,
-      events: shipments.events,
-      createdAt: shipments.createdAt,
-      orderId: shipments.orderId,
-      orderNumber: orders.orderNumber,
-      customerName: orders.customerName,
-      customerPhone: orders.customerPhone,
-      // العنوان jsonb — بناخد المدينة منه بدل ما نجيب الكائن كله
-      city: sql<string | null>`${orders.shippingAddress}->>'city'`,
-    })
-    .from(shipments)
-    .innerJoin(orders, eq(orders.id, shipments.orderId))
-    .where(eq(shipments.storeId, store.id))
-    .orderBy(desc(shipments.createdAt))
-    .limit(300)
-
-  /**
-   * الطلبات المستحقّة للشحن.
-   *
-   * الطلب المؤكّد اللي لسه مالوش شحنة هو أكتر حاجة بتتنسي في اليوم
-   * المزحوم — والعميل بيبقى دافع ومستني. بنعرضهم فوق عشان التاجر
-   * يشحنهم من هنا من غير ما يفتح كل طلب لوحده.
-   */
-  const shipped = db
-    .select({ id: shipments.orderId })
-    .from(shipments)
-    .where(eq(shipments.storeId, store.id))
-
-  const pending = (await db
-    .select({
-      id: orders.id,
-      orderNumber: orders.orderNumber,
-      customerName: orders.customerName,
-      city: sql<string | null>`${orders.shippingAddress}->>'city'`,
-      total: orders.total,
-      paymentMethod: orders.paymentMethod,
-      paymentStatus: orders.paymentStatus,
-    })
-    .from(orders)
-    .where(
-      and(
-        eq(orders.storeId, store.id),
-        inArray(orders.status, ['confirmed', 'processing']),
-        notInArray(orders.id, shipped),
-      ),
-    )
-    .orderBy(desc(orders.createdAt))
-    .limit(50)) as PendingOrder[]
-
-  /**
-   * الفلوس اللي لسه عند شركات الشحن.
-   *
-   * اتسلّمت + الدفع عند الاستلام + لسه ما اتحصّلش. ده الرقم اللي
-   * التاجر بيطالب بيه الشركة، ومن غيره بيصدّق كشفها على عماه.
-   */
-  const [outstanding] = await db
-    .select({
-      amount: sql<number>`coalesce(sum(${shipments.codAmount}), 0)`,
-      count: sql<number>`count(*)`,
-    })
-    .from(shipments)
-    .where(
-      and(
-        eq(shipments.storeId, store.id),
-        eq(shipments.status, 'delivered'),
-        eq(shipments.isCodCollected, false),
-        isNull(shipments.settledAt),
-      ),
-    )
-
-  const inTransit = rows.filter(
-    (r) => !['delivered', 'failed', 'returned'].includes(r.status),
-  ).length
-  const failed = rows.filter((r) => ['failed', 'returned'].includes(r.status)).length
+  /* الاستعلامات في `src/lib/shipments-data.ts` — تطبيق الموبايل بيقرا نفس البيانات */
+  const { rows, pending, autoCarrierName, outstandingAmount, outstandingCount, inTransit, failed } =
+    await loadShipments(store)
 
   return (
     <div className="flex flex-col gap-6">
@@ -121,9 +30,9 @@ export default async function ShipmentsPage() {
           <Stat label="في الطريق" value={String(inTransit)} hint="لسه ما اتسلّمتش" />
           <Stat
             label="فلوس عند شركة الشحن"
-            value={formatMoney(Number(outstanding?.amount ?? 0), store.currency)}
-            hint={`${Number(outstanding?.count ?? 0)} شحنة اتسلّمت ولسه ما اتحصّلتش`}
-            highlight={Number(outstanding?.amount ?? 0) > 0}
+            value={formatMoney(outstandingAmount, store.currency)}
+            hint={`${outstandingCount} شحنة اتسلّمت ولسه ما اتحصّلتش`}
+            highlight={outstandingAmount > 0}
           />
           <Stat
             label="فشل أو رجع"
@@ -146,7 +55,7 @@ export default async function ShipmentsPage() {
       ) : (
         <Reveal>
           <ShipmentsManager
-            shipments={rows as ShipmentRow[]}
+            shipments={rows}
             pending={pending}
             currency={store.currency}
             autoCarrier={autoCarrierName}
