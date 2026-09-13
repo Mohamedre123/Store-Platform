@@ -261,25 +261,36 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
 
 ## 8) الحالة الحالية (آخر تحديث: 2026-09-13)
 
-- **الموقع:** آخر نشر = commit `e3fff92` (اختيار الموديل). شغّال ومتختبر.
-- **التطبيق:** آخر نسخة مبنية **1.5 (versionCode 6)** في `H:\for claude\zawya-release\zawya-1.5.apk`
-  و`.aab`. النسخة الجاية **1.6 / versionCode 7**.
+- **الموقع:** آخر نشر = commit `537568a` (إشعارات الطلبات). شغّال ومتختبر.
+- **التطبيق:** آخر نسخة مبنية **1.6 (versionCode 7)** في `H:\for claude\zawya-release\zawya-1.6.apk`
+  و`.aab`. النسخة الجاية **1.7 / versionCode 8**.
 - **اتعمل:** التطبيق كامل بيفتح المنصة بلمسة تطبيق + شاشات أصلية (الرئيسية، الطلبات،
   المنتجات، العملاء، المزيد) + شعار زاوية بيودّي للوحة + إصلاح «المزيد» + إصلاح حصّة Gemini
   + اختيار الموديل يدوي/افتراضي.
 - **Firebase:** مشروع `zawyaeg-1`. `google-services.json` موجود في `H:\for claude\`، وملف
   الـservice account (`zawyaeg-1-firebase-adminsdk-*.json`) موجود هناك برضو.
 
+### إشعارات الطلبات الجديدة (Push) — اتعملت في نسخة 1.6 (commit `537568a`)
+
+- **التطبيق:** `@capacitor/push-notifications` + `mobile/src/layer/push.ts` (قناة `orders`، طلب الإذن بعد
+  دخول اللوحة، تسجيل الجهاز مرة كل تشغيل، الضغط على الإشعار بيفتح الطلب، ولو التطبيق مفتوح بتظهر رسالة
+  صغيرة بزرار «افتح»، و`unregisterPush()` قبل الخروج في `more.tsx`). أيقونة الإشعار
+  `res/drawable/ic_stat_zawya.xml` وإعداداتها في `AndroidManifest.xml` (+ `POST_NOTIFICATIONS`).
+- `mobile/android/app/google-services.json` **مش في git** (في `.gitignore`) — قبل أي بناء محلي اتأكد إنه
+  موجود، ولو مش موجود انسخه من `H:\for claude\google-services.json`. من غيره البناء بيعدّي بس الإشعارات ما تشتغلش
+  (وده حال بناء GitHub Actions حاليًا).
+- **الخادم:** جدول `push_devices` (migration 0035 متطبّقة) — `src/db/schema/push.ts`؛
+  `src/lib/push.ts` (FCM HTTP v1 بـJWT من `node:crypto`، من غير firebase-admin؛ الصلاحية `orders.view`
+  بتتقاس وقت الإرسال؛ التوكنات الميتة بتتمسح)؛ مسارات `POST /api/app/push/register` و`unregister`،
+  و`GET /api/app/push/status` (بـ`Authorization: Bearer $CRON_SECRET` — تشخيص من غير أسرار).
+  الإرسال من `notifyTeam('order_placed')` في `src/lib/notify-team.ts`.
+- **مفتاح حساب الخدمة:** متخزّن مشفّر في `platform_settings` بالمفتاح `firebase_service_account`
+  بواسطة `node .scripts/set-firebase.mjs "<مسار الملف>"` (أو env `FIREBASE_SERVICE_ACCOUNT` على Vercel لو اتحط — ليه الأولوية).
+- **iOS:** لسه — محتاج مفتاح APNs في Firebase + حساب Apple Developer + `GoogleService-Info.plist` وتعديل AppDelegate.
+
 ## 9) اللي لسه (بالترتيب)
 
-1. **إشعارات الطلبات الجديدة (Push)** — شغّال عليها دلوقتي. التصميم:
-   - `@capacitor/push-notifications` في `mobile/`، و`google-services.json` في `mobile/android/app/`
-     (ملف عام مش سرّي، بس ما يترفعش لو فيه قلق — مسموح في git عادةً).
-   - جدول `push_devices` (user/store/token/platform) + `POST /api/app/push/register` و`unregister`.
-   - الإرسال عبر FCM HTTP v1 (JWT من الـservice account في env `FIREBASE_SERVICE_ACCOUNT` على Vercel)
-     من `notifyTeam` في `src/lib/notify-team.ts` عند `order_placed`.
-   - الضغط على الإشعار يفتح `/dashboard/orders/<id>` في التطبيق.
-   - نسخة التطبيق 1.6 وابعتها.
+1. صاحب المشروع يثبّت 1.6، يسمح بالإشعارات، ويعمل طلب تجريبي من متجره ويتأكد إن الإشعار وصل.
 2. صاحب المشروع يجرّب: يختار موديل صور مستقر في الإضافات، يعدّل جدول «بوست يومي»، يضغط «جرّبه».
 3. شاشات أصلية تانية: التحليلات، التسويق، الشحن، الإعدادات، وإضافة/تعديل منتج بالكاميرا.
 4. قفل بالبصمة.
