@@ -31,6 +31,10 @@ import android.webkit.WebView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.biometric.BiometricManager;
+import androidx.biometric.BiometricPrompt;
+import androidx.core.content.ContextCompat;
+import androidx.fragment.app.FragmentActivity;
 import androidx.browser.customtabs.CustomTabColorSchemeParams;
 import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.core.content.FileProvider;
@@ -133,6 +137,70 @@ public class ZawyaShellPlugin extends Plugin {
                     }
                 }
             );
+    }
+
+    /* ─────────────── قفل التطبيق بالبصمة ─────────────── */
+
+    /**
+     * أندرويد ١١+: بصمة أو وش أو قفل الشاشة (PIN/نمط). أقدم من كده: البصمة بس —
+     * دمج «قفل الشاشة» مع البصمة مش مدعوم هناك في BiometricPrompt.
+     */
+    private int lockAuthenticators() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+            ? BiometricManager.Authenticators.BIOMETRIC_WEAK | BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            : BiometricManager.Authenticators.BIOMETRIC_WEAK;
+    }
+
+    @PluginMethod
+    public void biometricStatus(PluginCall call) {
+        int result = BiometricManager.from(getContext()).canAuthenticate(lockAuthenticators());
+        JSObject out = new JSObject();
+        out.put("available", result == BiometricManager.BIOMETRIC_SUCCESS);
+        call.resolve(out);
+    }
+
+    /** بيرجّع {ok:true} أو {ok:false, error} — الإلغاء مش خطأ بيوقف الطبقة */
+    @PluginMethod
+    public void biometricAuthenticate(PluginCall call) {
+        final String title = call.getString("title", "افتح زاوية");
+        final String subtitle = call.getString("subtitle", "");
+        getActivity()
+            .runOnUiThread(() -> {
+                try {
+                    BiometricPrompt prompt = new BiometricPrompt(
+                        (FragmentActivity) getActivity(),
+                        ContextCompat.getMainExecutor(getContext()),
+                        new BiometricPrompt.AuthenticationCallback() {
+                            @Override
+                            public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
+                                JSObject out = new JSObject();
+                                out.put("ok", true);
+                                call.resolve(out);
+                            }
+
+                            @Override
+                            public void onAuthenticationError(int code, @NonNull CharSequence message) {
+                                JSObject out = new JSObject();
+                                out.put("ok", false);
+                                out.put("code", code);
+                                out.put("error", message.toString());
+                                call.resolve(out);
+                            }
+                        }
+                    );
+                    BiometricPrompt.PromptInfo.Builder info = new BiometricPrompt.PromptInfo.Builder()
+                        .setTitle(title)
+                        .setAllowedAuthenticators(lockAuthenticators());
+                    if (!subtitle.isEmpty()) info.setSubtitle(subtitle);
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) info.setNegativeButtonText("إلغاء");
+                    prompt.authenticate(info.build());
+                } catch (Exception e) {
+                    JSObject out = new JSObject();
+                    out.put("ok", false);
+                    out.put("error", "القفل مش متاح على الجهاز ده");
+                    call.resolve(out);
+                }
+            });
     }
 
     /** الطبقة: اللوحة جاهزة — شاشة الافتتاح الأصلية تختفي */

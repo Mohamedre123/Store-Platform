@@ -124,7 +124,12 @@ git push origin main                              # ده اللي بينشر ا�
 | الاشتراك (الحالة وكام يوم فاضل، عدّاد الطلبات، بدء التجربة بضغطة، الباقات، معرّف الحساب، الطلبات والسجل) — الدفع بزرار «اشترك» ← `?web=1` | `subscription.tsx` | `/api/app/subscription`، `POST /api/app/subscription/trial` |
 | الإعدادات (قايمة مجمّعة بكل صفحات الإعدادات، متفلترة بالصلاحيات من `/api/app/me`) — «بيانات المتجر» ← `/dashboard/settings?web=1` | `settings.tsx` | `/api/app/me` |
 
-الشاشات الخمسة الأخيرة بيقروا بياناتهم من `shell/business-api.ts` (أنواع البيانات + `cachedResource`)، والطلبات من
+| منتج جديد `/dashboard/products/new` (صور بالكاميرا أو المعرض — بتتصغّر لـ١٦٠٠px JPEG على الموبايل وتترفع على `/api/upload` وهو بيكتب، اسم وسعر وقبل الخصم ووصف، تتبّع مخزون وكمية، قسم، نشر/مسوّدة) — المقاسات والسيو ← `?web=1` | `product-new.tsx` | `/api/app/products/form`، `POST /api/app/products/new` (بينادي `saveProductAction` بـFormData وبيعتبر `NEXT_REDIRECT` نجاح) |
+| المراجعات (مستنية موافقتك/منشورة، نجوم، وافق/اخفي، رد، امسح بتأكيد) | `reviews.tsx` | `/api/app/reviews`، `POST /api/app/reviews/:id/{approve,reply,delete}` |
+| المرتجعات (محتاجة إجراء/الكل، تغيير الحالة من لوحة، ملاحظة داخلية، اتصال) | `returns.tsx` | `/api/app/returns`، `POST /api/app/returns/:id/{status,note}` |
+| الشكاوى (مستنية ردّك/الكل، محادثة في لوحة طويلة، رد، اتحلّت/اقفلها/افتحها تاني) | `complaints.tsx` | `/api/app/complaints`، `/api/app/complaints/:id` (الرسايل)، `POST /api/app/complaints/:id/{reply,status}` |
+
+الشاشات دي كلها بيقروا بياناتهم من `shell/business-api.ts` (أنواع البيانات + `cachedResource`)، والطلبات من
 `shell/http.ts` (`useResource` = كاش + تحديث + رجوع لصفحة المنصة لو المسار مش منشور، و`postAppJson` = POST برسايل عربي)،
 والستايل في `shell/styles-business.ts`. **أي شاشة جديدة استخدم `cachedResource` + `useResource` بدل ما تكرر الكود.**
 
@@ -244,6 +249,11 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
 | `src/lib/subscription-data.ts` (`loadSubscription`, `SUB_STATUS`, `REQUEST_STATUS`) | `src/app/dashboard/subscription/page.tsx` | `/api/app/subscription` ← `src/lib/app-subscription.ts` ← `shell/subscription.tsx` |
 | `src/app/dashboard/subscription/actions.ts` (`startTrialAction`) | زرار التجربة في اللوحة | `POST /api/app/subscription/trial` بيناديها |
 
+| `src/lib/reviews-data.ts` (`loadReviews`) + `reviews/actions.ts` | `src/app/dashboard/reviews/page.tsx` | `/api/app/reviews*` ← `src/lib/app-reviews.ts` ← `shell/reviews.tsx` |
+| `src/lib/returns-data.ts` (`loadReturns`) + `returns/actions.ts` + `src/lib/returns-meta.ts` | `src/app/dashboard/returns/page.tsx` | `/api/app/returns*` ← `src/lib/app-returns.ts` ← `shell/returns.tsx` |
+| `src/lib/tickets.ts` (`listTickets`, `ticketMessages`) + `complaints/actions.ts` + `tickets-meta.ts` | `src/app/dashboard/complaints/page.tsx` | `/api/app/complaints*` ← `src/lib/app-complaints.ts` ← `shell/complaints.tsx` |
+| `src/app/dashboard/products/actions.ts` (`saveProductAction`) + `/api/upload` | فورم المنتج في اللوحة | `POST /api/app/products/new` ← `shell/product-new.tsx` (لو اتغيّرت أسماء حقول الفورم، الـroute ده يتعدّل) |
+
 ⚠ **ما تصدّرش ثوابت من ملف `page.tsx`** (Next بيرفض أي export غير المعروفين) — الثوابت المشتركة مكانها `src/lib/*-data.ts`.
 و**ما تستوردش قيم (مش أنواع) من ملف فيه `'use client'` في كود الخادم** — بتوصل كمرجع مش كقيمة. `import type` بس.
 | `src/lib/subscription.ts` (`activateStore`/`deactivateStore`) | الإدارة + صفحة الاشتراك | بتبعت رسايل الاشتراك تلقائي (قسم 7ب) — ما تشيلش نداء `notifySubscription` |
@@ -356,6 +366,17 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
   على أندرويد الطبقة **ما بتركّبش** شاشة الافتتاح بتاعة الويب. iOS لسه بيستخدم شاشة الويب (`launch.ts`)، واللوجو فيها
   بقى بيتنفّس ولمعته بتتكرر.
 
+## 7هـ) قفل التطبيق بالبصمة (أندرويد) — نسخة 2.0
+
+- **Java:** `ZawyaShellPlugin.biometricStatus` و`biometricAuthenticate` (BiometricPrompt؛ أندرويد ١١+ بصمة/وش أو
+  قفل الشاشة، أقدم بصمة بس بزرار «إلغاء»). المكتبة `androidx.biometric:biometric:1.1.0` في `android/app/build.gradle`.
+  الرد دايمًا `resolve` بـ`{ok}` — الإلغاء مش استثناء.
+- **الطبقة:** `mobile/src/layer/lock.ts` — مفتاح `zw-lock` في localStorage. بيقفل عند فتح التطبيق من جديد (`zw-unlocked`
+  في sessionStorage بيمنع القفل مع كل تحميل صفحة)، وبيغطّي المحتوى لحظة الخروج، ولو الرجوع بعد أكتر من ٣٠ ثانية بيطلب
+  البصمة. نافذة البصمة نفسها بتعمل pause/resume — متجاهَلة بـ`authenticating`. الغطا `z-index:45`.
+- **التفعيل:** شاشة الإعدادات الأصلية ← «الأمان» ← «قفل التطبيق بالبصمة» (بيظهر بس لو الجهاز يدعم). التفعيل والإلغاء
+  الاتنين محتاجين بصمة. iOS: مش مدعوم لسه (محتاج Face ID plugin).
+
 ## 8) الحالة الحالية (آخر تحديث: 2026-09-13)
 
 - **الموقع:** آخر نشر = commit `51e8067` (رسايل الاشتراك + زرار «جدّد الاشتراك» + مسارات `/api/app/account/*`).
@@ -364,9 +385,11 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
   «فاضل ٧ أيام» هيتبعت يوم 2026-09-21 تقريبًا.
 - **آخر نشر للموقع بعده:** commit `f20bed6` (لودرات التحليلات والشحنات المشتركة + `/api/app/analytics` و`/api/app/shipments`).
   اتختبر على الحي: المسارين الجداد 401 من غير جلسة، والصفحات 200/307 زي ما هي.
-- **التطبيق:** آخر نسخة مبنية **1.9 (versionCode 10)** في `H:\for claude\zawya-release\zawya-1.9.apk` و`.aab`
-  (شاشات الكوبونات والعروض، المخزون، سجل الرسايل، الاشتراك، الإعدادات — فوق 1.8: التحليلات والشحنات والهيكل الفوري
-  وشاشة الافتتاح المتحركة). النسخة الجاية **2.0 / versionCode 11**.
+- **التطبيق:** آخر نسخة مبنية **2.0 (versionCode 11)** في `H:\for claude\zawya-release\zawya-2.0.apk` و`.aab`
+  (منتج جديد بالكاميرا، المراجعات، المرتجعات، الشكاوى، قفل البصمة — فوق 1.9: الكوبونات والمخزون والرسايل والاشتراك
+  والإعدادات، وفوق 1.8: التحليلات والشحنات والهيكل الفوري وشاشة الافتتاح المتحركة). النسخة الجاية **2.1 / versionCode 12**.
+- **درس من 2.0:** أي حركة بتبدأ بـ`requestAnimationFrame` بتقف لو نافذة الـWebView مش ظاهرة (والاختبار في المتصفح
+  المستخبي بيبان كأنه باظ) — لفتح لوحة بعد أول رسم استخدم `setTimeout(…, 30)`.
 - **دروس من 1.9 (خليك فاكرها):**
   - الـswitch (`<span class="switch">`) جوّه `<button>` عادي بيبقى inline ومقاسه صفر والدايرة بتطير لطرف الشاشة — الزرار
     اللي حواليه لازم `display:inline-flex` (`.switch-btn`). جوّه `.switch-row` شغّال لأنه flex أصلًا.

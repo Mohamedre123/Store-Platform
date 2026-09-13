@@ -86,6 +86,83 @@ export type SubscriptionPayload = {
   }>
 }
 
+export type ReviewsPayload = {
+  waiting: number
+  reviews: Array<{
+    id: string
+    authorName: string
+    rating: number
+    body: string | null
+    verified: boolean
+    approved: boolean
+    reply: string | null
+    productName: string | null
+    createdAt: string
+  }>
+}
+
+export type ReturnsPayload = {
+  open: number
+  statuses: Array<{ key: string; label: string; bg: string; fg: string }>
+  returns: Array<{
+    id: string
+    number: string
+    typeLabel: string
+    status: string
+    statusLabel: string
+    bg: string
+    fg: string
+    reason: string | null
+    customerNote: string | null
+    merchantNote: string | null
+    refundLabel: string | null
+    orderLabel: string
+    customerName: string | null
+    customerPhone: string | null
+    createdAt: string
+  }>
+}
+
+export type ProductFormPayload = { currency: string; categories: Array<{ id: string; name: string }> }
+
+export type ComplaintsPayload = {
+  canReply: boolean
+  open: number
+  statuses: Array<{ key: string; label: string }>
+  tickets: Array<{
+    id: string
+    number: string
+    subject: string
+    categoryLabel: string
+    status: string
+    statusLabel: string
+    bg: string
+    fg: string
+    customerName: string | null
+    customerPhone: string | null
+    orderId: string | null
+    orderLabel: string | null
+    lastMessageBy: 'customer' | 'merchant'
+    lastMessageAt: string
+    messageCount: number
+  }>
+}
+
+export type ComplaintMessage = {
+  id: string
+  body: string
+  author: 'customer' | 'merchant'
+  authorName: string | null
+  images: string[]
+  createdAt: string
+}
+
+export const complaintsData = cachedResource<ComplaintsPayload>('zw-complaints:v1', '/api/app/complaints')
+
+export const reviewsData = cachedResource<ReviewsPayload>('zw-reviews:v1', '/api/app/reviews')
+export const returnsData = cachedResource<ReturnsPayload>('zw-returns:v1', '/api/app/returns')
+export const productFormData = cachedResource<ProductFormPayload>('zw-product-form:v1', '/api/app/products/form')
+
 export const marketingData = cachedResource<MarketingPayload>('zw-marketing:v1', '/api/app/marketing')
 export const inventoryData = cachedResource<InventoryPayload>('zw-inventory:v1', '/api/app/inventory')
 export const messagesData = cachedResource<MessagesPayload>('zw-messages:v1', '/api/app/messages')
@@ -96,4 +173,8 @@ export function clearBusinessCaches(): void {
   inventoryData.clear()
   messagesData.clear()
   subscriptionData.clear()
+  reviewsData.clear()
+  returnsData.clear()
+  productFormData.clear()
+  complaintsData.clear()
 }

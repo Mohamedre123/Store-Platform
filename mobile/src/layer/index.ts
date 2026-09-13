@@ -20,6 +20,7 @@ import { installGestures } from './gestures'
 import { installNetworkWatch } from './network'
 import { installShell } from './shell'
 import { installPush } from './push'
+import { installLock } from './lock'
 
 declare global {
   interface Window {
@@ -90,6 +91,8 @@ function boot(): void {
   installSystemBars()
   /* قبل شاشة الافتتاح: الرئيسية بتترسم من الكاش تحتها، فلما الافتتاح يختفي تكون جاهزة */
   installShell()
+  /* القفل بعد الهيكل: غطاه لازم يبقى فوق الشاشات الأصلية */
+  installLock()
   onRouteChange(() => {
     requestChromeSync(60)
     requestChromeSync(420)

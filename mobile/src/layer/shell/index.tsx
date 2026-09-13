@@ -50,6 +50,10 @@ import { InventoryScreen } from './inventory'
 import { MessagesScreen } from './messages'
 import { SubscriptionScreen } from './subscription'
 import { SettingsScreen } from './settings'
+import { NewProductScreen } from './product-new'
+import { ReviewsScreen } from './reviews'
+import { ReturnsScreen } from './returns'
+import { ComplaintsScreen } from './complaints'
 
 const ORDER_DETAIL = /^\/dashboard\/orders\/([^/]+)$/
 /* صفحات جوّه المنتجات مش منتجات — new وcategories وimport وtrash بيفضلوا صفحات المنصة */
@@ -82,6 +86,10 @@ type ScreenKey =
   | 'inventory'
   | 'messages'
   | 'subscription'
+  | 'newProduct'
+  | 'reviews'
+  | 'returns'
+  | 'complaints'
 
 function Shell() {
   const url = useLocation()
@@ -115,6 +123,10 @@ function Shell() {
     inventory: false,
     messages: false,
     subscription: false,
+    newProduct: false,
+    reviews: false,
+    returns: false,
+    complaints: false,
   })
   const markUnavailable = useMemo(
     () => ({
@@ -131,6 +143,10 @@ function Shell() {
       inventory: () => setUnavailable((u) => ({ ...u, inventory: true })),
       messages: () => setUnavailable((u) => ({ ...u, messages: true })),
       subscription: () => setUnavailable((u) => ({ ...u, subscription: true })),
+      newProduct: () => setUnavailable((u) => ({ ...u, newProduct: true })),
+      reviews: () => setUnavailable((u) => ({ ...u, reviews: true })),
+      returns: () => setUnavailable((u) => ({ ...u, returns: true })),
+      complaints: () => setUnavailable((u) => ({ ...u, complaints: true })),
     }),
     [],
   )
@@ -232,6 +248,22 @@ function Shell() {
         onUnavailable={markUnavailable.subscription}
       />
       <SettingsScreen visible={path === '/dashboard/settings' && !web} />
+      <NewProductScreen
+        visible={path === '/dashboard/products/new' && !unavailable.newProduct && !web}
+        onUnavailable={markUnavailable.newProduct}
+      />
+      <ReviewsScreen
+        visible={path === '/dashboard/reviews' && !unavailable.reviews && !web}
+        onUnavailable={markUnavailable.reviews}
+      />
+      <ReturnsScreen
+        visible={path === '/dashboard/returns' && !unavailable.returns && !web}
+        onUnavailable={markUnavailable.returns}
+      />
+      <ComplaintsScreen
+        visible={path === '/dashboard/complaints' && !unavailable.complaints && !web}
+        onUnavailable={markUnavailable.complaints}
+      />
       <VerifyBar visible={path === '/verify'} />
       <TabBar path={path} active={onDashboard} />
       {onDashboard && <MoreSheet path={path} search={effective.searchParams.toString()} />}

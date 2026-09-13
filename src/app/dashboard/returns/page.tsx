@@ -1,13 +1,11 @@
-import { desc, eq } from 'drizzle-orm'
 import { RotateCcw } from 'lucide-react'
-import { db } from '@/db'
-import { orders, returns } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { guard } from '@/lib/permissions'
+import { loadReturns } from '@/lib/returns-data'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { Card } from '@/components/ui'
-import { ReturnsManager, type ReturnRow } from './returns-manager'
+import { ReturnsManager } from './returns-manager'
 
 export const metadata = { title: 'المرتجعات' }
 
@@ -15,28 +13,8 @@ export default async function ReturnsPage() {
   const { store, actor } = await getDashboardContext()
   guard(actor, 'orders.view')
 
-  const rows = await db
-    .select({
-      id: returns.id,
-      returnNumber: returns.returnNumber,
-      type: returns.type,
-      status: returns.status,
-      reason: returns.reason,
-      customerNote: returns.customerNote,
-      merchantNote: returns.merchantNote,
-      refundAmount: returns.refundAmount,
-      createdAt: returns.createdAt,
-      orderNumber: orders.orderNumber,
-      customerName: orders.customerName,
-      customerPhone: orders.customerPhone,
-    })
-    .from(returns)
-    .innerJoin(orders, eq(orders.id, returns.orderId))
-    .where(eq(returns.storeId, store.id))
-    .orderBy(desc(returns.createdAt))
-    .limit(200)
-
-  const open = rows.filter((r) => !['completed', 'rejected'].includes(r.status)).length
+  /* الاستعلام في `src/lib/returns-data.ts` — تطبيق الموبايل بيقرا نفس البيانات */
+  const { rows, open } = await loadReturns(store)
 
   return (
     <div className="flex flex-col gap-6">
@@ -61,7 +39,7 @@ export default async function ReturnsPage() {
         </Reveal>
       ) : (
         <Reveal>
-          <ReturnsManager returns={rows as ReturnRow[]} currency={store.currency} />
+          <ReturnsManager returns={rows} currency={store.currency} />
         </Reveal>
       )}
     </div>

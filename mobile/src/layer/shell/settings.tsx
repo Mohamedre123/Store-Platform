@@ -7,8 +7,10 @@
  * المستخدم (نفس `/api/app/me` اللي «المزيد» بيقرا منه).
  */
 import { useEffect, useMemo, useState } from 'preact/hooks'
-import { haptic } from '../bridge'
+import { haptic, hapticNotify } from '../bridge'
+import { toast } from '../dom'
 import { icons } from '../icons'
+import { authenticate, biometricAvailable, lockEnabled, setLockEnabled } from '../lock'
 import { assetUrl } from './api'
 import { initials } from './format'
 import { fetchMe, readMe, type Me } from './more'
@@ -61,11 +63,33 @@ const GROUPS: Array<{ title: string; items: Item[] }> = [
 
 export function SettingsScreen({ visible }: { visible: boolean }) {
   const [me, setMe] = useState<Me | null>(readMe)
+  const [lockAvailable, setLockAvailable] = useState(false)
+  const [lockOn, setLockOn] = useState(lockEnabled)
+  const [lockBusy, setLockBusy] = useState(false)
 
   useEffect(() => {
     if (!visible) return
     void fetchMe().then((fresh) => fresh && setMe(fresh))
+    void biometricAvailable().then(setLockAvailable)
+    setLockOn(lockEnabled())
   }, [visible])
+
+  /* التفعيل والإلغاء الاتنين بالبصمة — محدش ماسك الموبايل يقدر يشيل القفل */
+  const toggleLock = async () => {
+    if (lockBusy) return
+    haptic('LIGHT')
+    setLockBusy(true)
+    const res = await authenticate(lockOn ? 'إلغاء قفل زاوية' : 'تفعيل قفل زاوية')
+    setLockBusy(false)
+    if (!res.ok) {
+      if (res.error) toast(res.error, { tone: 'danger' })
+      return
+    }
+    setLockEnabled(!lockOn)
+    setLockOn(!lockOn)
+    hapticNotify('SUCCESS')
+    toast(lockOn ? 'القفل اتلغى' : 'اتفعّل — التطبيق هيطلب بصمتك كل ما يتفتح', { tone: 'success', duration: 2600 })
+  }
 
   const groups = useMemo(() => {
     const allowed = allowedBy(me?.role ?? null, me?.permissions ?? null)
@@ -129,6 +153,27 @@ export function SettingsScreen({ visible }: { visible: boolean }) {
             </div>
           </div>
         ))}
+
+        {lockAvailable && (
+          <div class="set-group rise">
+            <small>الأمان</small>
+            <div class="card set-lock">
+              <button type="button" class="switch-row" disabled={lockBusy} onClick={() => void toggleLock()}>
+                <span class="switch-text">
+                  <b>قفل التطبيق بالبصمة</b>
+                  <small>
+                    {lockOn
+                      ? 'بيطلب بصمتك أو قفل الشاشة كل ما التطبيق يتفتح'
+                      : 'محدش يفتح طلباتك وعملاءك لو موبايلك مع حد تاني'}
+                  </small>
+                </span>
+                <span class={`switch${lockOn ? ' switch--on' : ''}${lockBusy ? ' switch--busy' : ''}`}>
+                  <span />
+                </span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </Screen>
   )

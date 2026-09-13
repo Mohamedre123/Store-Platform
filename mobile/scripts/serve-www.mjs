@@ -44,6 +44,35 @@ createServer(async (req, res) => {
     return
   }
 
+  /* رفع صورة (منتج جديد) — بيستهلك الملف ويرجّع رابط وهمي */
+  if (url.pathname === '/api/upload' && req.method === 'POST') {
+    for await (const _ of req) void _
+    await new Promise((r) => setTimeout(r, 800))
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
+    res.end(JSON.stringify({ url: `https://example.com/products/${Date.now()}.jpg`, path: 'products/x.jpg' }))
+    return
+  }
+
+  /* منتج جديد والمراجعات والمرتجعات والشكاوى (dev/mock-care.mjs) */
+  if (/^\/api\/app\/(products\/form|products\/new|reviews|returns|complaints)(\/|$)/.test(url.pathname)) {
+    const mock = await import(new URL('../dev/mock-care.mjs', import.meta.url))
+    await new Promise((r) => setTimeout(r, 450))
+    const send = (status, body) => {
+      res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
+      res.end(JSON.stringify(body))
+    }
+    if (req.method === 'POST') {
+      for await (const _ of req) void _
+      return send(200, { ok: true })
+    }
+    const parts = url.pathname.split('/').filter(Boolean)
+    if (url.pathname === '/api/app/products/form') return send(200, mock.productForm())
+    if (parts[2] === 'reviews') return send(200, mock.reviews())
+    if (parts[2] === 'returns') return send(200, mock.returns())
+    if (parts[2] === 'complaints') return send(200, parts.length === 4 ? mock.thread(parts[3]) : mock.complaints())
+    return send(404, { error: 'not_found' })
+  }
+
   /* الكوبونات والمخزون والرسايل والاشتراك (dev/mock-business.mjs) */
   if (/^\/api\/app\/(marketing|inventory|messages|subscription)(\/|$)/.test(url.pathname)) {
     const mock = await import(new URL('../dev/mock-business.mjs', import.meta.url))
