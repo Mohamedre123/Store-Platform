@@ -58,6 +58,10 @@
       function render() {
         const path = location.pathname
         const app = document.getElementById('app')
+        if (path === '/verify') {
+          app.innerHTML = `<header><b>زاوية</b></header><main class="login" style="text-align:center"><h2>أكّد بريدك</h2><p>بعتنا رمز من ٦ أرقام على<br><bdi dir="ltr">owner@mail.com</bdi></p><div dir="ltr" style="display:flex;gap:8px;justify-content:center">${'<input style="width:44px;text-align:center" maxlength="1">'.repeat(6)}</div><button class="btn">تأكيد</button></main>`
+          return
+        }
         if (path === '/login' || path === '/signup') {
           app.innerHTML = `<header><b>زاوية</b></header><div class="login"><h2>أهلًا بيك تاني</h2><label>البريد الإلكتروني</label><input dir="ltr" placeholder="you@example.com"><label>كلمة المرور</label><input type="password"><button class="btn" onclick="go('/dashboard')">دخول</button></div>`
           return

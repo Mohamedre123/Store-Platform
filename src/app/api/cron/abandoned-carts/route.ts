@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { sendAbandonedCartReminders } from '@/lib/abandoned-carts'
 import { rollupAllStores } from '@/lib/analytics-events'
 import { drainJobs, pruneJobs } from '@/lib/jobs'
-import { expireSubscriptions } from '@/lib/subscription'
+import { runSubscriptionLifecycle } from '@/lib/subscription-lifecycle'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -76,12 +76,16 @@ export async function GET(req: NextRequest) {
 
     ولأنها كده، فشلها ما يصحّش يخلّي المهمة كلها تبان فاشلة.
   */
+  /* ومعاها تذكيرات التجديد ورسايل الانتهاء — `subscription-lifecycle.ts` */
   let expired = 0
+  let subscriptionNotices = 0
   try {
-    expired = (await expireSubscriptions()).expired
+    const lifecycle = await runSubscriptionLifecycle()
+    expired = lifecycle.expired
+    subscriptionNotices = lifecycle.sent
   } catch (e) {
     console.error('فشل إنهاء الاشتراكات المنتهية:', e)
   }
 
-  return NextResponse.json({ ok: true, ...result, rolledUp, jobs, expired })
+  return NextResponse.json({ ok: true, ...result, rolledUp, jobs, expired, subscriptionNotices })
 }

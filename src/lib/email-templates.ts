@@ -14,13 +14,13 @@ import { ROOT_DOMAIN } from './domain'
  *    الملوّن هو المناسب.
  */
 
-const SITE = ROOT_DOMAIN.startsWith('localhost') ? 'http://' + ROOT_DOMAIN : 'https://' + ROOT_DOMAIN
+export const SITE = ROOT_DOMAIN.startsWith('localhost') ? 'http://' + ROOT_DOMAIN : 'https://' + ROOT_DOMAIN
 
 /** الصور في البريد لازم روابط مطلقة — المسارات النسبية مش بتتحمّل */
 const LOGO_URL = `${SITE}${brand.mark}`
 const WORDMARK_URL = `${SITE}${brand.wordmark}`
 
-const COLORS = {
+export const COLORS = {
   ink: '#222540',
   muted: '#5c6890',
   subtle: '#8a92ad',
@@ -43,7 +43,7 @@ const COLORS = {
   أول كلام ظاهر في الرسالة لو ما لقاش واحدًا مخصّصًا — يعني كنا
   بندفع تهمة إخفاء محتوى تمن حاجة بتحصل لوحدها.
 */
-function layout(inner: string, _preheader: string) {
+export function layout(inner: string, _preheader: string) {
   return `<!doctype html>
 <html lang="ar" dir="rtl" xmlns:v="urn:schemas-microsoft-com:vml">
 <head>

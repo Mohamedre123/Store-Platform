@@ -19,7 +19,7 @@ const mobile = path.dirname(path.dirname(fileURLToPath(import.meta.url)))
 const root = path.join(mobile, 'www')
 const devRoot = path.join(mobile, 'dev')
 /* صفحة التجربة بتترد على مسارات المنصة عشان الطبقة تتصرف زي ما هي على الموقع */
-const harnessRoutes = /^\/(login|signup|dashboard)(\/|$)/
+const harnessRoutes = /^\/(login|signup|dashboard|verify)(\/|$)/
 const port = Number(process.env.PORT) || 4455
 const types = { '.js': 'text/javascript; charset=utf-8', '.html': 'text/html; charset=utf-8', '.png': 'image/png' }
 
@@ -39,6 +39,26 @@ createServer(async (req, res) => {
               role: url.searchParams.get('role') ?? 'owner',
               permissions: [],
             },
+      ),
+    )
+    return
+  }
+
+  /* صفحة تأكيد البريد: تغيير البريد وإلغاء التسجيل */
+  if (url.pathname.startsWith('/api/app/account/')) {
+    let raw = ''
+    for await (const chunk of req) raw += chunk
+    const body = raw ? JSON.parse(raw) : {}
+    await new Promise((r) => setTimeout(r, 600))
+    const taken = url.pathname.endsWith('/change-email') && String(body.email ?? '').startsWith('taken')
+    res.writeHead(taken ? 409 : 200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
+    res.end(
+      JSON.stringify(
+        taken
+          ? { ok: false, error: 'taken', message: 'البريد ده مسجّل بحساب تاني — سجّل دخول بيه بدل التسجيل الجديد.' }
+          : url.pathname.endsWith('/abandon')
+            ? { ok: true, deleted: true }
+            : { ok: true, sent: true },
       ),
     )
     return

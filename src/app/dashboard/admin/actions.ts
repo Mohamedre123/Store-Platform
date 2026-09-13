@@ -1,10 +1,10 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { eq } from 'drizzle-orm'
+import { and, desc, eq, inArray } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/db'
-import { subscriptionRequests } from '@/db/schema'
+import { stores, subscriptionRequests, subscriptions } from '@/db/schema'
 import { requirePlatformAdmin } from '@/lib/store-context'
 import { activateStore, deactivateStore } from '@/lib/subscription'
 import { recordAudit } from '@/lib/audit'
@@ -53,7 +53,57 @@ export async function activateAction(raw: unknown): Promise<AdminState> {
 
   revalidatePath('/dashboard/admin')
   const plan = getPlan(parsed.data.plan)
-  return { ok: true, message: `اتفعّل ${plan?.name ?? ''} لحد ${formatDate(res.until)}` }
+  return {
+    ok: true,
+    message: `اتفعّل ${plan?.name ?? ''} لحد ${formatDate(res.until)} — وهيوصله إيميل بالتفعيل`,
+  }
+}
+
+/**
+ * «جدّد» — نفس باقته المدفوعة الأخيرة، من نهاية فترته الحالية.
+ *
+ * التاجر بيحوّل ويبعت، والإدارة كانت بتدوّر هو كان شهري ولا سنوي عشان
+ * تدوس الزرار الصح. هنا الزرار عارف لوحده، والتاجر بيوصله إيميل
+ * «اتجدّد لحد…» بالتاريخ الجديد.
+ */
+export async function renewAction(storeId: string): Promise<AdminState> {
+  const admin = await requirePlatformAdmin()
+
+  const parsed = z.string().uuid().safeParse(storeId)
+  if (!parsed.success) return { error: 'متجر غير معروف' }
+
+  const [store] = await db.select({ plan: stores.plan }).from(stores).where(eq(stores.id, parsed.data)).limit(1)
+  if (!store) return { error: 'المتجر مش موجود' }
+
+  let planKey = store.plan === 'monthly' || store.plan === 'yearly' ? store.plan : null
+  if (!planKey) {
+    const [last] = await db
+      .select({ plan: subscriptions.plan })
+      .from(subscriptions)
+      .where(and(eq(subscriptions.storeId, parsed.data), inArray(subscriptions.plan, ['monthly', 'yearly'])))
+      .orderBy(desc(subscriptions.startedAt))
+      .limit(1)
+    planKey = last?.plan === 'monthly' || last?.plan === 'yearly' ? last.plan : null
+  }
+  if (!planKey) return { error: 'المتجر ده ما اشتركش في باقة مدفوعة قبل كده — فعّل شهري أو سنوي.' }
+
+  const res = await activateStore({ storeId: parsed.data, plan: planKey, adminId: admin.id })
+  if (!res.ok) return { error: res.error }
+
+  await recordAudit({
+    storeId: parsed.data,
+    userId: admin.id,
+    action: 'subscription.activate',
+    resource: 'store',
+    resourceId: parsed.data,
+    after: { plan: planKey, until: res.until.toISOString(), renew: true },
+  })
+
+  revalidatePath('/dashboard/admin')
+  return {
+    ok: true,
+    message: `اتجدّد ${getPlan(planKey)?.name ?? ''} لحد ${formatDate(res.until)} — وهيوصله إيميل بالتجديد`,
+  }
 }
 
 export async function deactivateAction(storeId: string): Promise<AdminState> {
@@ -73,7 +123,7 @@ export async function deactivateAction(storeId: string): Promise<AdminState> {
   })
 
   revalidatePath('/dashboard/admin')
-  return { ok: true, message: 'اتقفل — المميزات وقفت فورًا' }
+  return { ok: true, message: 'اتقفل — المميزات وقفت فورًا، ووصله إيميل بالإيقاف' }
 }
 
 /** رفض طلب — التحويل ما وصلش أو الإيصال مش مظبوط */

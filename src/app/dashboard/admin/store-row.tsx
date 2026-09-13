@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { Ban, Check, Clock, Crown, Gift, Loader2, Store, X } from 'lucide-react'
-import { activateAction, deactivateAction, rejectRequestAction } from './actions'
+import { Ban, Check, Clock, Crown, Gift, Loader2, RefreshCw, Store, X } from 'lucide-react'
+import { activateAction, deactivateAction, rejectRequestAction, renewAction } from './actions'
 
 export type AdminStoreRow = {
   storeId: string
@@ -27,6 +27,8 @@ export type AdminStoreRow = {
    */
   delivered: number
   referrals: number
+  /** آخر باقة مدفوعة — زرار «جدّد» بيجدّدها. فاضي لو ما اشتركش قبل كده */
+  renewPlan: { key: 'monthly' | 'yearly'; name: string } | null
   /** طلب اشتراك معلّق — لو موجود، التفعيل بيقفله معاه */
   request: {
     id: string
@@ -191,6 +193,30 @@ export function StoreRow({ row }: { row: AdminStoreRow }) {
             </button>
           )
         })}
+
+        {row.renewPlan && (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() =>
+              confirming === 'renew' ? run(() => renewAction(row.storeId)) : setConfirming('renew')
+            }
+            className={`inline-flex min-h-11 flex-1 basis-32 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-semibold transition-colors disabled:opacity-60 ${
+              confirming === 'renew'
+                ? 'bg-[var(--color-success)] text-white'
+                : 'bg-[var(--primary)] text-[var(--primary-fg)] hover:opacity-90'
+            }`}
+          >
+            {pending && confirming === 'renew' ? (
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            ) : confirming === 'renew' ? (
+              <Check className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            )}
+            {confirming === 'renew' ? 'أكّد التجديد' : `جدّد الاشتراك (${row.renewPlan.name})`}
+          </button>
+        )}
 
         <button
           type="button"

@@ -23,12 +23,30 @@ html.zw-app button,html.zw-app [role="button"],html.zw-app nav a{-webkit-user-se
 html.zw-app button:not(:disabled):active,html.zw-app [role="button"]:active{scale:.97}
 html.zw-app button.fixed:active{scale:none}
 
-@keyframes zw-page-in{from{opacity:0;transform:translate3d(0,14px,0)}to{opacity:1;transform:none}}
-@keyframes zw-page-back{from{opacity:0;transform:translate3d(0,-10px,0)}to{opacity:1;transform:none}}
-@keyframes zw-page-soft{from{opacity:.4}to{opacity:1}}
-html.zw-app main.zw-enter>:not(.fixed){animation:zw-page-in .36s cubic-bezier(.16,1,.3,1) both}
-html.zw-app main.zw-enter-back>:not(.fixed){animation:zw-page-back .3s cubic-bezier(.16,1,.3,1) both}
-html.zw-app main.zw-enter-soft>:not(.fixed){animation:zw-page-soft .22s ease-out both}
+/*
+  حركة الصفحة على الـmain نفسه وبالشفافية بس.
+
+  كانت بتتحرك على كل ابن مباشر للـmain بـtransform — صفحة فيها
+  عشرين كارت = عشرين طبقة بتترسم في نفس الفريم، وده اللي كان بيسقّط
+  فريمات على الموبايلات المتوسطة. طبقة واحدة بالشفافية = نفس الإحساس
+  بجزء من التكلفة، ومن غير ما الأزرار الثابتة تتحرك مع الصفحة.
+*/
+@keyframes zw-page-in{from{opacity:0}to{opacity:1}}
+@keyframes zw-page-soft{from{opacity:.55}to{opacity:1}}
+html.zw-app main.zw-enter,html.zw-app main.zw-enter-back{animation:zw-page-in .24s cubic-bezier(.2,.8,.2,1) both}
+html.zw-app main.zw-enter-soft{animation:zw-page-soft .18s ease-out both}
+
+/*
+  السلاسة قبل الزينة جوّه التطبيق:
+  - الخلفية المتحركة (aurora) مخفية — الشاشات الأصلية ليها خلفيتها.
+  - تغبيش ما وراء العناصر (backdrop-blur) بيتقفل: بيتحسب من جديد مع كل
+    بكسل تمرير تحته، وهو أغلى حاجة في رسم الـWebView على أندرويد.
+*/
+html.zw-app .zw-aurora{display:none!important}
+html.zw-app [class*="backdrop-blur"]{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+
+/* صفحة تأكيد البريد: هيدر الموقع بيتخفي ومكانه شريط التطبيق (shell/verify.tsx) */
+html.zw-app.zw-verify header{visibility:hidden}
 
 html.zw-app ${NAV}>*{position:relative;isolation:isolate}
 html.zw-app ${NAV}>[aria-current="page"]::before{content:"";position:absolute;z-index:-1;top:6px;left:50%;width:58px;height:32px;margin-left:-29px;border-radius:16px;background:var(--primary-soft);animation:zw-pill .4s cubic-bezier(.34,1.56,.64,1) both}
@@ -139,11 +157,13 @@ img{display:block;-webkit-user-drag:none}
 /* ─── الاتصال ─── */
 .net{position:fixed;top:10px;left:50%;display:flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;background:#b91c1c;color:#fff;font-size:13px;font-weight:600;white-space:nowrap;box-shadow:0 12px 28px -12px rgba(0,0,0,.55);transform:translate3d(-50%,-160%,0);transition:transform .5s cubic-bezier(.16,1,.3,1)}
 .net--on{transform:translate3d(-50%,0,0)}
+/* الافتتاح والتعريف فوق أي شريط من الهيكل (التبويبات، شريط صفحة التأكيد) */
+.launch,.ob{z-index:40}
 .net svg{width:16px;height:16px;flex:none}
 
 /* ─── الإشعارات ─── */
 .toasts{position:fixed;left:16px;right:16px;bottom:calc(var(--dash-nav,0px) + 16px);display:flex;flex-direction:column;align-items:center;gap:8px}
-.toast{pointer-events:auto;display:flex;align-items:center;gap:10px;max-width:420px;min-height:48px;padding:10px 14px;border-radius:14px;color:#fff;font-size:14px;line-height:1.5;background:rgba(22,24,43,.95);box-shadow:0 14px 34px -12px rgba(0,0,0,.55);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);animation:toast-in .38s cubic-bezier(.16,1,.3,1) both}
+.toast{pointer-events:auto;display:flex;align-items:center;gap:10px;max-width:420px;min-height:48px;padding:10px 14px;border-radius:14px;color:#fff;font-size:14px;line-height:1.5;background:rgba(22,24,43,.97);box-shadow:0 14px 34px -12px rgba(0,0,0,.55);animation:toast-in .38s cubic-bezier(.16,1,.3,1) both}
 .toast--out{animation:toast-out .26s ease forwards}
 .toast-icon{width:18px;height:18px;flex:none}
 .toast--success .toast-icon{color:#4ade80}

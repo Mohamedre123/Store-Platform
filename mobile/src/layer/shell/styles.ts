@@ -17,13 +17,13 @@ export const SHELL_CSS = `
 .rise{animation:h-rise .55s cubic-bezier(.16,1,.3,1) both}
 
 /* ─── الشاشة ─── */
-.home{position:fixed;top:0;right:0;bottom:0;left:0;pointer-events:auto;background:var(--bg,#f6f6f9);transition:opacity .28s ease,transform .34s cubic-bezier(.2,.8,.2,1);will-change:transform,opacity}
+.home{position:fixed;top:0;right:0;bottom:0;left:0;pointer-events:auto;background:var(--bg,#f6f6f9);transition:opacity .28s ease,transform .34s cubic-bezier(.2,.8,.2,1);contain:layout paint}
 .home--hidden{opacity:0;transform:translate3d(10%,0,0);pointer-events:none;visibility:hidden;transition:opacity .22s ease,transform .3s cubic-bezier(.4,0,.2,1),visibility 0s linear .3s}
 .home-scroll{position:absolute;top:0;right:0;bottom:0;left:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch}
 .home-body{padding:6px 16px calc(64px + 32px + env(safe-area-inset-bottom,0px));max-width:720px;margin:0 auto}
 .home-body>*+*{margin-top:14px}
 .home-bar{position:absolute;top:0;left:0;right:0;z-index:3;height:50px;display:flex;align-items:center;justify-content:center;padding:0 60px;font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:var(--surface,#fff);border-bottom:1px solid var(--border,#e2e4ec);opacity:0;transform:translate3d(0,-8px,0);transition:opacity .22s ease,transform .22s ease;pointer-events:none}
-@supports ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))) and (background:color-mix(in srgb,red 50%,blue)){.home-bar{background:color-mix(in srgb,var(--bg,#f6f6f9) 80%,transparent);-webkit-backdrop-filter:blur(18px) saturate(1.7);backdrop-filter:blur(18px) saturate(1.7)}}
+.home-bar{background:var(--bg,#f6f6f9)}
 .home-bar--on{opacity:1;transform:none}
 
 .hptr{position:absolute;top:0;left:50%;z-index:4;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--primary,#634b9a);background:var(--surface,#fff);box-shadow:0 8px 22px -8px rgba(34,37,64,.45);opacity:0;transform:translate3d(-50%,-48px,0);pointer-events:none}
@@ -167,8 +167,9 @@ button.row:active{background:var(--surface-2,#f1f2f6)}
 .updated{display:block}
 .updated--stale{color:var(--color-warning,#a16207)}
 
-.sk{display:block;background:linear-gradient(90deg,var(--surface-2,#f1f2f6) 25%,var(--surface,#fff) 50%,var(--surface-2,#f1f2f6) 75%);background-size:200% 100%;animation:h-sk 1.25s ease-in-out infinite;border-radius:14px}
-@keyframes h-sk{from{background-position:200% 0}to{background-position:-200% 0}}
+/* نبض بالشفافية بدل لمعة بتتحرك: الشفافية بتتحسب على كرت الشاشة، واللمعة كانت بتعيد رسم كل هيكل في كل فريم */
+.sk{display:block;background:var(--surface-2,#eceef4);animation:h-sk 1.1s ease-in-out infinite alternate;border-radius:14px}
+@keyframes h-sk{from{opacity:1}to{opacity:.5}}
 
 .home-empty{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:24px 32px;text-align:center}
 .home-empty-icon{width:72px;height:72px;margin-bottom:10px;border-radius:24px;display:flex;align-items:center;justify-content:center;color:var(--primary,#634b9a);background:var(--primary-soft,#ece8f5)}
@@ -178,7 +179,6 @@ button.row:active{background:var(--surface-2,#f1f2f6)}
 
 /* ─── شريط التبويبات ─── */
 .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:6;pointer-events:auto;isolation:isolate;display:flex;height:calc(64px + env(safe-area-inset-bottom,0px));padding-bottom:env(safe-area-inset-bottom,0px);background:var(--surface,#fff);border-top:1px solid var(--border,#e2e4ec);transition:transform .32s cubic-bezier(.2,.8,.2,1)}
-@supports ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))) and (background:color-mix(in srgb,red 50%,blue)){.tabbar{background:color-mix(in srgb,var(--surface,#fff) 84%,transparent);-webkit-backdrop-filter:blur(22px) saturate(1.8);backdrop-filter:blur(22px) saturate(1.8)}}
 .tabbar--hidden{transform:translate3d(0,110%,0);pointer-events:none}
 .tab{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:0;background:none;font-size:11.5px!important;font-weight:600;color:var(--fg-muted,#5c6890)!important;transition:color .2s}
 .tab .ic{width:24px;height:24px;transition:transform .32s cubic-bezier(.34,1.56,.64,1)}

@@ -1,7 +1,7 @@
 import { and, count, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm'
 import { Clock, Inbox, ShieldCheck, Share2, Users } from 'lucide-react'
 import { db } from '@/db'
-import { orders, storeMembers, stores, subscriptionRequests, users } from '@/db/schema'
+import { orders, storeMembers, stores, subscriptionRequests, subscriptions, users } from '@/db/schema'
 import { requirePlatformAdmin } from '@/lib/store-context'
 import { getPlan, STATUS_LABEL, daysLeft } from '@/lib/plans'
 import { normalizeAccountId, looksLikeAccountId } from '@/lib/account-id'
@@ -182,6 +182,17 @@ export default async function AdminPage({
 
   const pickerDelivered = await deliveredCounts(allStoresForPicker.map((x) => x.id))
 
+  /* آخر باقة مدفوعة لكل متجر — زرار «جدّد» بيجدّدها من غير ما الإدارة تفتكر */
+  const lastPaid = new Map<string, string>()
+  if (storeIds.length) {
+    const paidRows = await db
+      .select({ storeId: subscriptions.storeId, plan: subscriptions.plan })
+      .from(subscriptions)
+      .where(and(inArray(subscriptions.storeId, storeIds), inArray(subscriptions.plan, ['monthly', 'yearly'])))
+      .orderBy(desc(subscriptions.startedAt))
+    for (const p of paidRows) if (!lastPaid.has(p.storeId)) lastPaid.set(p.storeId, p.plan)
+  }
+
   const now = Date.now()
 
   const view: AdminStoreRow[] = rows.map((r) => {
@@ -215,6 +226,12 @@ export default async function AdminPage({
       orders: countByStore.get(r.storeId) ?? 0,
       delivered: delivered.get(r.storeId) ?? 0,
       referrals: refCounts.get(r.storeId) ?? 0,
+      renewPlan: (() => {
+        if (r.isAdmin) return null
+        const key = r.plan === 'monthly' || r.plan === 'yearly' ? r.plan : lastPaid.get(r.storeId)
+        const plan = key === 'monthly' || key === 'yearly' ? getPlan(key) : null
+        return plan ? { key: plan.key as 'monthly' | 'yearly', name: plan.name } : null
+      })(),
       request: req
         ? {
             id: req.id,

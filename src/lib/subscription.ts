@@ -3,6 +3,7 @@ import { and, eq, isNotNull, lt, or } from 'drizzle-orm'
 import { db } from '@/db'
 import { stores, subscriptionRequests, subscriptions } from '@/db/schema'
 import { getPlan, periodEnd, type Plan } from './plans'
+import { notifySubscription } from './subscription-notify'
 import type { PlanKey } from '@/db/schema'
 
 /**
@@ -61,6 +62,11 @@ export async function activateStore(input: {
   const current = plan.key === 'trial' ? store.trialEndsAt : store.subscribedUntil
   const from = current && new Date(current) > now ? new Date(current) : now
   const until = periodEnd(plan, from)
+  /*
+    «جدّد» لا «فعّل» لأي متجر دفع قبل كده — حتى لو اشتراكه كان خلص.
+    `subscribedUntil` ما بيرجعش فاضي أبدًا بعد أول دفع (شوف `trialState`).
+  */
+  const noticeKind = plan.key === 'trial' ? 'trial_started' : store.subscribedUntil ? 'renewed' : 'activated'
 
   if (plan.key === 'trial') {
     await db
@@ -117,6 +123,9 @@ export async function activateStore(input: {
       .where(eq(subscriptionRequests.id, input.requestId))
   }
 
+  /* إيميل (وواتساب لو واتساب المنصة مربوط) — من غير ما الزرار يستنى */
+  notifySubscription({ storeId: store.id, kind: noticeKind, until, planKey: plan.key })
+
   return { ok: true, until }
 }
 
@@ -154,6 +163,8 @@ export async function deactivateStore(storeId: string, adminId: string): Promise
     .update(subscriptions)
     .set({ status: 'cancelled', cancelledAt: new Date() })
     .where(and(eq(subscriptions.storeId, storeId), eq(subscriptions.status, 'active')))
+
+  notifySubscription({ storeId, kind: 'cancelled', until: past })
 }
 
 /**

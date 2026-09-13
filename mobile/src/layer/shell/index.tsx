@@ -36,6 +36,8 @@ import { MORE_CSS } from './styles-more'
 import { clearMeCache, MoreSheet } from './more'
 import { SHELL_CSS } from './styles'
 import { TabBar } from './tabbar'
+import { VERIFY_CSS } from './styles-verify'
+import { VerifyBar } from './verify'
 
 const ORDER_DETAIL = /^\/dashboard\/orders\/([^/]+)$/
 /* صفحات جوّه المنتجات مش منتجات — new وcategories وimport وtrash بيفضلوا صفحات المنصة */
@@ -165,6 +167,7 @@ function Shell() {
         customerId={customerId ?? lastCustomerId}
         onUnavailable={markUnavailable.customer}
       />
+      <VerifyBar visible={path === '/verify'} />
       <TabBar path={path} active={onDashboard} />
       {onDashboard && <MoreSheet path={path} search={effective.searchParams.toString()} />}
     </>
@@ -174,7 +177,7 @@ function Shell() {
 export function installShell(): void {
   const root = layer()
   const style = document.createElement('style')
-  style.textContent = SHELL_CSS + ORDERS_CSS + PRODUCTS_CSS + CUSTOMERS_CSS + MORE_CSS
+  style.textContent = SHELL_CSS + ORDERS_CSS + PRODUCTS_CSS + CUSTOMERS_CSS + MORE_CSS + VERIFY_CSS
   root.appendChild(style)
   const mount = document.createElement('div')
   mount.className = 'shell'

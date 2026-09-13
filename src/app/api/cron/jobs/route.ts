@@ -4,6 +4,7 @@ import { db } from '@/db'
 import { platformSettings } from '@/db/schema'
 import { drainJobs, pruneJobs } from '@/lib/jobs'
 import { queueDueSchedules } from '@/lib/content-schedules'
+import { runSubscriptionLifecycle } from '@/lib/subscription-lifecycle'
 
 export const dynamic = 'force-dynamic'
 /*
@@ -87,5 +88,14 @@ export async function GET(req: NextRequest) {
   const summary = await drainJobs(40)
   const pruned = await pruneJobs().catch(() => 0)
 
-  return NextResponse.json({ ok: true, ...summary, pruned, queued })
+  /*
+    تذكيرات التجديد من العامل ده كمان — مش مستنية المهمة اليومية بس.
+    كل نص ساعة بالكتير، ومش في نص الليل (`subscription-lifecycle.ts`).
+  */
+  const subscriptions = await runSubscriptionLifecycle({ minIntervalMinutes: 30 }).catch((e) => {
+    console.error('فشل دورة الاشتراكات:', e)
+    return null
+  })
+
+  return NextResponse.json({ ok: true, ...summary, pruned, queued, subscriptions })
 }

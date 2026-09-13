@@ -34,6 +34,7 @@ import androidx.annotation.Nullable;
 import androidx.browser.customtabs.CustomTabColorSchemeParams;
 import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.core.content.FileProvider;
+import androidx.webkit.WebSettingsCompat;
 import androidx.webkit.WebViewCompat;
 import androidx.webkit.WebViewFeature;
 import com.getcapacitor.JSArray;
@@ -176,6 +177,17 @@ public class ZawyaShellPlugin extends Plugin {
         settings.setSupportZoom(false);
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
+        /*
+         * السلاسة: الـWebView بيرسم الجزء اللي جاي تحت الشاشة مسبقًا، فالتمرير
+         * السريع ما بيكشفش مساحة فاضية بتترسم متأخر. وأولوية عملية الرسم «مهمة»
+         * عشان النظام ما يبطّأهاش وهي قدّام المستخدم.
+         */
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.OFF_SCREEN_PRERASTER)) {
+            WebSettingsCompat.setOffscreenPreRaster(settings, true);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            webView.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, true);
+        }
         webView.setDownloadListener(this::handleDownload);
     }
 

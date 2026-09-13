@@ -24,6 +24,9 @@
 - الحاجات الكبيرة (أدوات، تحميلات، ملفات بناء) على **`H:\for claude`** — درايف C: مليان.
 - بعد ما تبني نسخة APK جديدة ابعتها له بـ`SendUserFile` (ولو الإرسال فشل/طوّل، قوله مسار
   الملف على `H:\for claude\zawya-release\`).
+- **بعد أي مهمة تخلص: حدّث الملف ده** — اللي اتعمل (قسم 8)، واللي لسه (قسم 9)، وأي فهم جديد
+  للمشروع (ملفات جديدة، قواعد، مشاكل واتحلّت). الهدف إن الشات اللي بعدك يعرف كل حاجة حرفيًا
+  لو الكونتكست خلص. ده طلب صريح من صاحب المشروع.
 
 ---
 
@@ -72,7 +75,7 @@ git push origin main                              # ده اللي بينشر ا�
 
 ### تعديلات قاعدة البيانات (Migrations)
 
-- اكتب ملف SQL يدوي: `drizzle/00NN_name.sql` (آخر رقم حاليًا **0034**)، والجمل مفصولة بـ
+- اكتب ملف SQL يدوي: `drizzle/00NN_name.sql` (آخر رقم حاليًا **0036**)، والجمل مفصولة بـ
   `--> statement-breakpoint`، واستخدم `IF NOT EXISTS`.
 - عدّل الـschema في `src/db/schema/*.ts`.
 - **طبّقه على قاعدة الإنتاج قبل رفع الكود** اللي بيقرا الأعمدة الجديدة:
@@ -112,6 +115,7 @@ git push origin main                              # ده اللي بينشر ا�
 | المنتجات + تفاصيل (تفعيل/إيقاف، حذف) | `products.tsx`, `products-api.ts`, `product-detail.tsx` | `/api/app/products*` |
 | العملاء + صفحة عميل | `customers.tsx`, `customers-api.ts`, `customer-detail.tsx` | `/api/app/customers*` |
 | «المزيد» (لوحة سفلية بكل الأقسام + المستخدم + خروج) | `more.tsx`, `nav-data.ts` | `/api/app/me`, `/api/app/logout` |
+| شريط صفحة تأكيد البريد `/verify` (رجوع + «غيّر البريد» + «سجّل بحساب تاني» + «الغِ التسجيل») | `verify.tsx`, `styles-verify.ts` | `/api/app/account/change-email`, `/api/app/account/abandon` |
 
 باقي الملفات: `index.tsx` (التوجيه بين الشاشات + TabBar)، `screen.tsx` (`Screen` مع
 `overlay` للأزرار العايمة، و`Sheet` مع `tall`)، `tabbar.tsx`، `navigate.ts`، `ui.tsx`،
@@ -217,6 +221,8 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
 | `src/components/dashboard/sidebar.tsx` (`NAV`) | القايمة الجانبية و«المزيد» | **منسوخة** في `mobile/src/layer/shell/nav-data.ts` — أي قسم يتضاف أو يتغيّر هنا يتعدّل هناك |
 | `/api/app/me` و `/api/app/logout` | — | قايمة «المزيد» في التطبيق (المستخدم وصلاحياته، وتسجيل الخروج) |
 | `src/lib/store-context.ts` (`getOptionalDashboardContext`) | — | سياق من غير redirect للـAPI |
+| `src/lib/otp.ts` (`issueEmailOtp`) | صفحة `/verify` | `/api/app/account/change-email` بيناديها بعد تغيير البريد |
+| `src/lib/subscription.ts` (`activateStore`/`deactivateStore`) | الإدارة + صفحة الاشتراك | بتبعت رسايل الاشتراك تلقائي (قسم 7ب) — ما تشيلش نداء `notifySubscription` |
 
 ## 6) القواعد
 
@@ -259,11 +265,59 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
 
 ---
 
+## 7ب) رسايل الاشتراك للتاجر (إيميل + واتساب) — اتعملت 2026-09-13
+
+- **إمتى بتتبعت:**
+  | الحدث | منين | النوع (`kind`) |
+  |---|---|---|
+  | التاجر بدأ التجربة المجانية (٣ أيام) | `startTrialAction` ← `activateStore` | `trial_started` |
+  | الإدارة فعّلت باقة لأول مرة | `activateAction` ← `activateStore` | `activated` |
+  | الإدارة فعّلت/جدّدت لمتجر دفع قبل كده (`subscribedUntil` مش فاضي) | `activateAction` أو زرار **«جدّد الاشتراك»** (`renewAction`) | `renewed` |
+  | الإدارة وقفت الاشتراك | `deactivateAction` ← `deactivateStore` | `cancelled` |
+  | فاضل ٧ / ٣ / ١ يوم (مدفوع) — ويوم واحد بس للتجربة | `runSubscriptionLifecycle` | `reminder_7/3/1` |
+  | الاشتراك انتهى / التجربة انتهت (خلال ٣ أيام من الانتهاء) | `runSubscriptionLifecycle` | `expired` / `trial_ended` |
+- **الملفات:** `src/lib/subscription-notify.ts` (`deliverSubscriptionNotice` / `notifySubscription` بـ`after()`)،
+  `src/lib/subscription-email.ts` (القالب بهوية المنصة — بيستخدم `layout`/`COLORS`/`SITE` المصدّرين من
+  `email-templates.ts`)، `src/lib/subscription-lifecycle.ts` (انتهاء + تذكيرات)،
+  جدول `subscription_notices` (migration **0036** متطبّقة) بمفتاح فريد (متجر، نوع، نهاية الفترة) = **مفيش تكرار أبدًا**.
+- **بتشتغل منين:** `/api/cron/jobs` (العامل اللي بيشتغل طول اليوم — بحد أقصى كل ٣٠ دقيقة بمفتاح
+  `subscription_lifecycle_at` في `platform_settings`) و`/api/cron/abandoned-carts` (اليومي). **مش بتبعت من ١٠ بالليل
+  لـ١٠ الصبح بتوقيت القاهرة.**
+- **الإيميل:** لبريد صاحب الحساب (أو بريد المتجر)، معاملاتي (من غير List-Unsubscribe)، نسخة نصية، اسم المتجر متهرّب
+  (escape). بيتسجّل في `message_log` باسم متجر التاجر بحدث `subscription_<kind>`.
+- **الواتساب:** بيخرج من **واتساب متجر الإدارة** (صاحب بريد في `src/lib/admin.ts` أو `is_platform_admin`) لو مربوط
+  من «الإعدادات ← واتساب» — لرقم `stores.whatsapp` أو `users.phone` أو `stores.phone`. **حاليًا واتساب متجر الإدارة
+  (atlosa) مش مربوط** ← الإيميل بس اللي بيوصل لحد ما يتربط.
+- متجر الإدارة نفسه ما بيوصلوش أي رسالة اشتراك.
+- التجربة **مش تلقائية عند التسجيل** (قرار قديم مقصود في `signupAction`) — التاجر بيبدأها من صفحة الاشتراك، والإيميل
+  بيوصله لحظتها.
+
+## 7ج) صفحة تأكيد البريد في التطبيق + السلاسة — اتعملت في نسخة 1.7
+
+- **المشكلة:** التاجر في `/verify` كان محبوس (مفيش رجوع ولا تغيير بريد). **الحل للتطبيق بس:** `shell/verify.tsx`
+  بيحط شريط مكان هيدر الموقع (الهيدر بيتخفي بـ`html.zw-verify header{visibility:hidden}`) + لوحة خيارات، ورجوع أندرويد
+  بيفتحها.
+  - `POST /api/app/account/change-email` — للحساب اللي لسه ما اتأكدش بس؛ بيرفض البريد المستخدم وبريد الإدارة؛
+    حد ٦ رموز في الساعة؛ بيغيّر `users.email` و`stores.email` (لو كان زي القديم) وبيبعت رمز جديد.
+  - `POST /api/app/account/abandon` — بيخرج، ولو الحساب **لسه ما اتأكدش** بيمسحه هو والمتجر (لو مفيهوش عضو تاني ولا
+    طلبات) — فالبريد والرابط يرجعوا متاحين. الحساب المتأكّد عمره ما بيتمسح من هنا.
+- **السلاسة (التطبيق بس — كل القواعد مشروطة بـ`html.zw-app`):**
+  - اتشال `backdrop-filter` (تغبيش) من شريط التبويبات وشريط العنوان والرسايل الصغيرة، ومن أي عنصر في الموقع فيه
+    `backdrop-blur` — ده كان أكبر سبب لسقوط الفريمات مع التمرير.
+  - خلفية الموقع المتحركة (`.zw-aurora`) مخفية جوّه التطبيق.
+  - حركة الصفحات بقت شفافية على `main` نفسه بدل transform على كل عنصر جوّاه.
+  - `will-change` اتشال من الشاشات الأصلية المخفية (كانت ماسكة ذاكرة كرت الشاشة) — مكانه `contain:layout paint`.
+  - هياكل التحميل (`.sk`) بقت نبض شفافية بدل لمعة بتعيد الرسم.
+  - شريط التبويبات بيتحدّث كل ١٢٠ms بالكتير بدل مع كل تغيير في الصفحة.
+  - أندرويد: `setOffscreenPreRaster(true)` و`RENDERER_PRIORITY_IMPORTANT` في `ZawyaShellPlugin.configureWebView`.
+  - `.launch,.ob{z-index:40}` عشان الافتتاح يفضل فوق أي شريط.
+- **قاعدة للجاي:** ما ترجعش `backdrop-filter` ولا `will-change` دايم ولا حركة على عناصر كتير جوّه التطبيق.
+
 ## 8) الحالة الحالية (آخر تحديث: 2026-09-13)
 
-- **الموقع:** آخر نشر = commit `537568a` (إشعارات الطلبات). شغّال ومتختبر.
-- **التطبيق:** آخر نسخة مبنية **1.6 (versionCode 7)** في `H:\for claude\zawya-release\zawya-1.6.apk`
-  و`.aab`. النسخة الجاية **1.7 / versionCode 8**.
+- **الموقع:** آخر نشر = رسايل الاشتراك + زرار «جدّد الاشتراك» + مسارات `/api/app/account/*` (بعد `537568a`).
+- **التطبيق:** آخر نسخة مبنية **1.7 (versionCode 8)** في `H:\for claude\zawya-release\zawya-1.7.apk`
+  و`.aab` (صفحة التأكيد + السلاسة). النسخة الجاية **1.8 / versionCode 9**.
 - **اتعمل:** التطبيق كامل بيفتح المنصة بلمسة تطبيق + شاشات أصلية (الرئيسية، الطلبات،
   المنتجات، العملاء، المزيد) + شعار زاوية بيودّي للوحة + إصلاح «المزيد» + إصلاح حصّة Gemini
   + اختيار الموديل يدوي/افتراضي.
@@ -282,7 +336,9 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
 - **الخادم:** جدول `push_devices` (migration 0035 متطبّقة) — `src/db/schema/push.ts`؛
   `src/lib/push.ts` (FCM HTTP v1 بـJWT من `node:crypto`، من غير firebase-admin؛ الصلاحية `orders.view`
   بتتقاس وقت الإرسال؛ التوكنات الميتة بتتمسح)؛ مسارات `POST /api/app/push/register` و`unregister`،
-  و`GET /api/app/push/status` (بـ`Authorization: Bearer $CRON_SECRET` — تشخيص من غير أسرار).
+  و`GET /api/app/push/status` (بـ`Authorization: Bearer <CRON_SECRET أو jobs_cron_token من platform_settings>` —
+  تشخيص من غير أسرار؛ اتجرّب على الحي ورجّع `{"configured":true,"auth":true,"project":"zawyaeg-1"}`).
+  **الإشعارات اتجرّبت على موبايل صاحب المشروع وشغّالة.**
   الإرسال من `notifyTeam('order_placed')` في `src/lib/notify-team.ts`.
 - **مفتاح حساب الخدمة:** متخزّن مشفّر في `platform_settings` بالمفتاح `firebase_service_account`
   بواسطة `node .scripts/set-firebase.mjs "<مسار الملف>"` (أو env `FIREBASE_SERVICE_ACCOUNT` على Vercel لو اتحط — ليه الأولوية).
@@ -290,8 +346,11 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
 
 ## 9) اللي لسه (بالترتيب)
 
-1. صاحب المشروع يثبّت 1.6، يسمح بالإشعارات، ويعمل طلب تجريبي من متجره ويتأكد إن الإشعار وصل.
-2. صاحب المشروع يجرّب: يختار موديل صور مستقر في الإضافات، يعدّل جدول «بوست يومي»، يضغط «جرّبه».
+1. صاحب المشروع يثبّت 1.7 ويجرّب: صفحة تأكيد البريد (غيّر البريد / الغِ التسجيل) + إحساس السلاسة.
+2. صاحب المشروع يربط واتساب متجر الإدارة (atlosa) من «الإعدادات ← واتساب» عشان رسايل الاشتراك توصل واتساب كمان،
+   ويجرّب «جدّد الاشتراك» من «إدارة المنصة» على متجر تجريبي ويتأكد الإيميل وصل الوارد.
+3. لو لسه في تقطيع في صفحات معيّنة من الموقع جوّه التطبيق: افحص الصفحة دي بالذات (رسوم بيانية/قوايم طويلة) —
+   الحل الجذري تحويلها لشاشة أصلية.
 3. شاشات أصلية تانية: التحليلات، التسويق، الشحن، الإعدادات، وإضافة/تعديل منتج بالكاميرا.
 4. قفل بالبصمة.
 5. الرفع على جوجل بلاي (حساب مطوّر 25$ — هو اللي يعمله) و App Store (حساب Apple + ماك).

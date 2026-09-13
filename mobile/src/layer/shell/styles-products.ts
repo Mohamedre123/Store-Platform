@@ -20,7 +20,7 @@ export const PRODUCTS_CSS = `
 .pcard-img{position:relative;display:flex;align-items:center;justify-content:center;aspect-ratio:1;background:var(--surface-2,#f1f2f6);color:var(--fg-subtle,#8a92ad)}
 .pcard-img img{width:100%;height:100%;object-fit:cover}
 .pcard-img>.ic{width:30px;height:30px}
-.pcard-badge{position:absolute;top:8px;right:8px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;color:#fff;background:rgba(22,24,43,.72);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.pcard-badge{position:absolute;top:8px;right:8px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;color:#fff;background:rgba(22,24,43,.82)}
 .pcard-body{display:flex;flex-direction:column;gap:2px;padding:10px 11px 12px}
 .pcard-name{font-size:13.5px;font-weight:600;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .pcard-cat{font-size:11.5px;color:var(--fg-subtle,#8a92ad);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

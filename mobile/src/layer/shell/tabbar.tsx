@@ -76,13 +76,19 @@ export function TabBar({ path, active }: { path: string; active: boolean }) {
   const [keyboard, setKeyboard] = useState(false)
 
   useEffect(() => {
+    /*
+      كل تغيير في الصفحة كان بيعيد رسم الشريط في الفريم اللي بعده —
+      وصفحة بتتحدّث (عدّاد، رسم بياني، React بيرسم) كانت بتشغّله عشرات
+      المرات في الثانية وسط التمرير. الشريط بيتغيّر لما قايمة تتفتح أو
+      التبويبات تتغيّر، وده ما يحتاجش أسرع من ١٢٠ms.
+    */
     let frame = 0
     const schedule = () => {
       if (frame) return
-      frame = requestAnimationFrame(() => {
+      frame = window.setTimeout(() => {
         frame = 0
         rerender((n) => n + 1)
-      })
+      }, 120)
     }
     let observer: MutationObserver | null = null
     const start = () => {
@@ -103,7 +109,7 @@ export function TabBar({ path, active }: { path: string; active: boolean }) {
     return () => {
       observer?.disconnect()
       window.removeEventListener('resize', onResize)
-      cancelAnimationFrame(frame)
+      clearTimeout(frame)
     }
   }, [])
 
