@@ -59,6 +59,10 @@ import { OPS_CSS } from './styles-ops'
 import { BlockedScreen } from './blocked'
 import { CouriersScreen } from './couriers'
 import { BookingsScreen } from './bookings'
+import { ExpensesScreen } from './expenses'
+import { SuppliersScreen } from './suppliers'
+import { CategoriesScreen } from './categories'
+import { TrashScreen } from './trash'
 
 const ORDER_DETAIL = /^\/dashboard\/orders\/([^/]+)$/
 /* صفحات جوّه المنتجات مش منتجات — new وcategories وimport وtrash بيفضلوا صفحات المنصة */
@@ -99,8 +103,16 @@ type ScreenKey =
   | 'blocked'
   | 'couriers'
   | 'bookings'
+  | 'expenses'
+  | 'suppliers'
+  | 'categories'
+  | 'trash'
 
 const SCREEN_KEYS: ScreenKey[] = [
+  'expenses',
+  'suppliers',
+  'categories',
+  'trash',
   'home',
   'orders',
   'order',
@@ -284,6 +296,22 @@ function Shell() {
       <BookingsScreen
         visible={path === '/dashboard/bookings' && !unavailable.bookings && !web}
         onUnavailable={markUnavailable.bookings}
+      />
+      <ExpensesScreen
+        visible={path === '/dashboard/expenses' && !unavailable.expenses && !web}
+        onUnavailable={markUnavailable.expenses}
+      />
+      <SuppliersScreen
+        visible={path === '/dashboard/suppliers' && !unavailable.suppliers && !web}
+        onUnavailable={markUnavailable.suppliers}
+      />
+      <CategoriesScreen
+        visible={path === '/dashboard/products/categories' && !unavailable.categories && !web}
+        onUnavailable={markUnavailable.categories}
+      />
+      <TrashScreen
+        visible={path === '/dashboard/products/trash' && !unavailable.trash && !web}
+        onUnavailable={markUnavailable.trash}
       />
       <VerifyBar visible={path === '/verify'} />
       <TabBar path={path} active={onDashboard} />

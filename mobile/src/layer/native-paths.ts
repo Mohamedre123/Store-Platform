@@ -29,6 +29,10 @@ const NATIVE: RegExp[] = [
   /^\/dashboard\/customers\/blocked$/,
   /^\/dashboard\/couriers$/,
   /^\/dashboard\/bookings$/,
+  /^\/dashboard\/expenses$/,
+  /^\/dashboard\/suppliers$/,
+  /^\/dashboard\/products\/categories$/,
+  /^\/dashboard\/products\/trash$/,
 ]
 
 export function isNativePath(url: URL): boolean {

@@ -133,7 +133,12 @@ git push origin main                              # ده اللي بينشر ا�
 | المندوبون `/dashboard/couriers` (أرقام، طلبات مستنية مندوب ← «اسند» بلوحة مرتّبة بالمنطقة، كارت لكل مندوب بحسابه + «اقفل الحساب» بتأكيد، «ابعتله الرابط» على واتساب، انسخ، ⋯ = اتصل/عدّل/وقّفه/رابط جديد، إضافة وتعديل في لوحة) | `couriers.tsx` | `/api/app/couriers`، `POST /api/app/couriers/{save,assign}`، `POST /api/app/couriers/:id/{toggle,settle,rotate}` |
 | الحجوزات `/dashboard/bookings` (مواعيد العمل كارت ← لوحة تعديل: تشغيل/أيام/من-لحد/مدة المعاد، الجاية واللي فات متقسّمين بالأيام «النهارده/بكرة»، تغيير الحالة، اتصال) | `bookings.tsx` | `/api/app/bookings`، `POST /api/app/bookings/hours`، `POST /api/app/bookings/:id/status` |
 
-شاشات الحظر والمندوبين والحجوزات بياناتهم في `shell/ops-api.ts` (فيه كمان `waNumber` لرقم واتساب دولي) وستايلهم في `shell/styles-ops.ts`.
+| المصروفات والأرباح `/dashboard/expenses` (صافي ربح ٣٠ يوم بهامشه، «فلوسك رايحة فين» بشرايط ملوّنة، فلتر بالتصنيف، دوسة على المصروف = لوحة تعديل فيها «احذف» بتأكيد، «سجّل مصروف»: تصنيف/على إيه/المبلغ/التاريخ/ملاحظة/شهري) | `expenses.tsx` | `/api/app/expenses` (`finance.view`)، `POST /api/app/expenses/save`، `POST /api/app/expenses/:id/delete` |
+| الموردون `/dashboard/suppliers` («محتاج تطلبه» متجمّع على المورّد + «ابعتله الطلبية» على واتساب بقايمة الأصناف + اتصال، قايمة الموردين، «المنتجات» = لوحة ربط/فكّ ربط بالبحث، ⋯ = اتصال/واتساب/إيميل/تعديل/حذف بتأكيد) | `suppliers.tsx` | `/api/app/suppliers` (`inventory.manage`)، `POST /api/app/suppliers/{save,link}`، `POST /api/app/suppliers/:id/delete` |
+| الأقسام `/dashboard/products/categories` (رئيسي وتحته الفرعي بمسافة، صورة وعدد منتجات، دوسة = لوحة: صورة بالكاميرا/المعرض على `/api/upload` فولدر `categories`، الاسم، «تحت قسم» (القسم اللي ليه فرعيين بيفضل رئيسي)، الوصف، الظهور، «امسح القسم» بتأكيد) | `categories.tsx` | `/api/app/categories` (`products.view`)، `POST /api/app/categories/save` (FormData ← `saveCategoryAction` + `NEXT_REDIRECT` = نجاح)، `POST /api/app/categories/:id/delete` (`products.manage`) |
+| سلة المهملات `/dashboard/products/trash` («رجّعه» = مسوّدة + زرار «افتحه»، امسح نهائي بتأكيد) | `trash.tsx` | `/api/app/trash` (`products.manage`)، `POST /api/app/trash/:id/{restore,purge}` |
+
+شاشات الحظر والمندوبين والحجوزات والمصروفات والموردين والأقسام والسلة بياناتهم في `shell/ops-api.ts` (فيه كمان `waNumber` لرقم واتساب دولي و`toLatin` للأرقام العربي) وستايلهم في `shell/styles-ops.ts`. رفع الصور (`shrink` و`upload(file, folder)`) متصدّر من `shell/product-new.tsx`.
 الشاشات دي كلها بيقروا بياناتهم من `shell/business-api.ts` (أنواع البيانات + `cachedResource`)، والطلبات من
 `shell/http.ts` (`useResource` = كاش + تحديث + رجوع لصفحة المنصة لو المسار مش منشور، و`postAppJson` = POST برسايل عربي)،
 والستايل في `shell/styles-business.ts`. **أي شاشة جديدة استخدم `cachedResource` + `useResource` بدل ما تكرر الكود.**
@@ -261,6 +266,10 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
 | `src/lib/blocked-data.ts` (`loadBlocked`) + `customers/block-actions.ts` | `src/app/dashboard/customers/blocked/page.tsx` | `/api/app/blocked*` ← `src/lib/app-blocked.ts` ← `shell/blocked.tsx` |
 | `src/lib/couriers-data.ts` (`loadCouriers`) + `couriers/actions.ts` + `src/lib/couriers-meta.ts` | `src/app/dashboard/couriers/page.tsx` | `/api/app/couriers*` ← `src/lib/app-couriers.ts` ← `shell/couriers.tsx` |
 | `src/lib/bookings-data.ts` (`loadBookings`) + `bookings/actions.ts` + `src/lib/bookings-meta.ts` | `src/app/dashboard/bookings/page.tsx` | `/api/app/bookings*` ← `src/lib/app-bookings.ts` ← `shell/bookings.tsx` |
+| `src/lib/expenses-data.ts` (`loadExpenses` — فيه حساب الربح) + `expenses/actions.ts` + `src/lib/expenses.ts` | `src/app/dashboard/expenses/page.tsx` | `/api/app/expenses*` ← `src/lib/app-expenses.ts` ← `shell/expenses.tsx` |
+| `src/lib/suppliers-data.ts` (`loadSuppliers`) + `suppliers/actions.ts` | `src/app/dashboard/suppliers/page.tsx` | `/api/app/suppliers*` ← `src/lib/app-suppliers.ts` ← `shell/suppliers.tsx` |
+| `src/lib/categories-data.ts` (`loadCategories`) + `products/actions.ts` (`saveCategoryAction`, `deleteCategoryAction`) | `src/app/dashboard/products/categories/page.tsx` | `/api/app/categories*` ← `src/lib/app-categories.ts` ← `shell/categories.tsx` |
+| `src/lib/trash-data.ts` (`loadTrash`) + `products/actions.ts` (`restoreProductAction`, `purgeProductAction`) | `src/app/dashboard/products/trash/page.tsx` | `/api/app/trash*` ← `shell/trash.tsx` |
 
 ⚠ **ما تصدّرش ثوابت من ملف `page.tsx`** (Next بيرفض أي export غير المعروفين) — الثوابت المشتركة مكانها `src/lib/*-data.ts`.
 و**ما تستوردش قيم (مش أنواع) من ملف فيه `'use client'` في كود الخادم** — بتوصل كمرجع مش كقيمة. `import type` بس.
@@ -396,10 +405,13 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
 - **آخر نشر للموقع (2.1):** commit `4cb078c` + commit فاضي `977556c` (Vercel ما نشرش الأول لوحده — حصلت مرتين، لو المسارات
   الجديدة فضلت 404 بعد ١٠ دقايق ارفع commit فاضي). اتختبر على الحي: `/api/app/{blocked,bookings,couriers}` و`products/:id/edit`
   = 401، والـPOST من غير Origin = 403، والصفحات 200/307 زي ما هي.
-- **التطبيق:** آخر نسخة مبنية **2.1 (versionCode 12)** في `H:\for claude\zawya-release\zawya-2.1.apk` و`.aab`
-  (تعديل منتج بالكاميرا، الحظر، المندوبون، الحجوزات — فوق 2.0: منتج جديد بالكاميرا، المراجعات، المرتجعات، الشكاوى،
-  قفل البصمة — فوق 1.9: الكوبونات والمخزون والرسايل والاشتراك والإعدادات، وفوق 1.8: التحليلات والشحنات والهيكل الفوري
-  وشاشة الافتتاح المتحركة). النسخة الجاية **2.2 / versionCode 13**.
+- **التطبيق:** آخر نسخة مبنية **2.2 (versionCode 13)** في `H:\for claude\zawya-release\zawya-2.2.apk` و`.aab`
+  (المصروفات والأرباح، الموردون، الأقسام، سلة المهملات — فوق 2.1: تعديل منتج بالكاميرا، الحظر، المندوبون، الحجوزات —
+  فوق 2.0: منتج جديد بالكاميرا، المراجعات، المرتجعات، الشكاوى، قفل البصمة — فوق 1.9: الكوبونات والمخزون والرسايل
+  والاشتراك والإعدادات، وفوق 1.8: التحليلات والشحنات والهيكل الفوري وشاشة الافتتاح المتحركة). النسخة الجاية **2.3 / versionCode 14**.
+- **درس من 2.2:** الشاشات الأصلية المخفية بتفضل في الـDOM (`visibility:hidden`) — أي سكربت اختبار بيدوّر على زرار لازم
+  يدوّر جوّه الشاشة الظاهرة بس (`[...r.querySelectorAll('.screen')].filter(s => getComputedStyle(s).visibility !== 'hidden')`)،
+  وإلا بيدوس زرار في شاشة تانية مستخبية.
 - **درس من 2.1:** في صفحة التجربة (`serve-www`) مفيش راوتر Next، فـ`navigate()` بيعمل تحميل كامل — أي سكربت اختبار بيدوس
   زرار بيتنقّل بيتقطع. اختبر على خطوات: دوس في سكربت، استنى، واقرا النتيجة في سكربت تاني.
 - **درس من 2.1:** الأرقام جنب كلام عربي في نفس السطر لازم `<bdi dir="ltr">` — من غيرها علامة `+` بتروح آخر الرقم.
@@ -445,8 +457,7 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
    المندوبين («ابعتله الرابط» بيفتح واتساب)، الحجوزات — بالبيانات الحقيقية (اتجرّبوا ببيانات وهمية بس).
 2. صاحب المشروع يربط واتساب متجر الإدارة (atlosa) من «الإعدادات ← واتساب» عشان رسايل الاشتراك توصل واتساب كمان،
    ويجرّب «جدّد الاشتراك» من «إدارة المنصة» على متجر تجريبي ويتأكد الإيميل وصل الوارد.
-3. شاشات أصلية جاية (اللي لسه صفحات موقع): المصروفات `/dashboard/expenses`، الموردين `/dashboard/suppliers`،
-   الولاء `/dashboard/loyalty`، الإحالات/المسوّقين `/dashboard/affiliates` و`referrals`، الأقسام `/dashboard/products/categories`،
-   سلة المهملات `/dashboard/products/trash`، وإنشاء كوبون/شحنة من التطبيق بدل `?web=1`.
+3. شاشات أصلية جاية (اللي لسه صفحات موقع): الولاء والنقاط `/dashboard/loyalty` (فورم إعدادات كبير + المكافآت + العجلة)،
+   المسوّقين بالعمولة `/dashboard/affiliates`، الإحالات `/dashboard/referrals`، وإنشاء كوبون/شحنة من التطبيق بدل `?web=1`.
 4. iOS: Face ID للقفل + إشعارات APNs (محتاج حساب Apple Developer + ماك).
 5. **جوجل بلاي مؤجّل** (صاحب المشروع قال مفيش ميزانية دلوقتي) — ما تفتحش الموضوع غير لو طلبه.

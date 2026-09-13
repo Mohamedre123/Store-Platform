@@ -73,6 +73,43 @@ export const OPS_CSS = `
 .bk-past{opacity:.78}
 .bk-notes{padding:8px 10px;border-radius:12px;font-size:13px;background:var(--surface-2,#f1f2f6)}
 
+/* ─── المصروفات ─── */
+.ex-net{border-color:var(--primary,#634b9a)}
+.ex-margin{font-size:11.5px;color:var(--fg-subtle,#8a92ad)}
+.ex-where{margin-top:12px}
+.ex-bars{display:flex;flex-direction:column;gap:10px;margin:10px 0 0;padding:0;list-style:none}
+.ex-bars li{display:flex;align-items:center;gap:10px}
+.ex-bar-label{width:96px;flex:none;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ex-bar{flex:1;height:8px;border-radius:999px;overflow:hidden;background:var(--surface-2,#f1f2f6)}
+.ex-bar i{display:block;height:100%;border-radius:999px}
+.ex-bars b{flex:none;min-width:70px;font-size:12.5px;text-align:left}
+.ex-row{display:flex;align-items:center;gap:10px;width:100%;padding:12px 14px;border:0;background:none;text-align:start;color:var(--fg,#222540)!important}
+.ex-row+.ex-row{border-top:1px solid var(--border,#e2e4ec)}
+.ex-stripe{width:5px;height:36px;flex:none;border-radius:999px}
+.ex-amount{flex:none;font-size:14.5px}
+.ex-confirm{display:flex;flex-direction:column;gap:4px;padding:10px 0 0;border-top:1px solid var(--border,#e2e4ec)}
+
+/* ─── الموردون ─── */
+.sp-items{display:flex;flex-direction:column;border-radius:14px;background:var(--surface-2,#f1f2f6)}
+.sp-item{display:flex;align-items:center;gap:10px;padding:10px 12px}
+.sp-item+.sp-item{border-top:1px solid var(--border,#e2e4ec)}
+.sp-link{display:flex;flex-direction:column;gap:10px;padding:0 4px}
+.sp-link .mk-sec{margin:10px 4px 0}
+.sp-free{width:100%;border:0;background:none;text-align:start;color:var(--primary,#634b9a)!important}
+.sp-free .bl-main b{color:var(--fg,#222540)}
+.sp-free .ic{width:18px;height:18px}
+
+/* ─── الأقسام ─── */
+.ct-row{width:100%;border:0;background:none;text-align:start;color:var(--fg,#222540)!important}
+.ct-row--child{padding-right:34px}
+.ct-row--child .inv-thumb{width:38px;height:38px;border-radius:11px}
+.ct-image{display:flex;align-items:center;gap:14px}
+.ct-image-box{position:relative;width:84px;height:84px;flex:none;border-radius:18px;overflow:hidden;display:flex;align-items:center;justify-content:center;color:var(--fg-subtle,#8a92ad);background:var(--surface-2,#f1f2f6)}
+.ct-image-box img{width:100%;height:100%;object-fit:cover}
+.ct-image-box .ic{width:26px;height:26px}
+.ct-image-actions{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+.ct-image-actions b{font-size:13px;color:var(--fg-muted,#5c6890)}
+
 /* ─── فورم المنتج: خلّيها الغلاف ─── */
 .np-makecover{position:absolute;right:6px;bottom:6px;padding:2px 8px;border:0;border-radius:999px;font-size:10.5px!important;font-weight:700;color:#fff!important;background:rgba(22,24,43,.62)}
 .np-note{margin:0;padding:10px 12px;border-radius:12px;font-size:13px;line-height:1.7;color:var(--fg-muted,#5c6890);background:var(--surface-2,#f1f2f6)}

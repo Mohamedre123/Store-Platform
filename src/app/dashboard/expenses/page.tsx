@@ -1,85 +1,19 @@
-import { and, desc, eq, sql } from 'drizzle-orm'
-import { db } from '@/db'
-import { expenses, orders } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { guard } from '@/lib/permissions'
-import { computeProfit } from '@/lib/expenses'
+import { loadExpenses } from '@/lib/expenses-data'
 import { formatBps, formatMoney } from '@/lib/utils'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { Card } from '@/components/ui'
-import { ExpensesManager, type CategoryTotal, type ExpenseRow } from './expenses-manager'
+import { ExpensesManager } from './expenses-manager'
 
 export const metadata = { title: 'المصروفات' }
-
-/** طلب حقيقي محسوب في الإيراد — نفس تعريف صفحة التحليلات بالحرف */
-const realOrder = sql`is_incomplete = false and status not in ('cancelled','returned')`
 
 export default async function ExpensesPage() {
   const { store, actor } = await getDashboardContext()
   guard(actor, 'finance.view')
 
-  const [rows, totals, [sales], [monthSpend]] = await Promise.all([
-    db
-      .select({
-        id: expenses.id,
-        title: expenses.title,
-        category: expenses.category,
-        amount: expenses.amount,
-        spentAt: expenses.spentAt,
-        note: expenses.note,
-        isRecurring: expenses.isRecurring,
-      })
-      .from(expenses)
-      .where(eq(expenses.storeId, store.id))
-      .orderBy(desc(expenses.spentAt))
-      .limit(200),
-
-    /* التوزيع على آخر ٣٠ يوم — نفس نافذة مؤشرات التحليلات */
-    db
-      .select({ category: expenses.category, total: sql<number>`sum(${expenses.amount})::bigint` })
-      .from(expenses)
-      .where(
-        and(
-          eq(expenses.storeId, store.id),
-          sql`${expenses.spentAt} >= now() - interval '30 days'`,
-        ),
-      )
-      .groupBy(expenses.category)
-      .orderBy(sql`sum(${expenses.amount}) desc`),
-
-    db
-      .select({
-        revenue: sql<number>`coalesce(sum(${orders.total}), 0)::bigint`,
-        cogs: sql<number>`coalesce(sum(${orders.costTotal}), 0)::bigint`,
-        shipping: sql<number>`coalesce(sum(${orders.shippingTotal}), 0)::bigint`,
-      })
-      .from(orders)
-      .where(
-        and(
-          eq(orders.storeId, store.id),
-          realOrder,
-          sql`${orders.createdAt} >= now() - interval '30 days'`,
-        ),
-      ),
-
-    db
-      .select({ total: sql<number>`coalesce(sum(${expenses.amount}), 0)::bigint` })
-      .from(expenses)
-      .where(
-        and(
-          eq(expenses.storeId, store.id),
-          sql`${expenses.spentAt} >= now() - interval '30 days'`,
-        ),
-      ),
-  ])
-
-  const profit = computeProfit({
-    revenue: Number(sales?.revenue ?? 0),
-    cogs: Number(sales?.cogs ?? 0),
-    shippingCollected: Number(sales?.shipping ?? 0),
-    expenses: Number(monthSpend?.total ?? 0),
-  })
+  const { rows, totals, monthTotal, profit } = await loadExpenses(store.id)
 
   const cards = [
     { label: 'مبيعات ٣٠ يوم', value: formatMoney(profit.revenue, store.currency) },
@@ -138,22 +72,7 @@ export default async function ExpensesPage() {
       )}
 
       <Reveal delay={80}>
-        <ExpensesManager
-          rows={rows.map(
-            (r): ExpenseRow => ({
-              id: r.id,
-              title: r.title,
-              category: r.category,
-              amount: r.amount,
-              spentAt: r.spentAt.toISOString(),
-              note: r.note,
-              isRecurring: r.isRecurring,
-            }),
-          )}
-          totals={totals.map((t): CategoryTotal => ({ category: t.category, total: Number(t.total) }))}
-          monthTotal={Number(monthSpend?.total ?? 0)}
-          currency={store.currency}
-        />
+        <ExpensesManager rows={rows} totals={totals} monthTotal={monthTotal} currency={store.currency} />
       </Reveal>
     </div>
   )

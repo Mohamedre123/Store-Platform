@@ -54,7 +54,7 @@ createServer(async (req, res) => {
   }
 
   /* تعديل المنتج والحظر والمندوبين والحجوزات (dev/mock-ops.mjs) */
-  if (/^\/api\/app\/(blocked|couriers|bookings)(\/|$)/.test(url.pathname) || /^\/api\/app\/products\/[^/]+\/edit$/.test(url.pathname)) {
+  if (/^\/api\/app\/(blocked|couriers|bookings|expenses|suppliers|categories|trash)(\/|$)/.test(url.pathname) || /^\/api\/app\/products\/[^/]+\/edit$/.test(url.pathname)) {
     const mock = await import(new URL('../dev/mock-ops.mjs', import.meta.url))
     await new Promise((r) => setTimeout(r, 450))
     const send = (status, body) => {

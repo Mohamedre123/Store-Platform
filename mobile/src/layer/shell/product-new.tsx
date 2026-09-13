@@ -50,7 +50,7 @@ type EditPayload = {
 const toLatin = (s: string) => s.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace(/[٫,]/g, '.')
 
 /** أقصى ضلع ١٦٠٠ بكسل JPEG — كفاية لصفحة المنتج وأخف ١٠ مرات من صورة الكاميرا */
-async function shrink(file: File): Promise<File> {
+export async function shrink(file: File): Promise<File> {
   try {
     const bitmap = await createImageBitmap(file)
     const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height))
@@ -67,10 +67,10 @@ async function shrink(file: File): Promise<File> {
   }
 }
 
-async function upload(file: File): Promise<string | null> {
+export async function upload(file: File, folder = 'products'): Promise<string | null> {
   const body = new FormData()
   body.append('file', file)
-  body.append('folder', 'products')
+  body.append('folder', folder)
   try {
     const res = await fetch('/api/upload', { method: 'POST', body, credentials: 'same-origin' })
     const data = (await res.json().catch(() => null)) as { url?: string } | null

@@ -1,10 +1,8 @@
 import Link from 'next/link'
-import { asc, count, eq } from 'drizzle-orm'
 import { ArrowRight } from 'lucide-react'
-import { db } from '@/db'
-import { categories, products } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { guard } from '@/lib/permissions'
+import { loadCategories } from '@/lib/categories-data'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { CategoriesManager } from './categories-manager'
@@ -15,21 +13,7 @@ export default async function CategoriesPage() {
   const { store, actor } = await getDashboardContext()
   guard(actor, 'products.view')
 
-  const rows = await db
-    .select({
-      id: categories.id,
-      name: categories.name,
-      description: categories.description,
-      image: categories.image,
-      isActive: categories.isActive,
-      parentId: categories.parentId,
-      productCount: count(products.id),
-    })
-    .from(categories)
-    .leftJoin(products, eq(products.categoryId, categories.id))
-    .where(eq(categories.storeId, store.id))
-    .groupBy(categories.id)
-    .orderBy(asc(categories.sortOrder))
+  const rows = await loadCategories(store.id)
 
   return (
     <div className="flex flex-col gap-8">

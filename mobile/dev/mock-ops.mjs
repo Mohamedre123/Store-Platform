@@ -82,6 +82,91 @@ export function bookings() {
   }
 }
 
+const EXP = {
+  ads: ['إعلانات', 'فيسبوك، تيك توك، جوجل، مؤثّرين', '#634b9a'],
+  goods: ['شراء بضاعة', 'فواتير الموردين', '#0f4c81'],
+  shipping: ['شحن ومرتجعات', 'اللي بتدفعه لشركة الشحن', '#0d9488'],
+  salaries: ['مرتبات وعمولات', 'الموظفين والمندوبين', '#c9a227'],
+  packaging: ['تغليف ومطبوعات', 'كراتين، أكياس، استيكرات', '#a8577a'],
+  rent: ['إيجار ومرافق', 'المحل، المخزن، كهربا، نت', '#6b5644'],
+  fees: ['رسوم واشتراكات', 'بوابات الدفع، الاشتراكات الشهرية', '#b3341f'],
+  other: ['أخرى', 'أي حاجة تانية', '#7a7a85'],
+}
+
+export function expenses() {
+  const rows = [
+    ['e1', 'حملة فيسبوك سبتمبر', 'ads', 350000, 2, null, false],
+    ['e2', 'إيجار المخزن', 'rent', 500000, 10, 'بيتدفع أول الشهر', true],
+    ['e3', 'كراتين وأكياس', 'packaging', 45000, 5, null, false],
+    ['e4', 'مرتب مساعد المبيعات', 'salaries', 400000, 12, null, true],
+    ['e5', 'تيك توك', 'ads', 120000, 20, null, false],
+  ]
+  const list = rows.map(([id, title, category, amount, daysAgo, note, isRecurring]) => ({
+    id, title, category, amount, note, isRecurring,
+    spentAt: new Date(now - daysAgo * 86400e3).toISOString(),
+    categoryLabel: EXP[category][0], color: EXP[category][2],
+  }))
+  const by = {}
+  for (const e of list) by[e.category] = (by[e.category] ?? 0) + e.amount
+  const monthTotal = list.reduce((s, e) => s + e.amount, 0)
+  return {
+    currency: 'EGP',
+    categories: Object.entries(EXP).map(([key, [label, hint, color]]) => ({ key, label, hint, color })),
+    profit: { revenue: 4800000, cogs: 2100000, expenses: monthTotal, net: 4800000 - 180000 - 2100000 - monthTotal, marginBps: 870, shippingCollected: 180000 },
+    monthTotal,
+    totals: Object.entries(by).sort((a, b) => b[1] - a[1]).map(([category, total]) => ({ category, total, label: EXP[category][0], color: EXP[category][2] })),
+    expenses: list,
+  }
+}
+
+export function suppliers() {
+  const products = [
+    { id: 'p1', name: 'قميص قطن بياقة', supplierId: 's1' },
+    { id: 'p2', name: 'بنطلون جينز سليم', supplierId: 's1' },
+    { id: 'p3', name: 'شنطة جلد يدوي', supplierId: 's2' },
+    { id: 'p4', name: 'ساعة كلاسيك', supplierId: null },
+    { id: 'p5', name: 'حزام جلد', supplierId: null },
+  ]
+  return {
+    currency: 'EGP',
+    unlinkedCount: 2,
+    reorderCount: 3,
+    reorder: [
+      { supplierId: 's1', name: 'مصنع النور', phone: '01005556667', items: [
+        { id: 'p1', name: 'قميص قطن بياقة', sku: 'SH-01', stock: 0, costPrice: 18000 },
+        { id: 'p2', name: 'بنطلون جينز سليم', sku: null, stock: 3, costPrice: 26000 },
+      ] },
+      { supplierId: null, name: null, phone: null, items: [{ id: 'p4', name: 'ساعة كلاسيك', sku: 'W-7', stock: 2, costPrice: null }] },
+    ],
+    suppliers: [
+      { id: 's1', name: 'مصنع النور', phone: '01005556667', email: 'sales@alnour.com', marginPercent: 35, isActive: true, productCount: 2 },
+      { id: 's2', name: 'ورشة الجلود', phone: null, email: null, marginPercent: 30, isActive: false, productCount: 1 },
+    ],
+    products,
+  }
+}
+
+export function categories() {
+  return {
+    categories: [
+      { id: 'cat1', name: 'ملابس رجالي', description: null, image: null, isActive: true, parentId: null, parentName: null, productCount: 12 },
+      { id: 'cat2', name: 'قمصان', description: 'قطن ١٠٠٪', image: null, isActive: true, parentId: 'cat1', parentName: 'ملابس رجالي', productCount: 5 },
+      { id: 'cat3', name: 'بناطيل', description: null, image: null, isActive: false, parentId: 'cat1', parentName: 'ملابس رجالي', productCount: 0 },
+      { id: 'cat4', name: 'إكسسوارات', description: null, image: null, isActive: true, parentId: null, parentName: null, productCount: 7 },
+    ],
+  }
+}
+
+export function trash() {
+  return {
+    currency: 'EGP',
+    products: [
+      { id: 't-1', name: 'تيشيرت صيفي قديم', price: 19900, image: null, deletedAt: hoursAgo(30) },
+      { id: 't-2', name: 'كاب رياضي', price: 12000, image: null, deletedAt: hoursAgo(300) },
+    ],
+  }
+}
+
 /** فورم التعديل من تفاصيل المنتج الوهمية (mock-api.mjs) */
 export function productEdit(detail) {
   const p = detail.product
