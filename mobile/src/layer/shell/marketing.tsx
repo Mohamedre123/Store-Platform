@@ -3,13 +3,15 @@
  *
  * كل كوبون كارت فيه الكود (بتدوس عليه يتنسخ)، قيمة الخصم، شروطه، وعدد
  * مرات استخدامه، وزرار تشغيل/إيقاف بضغطة. وتحت: عروض الكمية والباقات
- * بنفس الزرار. الإنشاء والتعديل التفصيلي فضلوا في صفحة المنصة («+ كوبون»).
+ * بنفس الزرار. «+ كوبون» والدوسة على أي كوبون بيفتحوا فورم الكوبون في لوحة
+ * (`coupon-editor.tsx`). عروض الكمية والباقات بتتعمل من صفحة المنصة.
  */
 import { useState } from 'preact/hooks'
 import { haptic, hapticNotify } from '../bridge'
 import { toast } from '../dom'
 import { icons } from '../icons'
-import { marketingData } from './business-api'
+import { marketingData, type MarketingPayload } from './business-api'
+import { CouponEditor, emptyCoupon, type CouponForm } from './coupon-editor'
 import { formatNumber } from './format'
 import { postAppJson, useResource } from './http'
 import { navigate } from './navigate'
@@ -56,6 +58,20 @@ export function MarketingScreen({ visible, onUnavailable }: { visible: boolean; 
     navigate('/dashboard/marketing?web=1')
   }
 
+  /* فورم الكوبون — ولو الموقع لسه ما بيبعتش خانات الفورم، صفحة المنصة */
+  const [editing, setEditing] = useState<CouponForm | null>(null)
+  const canEdit = Boolean(data?.pickProducts)
+  const newCoupon = () => {
+    if (!canEdit) return manage()
+    haptic('LIGHT')
+    setEditing(emptyCoupon())
+  }
+  const editCoupon = (c: MarketingPayload['coupons'][number]) => {
+    if (!c.form) return manage()
+    haptic('LIGHT')
+    setEditing({ ...c.form, id: c.id, code: c.code, description: c.description ?? '', isActive: c.isActive })
+  }
+
   const copy = async (code: string) => {
     haptic('LIGHT')
     try {
@@ -74,7 +90,7 @@ export function MarketingScreen({ visible, onUnavailable }: { visible: boolean; 
             <h1 class="page-title">الكوبونات والعروض</h1>
             <p class="page-sub">بتتطبّق للعميل في الشيك أوت فورًا</p>
           </div>
-          <button type="button" class="pill-btn press" onClick={manage}>
+          <button type="button" class="pill-btn press" onClick={newCoupon}>
             <Icon svg={icons.plus()} />
             كوبون
           </button>
@@ -125,7 +141,7 @@ export function MarketingScreen({ visible, onUnavailable }: { visible: boolean; 
                 </span>
                 <b>مافيش كوبونات لسه</b>
                 <p>اعمل كوبون وابعته لعملاءك على واتساب أو السوشيال.</p>
-                <button type="button" class="btn btn--primary press" onClick={manage}>
+                <button type="button" class="btn btn--primary press" onClick={newCoupon}>
                   <Icon svg={icons.plus()} />
                   اعمل كوبون
                 </button>
@@ -147,14 +163,17 @@ export function MarketingScreen({ visible, onUnavailable }: { visible: boolean; 
                         <b class="mk-value">{c.valueLabel}</b>
                       </div>
                       {c.description && <p class="mk-desc">{c.description}</p>}
-                      <div class="mk-conds">
+                      <div class="mk-conds mk-conds--tap" role="button" tabIndex={0} onClick={() => editCoupon(c)}>
                         {c.expired && <span class="mk-expired">انتهى</span>}
                         {c.conditions.map((t) => (
                           <span key={t}>{t}</span>
                         ))}
                       </div>
                       <div class="mk-foot">
-                        <small>{c.usedLabel}</small>
+                        <button type="button" class="mk-edit press" onClick={() => editCoupon(c)}>
+                          <Icon svg={icons.pencil()} />
+                          {c.usedLabel}
+                        </button>
                         <button
                           type="button"
                           class="switch-btn"
@@ -250,10 +269,32 @@ export function MarketingScreen({ visible, onUnavailable }: { visible: boolean; 
               </div>
             )}
 
-            <p class="fine center">دوس على الكود عشان تنسخه. التعديل التفصيلي من زرار «كوبون».</p>
+            <button type="button" class="an-link press rise" onClick={manage}>
+              <Icon svg={icons.layers()} />
+              <span>
+                اعمل عرض كمية أو باقة
+                <small>من صفحة التسويق الكاملة</small>
+              </span>
+              <Icon svg={icons.chevronLeft()} className="ic an-chev" />
+            </button>
+            <p class="fine center">دوس على الكود عشان تنسخه، وعلى القلم عشان تعدّل الكوبون.</p>
           </>
         )}
       </div>
+
+      {data && (
+        <CouponEditor
+          initial={editing}
+          data={data}
+          onClose={() => setEditing(null)}
+          onDone={async (message) => {
+            await load()
+            hapticNotify('SUCCESS')
+            toast(message, { tone: 'success', duration: 2400 })
+            setEditing(null)
+          }}
+        />
+      )}
     </Screen>
   )
 }

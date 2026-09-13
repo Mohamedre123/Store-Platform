@@ -16,7 +16,23 @@ export type MarketingPayload = {
     usedLabel: string
     isActive: boolean
     expired: boolean
+    /* من 2.4 — لو الموقع أقدم مش هيبقى موجود والتعديل بيفتح صفحة المنصة */
+    form?: {
+      type: 'percent' | 'fixed' | 'free_shipping'
+      value: string
+      maxDiscount: string
+      minOrder: string
+      appliesTo: 'all' | 'products' | 'categories'
+      targetIds: string[]
+      eligibility: string
+      usageLimit: string
+      usageLimitPerCustomer: string
+      startsAt: string
+      endsAt: string
+    }
   }>
+  pickProducts?: Array<{ id: string; name: string }>
+  pickCategories?: Array<{ id: string; name: string }>
   offers: Array<{ id: string; name: string; badge: string | null; tiersLabel: string; productsLabel: string; isActive: boolean }>
   bundles: Array<{ id: string; name: string; badge: string | null; productsLabel: string; priceLabel: string; isActive: boolean }>
 }

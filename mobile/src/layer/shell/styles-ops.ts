@@ -140,6 +140,23 @@ export const OPS_CSS = `
 .ref-good{color:var(--color-success,#15803d)}
 .ref-note{margin-top:12px}
 
+/* ─── فورم الكوبون ─── */
+.cp-code-row{display:flex;gap:8px}
+.cp-code-row .np-input{flex:1;min-width:0}
+.cp-gen{flex:none;padding:0 14px}
+.cp-targets{display:flex;flex-direction:column;gap:8px}
+.cp-target-list{max-height:260px;overflow-y:auto;overscroll-behavior:contain}
+.cp-check{width:24px;height:24px;flex:none;border:1.5px solid var(--border-strong,#cdd1de);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff}
+.cp-check--on{border-color:var(--primary,#634b9a);background:var(--primary,#634b9a)}
+.cp-check .ic{width:15px;height:15px}
+.mk-conds--tap{cursor:pointer}
+.mk-edit{display:inline-flex;align-items:center;gap:6px;padding:4px 0;border:0;background:none;font-size:12.5px!important;color:var(--fg-muted,#5c6890)!important}
+.mk-edit .ic{width:14px;height:14px;color:var(--primary,#634b9a)}
+
+/* ─── الشحنات: اللوحات ─── */
+.sh-order{display:flex;align-items:center;gap:10px;padding:12px;border-radius:14px;background:var(--surface-2,#f1f2f6)}
+.sh-next{margin:0 4px 8px}
+
 /* ─── فورم المنتج: خلّيها الغلاف ─── */
 .np-makecover{position:absolute;right:6px;bottom:6px;padding:2px 8px;border:0;border-radius:999px;font-size:10.5px!important;font-weight:700;color:#fff!important;background:rgba(22,24,43,.62)}
 .np-note{margin:0;padding:10px 12px;border-radius:12px;font-size:13px;line-height:1.7;color:var(--fg-muted,#5c6890);background:var(--surface-2,#f1f2f6)}

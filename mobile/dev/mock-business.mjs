@@ -7,7 +7,7 @@ const now = Date.now()
 const hoursAgo = (h) => new Date(now - h * 3600e3).toISOString()
 
 export function marketing() {
-  return {
+  const data = {
     currency: 'EGP',
     stats: { active: 2, totalUses: 57, total: 3 },
     coupons: [
@@ -18,6 +18,23 @@ export function marketing() {
     offers: [{ id: 'of1', name: 'اشتري أكتر ووفّر', badge: 'عرض', tiersLabel: '٢ قطع: خصم ١٠٪ · ٣ قطع: خصم ١٥٪', productsLabel: 'على كل المنتجات', isActive: true }],
     bundles: [{ id: 'bd1', name: 'طقم السهرة', badge: 'باقة', productsLabel: 'فستان سهرة ستان + شنطة جلد يد', priceLabel: '١٬٤٠٠ ج.م.', isActive: false }],
   }
+  const forms = {
+    cp1: { type: 'percent', value: '20', maxDiscount: '100', minOrder: '300', appliesTo: 'all', targetIds: [], eligibility: 'all', usageLimit: '', usageLimitPerCustomer: '1', startsAt: '', endsAt: '2026-09-30' },
+    cp2: { type: 'fixed', value: '50', maxDiscount: '', minOrder: '', appliesTo: 'all', targetIds: [], eligibility: 'first_order', usageLimit: '100', usageLimitPerCustomer: '1', startsAt: '', endsAt: '' },
+    cp3: { type: 'free_shipping', value: '', maxDiscount: '', minOrder: '', appliesTo: 'products', targetIds: ['p1', 'p3', 'p4'], eligibility: 'all', usageLimit: '', usageLimitPerCustomer: '2', startsAt: '', endsAt: '2026-09-01' },
+  }
+  data.coupons = data.coupons.map((c) => ({ ...c, form: forms[c.id] }))
+  data.pickProducts = [
+    { id: 'p1', name: 'فستان سهرة ستان' },
+    { id: 'p2', name: 'بلوزة قطن مطرّزة' },
+    { id: 'p3', name: 'شنطة جلد يد' },
+    { id: 'p4', name: 'طرحة شيفون' },
+  ]
+  data.pickCategories = [
+    { id: 'c1', name: 'فساتين' },
+    { id: 'c2', name: 'شنط' },
+  ]
+  return data
 }
 
 export function inventory() {

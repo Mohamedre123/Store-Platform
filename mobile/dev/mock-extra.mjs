@@ -55,6 +55,8 @@ const STATUS = {
   failed: ['فشل التسليم', 'var(--color-danger-soft)', 'var(--color-danger)'],
 }
 
+const NEXT = { created: 'picked_up', picked_up: 'in_transit', in_transit: 'out_for_delivery', out_for_delivery: 'delivered' }
+
 export function shipments() {
   const rows = [
     ['o5', '1038', 'يوسف سمير', 'طنطا', 'in_transit', 33000, false, 'بوسطة', 'BST-22841'],
@@ -67,10 +69,19 @@ export function shipments() {
   return {
     currency: 'EGP',
     autoCarrier: 'بوسطة',
+    carriers: [
+      { key: 'bosta', label: 'بوسطة' },
+      { key: 'mylerz', label: 'مايلرز' },
+      { key: 'jt', label: 'J&T Express' },
+      { key: 'aramex', label: 'أرامكس' },
+      { key: 'internal', label: 'مندوب المتجر' },
+      { key: 'other', label: 'شركة تانية' },
+    ],
+    statuses: Object.entries(STATUS).map(([key, [label, bg, fg]]) => ({ key, label, bg, fg })),
     stats: { inTransit: 3, failed: 1, outstandingAmount: 152000, outstandingCount: 1 },
     pending: [
-      { orderId: 'o2', orderNumber: '1041', customerName: 'سارة محمود', city: 'الجيزة', total: 120000, cod: true, paid: false },
-      { orderId: 'o4', orderNumber: '1039', customerName: 'منى إبراهيم', city: 'المنصورة', total: 210000, cod: false, paid: true },
+      { orderId: 'o2', orderNumber: '1041', customerName: 'سارة محمود', city: 'الجيزة', total: 120000, cod: true, paid: false, codDefault: 120000 },
+      { orderId: 'o4', orderNumber: '1039', customerName: 'منى إبراهيم', city: 'المنصورة', total: 210000, cod: false, paid: true, codDefault: 0 },
     ],
     shipments: rows.map(([orderId, orderNumber, customerName, city, status, codAmount, collected, carrierLabel, trackingNumber], i) => ({
       id: `s${i + 1}`,
@@ -88,6 +99,8 @@ export function shipments() {
       fg: STATUS[status][2],
       codAmount,
       collected,
+      nextStatus: NEXT[status] ?? null,
+      nextLabel: NEXT[status] ? (STATUS[NEXT[status]]?.[0] ?? 'المندوب استلمها') : null,
       createdAt: hoursAgo(i * 9 + 3),
     })),
   }

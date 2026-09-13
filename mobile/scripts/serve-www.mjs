@@ -114,6 +114,18 @@ createServer(async (req, res) => {
     return send(200, mock[name]())
   }
 
+  /* أفعال الشحنات: تسجيل، إرسال للشركة، الحالة، التحصيل */
+  if (url.pathname.startsWith('/api/app/shipments/') && req.method === 'POST') {
+    let raw = ''
+    for await (const chunk of req) raw += chunk
+    await new Promise((r) => setTimeout(r, 500))
+    const body = raw ? JSON.parse(raw) : {}
+    const bad = url.pathname.endsWith('/create') && !body.carrier
+    res.writeHead(bad ? 400 : 200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
+    res.end(JSON.stringify(bad ? { ok: false, error: 'اختار شركة الشحن' } : { ok: true }))
+    return
+  }
+
   /* التحليلات والشحنات (dev/mock-extra.mjs) */
   if (url.pathname === '/api/app/analytics' || url.pathname === '/api/app/shipments') {
     const mock = await import(new URL('../dev/mock-extra.mjs', import.meta.url))

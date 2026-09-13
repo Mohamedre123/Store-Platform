@@ -1,7 +1,7 @@
 import 'server-only'
 import type { ActiveStore } from '@/lib/store-context'
 import { loadShipments } from '@/lib/shipments-data'
-import { carrierMeta, shipmentStatusMeta, trackingUrl } from '@/lib/carriers'
+import { CARRIERS, SHIPMENT_STATUSES, carrierMeta, nextShipmentStatus, shipmentStatusMeta, trackingUrl } from '@/lib/carriers'
 import { formatOrderNumber } from '@/lib/order-number'
 
 /** شكل الشحنات اللي تطبيق الموبايل بيستلمه — المبالغ بالوحدة الصغرى والتواريخ ISO */
@@ -11,6 +11,9 @@ export async function shipmentsPayload(store: ActiveStore) {
   return {
     currency: store.currency,
     autoCarrier: data.autoCarrierName,
+    /* لفورم «سجّل شحنة» ولوحة تغيير الحالة في التطبيق */
+    carriers: CARRIERS.map((c) => ({ key: c.key, label: c.label })),
+    statuses: SHIPMENT_STATUSES.map((s) => ({ key: s.key, label: s.label, bg: s.bg, fg: s.fg })),
     stats: {
       inTransit: data.inTransit,
       failed: data.failed,
@@ -25,9 +28,12 @@ export async function shipmentsPayload(store: ActiveStore) {
       total: p.total,
       cod: p.paymentMethod === 'cod',
       paid: p.paymentStatus === 'paid',
+      /* اللي المندوب هيحصّله افتراضيًا — نفس فورم اللوحة: الطلب مش أونلاين ولسه ما اتدفعش */
+      codDefault: p.paymentMethod !== 'online' && p.paymentStatus !== 'paid' ? p.total : 0,
     })),
     shipments: data.rows.map((s) => {
       const meta = shipmentStatusMeta(s.status)
+      const next = nextShipmentStatus(s.status)
       return {
         id: s.id,
         orderId: s.orderId,
@@ -42,6 +48,8 @@ export async function shipmentsPayload(store: ActiveStore) {
         statusLabel: meta.label,
         bg: meta.bg,
         fg: meta.fg,
+        nextStatus: next,
+        nextLabel: next ? shipmentStatusMeta(next).label : null,
         codAmount: s.codAmount,
         collected: s.isCodCollected || Boolean(s.settledAt),
         createdAt: new Date(s.createdAt).toISOString(),

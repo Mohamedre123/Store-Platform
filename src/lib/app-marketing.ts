@@ -52,8 +52,25 @@ export async function marketingPayload(store: ActiveStore) {
             : `استُخدم ${n(c.usedCount)} مرة`,
         isActive: c.isActive,
         expired: Boolean(ends && ends.getTime() <= now) || (c.usageLimit !== null && c.usedCount >= c.usageLimit),
+        /* خانات فورم التعديل في التطبيق — نفس `rowToForm` في فورم اللوحة */
+        form: {
+          type: c.type,
+          value: c.type === 'free_shipping' ? '' : String(c.value / 100),
+          maxDiscount: c.maxDiscount ? String(c.maxDiscount / 100) : '',
+          minOrder: c.minOrder ? String(c.minOrder / 100) : '',
+          appliesTo: c.appliesTo,
+          targetIds: c.targetIds,
+          eligibility: c.eligibility,
+          usageLimit: c.usageLimit ? String(c.usageLimit) : '',
+          usageLimitPerCustomer: String(c.usageLimitPerCustomer),
+          startsAt: starts ? starts.toISOString().slice(0, 10) : '',
+          endsAt: ends ? ends.toISOString().slice(0, 10) : '',
+        },
       }
     }),
+    /* للاختيار في «ينطبق على» */
+    pickProducts: data.products.map((p) => ({ id: p.id, name: p.name })),
+    pickCategories: data.categories,
     offers: data.quantityOffers.map((o) => ({
       id: o.id,
       name: o.name,

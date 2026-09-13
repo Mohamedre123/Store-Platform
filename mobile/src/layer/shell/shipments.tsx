@@ -5,17 +5,19 @@
  * اللي لسه عند شركة الشحن، الطلبات المؤكّدة اللي مستنية تتشحن، وحالة كل
  * شحنة ورقم بوليصتها وتتبّعها. الضغط على أي شحنة أو طلب بيفتح الطلب نفسه.
  *
- * تسجيل شحنة جديدة وتغيير الحالة والتحصيل فضلوا في صفحة المنصة
- * (زرار «شحنة») — نفس الشاشة اللي التاجر متعوّد عليها.
+ * تسجيل شحنة على طلب مستني (يدوي أو عند الشركة المربوطة)، وتغيير الحالة،
+ * والتحصيل — كلهم من لوحات تحت (`shipment-sheets.tsx`). لو الموقع لسه ما
+ * بيبعتش شركات الشحن، الأزرار بتفتح صفحة المنصة زي الأول.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks'
-import { haptic } from '../bridge'
+import { haptic, hapticNotify } from '../bridge'
 import { toast } from '../dom'
 import { icons } from '../icons'
 import { formatDateTime, formatMoney, formatNumber } from './format'
 import { navigate, openExternal } from './navigate'
-import { Screen } from './screen'
-import { fetchShipments, readShipmentsCache, type ShipmentItem } from './shipments-api'
+import { Screen, Sheet } from './screen'
+import { CreateShipmentSheet, ShipmentActionsSheet } from './shipment-sheets'
+import { fetchShipments, readShipmentsCache, type PendingShipment, type ShipmentItem } from './shipments-api'
 import { Icon } from './ui'
 
 type Filter = 'all' | 'active' | 'unsettled' | 'problem'
@@ -64,14 +66,44 @@ export function ShipmentsScreen({ visible, onUnavailable }: { visible: boolean; 
     return list
   }, [data, filter])
 
-  const manage = () => {
-    haptic('LIGHT')
-    navigate('/dashboard/shipments?web=1')
-  }
+  const [createFor, setCreateFor] = useState<PendingShipment | null>(null)
+  const [actionsFor, setActionsFor] = useState<ShipmentItem | null>(null)
+  const [pickPending, setPickPending] = useState(false)
+  const native = Boolean(data?.carriers)
 
   const openOrder = (orderId: string) => {
     haptic('LIGHT')
+    setCreateFor(null)
+    setActionsFor(null)
     navigate(`/dashboard/orders/${orderId}`)
+  }
+
+  const manage = () => {
+    haptic('LIGHT')
+    if (!native) return navigate('/dashboard/shipments?web=1')
+    if (!data?.pending.length) return void toast('مفيش طلبات مؤكّدة مستنية شحن دلوقتي')
+    if (data.pending.length === 1) return setCreateFor(data.pending[0])
+    setPickPending(true)
+  }
+
+  const shipPending = (p: PendingShipment) => {
+    if (!native) return openOrder(p.orderId)
+    haptic('LIGHT')
+    setCreateFor(p)
+  }
+
+  const openShipment = (s: ShipmentItem) => {
+    if (!native) return openOrder(s.orderId)
+    haptic('LIGHT')
+    setActionsFor(s)
+  }
+
+  const done = async (message: string) => {
+    await load()
+    hapticNotify('SUCCESS')
+    toast(message, { tone: 'success', duration: 2400 })
+    setCreateFor(null)
+    setActionsFor(null)
   }
 
   return (
@@ -112,7 +144,7 @@ export function ShipmentsScreen({ visible, onUnavailable }: { visible: boolean; 
         )}
 
         {data?.autoCarrier && (
-          <p class="fine">مربوط بـ{data.autoCarrier} — من «شحنة» تبعت الطلب للشركة بضغطة.</p>
+          <p class="fine">مربوط بـ{data.autoCarrier} — دوس على أي طلب مستني وابعته للشركة بضغطة.</p>
         )}
 
         {data && data.pending.length > 0 && (
@@ -127,9 +159,9 @@ export function ShipmentsScreen({ visible, onUnavailable }: { visible: boolean; 
                 class="row press"
                 role="button"
                 tabIndex={0}
-                onClick={() => openOrder(p.orderId)}
+                onClick={() => shipPending(p)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') openOrder(p.orderId)
+                  if (e.key === 'Enter') shipPending(p)
                 }}
               >
                 <span class="sh-icon">
@@ -212,11 +244,41 @@ export function ShipmentsScreen({ visible, onUnavailable }: { visible: boolean; 
         ) : (
           <div class="olist">
             {shown.map((s, i) => (
-              <ShipmentCard key={s.id} item={s} currency={data.currency} delay={Math.min(i, 8) * 35} onOpen={openOrder} />
+              <ShipmentCard key={s.id} item={s} currency={data.currency} delay={Math.min(i, 8) * 35} onOpen={() => openShipment(s)} />
             ))}
           </div>
         )}
       </div>
+
+      {data && native && (
+        <>
+          <CreateShipmentSheet order={createFor} data={data} onClose={() => setCreateFor(null)} onDone={done} onOpenOrder={openOrder} />
+          <ShipmentActionsSheet item={actionsFor} data={data} onClose={() => setActionsFor(null)} onDone={done} onOpenOrder={openOrder} />
+          <Sheet open={pickPending} title="تشحن أنهي طلب؟" onClose={() => setPickPending(false)}>
+            <div class="sheet-list">
+              {data.pending.map((p) => (
+                <button
+                  key={p.orderId}
+                  type="button"
+                  class="sheet-row"
+                  onClick={() => {
+                    setPickPending(false)
+                    shipPending(p)
+                  }}
+                >
+                  <Icon svg={icons.package()} />
+                  <span class="sheet-row-label">
+                    #{p.orderNumber} · {p.customerName || 'بدون اسم'}
+                    <small class="set-hint">
+                      {p.city ?? 'من غير محافظة'} · {formatMoney(p.total, data.currency)}
+                    </small>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </Sheet>
+        </>
+      )}
     </Screen>
   )
 }
@@ -230,7 +292,7 @@ function ShipmentCard({
   item: ShipmentItem
   currency: string
   delay: number
-  onOpen: (orderId: string) => void
+  onOpen: () => void
 }) {
   const stop = (run: () => void) => (e: Event) => {
     e.stopPropagation()
@@ -254,9 +316,9 @@ function ShipmentCard({
       style={{ animationDelay: `${delay}ms` }}
       role="button"
       tabIndex={0}
-      onClick={() => onOpen(s.orderId)}
+      onClick={onOpen}
       onKeyDown={(e) => {
-        if (e.key === 'Enter') onOpen(s.orderId)
+        if (e.key === 'Enter') onOpen()
       }}
     >
       <div class="ocard-top">

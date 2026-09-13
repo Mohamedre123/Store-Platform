@@ -117,8 +117,8 @@ git push origin main                              # ده اللي بينشر ا�
 | «المزيد» (لوحة سفلية بكل الأقسام + المستخدم + خروج) | `more.tsx`, `nav-data.ts` | `/api/app/me`, `/api/app/logout` |
 | شريط صفحة تأكيد البريد `/verify` (رجوع + «غيّر البريد» + «سجّل بحساب تاني» + «الغِ التسجيل») | `verify.tsx`, `styles-verify.ts` | `/api/app/account/change-email`, `/api/app/account/abandon` |
 | التحليلات (مؤشرات، رسم إيرادات بالسحب، قُمع، توزيع الطلبات، الأكثر مبيعًا) | `analytics.tsx`, `analytics-api.ts`, `styles-analytics.ts` | `/api/app/analytics` |
-| الشحنات (إحصائيات، مستني يتشحن، قايمة بفلاتر، تتبّع/نسخ بوليصة) — التسجيل والتعديل بزرار «شحنة» ← `?web=1` | `shipments.tsx`, `shipments-api.ts` (الستايل في `styles-analytics.ts`) | `/api/app/shipments` |
-| الكوبونات والعروض (كروت كوبونات بنسخ الكود + تشغيل/إيقاف، عروض الكمية، الباقات) — الإنشاء والتعديل بزرار «كوبون» ← `?web=1` | `marketing.tsx` | `/api/app/marketing`، `POST /api/app/marketing/coupons/:id/toggle`، `POST /api/app/marketing/offers/:id/toggle` |
+| الشحنات (إحصائيات، مستني يتشحن، قايمة بفلاتر، تتبّع/نسخ بوليصة) — **من 2.4:** دوسة على طلب مستني = لوحة «شحنة للطلب» (سجّل عند الشركة المربوطة بضغطة، أو يدوي: الشركة/البوليصة/التكلفة/التحصيل — التحصيل بيتعبّى تلقائي)، زرار «شحنة» = اختيار الطلب، دوسة على شحنة = لوحة: الخطوة الجاية بزرار كبير، أي حالة، «استلمت الفلوس من الشركة»، افتح الطلب/تتبّع/اتصال. لو الموقع ما بيبعتش `carriers` الأزرار بتفتح `?web=1` زي الأول | `shipments.tsx`, `shipment-sheets.tsx`, `shipments-api.ts` (الستايل في `styles-analytics.ts` و`styles-ops.ts`) | `/api/app/shipments` (بقى فيه `carriers` و`statuses` و`codDefault` و`nextStatus/nextLabel`)، `POST /api/app/shipments/{create,dispatch}`، `POST /api/app/shipments/:id/{status,settle}` |
+| الكوبونات والعروض (كروت كوبونات بنسخ الكود + تشغيل/إيقاف، عروض الكمية، الباقات) — **من 2.4:** «+ كوبون» والقلم على أي كوبون = فورم الكوبون في لوحة (`coupon-editor.tsx`: الكود أو «ولّد»، النوع والقيمة وأقصى خصم، أقل طلب، ينطبق على كل/منتجات/أقسام باختيار بالبحث، أول طلب، حدود الاستخدام، التواريخ، التفعيل، الحذف بتأكيد). عروض الكمية والباقات لسه ← `?web=1` | `marketing.tsx`, `coupon-editor.tsx` | `/api/app/marketing` (بقى فيه `form` لكل كوبون و`pickProducts`/`pickCategories`)، `POST /api/app/marketing/coupons/save`، `POST /api/app/marketing/coupons/:id/{toggle,delete}`، `POST /api/app/marketing/offers/:id/toggle` |
 | المخزون (أرقام، فلتر نافد/منخفض، بحث، تعديل الكمية بـ−/+ أو كتابة الرقم — بيتحفظ بعد ٧٠٠ms، والمتغيّرات، وسجل الحركة) | `inventory.tsx` | `/api/app/inventory`، `POST /api/app/inventory/stock` |
 | سجل الرسايل (أرقام، فلتر اللي فشلت، سبب الفشل بدوسة، فتح الطلب) | `messages.tsx` | `/api/app/messages` |
 | الاشتراك (الحالة وكام يوم فاضل، عدّاد الطلبات، بدء التجربة بضغطة، الباقات، معرّف الحساب، الطلبات والسجل) — الدفع بزرار «اشترك» ← `?web=1` | `subscription.tsx` | `/api/app/subscription`، `POST /api/app/subscription/trial` |
@@ -256,7 +256,8 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
 | `src/lib/analytics-data.ts` (`loadAnalytics`) | `src/app/dashboard/analytics/page.tsx` | `/api/app/analytics` ← `src/lib/app-analytics.ts` ← `shell/analytics.tsx` |
 | `src/lib/shipments-data.ts` (`loadShipments`) | `src/app/dashboard/shipments/page.tsx` | `/api/app/shipments` ← `src/lib/app-shipments.ts` ← `shell/shipments.tsx` |
 | `src/lib/marketing-data.ts` (`loadMarketing`) | `src/app/dashboard/marketing/page.tsx` | `/api/app/marketing` ← `src/lib/app-marketing.ts` ← `shell/marketing.tsx` |
-| `src/app/dashboard/marketing/actions.ts` (`toggleCouponAction`) و`offer-actions.ts` (`toggleOfferAction`) | أزرار التشغيل في اللوحة | `POST /api/app/marketing/{coupons,offers}/:id/toggle` بيناديهم |
+| `src/app/dashboard/marketing/actions.ts` (`toggleCouponAction`, `saveCouponAction`, `deleteCouponAction`) و`offer-actions.ts` (`toggleOfferAction`) | فورم الكوبون وأزرار التشغيل في اللوحة | `POST /api/app/marketing/{coupons,offers}/:id/toggle` و`coupons/save` و`coupons/:id/delete` بيناديهم (لو اتغيّر `CouponInput` عدّل `coupons/save/route.ts` و`coupon-editor.tsx`) |
+| `src/app/dashboard/shipments/actions.ts` (`createShipmentAction`, `dispatchShipmentAction`, `updateShipmentStatusAction`, `settleCodAction`) + `src/lib/carriers.ts` (`CARRIERS`, `SHIPMENT_STATUSES`, `nextShipmentStatus`) | فورم الشحنة وأزرارها في اللوحة | `POST /api/app/shipments/{create,dispatch}` و`/api/app/shipments/:id/{status,settle}` ← `shell/shipment-sheets.tsx` |
 | `src/lib/inventory-data.ts` (`loadInventory`, `MOVEMENT_REASONS`) | `src/app/dashboard/inventory/page.tsx` | `/api/app/inventory` ← `src/lib/app-inventory.ts` ← `shell/inventory.tsx` |
 | `src/app/dashboard/inventory/actions.ts` (`setStockAction`) | خانة الكمية في اللوحة | `POST /api/app/inventory/stock` بيناديها |
 | `src/lib/messages-data.ts` (`loadMessages`) و`src/lib/message-labels.ts` | `src/app/dashboard/messages/page.tsx` | `/api/app/messages` ← `src/lib/app-messages.ts` ← `shell/messages.tsx` |
@@ -416,10 +417,15 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
 - **نشر الموقع (2.1):** commit `4cb078c` + commit فاضي `977556c` (Vercel ما نشرش الأول لوحده — حصلت مرتين، لو المسارات
   الجديدة فضلت 404 بعد ١٠ دقايق ارفع commit فاضي). اتختبر على الحي: `/api/app/{blocked,bookings,couriers}` و`products/:id/edit`
   = 401، والـPOST من غير Origin = 403، والصفحات 200/307 زي ما هي.
-- **التطبيق:** آخر نسخة مبنية **2.3 (versionCode 14)** في `H:\for claude\zawya-release\zawya-2.3.apk` و`.aab`
-  (الولاء والنقاط، المسوّقون بالعمولة، حِيل صاحبك — فوق 2.2: المصروفات والأرباح، الموردون، الأقسام، سلة المهملات — فوق 2.1: تعديل منتج بالكاميرا، الحظر، المندوبون، الحجوزات —
+- **التطبيق:** آخر نسخة مبنية **2.4 (versionCode 15)** في `H:\for claude\zawya-release\zawya-2.4.apk` و`.aab`
+  (إنشاء/تعديل/حذف كوبون من التطبيق، تسجيل شحنة وتغيير حالتها والتحصيل من التطبيق — فوق 2.3: الولاء والنقاط، المسوّقون بالعمولة، حِيل صاحبك — فوق 2.2: المصروفات والأرباح، الموردون، الأقسام، سلة المهملات — فوق 2.1: تعديل منتج بالكاميرا، الحظر، المندوبون، الحجوزات —
   فوق 2.0: منتج جديد بالكاميرا، المراجعات، المرتجعات، الشكاوى، قفل البصمة — فوق 1.9: الكوبونات والمخزون والرسايل
-  والاشتراك والإعدادات، وفوق 1.8: التحليلات والشحنات والهيكل الفوري وشاشة الافتتاح المتحركة). النسخة الجاية **2.4 / versionCode 15**.
+  والاشتراك والإعدادات، وفوق 1.8: التحليلات والشحنات والهيكل الفوري وشاشة الافتتاح المتحركة). النسخة الجاية **2.5 / versionCode 16**.
+- **درس من 2.4:** في سكربتات الاختبار دوّر على اللوحة المفتوحة بـ`.sheet--open` مش بنص جوّاها — لوحات شاشات تانية
+  (زي «غيّر حالة الطلب») فيها نفس الكلام. وأي خطأ في ملفات `mobile/dev/mock-*.mjs` بيوقّع سيرفر التجربة كله
+  (الشاشة بتقول «مش قادرين نجيب…») — شوف `preview_logs`.
+- **قاعدة 2.4 للحقول الجديدة:** أي حقل اتضاف لرد موجود (زي `form` في الكوبونات و`carriers` في الشحنات) خلّيه اختياري في
+  نوع التطبيق، والشاشة ترجع لـ`?web=1` لو مش موجود — عشان النسخة الجديدة تشتغل حتى لو الموقع لسه ما اتنشرش.
 - **درايف `Z:`** مش بارتشن — اختصار `subst` لفولدر المشروع عشان Gradle ما يقعش من المسار العربي. صاحب المشروع لاحظه وسأل؛
   اتشرحله إنه بيختفي مع الريستارت وبيتشال بـ`subst Z: /d` من غير ما يمسح حاجة.
 - **درس من 2.2:** الشاشات الأصلية المخفية بتفضل في الـDOM (`visibility:hidden`) — أي سكربت اختبار بيدوّر على زرار لازم
@@ -470,7 +476,7 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
    المندوبين («ابعتله الرابط» بيفتح واتساب)، الحجوزات — بالبيانات الحقيقية (اتجرّبوا ببيانات وهمية بس).
 2. صاحب المشروع يربط واتساب متجر الإدارة (atlosa) من «الإعدادات ← واتساب» عشان رسايل الاشتراك توصل واتساب كمان،
    ويجرّب «جدّد الاشتراك» من «إدارة المنصة» على متجر تجريبي ويتأكد الإيميل وصل الوارد.
-3. الجاي في التطبيق: إنشاء كوبون من التطبيق (بدل `?web=1` في الكوبونات)، تسجيل شحنة، تعديل مستويات الولاء وجوايز العجلة،
+3. الجاي في التطبيق: عروض الكمية والباقات من التطبيق (لسه `?web=1`)، تعديل مستويات الولاء وجوايز العجلة،
    وباقي صفحات اللوحة اللي لسه موقع (الاستوديو، الإضافات، واجهة المتجر، الأسواق، التجارب، المساعد، الأتمتة، المدونة، الوسائط، المطوّرين).
 4. iOS: Face ID للقفل + إشعارات APNs (محتاج حساب Apple Developer + ماك).
 5. **جوجل بلاي مؤجّل** (صاحب المشروع قال مفيش ميزانية دلوقتي) — ما تفتحش الموضوع غير لو طلبه.
