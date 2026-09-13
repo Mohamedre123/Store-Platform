@@ -289,6 +289,9 @@ export const contentSchedules = pgTable(
      * الجدول يقع.
      */
     aiProvider: text('ai_provider'),
+    /** موديل الكلام وموديل الصور للجدول ده — فاضي يعني افتراضي الإضافات */
+    aiTextModel: text('ai_text_model'),
+    aiImageModel: text('ai_image_model'),
 
     /**
      * ينشر لوحده ولا يستنّى موافقة؟

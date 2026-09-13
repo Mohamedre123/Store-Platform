@@ -24,6 +24,8 @@ import {
 } from '@/lib/content-schedules'
 import { disconnectAccount } from '@/lib/social'
 import { resolveStyle, type ImageStyle, type PresetKey, type ToneKey } from '@/lib/studio-meta'
+import { resolveEngines as resolveAiEngines } from '@/lib/ai/settings'
+import { listTextModels as listAiTextModels, listImageModels as listAiImageModels } from '@/lib/ai/llm'
 
 /**
  * أفعال الاستوديو.
@@ -67,6 +69,8 @@ export async function generateImageAction(input: {
   style?: ImageStyle | null
   /** Gemini أو ChatGPT */
   provider?: string | null
+  textModel?: string | null
+  imageModel?: string | null
 }): Promise<ImageState> {
   const { store, user } = await studioContext()
 
@@ -103,6 +107,8 @@ export async function generateImageAction(input: {
     */
     style: input.parentId ? null : resolveStyle(input.style, prompt),
     provider: input.provider ?? null,
+    textModel: input.textModel ?? null,
+    imageModel: input.imageModel ?? null,
   })
 
   if ('error' in res) return { ok: false, error: res.error }
@@ -130,6 +136,8 @@ export async function generateCarouselAction(input: {
   useProductPhoto?: boolean
   style?: ImageStyle | null
   provider?: string | null
+  textModel?: string | null
+  imageModel?: string | null
 }): Promise<CarouselState> {
   const { store, user } = await studioContext()
 
@@ -153,6 +161,8 @@ export async function generateCarouselAction(input: {
     seedUrl,
     style: resolveStyle(input.style, prompt),
     provider: input.provider ?? null,
+    textModel: input.textModel ?? null,
+    imageModel: input.imageModel ?? null,
   })
 
   if ('error' in res) return { ok: false, error: res.error }
@@ -173,6 +183,7 @@ export async function generateCopyAction(input: {
   tone: ToneKey
   extra?: string | null
   provider?: string | null
+  textModel?: string | null
 }): Promise<CopyState> {
   const { store } = await studioContext()
 
@@ -182,6 +193,7 @@ export async function generateCopyAction(input: {
     tone: input.tone,
     extra: input.extra ?? null,
     provider: input.provider ?? null,
+    textModel: input.textModel ?? null,
   })
 
   if ('error' in res) return { ok: false, error: res.error }
@@ -385,6 +397,8 @@ export async function saveScheduleAction(input: {
   slides?: number
   imageStyle?: ImageStyle | null
   aiProvider?: string | null
+  aiTextModel?: string | null
+  aiImageModel?: string | null
   autoPublish: boolean
   isActive: boolean
 }): Promise<SaveState> {
@@ -418,6 +432,8 @@ export async function saveScheduleAction(input: {
     slides: input.slides,
     imageStyle: input.imageStyle,
     aiProvider: input.aiProvider,
+    aiTextModel: input.aiTextModel ?? null,
+    aiImageModel: input.aiImageModel ?? null,
     autoPublish: input.autoPublish,
     isActive: input.isActive,
   })
@@ -490,4 +506,44 @@ export async function searchProductsAction(
     .limit(20)
 
   return rows.map((r) => ({ id: r.id, name: r.name, image: r.images?.[0] ?? null }))
+}
+
+export type ModelsState =
+  | {
+      ok: true
+      provider: 'gemini' | 'openai'
+      text: Array<{ id: string; label: string }>
+      image: Array<{ id: string; label: string }>
+      /** افتراضي الإضافات — بيتكتب جنب «الافتراضي» في القايمة */
+      defaultText: string
+      defaultImage: string | null
+    }
+  | { ok: false; error: string }
+
+/**
+ * موديلات المفتاح — لاختيار الموديل يدوي في الاستوديو والنشر التلقائي.
+ *
+ * القايمة من المزوّد نفسه على مفتاح التاجر، مش مكتوبة عندنا: جوجل
+ * وOpenAI بيضيفوا ويشيلوا موديلات كل شهر.
+ */
+export async function listAiModelsAction(input: { provider?: string | null }): Promise<ModelsState> {
+  const { store } = await studioContext()
+  const res = await resolveAiEngines(store.id, 'tools', input.provider ?? null)
+  if (!res.ok) return { ok: false, error: res.error }
+
+  const engine = res.engine
+  const [text, image] = await Promise.all([
+    listAiTextModels(engine.provider, engine.apiKey),
+    listAiImageModels(engine.provider, engine.apiKey),
+  ])
+  if (!text.ok) return { ok: false, error: text.error.message }
+
+  return {
+    ok: true,
+    provider: engine.provider,
+    text: text.data,
+    image: image.ok ? image.data : [],
+    defaultText: engine.model,
+    defaultImage: engine.imageModel,
+  }
 }

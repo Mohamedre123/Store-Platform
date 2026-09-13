@@ -40,6 +40,7 @@ import {
   type ToneKey,
 } from '@/lib/studio-meta'
 import { AI_PROVIDERS, type AiProvider } from '@/lib/ai/providers-meta'
+import { AiModelPicker } from './model-picker'
 import { Alert, Card } from '@/components/ui'
 import { SharePost } from '@/components/dashboard/share-post'
 import { toast } from '@/components/dashboard/toast'
@@ -165,6 +166,8 @@ export function StudioClient({
 
   /* Gemini ولا ChatGPT — للصورة والكاروسيل والفيديو والكلام مع بعض */
   const [provider, setProvider] = useState<AiProvider | null>(defaultProvider)
+  /* اختيار الموديل يدوي — فاضي يعني افتراضي الإضافات، وما بيغيّرهاش */
+  const [models, setModels] = useState({ textModel: '', imageModel: '' })
 
   /* النشر */
   const live = accounts.filter((a) => a.status === 'active')
@@ -226,6 +229,8 @@ export function StudioClient({
         useProductPhoto: !edit && useProductPhoto,
         style,
         provider,
+        textModel: models.textModel || null,
+        imageModel: models.imageModel || null,
       })
 
       if (!res.ok) {
@@ -317,6 +322,8 @@ export function StudioClient({
       useProductPhoto,
       style,
       provider,
+      textModel: models.textModel || null,
+      imageModel: models.imageModel || null,
     })
 
     if (!res.ok) setImgError(res.error)
@@ -343,6 +350,7 @@ export function StudioClient({
         tone,
         extra: extra.trim() || null,
         provider,
+        textModel: models.textModel || null,
       })
       if (!res.ok) setCopyError(res.error)
       else {
@@ -582,6 +590,16 @@ export function StudioClient({
               ))}
             </div>
           </div>
+        )}
+
+        {hasKey && (
+          <AiModelPicker
+            provider={provider}
+            textModel={models.textModel}
+            imageModel={models.imageModel}
+            showImage={media !== 'video'}
+            onChange={setModels}
+          />
         )}
 
         {media === 'video' && (

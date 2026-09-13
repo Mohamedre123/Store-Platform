@@ -1075,6 +1075,8 @@ export async function generateImage(input: {
   prompt: string
   image?: InlineImage
   aspectRatio?: string
+  /** موديل التاجر — بيتجرّب الأول، والبديل بس لو مالوش حصّة أو واقف */
+  preferred?: string | null
 }): Promise<GeminiResult<GeneratedImage>> {
   const list = await listImageModels(input.apiKey)
   if (!list.ok) return list
@@ -1090,14 +1092,24 @@ export async function generateImage(input: {
     }
   }
 
-  const alive = list.data.filter((m) => !deadModels.has(m.id))
-  const candidates = (alive.length ? alive : list.data).slice(0, 3)
+  /*
+    الترتيب: اختيار التاجر، وبعده الثابت قبل التجريبي.
+
+    الأحدث في قايمة جوجل غالبًا «preview» — وده اللي كان بيرد ٥٠٣
+    «الموديل مش متاح» ويوقف النشر التلقائي والمفتاح عليه موديل ثابت شغّال.
+  */
+  const unstable = (id: string) => /preview|exp/i.test(id)
+  const ordered = [...list.data].sort((a, b) => Number(unstable(a.id)) - Number(unstable(b.id)))
+  const preferred = input.preferred ? ordered.find((m) => m.id === input.preferred) ?? { id: input.preferred, label: input.preferred, usable: true } : null
+  const pool = preferred ? [preferred, ...ordered.filter((m) => m.id !== preferred.id)] : ordered
+  const alive = pool.filter((m) => m.id === preferred?.id || !deadModels.has(m.id))
+  const candidates = (alive.length ? alive : pool).slice(0, 3)
   const tried: string[] = []
   let first: GeminiResult<GeneratedImage> | null = null
 
   for (const candidate of candidates) {
     tried.push(candidate.id)
-    const res = await editImage({ ...input, model: candidate.id })
+    const res = await editImage({ apiKey: input.apiKey, prompt: input.prompt, image: input.image, aspectRatio: input.aspectRatio, model: candidate.id })
     if (res.ok) return res
     first ??= res
     if (!isDeadModel(res.error)) return res

@@ -7,6 +7,7 @@ import type { PluginDef } from '@/lib/plugins'
 import { AI_PROVIDERS, type AiIssue, type AiProvider } from '@/lib/ai/providers-meta'
 import { saveGeminiProAction, verifyAiKeyAction } from './ai-actions'
 import { IssueBanner, KeyField, ModelSelect, ProviderSwitch, type KeyCheck } from './ai-fields'
+import { ModelDefaults } from './model-defaults'
 
 export type GeminiProSaved = {
   enabled: boolean
@@ -15,6 +16,8 @@ export type GeminiProSaved = {
   hasOwnOpenaiKey: boolean
   model: string | null
   openaiModel: string | null
+  imageModel?: string | null
+  openaiImageModel?: string | null
   provider: AiProvider | null
   brief: string | null
   /** المزوّدين اللي ليهم مفتاح في إضافة الرد على العملاء — المساعد بيستعيرهم */
@@ -64,6 +67,8 @@ export function GeminiProCard({
   const [openaiModels, setOpenaiModels] = useState<Model[]>([])
   const [model, setModel] = useState(saved?.model ?? '')
   const [openaiModel, setOpenaiModel] = useState(saved?.openaiModel ?? '')
+  const [imageModel, setImageModel] = useState(saved?.imageModel ?? '')
+  const [openaiImageModel, setOpenaiImageModel] = useState(saved?.openaiImageModel ?? '')
   const [provider, setProvider] = useState<AiProvider | null>(saved?.provider ?? null)
   const [removed, setRemoved] = useState<AiProvider[]>([])
   const [brief] = useState(saved?.brief ?? '')
@@ -137,6 +142,8 @@ export function GeminiProCard({
         openaiKey: openaiKey || undefined,
         model: model || undefined,
         openaiModel: openaiModel || undefined,
+        imageModel,
+        openaiImageModel,
         removeKeys: removed.length ? removed : undefined,
         provider: effective ?? undefined,
         brief,
@@ -300,21 +307,21 @@ export function GeminiProCard({
               />
             )}
 
-            {(geminiModels.length > 0 || openaiModels.length > 0) && (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {geminiModels.length > 0 && (
-                  <ModelSelect label="موديل Gemini" value={model} onChange={setModel} models={geminiModels} />
-                )}
-                {openaiModels.length > 0 && (
-                  <ModelSelect
-                    label="موديل ChatGPT"
-                    value={openaiModel}
-                    onChange={setOpenaiModel}
-                    models={openaiModels}
-                  />
-                )}
-              </div>
-            )}
+            <ModelDefaults
+              slug="gemini_pro"
+              hasGemini={hasGemini}
+              hasOpenai={hasOpenai}
+              geminiKey={geminiKey}
+              openaiKey={openaiKey}
+              verified={{ gemini: geminiModels, openai: openaiModels }}
+              values={{ model, imageModel, openaiModel, openaiImageModel }}
+              onChange={(next) => {
+                if (next.model !== undefined) setModel(next.model)
+                if (next.imageModel !== undefined) setImageModel(next.imageModel)
+                if (next.openaiModel !== undefined) setOpenaiModel(next.openaiModel)
+                if (next.openaiImageModel !== undefined) setOpenaiImageModel(next.openaiImageModel)
+              }}
+            />
 
             <div className="flex items-start gap-2 rounded-lg bg-[var(--color-warning-soft)] px-3 py-2.5 text-xs text-[var(--color-warning)]">
               <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />

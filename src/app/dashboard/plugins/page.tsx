@@ -62,6 +62,8 @@ export default async function PluginsPage() {
             hasOpenaiKey: Boolean(gemini.openaiKey),
             model: gemini.model,
             openaiModel: gemini.openaiModel,
+            imageModel: gemini.imageModel,
+            openaiImageModel: gemini.openaiImageModel,
             botProvider: gemini.botProvider,
             brief: gemini.brief,
             botEnabled: gemini.botEnabled,
@@ -76,6 +78,8 @@ export default async function PluginsPage() {
             hasOwnOpenaiKey: Boolean(pro.openaiKey),
             model: pro.model,
             openaiModel: pro.openaiModel,
+            imageModel: pro.imageModel,
+            openaiImageModel: pro.openaiImageModel,
             provider: pro.provider,
             brief: pro.brief,
             baseProviders: [

@@ -43,6 +43,9 @@ export type AiConfig = {
   model: string | null
   openaiKey: string | null
   openaiModel: string | null
+  /** موديل الصور الافتراضي — فاضي يعني أول موديل صور شغّال */
+  imageModel: string | null
+  openaiImageModel: string | null
   /** المزوّد الافتراضي للمساعد والأدوات — التاجر بيبدّله من الشات */
   provider: AiProvider | null
   /** المزوّد اللي بيرد على عملاء المتجر — قرار التاجر لوحده */
@@ -66,6 +69,8 @@ const DEFAULTS: AiConfig = {
   model: null,
   openaiKey: null,
   openaiModel: null,
+  imageModel: null,
+  openaiImageModel: null,
   provider: null,
   botProvider: null,
   brief: null,
@@ -106,6 +111,8 @@ export const getAiConfig = cache(
       model: str(cfg.model),
       openaiKey: secrets?.openaiKey ?? null,
       openaiModel: str(cfg.openaiModel),
+      imageModel: str(cfg.imageModel),
+      openaiImageModel: str(cfg.openaiImageModel),
       provider: isProvider(cfg.provider) ? cfg.provider : null,
       botProvider: isProvider(cfg.botProvider) ? cfg.botProvider : null,
       brief: str(cfg.brief),
@@ -123,6 +130,22 @@ export const getAiConfig = cache(
 
 function keyOf(cfg: AiConfig, provider: AiProvider): string | null {
   return provider === 'openai' ? cfg.openaiKey : cfg.apiKey
+}
+
+function imageModelOf(cfg: AiConfig, provider: AiProvider): string | null {
+  return provider === 'openai' ? cfg.openaiImageModel : cfg.imageModel
+}
+
+/**
+ * الموديل ده تبع المزوّد ده؟
+ *
+ * الاختيار اليدوي بيتحفظ نص على الجدول. لو التاجر غيّر المزوّد بعدين،
+ * موديل ChatGPT ما يصحّش يتبعت لجوجل (ولا العكس) — بيتجاهل والافتراضي
+ * بيشتغل.
+ */
+export function modelFitsProvider(provider: AiProvider, id: string): boolean {
+  const openai = /^(gpt-|chatgpt-|o\d|dall-e)/i.test(id)
+  return provider === 'openai' ? openai : !openai
 }
 
 function modelOf(cfg: AiConfig, provider: AiProvider): string | null {
@@ -181,6 +204,8 @@ export type Engine = {
   provider: AiProvider
   apiKey: string
   model: string
+  /** موديل الصور — فاضي يعني أول موديل صور شغّال على المفتاح */
+  imageModel: string | null
   storeId: string
   slug: string
   /** رسالة آخر مشكلة محفوظة — عشان ما نكتبش نفس المشكلة مع كل رسالة */
@@ -212,10 +237,14 @@ function engineFrom(
     sources.map((s) => modelOf(s.cfg, provider)).find(Boolean) ??
     DEFAULT_MODELS[provider]
 
+  const imageModel =
+    imageModelOf(owner.cfg, provider) ?? sources.map((src) => imageModelOf(src.cfg, provider)).find(Boolean) ?? null
+
   return {
     provider,
     apiKey: keyOf(owner.cfg, provider)!,
     model,
+    imageModel,
     storeId,
     slug: owner.slug,
     issue: owner.cfg.lastIssue?.message ?? null,

@@ -20,6 +20,7 @@ import {
   type PresetKey,
 } from '@/lib/studio-meta'
 import { AI_PROVIDERS, type AiProvider } from '@/lib/ai/providers-meta'
+import { AiModelPicker } from '../model-picker'
 import { Alert, Button, Card, Field, Input, Textarea } from '@/components/ui'
 import { Toggle } from '@/components/dashboard/controls'
 import { toast } from '@/components/dashboard/toast'
@@ -41,6 +42,8 @@ type Schedule = {
   slides: number
   imageStyle: ImageStyle
   aiProvider: AiProvider | null
+  aiTextModel: string | null
+  aiImageModel: string | null
   autoPublish: boolean
   lastRunAt: string | null
   nextRunAt: string | null
@@ -66,6 +69,8 @@ const empty = (): Draft => ({
   slides: 5,
   imageStyle: 'auto',
   aiProvider: null,
+  aiTextModel: null,
+  aiImageModel: null,
   autoPublish: false,
 })
 
@@ -123,6 +128,8 @@ export function SchedulesManager({
         slides: draft.slides,
         imageStyle: draft.imageStyle,
         aiProvider: draft.aiProvider,
+        aiTextModel: draft.aiTextModel,
+        aiImageModel: draft.aiImageModel,
         autoPublish: draft.autoPublish,
         isActive: draft.isActive,
       })
@@ -411,6 +418,23 @@ export function SchedulesManager({
             </Field>
           )}
 
+          {providers.length > 0 && (
+            <Field
+              label="الموديل"
+              hint="«الافتراضي» هو اللي في صفحة الإضافات. اختيارك هنا للجدول ده بس — ولو الموديل وقف عند جوجل، بديل بيتجرّب للمرة دي واختيارك بيفضل."
+            >
+              <AiModelPicker
+                provider={draft.aiProvider}
+                textModel={draft.aiTextModel ?? ''}
+                imageModel={draft.aiImageModel ?? ''}
+                showImage={draft.media !== 'video'}
+                onChange={(next) =>
+                  setDraft((d) => (d ? { ...d, aiTextModel: next.textModel || null, aiImageModel: next.imageModel || null } : d))
+                }
+              />
+            </Field>
+          )}
+
           {/*
             شكل الصورة.
 
@@ -644,6 +668,8 @@ export function SchedulesManager({
                     slides: s.slides,
                     imageStyle: s.imageStyle,
                     aiProvider: s.aiProvider,
+                    aiTextModel: s.aiTextModel,
+                    aiImageModel: s.aiImageModel,
                     autoPublish: s.autoPublish,
                   })
                 }

@@ -10,7 +10,7 @@ import {
   startVideo as startSora,
 } from './ai/openai'
 import { generateText } from './ai/llm'
-import { noteAiOutcome, resolveEngines, type Engine } from './ai/settings'
+import { noteAiOutcome, resolveEngines, type Engine, modelFitsProvider } from './ai/settings'
 import { catalogBlock, briefLine, getStoreBrief, operationsBlock } from './ai/store-context'
 import { uploadImage, uploadVideo } from './storage'
 import { getStoreTheme } from './storefront'
@@ -62,10 +62,18 @@ export type StudioError = { error: string }
  * الرد على العملاء مقصود: أغلب التجّار مفعّلين إضافة واحدة بس،
  * ومطالبتهم بمفتاح تالت لميزة جديدة بتخلّيهم يسيبوها.
  */
-async function studioEngine(storeId: string, prefer?: string | null): Promise<Engine | StudioError> {
+async function studioEngine(
+  storeId: string,
+  prefer?: string | null,
+  /** اختيار يدوي من الاستوديو أو الجدول — بيغلب افتراضي الإضافات للطلب ده بس */
+  models?: { text?: string | null; image?: string | null },
+): Promise<Engine | StudioError> {
   const res = await resolveEngines(storeId, 'tools', prefer)
   if (!res.ok) return { error: res.error }
-  return res.engine
+  const engine = { ...res.engine }
+  if (models?.text && modelFitsProvider(engine.provider, models.text)) engine.model = models.text
+  if (models?.image && modelFitsProvider(engine.provider, models.image)) engine.imageModel = models.image
+  return engine
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -278,6 +286,7 @@ export function joinCopy(c: { hook: string; body: string; cta: string; link?: st
  * معاهم مختلف: تيك توك بيحطّهم في النص، وإنستجرام أول تعليق أحسن.
  */
 export async function writeCopy(input: {
+  textModel?: string | null
   storeId: string
   productId?: string | null
   tone: ToneKey
@@ -287,7 +296,7 @@ export async function writeCopy(input: {
   /** Gemini أو ChatGPT — فاضي يعني اختيار التاجر المحفوظ */
   provider?: string | null
 }): Promise<CopyResult | StudioError> {
-  const engine = await studioEngine(input.storeId, input.provider)
+  const engine = await studioEngine(input.storeId, input.provider, { text: input.textModel })
   if ('error' in engine) return engine
 
   const brief = await getStoreBrief(input.storeId, input.merchantBrief)
@@ -906,6 +915,8 @@ export type StudioImage = { id: string; url: string; prompt: string; preset: Pre
  * يفضل موجود، فبنرفع كل ناتج ونسيب الحذف له.
  */
 export async function makeImage(input: {
+  textModel?: string | null
+  imageModel?: string | null
   storeId: string
   userId: string
   prompt: string
@@ -930,7 +941,7 @@ export async function makeImage(input: {
   /** Gemini أو ChatGPT — فاضي يعني اختيار التاجر المحفوظ */
   provider?: string | null
 }): Promise<StudioImage | StudioError> {
-  const engine = await studioEngine(input.storeId, input.provider)
+  const engine = await studioEngine(input.storeId, input.provider, { text: input.textModel, image: input.imageModel })
   if ('error' in engine) return engine
 
   const preset = presetOf(input.preset)
@@ -1037,6 +1048,7 @@ export async function makeImage(input: {
   if (engine.provider === 'openai') {
     res = await openaiImage({
       apiKey: engine.apiKey,
+      model: engine.imageModel,
       prompt,
       images: base ? [base] : [],
       aspect: preset.aspect,
@@ -1045,6 +1057,7 @@ export async function makeImage(input: {
     /* موديل الصور بيتختار من المفتاح، ولو واحد مالوش حصّة بيتجرّب اللي بعده */
     res = await generateImage({
       apiKey: engine.apiKey,
+      preferred: engine.imageModel,
       prompt,
       image: base,
       aspectRatio: preset.aspect,
@@ -1291,6 +1304,8 @@ export type CarouselResult = { images: StudioImage[] } | StudioError
  * الرمي كان بيضيّع أربع نداءات دفع تمنهم.
  */
 export async function makeCarousel(input: {
+  textModel?: string | null
+  imageModel?: string | null
   storeId: string
   userId: string
   prompt: string
@@ -1305,7 +1320,7 @@ export async function makeCarousel(input: {
   const count = Math.max(2, Math.min(10, input.count))
   const images: StudioImage[] = []
 
-  const engine = await studioEngine(input.storeId, input.provider)
+  const engine = await studioEngine(input.storeId, input.provider, { text: input.textModel, image: input.imageModel })
   if ('error' in engine) return engine
 
   const product = input.productId ? await productBrief(input.storeId, input.productId) : null
@@ -1357,6 +1372,8 @@ export async function makeCarousel(input: {
       seedUrl: input.seedUrl ?? null,
       merchantBrief: input.merchantBrief,
       provider: engine.provider,
+      textModel: engine.model,
+      imageModel: engine.imageModel,
     })
 
     if ('error' in res) {

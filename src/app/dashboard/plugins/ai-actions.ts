@@ -20,6 +20,8 @@ import {
 } from '@/lib/ai/settings'
 import { LOCKED_MESSAGE } from '@/lib/entitlements'
 import { getStoreBrief, suggestBrief } from '@/lib/ai/store-context'
+import { getAiConfig as readAiConfig, GEMINI_SLUG as BASE_SLUG, GEMINI_PRO_SLUG as PRO_SLUG } from '@/lib/ai/settings'
+import { listTextModels as listAiTextModels, listImageModels as listAiImageModels } from '@/lib/ai/llm'
 
 /**
  * بوابة إضافات الذكاء.
@@ -96,6 +98,8 @@ const saveSchema = z.object({
   model: z.string().trim().max(120).optional(),
   openaiKey: z.string().trim().max(400).optional(),
   openaiModel: z.string().trim().max(120).optional(),
+  imageModel: z.string().trim().max(120).optional(),
+  openaiImageModel: z.string().trim().max(120).optional(),
   /** مسح مفتاح بعينه — «فاضي» معناه سيبه، فالمسح لازم يتطلب صراحةً */
   removeKeys: z.array(providerEnum).optional(),
   botProvider: providerEnum.optional(),
@@ -177,6 +181,13 @@ export async function saveGeminiAction(raw: unknown): Promise<SaveState> {
   const config = {
     model: apiKey ? input.model || current.model : null,
     openaiModel: openaiKey ? input.openaiModel || current.openaiModel : null,
+    /* فاضي = «تلقائي» — اختيار صريح، مش «ما اتبعتش» */
+    imageModel: apiKey ? (input.imageModel !== undefined ? input.imageModel || null : current.imageModel) : null,
+    openaiImageModel: openaiKey
+      ? input.openaiImageModel !== undefined
+        ? input.openaiImageModel || null
+        : current.openaiImageModel
+      : null,
     botProvider,
     provider: current.provider,
     brief: input.brief ?? current.brief,
@@ -220,6 +231,8 @@ const proSchema = z.object({
   model: z.string().trim().max(120).optional(),
   openaiKey: z.string().trim().max(400).optional(),
   openaiModel: z.string().trim().max(120).optional(),
+  imageModel: z.string().trim().max(120).optional(),
+  openaiImageModel: z.string().trim().max(120).optional(),
   removeKeys: z.array(providerEnum).optional(),
   provider: providerEnum.optional(),
   brief: z.string().trim().max(1500).optional(),
@@ -257,6 +270,8 @@ export async function saveGeminiProAction(raw: unknown): Promise<SaveState> {
   const config = {
     model: input.model || current.model,
     openaiModel: input.openaiModel || current.openaiModel,
+    imageModel: input.imageModel !== undefined ? input.imageModel || null : current.imageModel,
+    openaiImageModel: input.openaiImageModel !== undefined ? input.openaiImageModel || null : current.openaiImageModel,
     provider: input.provider ?? current.provider,
     brief: input.brief ?? current.brief,
   }
@@ -471,4 +486,39 @@ export async function refreshAiBriefAction(): Promise<RefreshBriefState> {
     console.error('فشل تحديث نبذة المساعد:', e)
     return { ok: false, error: 'حصلت مشكلة وإحنا بنحدّث. جرّب تاني.' }
   }
+}
+
+export type SavedModelsState =
+  | { ok: true; text: Model[]; image: Model[] }
+  | { ok: false; error: string }
+
+/**
+ * موديلات الكلام والصور على المفتاح المحفوظ — لكروت الإضافات.
+ *
+ * المفتاح بيتقري على الخادم ومش بيرجع للمتصفح. ولو فيه مفتاح جديد لسه
+ * متحقّق منه ومش محفوظ، القايمة بتتجاب بيه. إضافة المساعد بتستعير مفتاح
+ * إضافة الرد على العملاء لو مالهاش مفتاح — نفس اللي المساعد بيعمله.
+ */
+export async function listSavedModelsAction(input: {
+  slug: 'gemini' | 'gemini_pro'
+  provider: 'gemini' | 'openai'
+  apiKey?: string
+}): Promise<SavedModelsState> {
+  const { store } = await getDashboardContext()
+  const gate = await aiGate(store.id)
+  if (gate) return { ok: false, error: gate.error }
+  if (input.provider !== 'gemini' && input.provider !== 'openai') return { ok: false, error: 'المزوّد مش معروف' }
+
+  const own = await readAiConfig(store.id, input.slug === 'gemini_pro' ? PRO_SLUG : BASE_SLUG)
+  const base = input.slug === 'gemini_pro' ? await readAiConfig(store.id, BASE_SLUG) : own
+  const pick = (cfg: typeof own) => (input.provider === 'openai' ? cfg.openaiKey : cfg.apiKey)
+  const key = String(input.apiKey ?? '').trim() || pick(own) || pick(base)
+  if (!key) return { ok: true, text: [], image: [] }
+
+  const [text, image] = await Promise.all([
+    listAiTextModels(input.provider, key),
+    listAiImageModels(input.provider, key),
+  ])
+  if (!text.ok) return { ok: false, error: text.error.message }
+  return { ok: true, text: text.data, image: image.ok ? image.data : [] }
 }

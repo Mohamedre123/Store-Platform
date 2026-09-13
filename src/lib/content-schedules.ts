@@ -251,6 +251,8 @@ export type ScheduleRow = {
   slides: number
   imageStyle: ImageStyle
   aiProvider: AiProvider | null
+  aiTextModel: string | null
+  aiImageModel: string | null
   autoPublish: boolean
   lastRunAt: Date | null
   nextRunAt: Date | null
@@ -280,6 +282,8 @@ export async function listSchedules(storeId: string): Promise<ScheduleRow[]> {
     slides: r.slides,
     imageStyle: styleOf(r.imageStyle).key,
     aiProvider: isProvider(r.aiProvider) ? r.aiProvider : null,
+    aiTextModel: r.aiTextModel,
+    aiImageModel: r.aiImageModel,
     autoPublish: r.autoPublish,
     lastRunAt: r.lastRunAt,
     nextRunAt: r.nextRunAt,
@@ -311,6 +315,8 @@ export async function saveSchedule(input: {
   slides?: number
   imageStyle?: ImageStyle | null
   aiProvider?: string | null
+  aiTextModel?: string | null
+  aiImageModel?: string | null
   autoPublish: boolean
   isActive: boolean
 }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
@@ -348,6 +354,8 @@ export async function saveSchedule(input: {
     /* نفس الفكرة: أي نص غير معروف بيرجع «يختار لوحده» */
     imageStyle: styleOf(input.imageStyle).key,
     aiProvider: isProvider(input.aiProvider) ? input.aiProvider : null,
+    aiTextModel: input.aiTextModel?.trim().slice(0, 120) || null,
+    aiImageModel: input.aiImageModel?.trim().slice(0, 120) || null,
     autoPublish: input.autoPublish,
     isActive: input.isActive,
     nextRunAt: next,
@@ -517,6 +525,7 @@ export async function runSchedule(scheduleId: string): Promise<{ ok: boolean; er
     tone: tones[runs % tones.length],
     extra: s.style,
     provider: s.aiProvider,
+    textModel: s.aiTextModel,
   })
   if ('error' in copy) return fail(copy.error)
 
@@ -562,6 +571,8 @@ export async function runSchedule(scheduleId: string): Promise<{ ok: boolean; er
       seedUrl: seed,
       style,
       provider: s.aiProvider,
+      textModel: s.aiTextModel,
+      imageModel: s.aiImageModel,
     })
     if ('error' in set) return fail(set.error)
 
@@ -615,6 +626,8 @@ export async function runSchedule(scheduleId: string): Promise<{ ok: boolean; er
       seedUrl: seed,
       style,
       provider: s.aiProvider,
+      textModel: s.aiTextModel,
+      imageModel: s.aiImageModel,
     })
     if ('error' in image) return fail(image.error)
     imageUrls = [image.url]
