@@ -410,7 +410,10 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
   «فاضل ٧ أيام» هيتبعت يوم 2026-09-21 تقريبًا.
 - **آخر نشر للموقع بعده:** commit `f20bed6` (لودرات التحليلات والشحنات المشتركة + `/api/app/analytics` و`/api/app/shipments`).
   اتختبر على الحي: المسارين الجداد 401 من غير جلسة، والصفحات 200/307 زي ما هي.
-- **آخر نشر للموقع (2.4):** commit `e93a323` — اتنشر لوحده. اتختبر على الحي: `coupons/save` و`coupons/:id/delete`
+- **آخر نشر للموقع (2.5):** commit `726051c` — اتنشر لوحده. اتختبر على الحي: `marketing/{offers,bundles}/save`
+  و`marketing/offers/:id/delete` و`loyalty/{tiers,wheel}` = 403 من غير Origin، و`/api/app/{marketing,loyalty}` = 401،
+  والصفحات 200/307 زي ما هي.
+- **نشر الموقع (2.4):** commit `e93a323` — اتنشر لوحده. اتختبر على الحي: `coupons/save` و`coupons/:id/delete`
   و`shipments/{create,dispatch}` و`shipments/:id/status` = 403 من غير Origin، و`/api/app/{marketing,shipments}` = 401،
   والصفحات 200/307 زي ما هي.
 - **نشر الموقع (2.3):** commit `3a16800` — اتنشر لوحده. اتختبر على الحي: `/api/app/{loyalty,affiliates,referrals}` = 401،
