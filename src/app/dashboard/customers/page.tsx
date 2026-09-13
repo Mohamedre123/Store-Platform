@@ -1,9 +1,7 @@
 import Link from 'next/link'
-import { and, desc, eq, sql } from 'drizzle-orm'
 import { MessageCircle, Phone, Users } from 'lucide-react'
-import { db } from '@/db'
-import { customers } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
+import { CUSTOMER_TIERS, loadCustomersList } from '@/lib/customers-data'
 import { guard } from '@/lib/permissions'
 import { formatMoney, formatDate } from '@/lib/utils'
 import { PageHeader } from '@/components/dashboard/page-shell'
@@ -12,12 +10,7 @@ import { Card } from '@/components/ui'
 
 export const metadata = { title: 'العملاء' }
 
-const TIERS: Record<string, { label: string; bg: string; fg: string }> = {
-  bronze: { label: 'برونزي', bg: 'var(--surface-2)', fg: 'var(--fg-muted)' },
-  silver: { label: 'فضي', bg: 'var(--surface-2)', fg: 'var(--fg-muted)' },
-  gold: { label: 'ذهبي', bg: 'var(--color-warning-soft)', fg: 'var(--color-warning)' },
-  platinum: { label: 'بلاتيني', bg: 'var(--primary-soft)', fg: 'var(--primary)' },
-}
+const TIERS = CUSTOMER_TIERS
 
 export default async function CustomersPage({
   searchParams,
@@ -40,54 +33,8 @@ export default async function CustomersPage({
    *
    * فالمشتركون مش كيان تاني — هم نفس العملاء بعدسة تانية.
    */
-  const subscribersOnly = filter === 'subscribers'
-
-  const where = subscribersOnly
-    ? and(
-        eq(customers.storeId, store.id),
-        eq(customers.acceptsMarketing, true),
-        sql`${customers.email} is not null and ${customers.email} <> ''`,
-      )
-    : eq(customers.storeId, store.id)
-
-  const rows = await db
-    .select({
-      id: customers.id,
-      name: customers.name,
-      phone: customers.phone,
-      email: customers.email,
-      ordersCount: customers.ordersCount,
-      totalSpent: customers.totalSpent,
-      lastOrderAt: customers.lastOrderAt,
-      tier: customers.tier,
-      createdAt: customers.createdAt,
-    })
-    .from(customers)
-    .where(where)
-    .orderBy(desc(customers.totalSpent), desc(customers.createdAt))
-    .limit(200)
-
-  const [totals] = await db
-    .select({
-      count: sql<number>`count(*)::int`,
-      revenue: sql<number>`coalesce(sum(${customers.totalSpent}), 0)::int`,
-      repeat: sql<number>`count(*) filter (where ${customers.ordersCount} > 1)::int`,
-      /* المشتركون بنفس شرط الحملات بالحرف — رقمين مختلفين بيضيّعوا الثقة */
-      subscribers: sql<number>`count(*) filter (
-        where ${customers.acceptsMarketing} = true
-          and ${customers.email} is not null
-          and ${customers.email} <> ''
-      )::int`,
-    })
-    .from(customers)
-    .where(eq(customers.storeId, store.id))
-
-  /**
-   * متوسط ما ينفقه العميل — رقم بيوجّه قرارات التاجر أكتر من العدد
-   * المجرّد. عميل بينفق ٥٠٠ مرة واحدة غير عميل بينفق ٢٠٠ ثلاث مرات.
-   */
-  const average = totals.count > 0 ? Math.round(totals.revenue / totals.count) : 0
-  const repeatRate = totals.count > 0 ? Math.round((totals.repeat / totals.count) * 100) : 0
+  /* الاستعلامات في `loadCustomersList` — نفس المصدر اللي تطبيق الموبايل بيقرا منه */
+  const { rows, totals, average, repeatRate, subscribersOnly } = await loadCustomersList(store, filter)
 
   const stats = [
     { label: 'إجمالي العملاء', value: String(totals.count) },

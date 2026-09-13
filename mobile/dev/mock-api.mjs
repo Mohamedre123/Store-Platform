@@ -246,3 +246,93 @@ export function productAct(id, action) {
   }
   return { status: 404, json: { ok: false, error: 'not_found' } }
 }
+
+/* ─────────────── العملاء ─────────────── */
+
+const customerRows = [
+  ['محمد عادل', '01002345671', 'mohamed@mail.com', 9, 1_240_000, 'platinum', 340, ['جملة']],
+  ['سارة محمود', '01002346788', null, 6, 684_000, 'gold', 120, []],
+  ['منى إبراهيم', '01002347905', 'mona@mail.com', 4, 512_000, 'silver', 0, []],
+  ['كريم حسن', '01002349022', null, 3, 145_500, 'bronze', 0, ['رفض استلام']],
+  ['أحمد علي', '01002350139', 'ahmed@mail.com', 1, 75_000, 'bronze', 0, []],
+  ['هبة سامي', '01002351256', null, 1, 64_000, 'bronze', 0, []],
+  ['ليلى مصطفى', null, 'laila@mail.com', 1, 43_000, 'bronze', 0, []],
+]
+
+const customerList = customerRows.map(([name, phone, email, ordersCount, totalSpent, tier, points, tags], i) => ({
+  id: `10000000-0000-4000-8000-00000000000${i + 1}`,
+  name,
+  phone,
+  email,
+  ordersCount,
+  totalSpent,
+  tier,
+  points,
+  tags,
+  acceptsMarketing: i !== 3,
+  lastOrderAt: hoursAgo(i * 40 + 3),
+  createdAt: hoursAgo(24 * (60 - i * 6)),
+}))
+
+const TIER_LABEL = { bronze: 'برونزي', silver: 'فضي', gold: 'ذهبي', platinum: 'بلاتيني' }
+const hello = (name) => `مرحبًا${name ? ' ' + name : ''}، معاك متجر الأناقة`
+
+export function customersList(filter = 'all') {
+  const subs = customerList.filter((c) => c.acceptsMarketing && c.email)
+  const rows = filter === 'subscribers' ? subs : customerList
+  const revenue = customerList.reduce((n, c) => n + c.totalSpent, 0)
+  return {
+    currency: 'EGP',
+    filter,
+    totals: {
+      count: customerList.length,
+      subscribers: subs.length,
+      average: Math.round(revenue / customerList.length),
+      repeatRate: Math.round((customerList.filter((c) => c.ordersCount > 1).length / customerList.length) * 100),
+    },
+    customers: rows.map((c) => ({
+      id: c.id,
+      name: c.name,
+      phone: c.phone,
+      email: c.email,
+      ordersCount: c.ordersCount,
+      totalSpent: c.totalSpent,
+      lastOrderAt: c.lastOrderAt,
+      tier: c.tier,
+      tierLabel: c.ordersCount > 1 ? TIER_LABEL[c.tier] : null,
+      whatsappText: hello(c.name),
+    })),
+  }
+}
+
+export function customerDetail(id) {
+  const c = customerList.find((x) => x.id === id)
+  if (!c) return null
+  const statuses = ['delivered', 'delivered', 'shipped', 'cancelled', 'delivered', 'delivered', 'confirmed', 'delivered', 'delivered']
+  return {
+    currency: 'EGP',
+    customer: {
+      ...c,
+      tierLabel: TIER_LABEL[c.tier],
+      averageOrder: Math.round(c.totalSpent / Math.max(1, c.ordersCount)),
+      note: c.tags.includes('جملة') ? 'بياخد كميات للمحل بتاعه — كلّمه قبل أي تخفيضات.' : null,
+      isBlocked: false,
+    },
+    orders: Array.from({ length: Math.min(c.ordersCount, 8) }, (_, i) => ({
+      id: `o${(i % 10) + 1}`,
+      number: String(1042 - i * 3),
+      status: statuses[i],
+      statusLabel: LABELS[statuses[i]],
+      total: Math.round(c.totalSpent / c.ordersCount),
+      createdAt: hoursAgo(i * 120 + 3),
+    })),
+    trust: c.phone
+      ? c.tags.includes('رفض استلام')
+        ? { level: 'risky', label: 'خطر — أكّد قبل الشحن', score: 23, reasons: ['رفض استلام طلبين قبل كده'], networkStores: 3 }
+        : c.ordersCount > 2
+          ? { level: 'good', label: 'موثوق', score: 94, reasons: [`استلم ${c.ordersCount} طلبات قبل كده`], networkStores: 0 }
+          : { level: 'new', label: 'عميل جديد', score: null, reasons: [], networkStores: 0 }
+      : null,
+    whatsappText: hello(c.name),
+  }
+}

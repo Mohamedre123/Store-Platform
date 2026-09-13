@@ -26,6 +26,23 @@ const types = { '.js': 'text/javascript; charset=utf-8', '.html': 'text/html; ch
 createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', `http://localhost:${port}`)
 
+  /* بيانات وهمية للعملاء (dev/mock-api.mjs) */
+  if (url.pathname.startsWith('/api/app/customers')) {
+    const mock = await import(new URL('../dev/mock-api.mjs', import.meta.url))
+    const send = (status, body) => {
+      res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
+      res.end(JSON.stringify(body))
+    }
+    const parts = url.pathname.split('/').filter(Boolean)
+    await new Promise((r) => setTimeout(r, 450))
+    if (parts.length === 3) return send(200, mock.customersList(url.searchParams.get('filter') ?? 'all'))
+    if (parts.length === 4) {
+      const d = mock.customerDetail(parts[3])
+      return d ? send(200, d) : send(404, { error: 'not_found' })
+    }
+    return send(404, { error: 'not_found' })
+  }
+
   /* بيانات وهمية للمنتجات (dev/mock-api.mjs) */
   if (url.pathname.startsWith('/api/app/products')) {
     const mock = await import(new URL('../dev/mock-api.mjs', import.meta.url))

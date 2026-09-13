@@ -28,12 +28,18 @@ import { PRODUCTS_CSS } from './styles-products'
 import { ProductsScreen } from './products'
 import { ProductDetailScreen } from './product-detail'
 import { clearProductsCache } from './products-api'
+import { CUSTOMERS_CSS } from './styles-customers'
+import { CustomersScreen } from './customers'
+import { CustomerDetailScreen } from './customer-detail'
+import { clearCustomersCache } from './customers-api'
 import { SHELL_CSS } from './styles'
 import { TabBar } from './tabbar'
 
 const ORDER_DETAIL = /^\/dashboard\/orders\/([^/]+)$/
 /* صفحات جوّه المنتجات مش منتجات — new وcategories وimport وtrash بيفضلوا صفحات المنصة */
 const PRODUCT_DETAIL = /^\/dashboard\/products\/([0-9a-f-]{36})$/i
+/* «blocked» صفحة المنصة — العميل معرّفه uuid بس */
+const CUSTOMER_DETAIL = /^\/dashboard\/customers\/([0-9a-f-]{36})$/i
 
 function useLocation(): URL {
   const [href, setHref] = useState(location.href)
@@ -46,7 +52,7 @@ function useLocation(): URL {
   return new URL(href)
 }
 
-type ScreenKey = 'home' | 'orders' | 'order' | 'products' | 'product'
+type ScreenKey = 'home' | 'orders' | 'order' | 'products' | 'product' | 'customers' | 'customer'
 
 function Shell() {
   const url = useLocation()
@@ -72,6 +78,8 @@ function Shell() {
     order: false,
     products: false,
     product: false,
+    customers: false,
+    customer: false,
   })
   const markUnavailable = useMemo(
     () => ({
@@ -80,6 +88,8 @@ function Shell() {
       order: () => setUnavailable((u) => ({ ...u, order: true })),
       products: () => setUnavailable((u) => ({ ...u, products: true })),
       product: () => setUnavailable((u) => ({ ...u, product: true })),
+      customers: () => setUnavailable((u) => ({ ...u, customers: true })),
+      customer: () => setUnavailable((u) => ({ ...u, customer: true })),
     }),
     [],
   )
@@ -94,6 +104,13 @@ function Shell() {
     if (productId) setLastProductId(productId)
   }, [productId])
 
+  const customerMatch = path.match(CUSTOMER_DETAIL)
+  const customerId = customerMatch ? customerMatch[1] : null
+  const [lastCustomerId, setLastCustomerId] = useState<string | null>(customerId)
+  useEffect(() => {
+    if (customerId) setLastCustomerId(customerId)
+  }, [customerId])
+
   /* آخر طلب اتفتح بيفضل مرسوم وهو بيخرج — عشان حركة الرجوع تبان */
   const [lastOrderId, setLastOrderId] = useState<string | null>(orderId)
   useEffect(() => {
@@ -105,6 +122,7 @@ function Shell() {
       clearHomeCache()
       clearOrdersCache()
       clearProductsCache()
+      clearCustomersCache()
     }
   }, [path])
 
@@ -134,6 +152,16 @@ function Shell() {
         productId={productId ?? lastProductId}
         onUnavailable={markUnavailable.product}
       />
+      <CustomersScreen
+        visible={path === '/dashboard/customers' && !unavailable.customers && !web}
+        url={effective}
+        onUnavailable={markUnavailable.customers}
+      />
+      <CustomerDetailScreen
+        visible={Boolean(customerId) && !unavailable.customer && !web}
+        customerId={customerId ?? lastCustomerId}
+        onUnavailable={markUnavailable.customer}
+      />
       <TabBar path={path} active={onDashboard} />
     </>
   )
@@ -142,7 +170,7 @@ function Shell() {
 export function installShell(): void {
   const root = layer()
   const style = document.createElement('style')
-  style.textContent = SHELL_CSS + ORDERS_CSS + PRODUCTS_CSS
+  style.textContent = SHELL_CSS + ORDERS_CSS + PRODUCTS_CSS + CUSTOMERS_CSS
   root.appendChild(style)
   const mount = document.createElement('div')
   mount.className = 'shell'
