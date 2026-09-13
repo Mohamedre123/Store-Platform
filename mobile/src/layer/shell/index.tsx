@@ -43,6 +43,13 @@ import { clearAnalyticsCache } from './analytics-api'
 import { ANALYTICS_CSS } from './styles-analytics'
 import { ShipmentsScreen } from './shipments'
 import { clearShipmentsCache } from './shipments-api'
+import { clearBusinessCaches } from './business-api'
+import { BUSINESS_CSS } from './styles-business'
+import { MarketingScreen } from './marketing'
+import { InventoryScreen } from './inventory'
+import { MessagesScreen } from './messages'
+import { SubscriptionScreen } from './subscription'
+import { SettingsScreen } from './settings'
 
 const ORDER_DETAIL = /^\/dashboard\/orders\/([^/]+)$/
 /* صفحات جوّه المنتجات مش منتجات — new وcategories وimport وtrash بيفضلوا صفحات المنصة */
@@ -61,7 +68,20 @@ function useLocation(): URL {
   return new URL(href)
 }
 
-type ScreenKey = 'home' | 'orders' | 'order' | 'products' | 'product' | 'customers' | 'customer' | 'analytics' | 'shipments'
+type ScreenKey =
+  | 'home'
+  | 'orders'
+  | 'order'
+  | 'products'
+  | 'product'
+  | 'customers'
+  | 'customer'
+  | 'analytics'
+  | 'shipments'
+  | 'marketing'
+  | 'inventory'
+  | 'messages'
+  | 'subscription'
 
 function Shell() {
   const url = useLocation()
@@ -91,6 +111,10 @@ function Shell() {
     customer: false,
     analytics: false,
     shipments: false,
+    marketing: false,
+    inventory: false,
+    messages: false,
+    subscription: false,
   })
   const markUnavailable = useMemo(
     () => ({
@@ -103,6 +127,10 @@ function Shell() {
       customer: () => setUnavailable((u) => ({ ...u, customer: true })),
       analytics: () => setUnavailable((u) => ({ ...u, analytics: true })),
       shipments: () => setUnavailable((u) => ({ ...u, shipments: true })),
+      marketing: () => setUnavailable((u) => ({ ...u, marketing: true })),
+      inventory: () => setUnavailable((u) => ({ ...u, inventory: true })),
+      messages: () => setUnavailable((u) => ({ ...u, messages: true })),
+      subscription: () => setUnavailable((u) => ({ ...u, subscription: true })),
     }),
     [],
   )
@@ -138,6 +166,7 @@ function Shell() {
       clearCustomersCache()
       clearAnalyticsCache()
       clearShipmentsCache()
+      clearBusinessCaches()
       clearMeCache()
     }
   }, [path])
@@ -186,6 +215,23 @@ function Shell() {
         visible={path === '/dashboard/shipments' && !unavailable.shipments && !web}
         onUnavailable={markUnavailable.shipments}
       />
+      <MarketingScreen
+        visible={path === '/dashboard/marketing' && !unavailable.marketing && !web}
+        onUnavailable={markUnavailable.marketing}
+      />
+      <InventoryScreen
+        visible={path === '/dashboard/inventory' && !unavailable.inventory && !web}
+        onUnavailable={markUnavailable.inventory}
+      />
+      <MessagesScreen
+        visible={path === '/dashboard/messages' && !unavailable.messages && !web}
+        onUnavailable={markUnavailable.messages}
+      />
+      <SubscriptionScreen
+        visible={path === '/dashboard/subscription' && !unavailable.subscription && !web}
+        onUnavailable={markUnavailable.subscription}
+      />
+      <SettingsScreen visible={path === '/dashboard/settings' && !web} />
       <VerifyBar visible={path === '/verify'} />
       <TabBar path={path} active={onDashboard} />
       {onDashboard && <MoreSheet path={path} search={effective.searchParams.toString()} />}
@@ -196,7 +242,7 @@ function Shell() {
 export function installShell(): void {
   const root = layer()
   const style = document.createElement('style')
-  style.textContent = SHELL_CSS + ORDERS_CSS + PRODUCTS_CSS + CUSTOMERS_CSS + MORE_CSS + VERIFY_CSS + ANALYTICS_CSS
+  style.textContent = SHELL_CSS + ORDERS_CSS + PRODUCTS_CSS + CUSTOMERS_CSS + MORE_CSS + VERIFY_CSS + ANALYTICS_CSS + BUSINESS_CSS
   root.appendChild(style)
   const mount = document.createElement('div')
   mount.className = 'shell'

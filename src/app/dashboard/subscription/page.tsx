@@ -1,14 +1,10 @@
-import { and, desc, eq } from 'drizzle-orm'
 import { Crown, Package, Receipt, ShieldCheck } from 'lucide-react'
-import { db } from '@/db'
-import { subscriptionRequests, subscriptions } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { guard } from '@/lib/permissions'
-import { getEntitlements, getOrderQuota } from '@/lib/entitlements'
-import { ensureAccountId } from '@/lib/account-id'
-import { PLANS, PAID_PLANS, STATUS_LABEL, getPlan, daysLeft, trialState } from '@/lib/plans'
+import { PLANS, PAID_PLANS, STATUS_LABEL, getPlan, daysLeft } from '@/lib/plans'
 import { billing } from '@/lib/billing'
 import { formatMoney, formatDate } from '@/lib/utils'
+import { loadSubscription, REQUEST_STATUS, SUB_STATUS } from '@/lib/subscription-data'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { AccountBadge } from '@/components/dashboard/account-badge'
 import { Reveal } from '@/components/motion'
@@ -18,61 +14,12 @@ import { TrialCard } from './trial-card'
 
 export const metadata = { title: 'الاشتراك' }
 
-const SUB_STATUS: Record<string, { label: string; bg: string; fg: string }> = {
-  trialing: { label: 'تجريبي', bg: 'var(--color-warning-soft)', fg: 'var(--color-warning)' },
-  active: { label: 'شغّال', bg: 'var(--color-success-soft)', fg: 'var(--color-success)' },
-  past_due: { label: 'انتهى', bg: 'var(--color-danger-soft)', fg: 'var(--color-danger)' },
-  cancelled: { label: 'ملغي', bg: 'var(--surface-2)', fg: 'var(--fg-muted)' },
-}
-
-const REQUEST_STATUS: Record<string, { label: string; bg: string; fg: string }> = {
-  pending: { label: 'تحت المراجعة', bg: 'var(--color-info-soft)', fg: 'var(--color-info)' },
-  approved: { label: 'اتقبل', bg: 'var(--color-success-soft)', fg: 'var(--color-success)' },
-  rejected: { label: 'اترفض', bg: 'var(--color-danger-soft)', fg: 'var(--color-danger)' },
-}
-
 export default async function SubscriptionPage() {
   const { store, user, actor } = await getDashboardContext()
   guard(actor, 'team.manage')
 
-  const [ent, quota, accountId] = await Promise.all([
-    getEntitlements(store),
-    getOrderQuota(store),
-    ensureAccountId(user.id, user.publicId),
-  ])
-
-  const [history, requests] = await Promise.all([
-    db
-      .select({
-        id: subscriptions.id,
-        plan: subscriptions.plan,
-        status: subscriptions.status,
-        amount: subscriptions.amount,
-        currency: subscriptions.currency,
-        interval: subscriptions.interval,
-        startedAt: subscriptions.startedAt,
-        currentPeriodEnd: subscriptions.currentPeriodEnd,
-      })
-      .from(subscriptions)
-      .where(eq(subscriptions.storeId, store.id))
-      .orderBy(desc(subscriptions.createdAt))
-      .limit(24),
-    db
-      .select({
-        id: subscriptionRequests.id,
-        plan: subscriptionRequests.plan,
-        status: subscriptionRequests.status,
-        amount: subscriptionRequests.amount,
-        note: subscriptionRequests.note,
-        createdAt: subscriptionRequests.createdAt,
-      })
-      .from(subscriptionRequests)
-      .where(eq(subscriptionRequests.storeId, store.id))
-      .orderBy(desc(subscriptionRequests.createdAt))
-      .limit(10),
-  ])
-
-  const pending = requests.find((r) => r.status === 'pending') ?? null
+  /* الاستعلامات في `src/lib/subscription-data.ts` — تطبيق الموبايل بيقرا نفس البيانات */
+  const { ent, quota, accountId, history, requests, pending, trialCard } = await loadSubscription(store, user)
 
   const tone = ent.isAdmin
     ? { bg: 'var(--primary-soft)', fg: 'var(--primary)' }
@@ -92,13 +39,6 @@ export default async function SubscriptionPage() {
   }))
 
   const trial = PLANS.find((p) => p.key === 'trial')!
-
-  /* نفس الحكم اللي `startTrialAction` بيفحص بيه — مصدر واحد */
-  const trialCard = trialState({
-    onTrial: ent.onTrial,
-    trialEndsAt: store.trialEndsAt,
-    subscribedUntil: store.subscribedUntil,
-  })
 
   return (
     <div className="flex flex-col gap-6">
@@ -190,7 +130,7 @@ export default async function SubscriptionPage() {
         </Reveal>
       )}
 
-{/*
+      {/*
         الباقة التجريبية — التاجر بيبدأها بإيده.
 
         وبتختفي خالص لأي متجر اشترك قبل كده. الكارت الرمادي المكتوب

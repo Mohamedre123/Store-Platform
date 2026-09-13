@@ -44,6 +44,22 @@ createServer(async (req, res) => {
     return
   }
 
+  /* الكوبونات والمخزون والرسايل والاشتراك (dev/mock-business.mjs) */
+  if (/^\/api\/app\/(marketing|inventory|messages|subscription)(\/|$)/.test(url.pathname)) {
+    const mock = await import(new URL('../dev/mock-business.mjs', import.meta.url))
+    await new Promise((r) => setTimeout(r, 450))
+    const send = (status, body) => {
+      res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
+      res.end(JSON.stringify(body))
+    }
+    if (req.method === 'POST') {
+      if (url.pathname === '/api/app/subscription/trial') mock.startTrial()
+      return send(200, { ok: true, stock: 0 })
+    }
+    const name = url.pathname.split('/')[3]
+    return send(200, mock[name]())
+  }
+
   /* التحليلات والشحنات (dev/mock-extra.mjs) */
   if (url.pathname === '/api/app/analytics' || url.pathname === '/api/app/shipments') {
     const mock = await import(new URL('../dev/mock-extra.mjs', import.meta.url))

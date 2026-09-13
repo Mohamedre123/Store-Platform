@@ -118,6 +118,15 @@ git push origin main                              # ده اللي بينشر ا�
 | شريط صفحة تأكيد البريد `/verify` (رجوع + «غيّر البريد» + «سجّل بحساب تاني» + «الغِ التسجيل») | `verify.tsx`, `styles-verify.ts` | `/api/app/account/change-email`, `/api/app/account/abandon` |
 | التحليلات (مؤشرات، رسم إيرادات بالسحب، قُمع، توزيع الطلبات، الأكثر مبيعًا) | `analytics.tsx`, `analytics-api.ts`, `styles-analytics.ts` | `/api/app/analytics` |
 | الشحنات (إحصائيات، مستني يتشحن، قايمة بفلاتر، تتبّع/نسخ بوليصة) — التسجيل والتعديل بزرار «شحنة» ← `?web=1` | `shipments.tsx`, `shipments-api.ts` (الستايل في `styles-analytics.ts`) | `/api/app/shipments` |
+| الكوبونات والعروض (كروت كوبونات بنسخ الكود + تشغيل/إيقاف، عروض الكمية، الباقات) — الإنشاء والتعديل بزرار «كوبون» ← `?web=1` | `marketing.tsx` | `/api/app/marketing`، `POST /api/app/marketing/coupons/:id/toggle`، `POST /api/app/marketing/offers/:id/toggle` |
+| المخزون (أرقام، فلتر نافد/منخفض، بحث، تعديل الكمية بـ−/+ أو كتابة الرقم — بيتحفظ بعد ٧٠٠ms، والمتغيّرات، وسجل الحركة) | `inventory.tsx` | `/api/app/inventory`، `POST /api/app/inventory/stock` |
+| سجل الرسايل (أرقام، فلتر اللي فشلت، سبب الفشل بدوسة، فتح الطلب) | `messages.tsx` | `/api/app/messages` |
+| الاشتراك (الحالة وكام يوم فاضل، عدّاد الطلبات، بدء التجربة بضغطة، الباقات، معرّف الحساب، الطلبات والسجل) — الدفع بزرار «اشترك» ← `?web=1` | `subscription.tsx` | `/api/app/subscription`، `POST /api/app/subscription/trial` |
+| الإعدادات (قايمة مجمّعة بكل صفحات الإعدادات، متفلترة بالصلاحيات من `/api/app/me`) — «بيانات المتجر» ← `/dashboard/settings?web=1` | `settings.tsx` | `/api/app/me` |
+
+الشاشات الخمسة الأخيرة بيقروا بياناتهم من `shell/business-api.ts` (أنواع البيانات + `cachedResource`)، والطلبات من
+`shell/http.ts` (`useResource` = كاش + تحديث + رجوع لصفحة المنصة لو المسار مش منشور، و`postAppJson` = POST برسايل عربي)،
+والستايل في `shell/styles-business.ts`. **أي شاشة جديدة استخدم `cachedResource` + `useResource` بدل ما تكرر الكود.**
 
 باقي الملفات: `index.tsx` (التوجيه بين الشاشات + TabBar)، `screen.tsx` (`Screen` مع
 `overlay` للأزرار العايمة، و`Sheet` مع `tall`)، `tabbar.tsx`، `navigate.ts`، `ui.tsx`،
@@ -227,6 +236,16 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
 | `src/lib/otp.ts` (`issueEmailOtp`) | صفحة `/verify` | `/api/app/account/change-email` بيناديها بعد تغيير البريد |
 | `src/lib/analytics-data.ts` (`loadAnalytics`) | `src/app/dashboard/analytics/page.tsx` | `/api/app/analytics` ← `src/lib/app-analytics.ts` ← `shell/analytics.tsx` |
 | `src/lib/shipments-data.ts` (`loadShipments`) | `src/app/dashboard/shipments/page.tsx` | `/api/app/shipments` ← `src/lib/app-shipments.ts` ← `shell/shipments.tsx` |
+| `src/lib/marketing-data.ts` (`loadMarketing`) | `src/app/dashboard/marketing/page.tsx` | `/api/app/marketing` ← `src/lib/app-marketing.ts` ← `shell/marketing.tsx` |
+| `src/app/dashboard/marketing/actions.ts` (`toggleCouponAction`) و`offer-actions.ts` (`toggleOfferAction`) | أزرار التشغيل في اللوحة | `POST /api/app/marketing/{coupons,offers}/:id/toggle` بيناديهم |
+| `src/lib/inventory-data.ts` (`loadInventory`, `MOVEMENT_REASONS`) | `src/app/dashboard/inventory/page.tsx` | `/api/app/inventory` ← `src/lib/app-inventory.ts` ← `shell/inventory.tsx` |
+| `src/app/dashboard/inventory/actions.ts` (`setStockAction`) | خانة الكمية في اللوحة | `POST /api/app/inventory/stock` بيناديها |
+| `src/lib/messages-data.ts` (`loadMessages`) و`src/lib/message-labels.ts` | `src/app/dashboard/messages/page.tsx` | `/api/app/messages` ← `src/lib/app-messages.ts` ← `shell/messages.tsx` |
+| `src/lib/subscription-data.ts` (`loadSubscription`, `SUB_STATUS`, `REQUEST_STATUS`) | `src/app/dashboard/subscription/page.tsx` | `/api/app/subscription` ← `src/lib/app-subscription.ts` ← `shell/subscription.tsx` |
+| `src/app/dashboard/subscription/actions.ts` (`startTrialAction`) | زرار التجربة في اللوحة | `POST /api/app/subscription/trial` بيناديها |
+
+⚠ **ما تصدّرش ثوابت من ملف `page.tsx`** (Next بيرفض أي export غير المعروفين) — الثوابت المشتركة مكانها `src/lib/*-data.ts`.
+و**ما تستوردش قيم (مش أنواع) من ملف فيه `'use client'` في كود الخادم** — بتوصل كمرجع مش كقيمة. `import type` بس.
 | `src/lib/subscription.ts` (`activateStore`/`deactivateStore`) | الإدارة + صفحة الاشتراك | بتبعت رسايل الاشتراك تلقائي (قسم 7ب) — ما تشيلش نداء `notifySubscription` |
 
 ## 6) القواعد
@@ -345,8 +364,15 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
   «فاضل ٧ أيام» هيتبعت يوم 2026-09-21 تقريبًا.
 - **آخر نشر للموقع بعده:** commit `f20bed6` (لودرات التحليلات والشحنات المشتركة + `/api/app/analytics` و`/api/app/shipments`).
   اتختبر على الحي: المسارين الجداد 401 من غير جلسة، والصفحات 200/307 زي ما هي.
-- **التطبيق:** آخر نسخة مبنية **1.8 (versionCode 9)** في `H:\for claude\zawya-release\zawya-1.8.apk` و`.aab`
-  (شاشتي التحليلات والشحنات + الهيكل الفوري + شاشة الافتتاح المتحركة). النسخة الجاية **1.9 / versionCode 10**.
+- **التطبيق:** آخر نسخة مبنية **1.9 (versionCode 10)** في `H:\for claude\zawya-release\zawya-1.9.apk` و`.aab`
+  (شاشات الكوبونات والعروض، المخزون، سجل الرسايل، الاشتراك، الإعدادات — فوق 1.8: التحليلات والشحنات والهيكل الفوري
+  وشاشة الافتتاح المتحركة). النسخة الجاية **2.0 / versionCode 11**.
+- **دروس من 1.9 (خليك فاكرها):**
+  - الـswitch (`<span class="switch">`) جوّه `<button>` عادي بيبقى inline ومقاسه صفر والدايرة بتطير لطرف الشاشة — الزرار
+    اللي حواليه لازم `display:inline-flex` (`.switch-btn`). جوّه `.switch-row` شغّال لأنه flex أصلًا.
+  - أي زرار بيتداس بسرعة ورا بعض (−/+) لازم يقرا القيمة الحالية من `useRef` مش من الـstate — الضغطة التانية بتحصل قبل
+    ما الـstate يتحدّث وبتضيع (اتصلّحت في `inventory.tsx` بـ`editsRef`).
+  - لما نافذة التطبيق مستخبية، سكرين شوت المتصفح بيفشل — اختبر بـ`javascript_exec` جوّه `shadowRoot` بتاع `zawya-app-layer`.
 - **ملحوظة محاكي:** المحاكي (swiftshader) بطيء جدًا — الـWebView ممكن ياخد دقيقة يرسم لو فيه بناء Gradle أو Next شغّال
   في نفس الوقت. جرّب التطبيق على المحاكي والجهاز فاضي، واستنى ٦٠–٩٠ ثانية قبل ما تحكم إن فيه مشكلة.
 - **اتعمل:** التطبيق كامل بيفتح المنصة بلمسة تطبيق + شاشات أصلية (الرئيسية، الطلبات،

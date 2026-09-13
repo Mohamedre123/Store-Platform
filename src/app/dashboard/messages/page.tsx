@@ -1,14 +1,12 @@
-import { desc, eq, sql } from 'drizzle-orm'
 import { AlertCircle, Mail } from 'lucide-react'
-import { db } from '@/db'
-import { messageLog } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { guard } from '@/lib/permissions'
 import { isEmailConfigured } from '@/lib/email'
+import { loadMessages } from '@/lib/messages-data'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { Card } from '@/components/ui'
-import { MessagesList, type MessageRow } from './messages-list'
+import { MessagesList } from './messages-list'
 
 export const metadata = { title: 'سجل الرسايل' }
 export const dynamic = 'force-dynamic'
@@ -17,33 +15,8 @@ export default async function MessagesPage() {
   const { store, actor } = await getDashboardContext()
   guard(actor, 'orders.view')
 
-  const rows = (await db
-    .select({
-      id: messageLog.id,
-      channel: messageLog.channel,
-      event: messageLog.event,
-      recipient: messageLog.recipient,
-      body: messageLog.body,
-      status: messageLog.status,
-      provider: messageLog.provider,
-      errorMessage: messageLog.errorMessage,
-      orderId: messageLog.orderId,
-      sentAt: messageLog.sentAt,
-      createdAt: messageLog.createdAt,
-    })
-    .from(messageLog)
-    .where(eq(messageLog.storeId, store.id))
-    .orderBy(desc(messageLog.createdAt))
-    .limit(300)) as MessageRow[]
-
-  const [counts] = await db
-    .select({
-      total: sql<number>`count(*)::int`,
-      failed: sql<number>`count(*) filter (where ${messageLog.status} = 'failed')::int`,
-      last7: sql<number>`count(*) filter (where ${messageLog.createdAt} > now() - interval '7 days')::int`,
-    })
-    .from(messageLog)
-    .where(eq(messageLog.storeId, store.id))
+  /* الاستعلامات في `src/lib/messages-data.ts` — تطبيق الموبايل بيقرا نفس البيانات */
+  const { rows, total, failed, last7 } = await loadMessages(store)
 
   const configured = isEmailConfigured()
 
@@ -76,13 +49,9 @@ export default async function MessagesPage() {
       {rows.length > 0 && (
         <Reveal>
           <div className="grid gap-3 sm:grid-cols-3">
-            <Stat label="كل الرسايل" value={String(counts?.total ?? 0)} />
-            <Stat label="آخر ٧ أيام" value={String(counts?.last7 ?? 0)} />
-            <Stat
-              label="فشلت"
-              value={String(counts?.failed ?? 0)}
-              danger={(counts?.failed ?? 0) > 0}
-            />
+            <Stat label="كل الرسايل" value={String(total)} />
+            <Stat label="آخر ٧ أيام" value={String(last7)} />
+            <Stat label="فشلت" value={String(failed)} danger={failed > 0} />
           </div>
         </Reveal>
       )}

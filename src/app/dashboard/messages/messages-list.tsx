@@ -5,6 +5,7 @@ import { useMemo, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { Card } from '@/components/ui'
 import { formatDateTime } from '@/lib/utils'
+import { MESSAGE_EVENT_LABELS as EVENT_LABELS, MESSAGE_STATUS_META as STATUS_META } from '@/lib/message-labels'
 
 export type MessageRow = {
   id: string
@@ -20,27 +21,7 @@ export type MessageRow = {
   createdAt: Date
 }
 
-/** أسماء أنواع الرسايل بالعربي — المفتاح إنجليزي في قاعدة البيانات */
-const EVENT_LABELS: Record<string, string> = {
-  order_confirmation: 'تأكيد طلب',
-  merchant_new_order: 'إشعار طلب جديد',
-  abandoned_cart: 'تذكير سلة متروكة',
-  order_otp: 'رمز تحقق',
-  order_confirmed: 'الطلب اتأكّد',
-  order_processing: 'الطلب بيتجهّز',
-  order_shipped: 'الطلب اتشحن',
-  order_delivered: 'الطلب اتسلّم',
-  order_cancelled: 'الطلب اتلغى',
-  automation: 'أتمتة',
-}
-
-const STATUS_META: Record<string, { label: string; bg: string; fg: string }> = {
-  queued: { label: 'في الطابور', bg: 'var(--surface-2)', fg: 'var(--fg-muted)' },
-  sent: { label: 'اتبعتت', bg: 'var(--color-success-soft)', fg: 'var(--color-success)' },
-  delivered: { label: 'وصلت', bg: 'var(--color-success-soft)', fg: 'var(--color-success)' },
-  read: { label: 'اتقرت', bg: 'var(--color-success-soft)', fg: 'var(--color-success)' },
-  failed: { label: 'فشلت', bg: 'var(--color-danger-soft)', fg: 'var(--color-danger)' },
-}
+/* أسماء أنواع الرسايل وحالاتها في `src/lib/message-labels.ts` — تطبيق الموبايل بيقرا نفسها */
 
 export function MessagesList({ messages }: { messages: MessageRow[] }) {
   const [onlyFailed, setOnlyFailed] = useState(false)

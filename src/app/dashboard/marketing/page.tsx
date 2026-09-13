@@ -1,14 +1,12 @@
-import { and, desc, eq } from 'drizzle-orm'
-import { db } from '@/db'
-import { categories, coupons, offers, products } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { guard } from '@/lib/permissions'
+import { loadMarketing } from '@/lib/marketing-data'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { Card } from '@/components/ui'
-import { CouponsManager, type CouponRow } from './coupons-manager'
-import { OffersManager, type OfferRow } from './offers-manager'
-import { BundlesManager, type BundleRow, type PickProduct } from './bundles-manager'
+import { CouponsManager } from './coupons-manager'
+import { OffersManager } from './offers-manager'
+import { BundlesManager, type PickProduct } from './bundles-manager'
 
 export const metadata = { title: 'التسويق' }
 
@@ -16,43 +14,16 @@ export default async function MarketingPage() {
   const { store, actor } = await getDashboardContext()
   guard(actor, 'marketing.manage')
 
-  const [couponRows, productRows, categoryRows, offerRows] = await Promise.all([
-    db
-      .select()
-      .from(coupons)
-      .where(eq(coupons.storeId, store.id))
-      .orderBy(desc(coupons.isActive), desc(coupons.createdAt))
-      .limit(200),
-    db
-      .select({ id: products.id, name: products.name, price: products.price })
-      .from(products)
-      .where(and(eq(products.storeId, store.id), eq(products.status, 'active')))
-      .orderBy(products.name)
-      .limit(500),
-    db
-      .select({ id: categories.id, name: categories.name })
-      .from(categories)
-      .where(eq(categories.storeId, store.id))
-      .orderBy(categories.sortOrder),
-    db
-      .select()
-      .from(offers)
-      .where(eq(offers.storeId, store.id))
-      .orderBy(offers.sortOrder),
-  ])
-
-  const rows = couponRows as CouponRow[]
-
-  /*
-    العروض والباقات في نفس الجدول وبيتفرّقوا بـ`type`.
-
-    من غير الفصل ده، الباقة كانت بتطلع في شاشة عروض الكمية كعرض
-    بلا شرايح — سطر فاضي التاجر مش فاهم هو إيه ولا ليه مش شغّال.
-  */
-  const quantityOffers = offerRows.filter((o) => o.type === 'quantity_break') as OfferRow[]
-  const bundleRows = offerRows.filter((o) => o.type === 'fixed_bundle') as BundleRow[]
-  const active = rows.filter((c) => c.isActive).length
-  const totalUses = rows.reduce((n, c) => n + c.usedCount, 0)
+  /* الاستعلامات في `src/lib/marketing-data.ts` — تطبيق الموبايل بيقرا نفس البيانات */
+  const {
+    coupons: rows,
+    products: productRows,
+    categories: categoryRows,
+    quantityOffers,
+    bundles: bundleRows,
+    active,
+    totalUses,
+  } = await loadMarketing(store)
 
   const stats = [
     { label: 'كوبونات مفعّلة', value: String(active) },

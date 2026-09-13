@@ -1,12 +1,10 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { and, desc, eq } from 'drizzle-orm'
 import { Boxes, ImageOff } from 'lucide-react'
-import { db } from '@/db'
-import { inventoryMovements, products, productVariants } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { guard } from '@/lib/permissions'
 import { formatDateTime, formatMoney } from '@/lib/utils'
+import { loadInventory, MOVEMENT_REASONS as REASONS } from '@/lib/inventory-data'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { Card } from '@/components/ui'
@@ -22,16 +20,6 @@ const FILTERS: Array<{ key: Filter; label: string }> = [
   { key: 'out', label: 'نافد' },
 ]
 
-const REASONS: Record<string, string> = {
-  order: 'طلب',
-  return: 'مرتجع',
-  cancel: 'إلغاء طلب',
-  manual: 'تعديل يدوي',
-  restock: 'توريد',
-  import: 'استيراد',
-  transfer: 'نقل بين الفروع',
-}
-
 export default async function InventoryPage({
   searchParams,
 }: {
@@ -42,77 +30,14 @@ export default async function InventoryPage({
   const params = await searchParams
   const filter: Filter = params.filter === 'low' || params.filter === 'out' ? params.filter : 'all'
 
-  const rows = await db
-    .select({
-      id: products.id,
-      name: products.name,
-      sku: products.sku,
-      images: products.images,
-      stock: products.stock,
-      threshold: products.lowStockThreshold,
-      trackInventory: products.trackInventory,
-      costPrice: products.costPrice,
-    })
-    .from(products)
-    .where(and(eq(products.storeId, store.id), eq(products.trackInventory, true)))
-    .orderBy(products.stock, products.name)
-    .limit(300)
-
-  const variants = await db
-    .select({
-      id: productVariants.id,
-      productId: productVariants.productId,
-      title: productVariants.title,
-      sku: productVariants.sku,
-      stock: productVariants.stock,
-    })
-    .from(productVariants)
-    .where(and(eq(productVariants.storeId, store.id), eq(productVariants.isActive, true)))
-    .orderBy(productVariants.position)
-
-  const byProduct = new Map<string, typeof variants>()
-  for (const v of variants) {
-    const list = byProduct.get(v.productId) ?? []
-    list.push(v)
-    byProduct.set(v.productId, list)
-  }
-
-  /**
-   * المنتج اللي ليه متغيّرات، مخزونه الحقيقي هو مجموع مخزونها — خانة
-   * المنتج نفسها بتبقى غير مستعملة. بنحسب الاتنين ونعرض الصح.
-   */
-  const enriched = rows.map((p) => {
-    const vs = byProduct.get(p.id) ?? []
-    const effective = vs.length ? vs.reduce((sum, v) => sum + v.stock, 0) : p.stock
-    return { ...p, variants: vs, effective }
-  })
+  /* الاستعلامات في `src/lib/inventory-data.ts` — تطبيق الموبايل بيقرا نفس البيانات */
+  const { items: enriched, outCount, lowCount, units, value, movements } = await loadInventory(store)
 
   const visible = enriched.filter((p) => {
     if (filter === 'out') return p.effective <= 0
     if (filter === 'low') return p.effective > 0 && p.effective <= p.threshold
     return true
   })
-
-  const outCount = enriched.filter((p) => p.effective <= 0).length
-  const lowCount = enriched.filter((p) => p.effective > 0 && p.effective <= p.threshold).length
-  const units = enriched.reduce((sum, p) => sum + Math.max(0, p.effective), 0)
-  // قيمة المخزون بالتكلفة لا بسعر البيع — ده الفلوس المدفوعة فعلًا واللي واقفة في المخزن
-  const value = enriched.reduce((sum, p) => sum + Math.max(0, p.effective) * (p.costPrice ?? 0), 0)
-
-  const movements = await db
-    .select({
-      id: inventoryMovements.id,
-      delta: inventoryMovements.delta,
-      reason: inventoryMovements.reason,
-      note: inventoryMovements.note,
-      createdAt: inventoryMovements.createdAt,
-      productName: products.name,
-    })
-    .from(inventoryMovements)
-    .leftJoin(products, eq(products.id, inventoryMovements.productId))
-    .where(eq(inventoryMovements.storeId, store.id))
-    .orderBy(desc(inventoryMovements.createdAt))
-    .limit(40)
 
   const stats = [
     { label: 'قطع في المخزن', value: units.toLocaleString('ar-EG') },

@@ -25,7 +25,7 @@ import { clearProductsCache } from './products-api'
 import { Sheet } from './screen'
 import { Icon } from './ui'
 
-type Me = {
+export type Me = {
   user: { name: string | null; email: string; isPlatformAdmin: boolean }
   store: { name: string; slug: string; logo: string | null; url: string }
   role: string
@@ -34,7 +34,7 @@ type Me = {
 
 const ME_KEY = 'zw-me:v1'
 
-function readMe(): Me | null {
+export function readMe(): Me | null {
   try {
     const raw = localStorage.getItem(ME_KEY)
     return raw ? (JSON.parse(raw) as Me) : null
@@ -51,7 +51,7 @@ export function clearMeCache(): void {
   }
 }
 
-async function fetchMe(): Promise<Me | null> {
+export async function fetchMe(): Promise<Me | null> {
   try {
     const res = await fetch('/api/app/me', { credentials: 'same-origin', cache: 'no-store', headers: { accept: 'application/json' } })
     if (!res.ok || !(res.headers.get('content-type') ?? '').includes('application/json')) return null
