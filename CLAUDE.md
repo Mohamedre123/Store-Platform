@@ -141,6 +141,8 @@ git push origin main                              # ده اللي بينشر ا�
 | الولاء والنقاط `/dashboard/loyalty` (أرقام، مفتاح تشغيل النقاط، القواعد بمثال حي في لوحة، متجر المكافآت إضافة/تعديل/حذف، مفتاح تشغيل عجلة الحظ، آخر الحركات — **من 2.5:** «عدّل مستويات العملاء» (النوع/الاسم/من كام نقطة/الخصم، لحد ٤) و«عدّل العجلة» (التشغيل/العنوان/السطر/تظهر بعد/لفّات يوميًا/الجوايز من ٢ لـ٨ بالنوع والقيمة والفرصة واللون + مجموع الفرص) في لوحات `loyalty-editors.tsx` — لو `editsTiers` مش موجود ← `?web=1`) | `loyalty.tsx`, `loyalty-editors.tsx` | `/api/app/loyalty` (`customers.view` — بقى فيه `editsTiers` و`wheel.{subtitle,triggerAfterSeconds,freeSpinsPerDay,prizeInputs}`)، `POST /api/app/loyalty/{settings,wheel,tiers}` (`wheel` بيقبل `{enabled}` بس للنسخ القديمة أو كل الخانات والجوايز من 2.5؛ `tiers` بياخد اللون والمزايا من المستوى القديم بنفس المفتاح)، `POST /api/app/loyalty/rewards/save`، `POST /api/app/loyalty/rewards/:id/delete` — **`settings` بيبعت المستويات الموجودة (أو `DEFAULT_TIERS` من `src/lib/loyalty-meta.ts`) و`wheel` بيبعت العنوان والجوايز الموجودين**، لأن الأفعال بتكتب كل حاجة من الأول |
 | المسوّقون بالعمولة `/dashboard/affiliates` (مستحق/بيعات، كارت لكل مسوّق بكوده وضغطاته وبيعاته ومستحقه، «سجّل صرف» بتأكيد، «ابعتله رابطه» واتساب، انسخ، ⋯ = اتصل/عدّل/وقّفه/احذف، إضافة وتعديل في لوحة) | `affiliates.tsx` | `/api/app/affiliates` (`marketing.manage`)، `POST /api/app/affiliates/save`، `POST /api/app/affiliates/:id/{pay,delete}` |
 | حِيل صاحبك `/dashboard/referrals` (رابط الإحالة بنسخة، واتساب برسالة جاهزة، شارك، انسخ الرسالة، الكود، سجّلوا/اشتركوا/طلبات وصّلتها) | `referrals.tsx` | `/api/app/referrals` (من غير صلاحية — زي الصفحة) |
+| معرض الوسائط `/dashboard/media` (شبكة صور ٣ أعمدة بفلتر المجلد و«في X منتج»، «صوّر»/«من المعرض» بيرفعوا لحد ١٠ صور على `/api/upload` في المجلد المختار (الكل = `misc`)، دوسة = لوحة: معاينة، تغيير الاسم، انسخ/شارك/افتح، الحذف بتأكيد — المستعملة في منتج مالهاش زرار حذف) | `media.tsx` | `/api/app/media` (`storefront.manage` — بيعمل `syncFromStorage` زي الصفحة)، `POST /api/app/media/:id/{rename,delete}` |
+| المدوّنة `/dashboard/blog` (المقالات بالغلاف والمشاهدات ومفتاح نشر، «مقال جديد» والدوسة = لوحة كتابة: الغلاف بالكاميرا/المعرض (مجلد `misc`)، العنوان، المقدّمة، المحتوى، الكاتب، الرابط، النشر، «شارك رابط المقال»، الحذف بتأكيد) | `blog.tsx` | `/api/app/blog` (`storefront.manage`)، `POST /api/app/blog/save`، `POST /api/app/blog/:id/{toggle,delete}` |
 
 شاشات الحظر والمندوبين والحجوزات والمصروفات والموردين والأقسام والسلة والولاء والمسوّقين والإحالة بياناتهم في `shell/ops-api.ts` (فيه كمان `copyText` و`COPY_ICON`/`WALLET_ICON`) (فيه كمان `waNumber` لرقم واتساب دولي و`toLatin` للأرقام العربي) وستايلهم في `shell/styles-ops.ts`. رفع الصور (`shrink` و`upload(file, folder)`) متصدّر من `shell/product-new.tsx`.
 الشاشات دي كلها بيقروا بياناتهم من `shell/business-api.ts` (أنواع البيانات + `cachedResource`)، والطلبات من
@@ -278,6 +280,8 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
 | `src/lib/loyalty-data.ts` (`loadLoyalty`, `wheelPrizeInputs`) + `src/lib/loyalty-meta.ts` (`DEFAULT_TIERS` — فورم اللوحة بيستوردها منه) + `loyalty/{actions,rewards-actions,wheel-actions}.ts` + `src/lib/rewards-meta.ts` | `src/app/dashboard/loyalty/page.tsx` | `/api/app/loyalty*` ← `src/lib/app-loyalty.ts` ← `shell/loyalty.tsx` |
 | `src/lib/affiliates-data.ts` (`loadAffiliates`) + `affiliates/actions.ts` | `src/app/dashboard/affiliates/page.tsx` | `/api/app/affiliates*` ← `src/lib/app-affiliates.ts` ← `shell/affiliates.tsx` |
 | `src/lib/merchant-referrals.ts` (`referralSummary`) + `src/lib/notices.ts` (`storeStats`) | `src/app/dashboard/referrals/page.tsx` | `/api/app/referrals` ← `shell/referrals.tsx` |
+| `src/lib/media.ts` (`syncFromStorage`, `listMedia`, `usageFor`) + `src/lib/media-meta.ts` + `media/actions.ts` | `src/app/dashboard/media/page.tsx` | `/api/app/media*` ← `src/lib/app-media.ts` ← `shell/media.tsx` |
+| `src/lib/blog-data.ts` (`loadBlogPosts`) + `blog/actions.ts` (`savePostAction`, `togglePostAction`, `deletePostAction`) | `src/app/dashboard/blog/page.tsx` | `/api/app/blog*` ← `src/lib/app-blog.ts` ← `shell/blog.tsx` |
 
 ⚠ **ما تصدّرش ثوابت من ملف `page.tsx`** (Next بيرفض أي export غير المعروفين) — الثوابت المشتركة مكانها `src/lib/*-data.ts`.
 و**ما تستوردش قيم (مش أنواع) من ملف فيه `'use client'` في كود الخادم** — بتوصل كمرجع مش كقيمة. `import type` بس.
@@ -423,10 +427,12 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
 - **نشر الموقع (2.1):** commit `4cb078c` + commit فاضي `977556c` (Vercel ما نشرش الأول لوحده — حصلت مرتين، لو المسارات
   الجديدة فضلت 404 بعد ١٠ دقايق ارفع commit فاضي). اتختبر على الحي: `/api/app/{blocked,bookings,couriers}` و`products/:id/edit`
   = 401، والـPOST من غير Origin = 403، والصفحات 200/307 زي ما هي.
-- **التطبيق:** آخر نسخة مبنية **2.5 (versionCode 16)** في `H:\for claude\zawya-release\zawya-2.5.apk` و`.aab`
-  (عروض الكمية والباقات من التطبيق، تعديل مستويات الولاء وجوايز العجلة من التطبيق — فوق 2.4: إنشاء/تعديل/حذف كوبون من التطبيق، تسجيل شحنة وتغيير حالتها والتحصيل من التطبيق — فوق 2.3: الولاء والنقاط، المسوّقون بالعمولة، حِيل صاحبك — فوق 2.2: المصروفات والأرباح، الموردون، الأقسام، سلة المهملات — فوق 2.1: تعديل منتج بالكاميرا، الحظر، المندوبون، الحجوزات —
+- **التطبيق:** آخر نسخة مبنية **2.6 (versionCode 17)** في `H:\for claude\zawya-release\zawya-2.6.apk` و`.aab`
+  (معرض الوسائط بالرفع من الكاميرا، المدوّنة بالكتابة والنشر — فوق 2.5: عروض الكمية والباقات من التطبيق، تعديل مستويات الولاء وجوايز العجلة من التطبيق — فوق 2.4: إنشاء/تعديل/حذف كوبون من التطبيق، تسجيل شحنة وتغيير حالتها والتحصيل من التطبيق — فوق 2.3: الولاء والنقاط، المسوّقون بالعمولة، حِيل صاحبك — فوق 2.2: المصروفات والأرباح، الموردون، الأقسام، سلة المهملات — فوق 2.1: تعديل منتج بالكاميرا، الحظر، المندوبون، الحجوزات —
   فوق 2.0: منتج جديد بالكاميرا، المراجعات، المرتجعات، الشكاوى، قفل البصمة — فوق 1.9: الكوبونات والمخزون والرسايل
-  والاشتراك والإعدادات، وفوق 1.8: التحليلات والشحنات والهيكل الفوري وشاشة الافتتاح المتحركة). النسخة الجاية **2.6 / versionCode 17**.
+  والاشتراك والإعدادات، وفوق 1.8: التحليلات والشحنات والهيكل الفوري وشاشة الافتتاح المتحركة). النسخة الجاية **2.7 / versionCode 18**.
+- **درس من 2.6:** رفع الصور يتجرّب في المتصفح من غير كاميرا: اعمل `File` من `canvas.toBlob`، حطّه في `DataTransfer`،
+  واكتب `input.files = dt.files` وابعت `change` — سيرفر التجربة بيرد على `/api/upload` برابط وهمي.
 - **درس من 2.5:** سيرفر التجربة بيستورد `mock-*.mjs` بـ`import()` وNode بيحفظ الموديول — أي تعديل في ملفات الـmock
   محتاج `preview_stop` + `preview_start` عشان يبان.
 - **درس من 2.4:** في سكربتات الاختبار دوّر على اللوحة المفتوحة بـ`.sheet--open` مش بنص جوّاها — لوحات شاشات تانية
@@ -484,6 +490,8 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
    المندوبين («ابعتله الرابط» بيفتح واتساب)، الحجوزات — بالبيانات الحقيقية (اتجرّبوا ببيانات وهمية بس).
 2. صاحب المشروع يربط واتساب متجر الإدارة (atlosa) من «الإعدادات ← واتساب» عشان رسايل الاشتراك توصل واتساب كمان،
    ويجرّب «جدّد الاشتراك» من «إدارة المنصة» على متجر تجريبي ويتأكد الإيميل وصل الوارد.
-3. الجاي في التطبيق: باقي صفحات اللوحة اللي لسه موقع (الاستوديو، الإضافات، واجهة المتجر، الأسواق، التجارب، المساعد، الأتمتة، المدونة، الوسائط، المطوّرين).
+3. الجاي في التطبيق: باقي صفحات اللوحة اللي لسه موقع — بالترتيب المقترح: البانرات `/dashboard/storefront/banners`
+   (صور بالكاميرا)، الأتمتة `/dashboard/automations` (تشغيل/إيقاف)، الدفع `/dashboard/payments` والشحن `/dashboard/shipping`
+   (إعدادات)، البوستات `/dashboard/studio/posts`، ثم الاستوديو والإضافات وواجهة المتجر (كبار — ممكن يفضلوا موقع).
 4. iOS: Face ID للقفل + إشعارات APNs (محتاج حساب Apple Developer + ماك).
 5. **جوجل بلاي مؤجّل** (صاحب المشروع قال مفيش ميزانية دلوقتي) — ما تفتحش الموضوع غير لو طلبه.

@@ -1,8 +1,6 @@
-import { desc, eq } from 'drizzle-orm'
-import { db } from '@/db'
-import { blogPosts } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { guard } from '@/lib/permissions'
+import { loadBlogPosts } from '@/lib/blog-data'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { BlogManager, type PostRow } from './blog-manager'
@@ -13,23 +11,8 @@ export default async function BlogPage() {
   const { store, actor } = await getDashboardContext()
   guard(actor, 'storefront.manage')
 
-  const rows = await db
-    .select({
-      id: blogPosts.id,
-      title: blogPosts.title,
-      slug: blogPosts.slug,
-      excerpt: blogPosts.excerpt,
-      content: blogPosts.content,
-      cover: blogPosts.cover,
-      author: blogPosts.author,
-      isPublished: blogPosts.isPublished,
-      publishedAt: blogPosts.publishedAt,
-      views: blogPosts.views,
-    })
-    .from(blogPosts)
-    .where(eq(blogPosts.storeId, store.id))
-    .orderBy(desc(blogPosts.createdAt))
-    .limit(200)
+  /* الاستعلام في `src/lib/blog-data.ts` — تطبيق الموبايل بيقرا نفس المقالات */
+  const rows = await loadBlogPosts(store.id)
 
   return (
     <div className="flex flex-col gap-6">

@@ -234,6 +234,39 @@ export function referrals() {
   return { storeName: 'متجر الأناقة', link: 'https://www.zawyaeg.site/signup?ref=ELANAKA', code: 'ELANAKA', signups: 3, subscribed: 1, deliveredOrders: 412 }
 }
 
+/* صورة صغيرة ملوّنة كـdata URL — عشان الشبكة تبان من غير نت */
+const swatch = (hex) =>
+  `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="${hex}"/></svg>`)}`
+
+export function media() {
+  const rows = [
+    ['md1', 'فستان سهرة أمامي.jpg', 'products', 420000, 2, '#634b9a'],
+    ['md2', 'فستان سهرة خلفي.jpg', 'products', 380000, 1, '#8b5cf6'],
+    ['md3', 'بانر العيد.png', 'banners', 910000, 0, '#c9a227'],
+    ['md4', 'شعار.png', 'logos', 60000, 0, '#0f4c81'],
+    ['md5', 'قسم الشنط.jpg', 'categories', 250000, 0, '#a8577a'],
+    ['md6', 'صورة قديمة.jpg', 'misc', 190000, 0, '#6b5644'],
+  ]
+  const labels = { products: 'صور المنتجات', categories: 'صور الأقسام', banners: 'البانرات', logos: 'الشعارات', misc: 'متنوّع' }
+  return {
+    synced: 0,
+    totalBytes: rows.reduce((n, r) => n + r[3], 0),
+    folders: Object.entries(labels).map(([key, label]) => ({ key, label })),
+    items: rows.map(([id, name, folder, sizeBytes, usedIn, hex], i) => ({
+      id, name, folder, folderLabel: labels[folder], sizeBytes, usedIn, url: swatch(hex), createdAt: hoursAgo(i * 20 + 1),
+    })),
+  }
+}
+
+export function blog() {
+  return {
+    posts: [
+      { id: 'bp1', title: 'إزاي تختاري فستان السهرة المناسب لجسمك', slug: 'choose-evening-dress', excerpt: 'دليل سريع للمقاسات والقصّات', content: 'الفقرة الأولى.\n\nالفقرة التانية.', cover: swatch('#634b9a'), author: 'فريق المتجر', isPublished: true, publishedAt: hoursAgo(80), views: 312, url: 'https://www.zawyaeg.site/s/demo/blog/choose-evening-dress' },
+      { id: 'bp2', title: 'العناية بالشنط الجلد', slug: 'leather-care', excerpt: '', content: '', cover: null, author: '', isPublished: false, publishedAt: null, views: 0, url: 'https://www.zawyaeg.site/s/demo/blog/leather-care' },
+    ],
+  }
+}
+
 /** فورم التعديل من تفاصيل المنتج الوهمية (mock-api.mjs) */
 export function productEdit(detail) {
   const p = detail.product

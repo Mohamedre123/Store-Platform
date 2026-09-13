@@ -224,6 +224,43 @@ export type ReferralsPayload = {
   deliveredOrders: number
 }
 
+export type MediaItem = {
+  id: string
+  url: string
+  name: string
+  folder: string
+  folderLabel: string
+  sizeBytes: number
+  createdAt: string
+  usedIn: number
+}
+
+export type MediaPayload = {
+  synced: number
+  totalBytes: number
+  folders: Array<{ key: string; label: string }>
+  items: MediaItem[]
+}
+
+export type BlogPost = {
+  id: string
+  title: string
+  slug: string
+  excerpt: string
+  content: string
+  cover: string | null
+  author: string
+  isPublished: boolean
+  publishedAt: string | null
+  views: number
+  url: string
+}
+
+export type BlogPayload = { posts: BlogPost[] }
+
+export const mediaData = cachedResource<MediaPayload>('zw-media:v1', '/api/app/media')
+export const blogData = cachedResource<BlogPayload>('zw-blog:v1', '/api/app/blog')
+
 export const loyaltyData = cachedResource<LoyaltyPayload>('zw-loyalty:v1', '/api/app/loyalty')
 export const affiliatesData = cachedResource<AffiliatesPayload>('zw-affiliates:v1', '/api/app/affiliates')
 export const referralsData = cachedResource<ReferralsPayload>('zw-referrals:v1', '/api/app/referrals')
@@ -264,6 +301,14 @@ export function clearOpsCaches(): void {
   loyaltyData.clear()
   affiliatesData.clear()
   referralsData.clear()
+  mediaData.clear()
+  blogData.clear()
+}
+
+/** «١٫٢ ميجا» — حجم ملف بالعربي */
+export function formatSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toLocaleString('ar-EG', { maximumFractionDigits: 1 })} ميجا`
+  return `${Math.max(1, Math.round(bytes / 1024)).toLocaleString('ar-EG')} ك.ب`
 }
 
 /** أرقام عربي وفواصل ← أرقام لاتيني بنقطة عشرية */

@@ -153,6 +153,24 @@ export const OPS_CSS = `
 .mk-edit{display:inline-flex;align-items:center;gap:6px;padding:4px 0;border:0;background:none;font-size:12.5px!important;color:var(--fg-muted,#5c6890)!important}
 .mk-edit .ic{width:14px;height:14px;color:var(--primary,#634b9a)}
 
+/* ─── معرض الوسائط ─── */
+.md-upload{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:4px 0 12px}
+.md-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
+.md-cell{position:relative;aspect-ratio:1;padding:0;border:0;border-radius:14px;overflow:hidden;background:var(--surface-2,#f1f2f6)}
+.md-cell img{width:100%;height:100%;object-fit:cover;display:block}
+.md-sk{aspect-ratio:1;border-radius:14px}
+.md-used{position:absolute;right:5px;bottom:5px;padding:1px 6px;border-radius:999px;font-size:10px;font-weight:700;color:#fff;background:rgba(21,128,61,.85)}
+.md-preview{width:100%;max-height:44vh;object-fit:contain;border-radius:16px;background:var(--surface-2,#f1f2f6)}
+
+/* ─── المدوّنة ─── */
+.bg-row{padding:8px 10px 8px 6px}
+.bg-row--draft .bl-main b{color:var(--fg-muted,#5c6890)}
+.bg-open{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:4px;border:0;background:none;text-align:start;color:var(--fg,#222540)!important}
+.bg-thumb{width:56px;height:56px}
+.bg-cover{width:110px;height:74px}
+.bg-excerpt{min-height:80px}
+.bg-content{min-height:220px}
+
 /* ─── تعديل المستويات والعجلة ─── */
 .ly-edit{display:flex;flex-direction:column;gap:10px;padding:12px}
 .ly-edit-head{display:flex;align-items:center;gap:10px}
