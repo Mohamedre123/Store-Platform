@@ -54,7 +54,7 @@ createServer(async (req, res) => {
   }
 
   /* تعديل المنتج والحظر والمندوبين والحجوزات (dev/mock-ops.mjs) */
-  if (/^\/api\/app\/(blocked|couriers|bookings|expenses|suppliers|categories|trash|loyalty|affiliates|referrals|media|blog|banners|automations|payments|shipping|posts)(\/|$)/.test(url.pathname) || /^\/api\/app\/products\/[^/]+\/edit$/.test(url.pathname)) {
+  if (/^\/api\/app\/(blocked|couriers|bookings|expenses|suppliers|categories|trash|loyalty|affiliates|referrals|media|blog|banners|automations|payments|shipping|posts|schedules|social-accounts)(\/|$)/.test(url.pathname) || /^\/api\/app\/products\/[^/]+\/edit$/.test(url.pathname)) {
     const mock = await import(new URL('../dev/mock-ops.mjs', import.meta.url))
     await new Promise((r) => setTimeout(r, 450))
     const send = (status, body) => {
@@ -75,7 +75,8 @@ createServer(async (req, res) => {
       if (url.pathname.endsWith('/blocked/add') && !String(body.value ?? '').trim()) return send(400, { ok: false, error: 'اكتب القيمة' })
       return send(200, { ok: true, count: 3 })
     }
-    return send(200, mock[parts[2]]())
+    if (parts[2] === 'schedules' && parts[3] === 'models') return send(200, mock.scheduleModels())
+    return send(200, mock[parts[2] === 'social-accounts' ? 'socialAccounts' : parts[2]]())
   }
 
   /* منتج جديد والمراجعات والمرتجعات والشكاوى (dev/mock-care.mjs) */

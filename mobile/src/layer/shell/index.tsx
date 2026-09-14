@@ -78,6 +78,8 @@ import { COMMERCE_CSS } from './styles-commerce'
 import { PostsScreen } from './posts'
 import { clearStudioCaches } from './studio-api'
 import { STUDIO_CSS } from './styles-studio'
+import { SchedulesScreen } from './schedules'
+import { SocialAccountsScreen } from './social-accounts'
 
 const ORDER_DETAIL = /^\/dashboard\/orders\/([^/]+)$/
 /* صفحات جوّه المنتجات مش منتجات — new وcategories وimport وtrash بيفضلوا صفحات المنصة */
@@ -132,9 +134,13 @@ type ScreenKey =
   | 'payments'
   | 'shipping'
   | 'posts'
+  | 'schedules'
+  | 'socialAccounts'
 
 const SCREEN_KEYS: ScreenKey[] = [
   'posts',
+  'schedules',
+  'socialAccounts',
   'payments',
   'shipping',
   'banners',
@@ -389,6 +395,14 @@ function Shell() {
       <PostsScreen
         visible={path === '/dashboard/studio/posts' && !unavailable.posts && !web}
         onUnavailable={markUnavailable.posts}
+      />
+      <SchedulesScreen
+        visible={path === '/dashboard/studio/schedules' && !unavailable.schedules && !web}
+        onUnavailable={markUnavailable.schedules}
+      />
+      <SocialAccountsScreen
+        visible={path === '/dashboard/studio/accounts' && !unavailable.socialAccounts && !web}
+        onUnavailable={markUnavailable.socialAccounts}
       />
       <VerifyBar visible={path === '/verify'} />
       {/* شاشات التفاصيل ومنتج جديد ليها أزرار تحت — المساعد على الشاشات الرئيسية وصفحات المنصة */}

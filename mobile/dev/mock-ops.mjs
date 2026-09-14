@@ -383,3 +383,38 @@ export function posts() {
     ],
   }
 }
+
+export function schedules() {
+  const weekdays = ['الأحد', 'الاتنين', 'التلات', 'الأربع', 'الخميس', 'الجمعة', 'السبت'].map((label, day) => ({ day, label }))
+  const base = { targets: ['sa1'], source: 'auto', categoryId: null, productIds: [], style: null, preset: 'portrait', slides: 5, imageStyle: 'auto', aiProvider: null, aiTextModel: null, aiImageModel: null, lastRunAt: null, lastError: null }
+  return {
+    studioEnabled: true,
+    timezone: 'Africa/Cairo',
+    providers: [{ key: 'gemini', label: 'Gemini' }, { key: 'openai', label: 'ChatGPT' }],
+    weekdays,
+    presets: [{ key: 'portrait', label: 'إنستجرام', hint: '' }, { key: 'square', label: 'مربّع', hint: '' }, { key: 'story', label: 'ستوري وريلز', hint: '' }, { key: 'landscape', label: 'عرضي', hint: '' }],
+    styles: [{ key: 'auto', label: 'يختار لوحده', hint: 'على حسب المنتج وكلامك' }, { key: 'plain', label: 'خلفية سادة', hint: 'المنتج لوحده على لون واحد' }, { key: 'scene', label: 'مكان حقيقي', hint: 'المنتج في مكان استخدامه' }, { key: 'ugc', label: 'عفوية بالموبايل', hint: 'كأن عميل حقيقي صوّرها' }],
+    accounts: [{ id: 'sa1', name: 'متجر الأناقة', platform: 'facebook', color: '#1877F2' }, { id: 'sa2', name: '@elanaka.store', platform: 'instagram', color: '#E1306C' }],
+    categories: [{ id: 'c1', name: 'فساتين' }, { id: 'c2', name: 'شنط' }],
+    products: [{ id: 'p-000001', name: 'فستان صيفي', image: swatch('#c084fc') }, { id: 'p-000002', name: 'شنطة جلد', image: swatch('#92400e') }, { id: 'p-000003', name: 'حذاء رياضي', image: null }],
+    schedules: [
+      { ...base, id: '2d8f3e1a-4b5c-4d6e-9f7a-8b9c0d1e2f31', name: 'بوست يومي', isActive: true, days: [0, 1, 2, 3, 4, 5, 6], timeOfDay: '10:00', media: 'image', autoPublish: false, nextRunAt: hoursAgo(-14), summary: 'كل يوم الساعة 10:00' },
+      { ...base, id: '3e9a4f2b-5c6d-4e7f-8a9b-9c0d1e2f3a42', name: 'كاروسيل الجمعة', isActive: false, days: [5], timeOfDay: '19:30', media: 'carousel', slides: 6, autoPublish: true, targets: ['sa1', 'sa2'], nextRunAt: null, lastError: 'مفتاح Gemini خلص رصيده — راجع الإضافات', summary: 'كل الجمعة الساعة 19:30' },
+    ],
+  }
+}
+
+export function scheduleModels() {
+  return { ok: true, provider: 'gemini', text: [{ id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' }, { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' }], image: [{ id: 'imagen-4', label: 'Imagen 4' }], defaultText: 'gemini-2.5-flash', defaultImage: null }
+}
+
+export function socialAccounts() {
+  return {
+    studioEnabled: true,
+    viaProvider: true,
+    accounts: [
+      { id: 'sa1', name: 'متجر الأناقة', platform: 'facebook', platformLabel: 'فيسبوك', color: '#1877F2', avatar: null, canPublish: true, status: 'active', lastError: null },
+      { id: 'sa3', name: 'elanaka', platform: 'tiktok', platformLabel: 'تيك توك', color: '#010101', avatar: null, canPublish: false, status: 'expired', lastError: 'تيك توك لغى الإذن — اربط تاني' },
+    ],
+  }
+}

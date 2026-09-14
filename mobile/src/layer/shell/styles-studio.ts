@@ -38,4 +38,39 @@ video.pst-media{background:#000}
 .pst-hint{font-size:12px;line-height:1.7;color:var(--fg-subtle,#8a92ad)}
 .pst-account{display:inline-flex;align-items:center;gap:6px}
 .pst-account small{font-size:11px;opacity:.65}
+
+/* ─── النشر التلقائي (schedules.tsx) ─── */
+.sc-tz{display:block;margin:0 4px 10px}
+.sc-card{display:flex;flex-direction:column;gap:12px;padding:14px 16px}
+.sc-card--off .bl-main>b{opacity:.6}
+.sc-head{display:flex;align-items:flex-start;gap:10px}
+.sc-pills{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 2px}
+.sc-time{max-width:160px;margin-top:8px}
+.sc-options{display:flex;flex-direction:column;gap:8px}
+.sc-options--row{flex-direction:row;flex-wrap:wrap}
+.sc-options--row .sc-option{flex:1 1 calc(33% - 6px);min-width:96px}
+.sc-option{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:10px 12px;border:1.5px solid var(--border,#e2e4ec);border-radius:14px;background:var(--surface,#fff);text-align:start}
+.sc-option b{font-size:14px}
+.sc-option small{font-size:11.5px;font-weight:400;color:var(--fg-subtle,#8a92ad)}
+.sc-option--on{border-color:var(--primary,#634b9a);background:var(--primary-soft,#ece8f5)}
+.sc-option--on b{color:var(--primary,#634b9a)}
+.sc-warn{color:var(--color-warning,#a16207)!important}
+.sc-products{display:flex;flex-direction:column;gap:4px;max-height:260px;overflow-y:auto;margin-top:8px;padding:4px;border:1px solid var(--border,#e2e4ec);border-radius:14px}
+.sc-product{display:flex;align-items:center;gap:10px;min-height:48px;padding:4px 8px;border:0;border-radius:10px;background:none;text-align:start;font-size:14px}
+.sc-product .inv-thumb{width:38px;height:38px}
+.sc-product-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sc-product--on{background:var(--primary-soft,#ece8f5);color:var(--primary,#634b9a)!important}
+.sc-product .ic{width:18px;height:18px}
+.sc-styles{display:flex;flex-wrap:wrap;gap:6px}
+.sc-models{display:flex;flex-direction:column;gap:8px}
+
+/* ─── حسابات السوشيال (social-accounts.tsx) ─── */
+.sa-row{gap:10px}
+.sa-avatar{flex:none;width:42px;height:42px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.sa-avatar img{width:100%;height:100%;object-fit:cover}
+.sa-avatar i{width:12px;height:12px;border-radius:50%}
+.sa-connect{display:flex;flex-direction:column;gap:12px;margin-top:14px}
+.sa-connect .page-sub{margin:-6px 0 0}
+.sa-steps{margin:0;padding-inline-start:20px;display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.7;color:var(--fg-muted,#5c6890)}
+.sa-steps--dots{margin-top:6px;font-size:12.5px}
 `
