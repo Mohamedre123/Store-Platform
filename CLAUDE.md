@@ -475,7 +475,10 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
   «فاضل ٧ أيام» هيتبعت يوم 2026-09-21 تقريبًا.
 - **آخر نشر للموقع بعده:** commit `f20bed6` (لودرات التحليلات والشحنات المشتركة + `/api/app/analytics` و`/api/app/shipments`).
   اتختبر على الحي: المسارين الجداد 401 من غير جلسة، والصفحات 200/307 زي ما هي.
-- **آخر نشر للموقع (دعوة الموظف + 3.0):** commit `c80cb5c` (بعد `f53e10b` الناقص — درس الرفع تحت). اتختبر على الحي: `/join?t=غلط` = 200
+- **آخر نشر للموقع (3.1):** commit `cd6d761` — اتنشر لوحده خلال دقيقتين. اتختبر على الحي: `/api/app/{schedules,schedules/models,social-accounts}` = 401،
+  و`schedules/save` و`schedules/:id/{run,delete}` و`social-accounts/sync` و`social-accounts/:id/disconnect` = 403 من غير Origin، والصفحات
+  (`/`، `/login`، `/signup`، `/join` = 200؛ `/dashboard`، `/dashboard/studio/{schedules,accounts}` = 307) زي ما هي.
+- **نشر الموقع (دعوة الموظف + 3.0):** commit `c80cb5c` (بعد `f53e10b` الناقص — درس الرفع تحت). اتختبر على الحي: `/join?t=غلط` = 200
   وفيها «الدعوة مش شغّالة»، `/join` = 200 وفيها «الرابط ناقص»، `/login?next=/join…` = 200 بعنوان «سجّل دخول عشان تنضم للفريق»،
   `/api/app/posts` = 401، و`posts/:id/{publish,delete}` = 403 من غير Origin، والصفحات (`/`، `/login`، `/signup` = 200؛ `/verify`، `/dashboard`،
   `/dashboard/settings/team`، `/dashboard/studio/posts` = 307) زي ما هي. **ما اتجرّبش لسه:** دعوة حقيقية لبريد جديد (الإيميل وإنشاء الحساب والانضمام).
