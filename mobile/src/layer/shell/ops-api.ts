@@ -258,6 +258,57 @@ export type BlogPost = {
 
 export type BlogPayload = { posts: BlogPost[] }
 
+export type Banner = {
+  id: string
+  placement: string
+  placementLabel: string
+  title: string
+  subtitle: string
+  imageDesktop: string | null
+  imageMobile: string | null
+  ctaLabel: string
+  ctaUrl: string
+  startsAt: string
+  endsAt: string
+  isActive: boolean
+  expired: boolean
+}
+
+export type BannersPayload = { placements: Array<{ key: string; label: string }>; banners: Banner[] }
+
+export const bannersData = cachedResource<BannersPayload>('zw-banners:v1', '/api/app/banners')
+
+export type AutomationRecipient = {
+  id: string
+  name: string
+  channel: string
+  channelLabel: string
+  target: string
+  eventsLabel: string
+  isActive: boolean
+}
+
+export type AutomationRule = {
+  id: string
+  name: string
+  triggerLabel: string
+  conditions: string[]
+  actions: string[]
+  cooldownHours: number
+  enabled: boolean
+  runCount: number
+  lastRunAt: string | null
+}
+
+export type AutomationsPayload = {
+  whatsappReady: boolean
+  telegramReady: boolean
+  recipients: AutomationRecipient[]
+  rules: AutomationRule[]
+}
+
+export const automationsData = cachedResource<AutomationsPayload>('zw-automations:v1', '/api/app/automations')
+
 export const mediaData = cachedResource<MediaPayload>('zw-media:v1', '/api/app/media')
 export const blogData = cachedResource<BlogPayload>('zw-blog:v1', '/api/app/blog')
 
@@ -303,6 +354,8 @@ export function clearOpsCaches(): void {
   referralsData.clear()
   mediaData.clear()
   blogData.clear()
+  bannersData.clear()
+  automationsData.clear()
 }
 
 /** «١٫٢ ميجا» — حجم ملف بالعربي */

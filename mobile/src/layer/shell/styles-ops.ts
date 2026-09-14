@@ -171,6 +171,23 @@ export const OPS_CSS = `
 .bg-excerpt{min-height:80px}
 .bg-content{min-height:220px}
 
+/* ─── البانرات ─── */
+.bn-thumb{width:72px;height:48px;border-radius:12px}
+.bn-box{width:120px;height:68px}
+
+/* ─── الأتمتة ─── */
+.au-channels{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 6px}
+.au-ch{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;font-size:12.5px;font-weight:700;color:var(--fg-muted,#5c6890);background:var(--surface-2,#f1f2f6)}
+.au-ch .ic{width:15px;height:15px}
+.au-ch--on{color:var(--color-success,#15803d);background:var(--color-success-soft,#dcfce7)}
+.au-web{margin-top:14px}
+.au-flow{display:flex;flex-direction:column;gap:8px}
+.au-step{display:flex;flex-direction:column;gap:4px;padding:12px;border-radius:14px;background:var(--surface-2,#f1f2f6)}
+.au-step small{font-size:11.5px;font-weight:700;color:var(--fg-subtle,#8a92ad)}
+.au-step b{font-size:14px;line-height:1.6}
+.au-step--do{background:var(--primary-soft,#ece8f5)}
+.au-step--do small{color:var(--primary,#634b9a)}
+
 /* ─── تعديل المستويات والعجلة ─── */
 .ly-edit{display:flex;flex-direction:column;gap:10px;padding:12px}
 .ly-edit-head{display:flex;align-items:center;gap:10px}

@@ -1,8 +1,6 @@
-import { desc, eq } from 'drizzle-orm'
-import { db } from '@/db'
-import { banners } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { guard } from '@/lib/permissions'
+import { loadBanners } from '@/lib/banners-data'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { BannersManager, type BannerRow } from './banners-manager'
@@ -13,12 +11,8 @@ export default async function BannersPage() {
   const { store, actor } = await getDashboardContext()
   guard(actor, 'storefront.manage')
 
-  const rows = await db
-    .select()
-    .from(banners)
-    .where(eq(banners.storeId, store.id))
-    .orderBy(desc(banners.createdAt))
-    .limit(100)
+  /* الاستعلام في `src/lib/banners-data.ts` — تطبيق الموبايل بيقرا نفس البانرات */
+  const rows = await loadBanners(store.id)
 
   return (
     <div className="flex flex-col gap-6">

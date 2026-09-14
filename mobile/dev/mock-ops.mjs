@@ -267,6 +267,32 @@ export function blog() {
   }
 }
 
+export function banners() {
+  const labels = { hero: 'البانر الرئيسي', promo: 'شريط ترويجي', category: 'بانر قسم', popup: 'نافذة منبثقة' }
+  return {
+    placements: Object.entries(labels).map(([key, label]) => ({ key, label })),
+    banners: [
+      { id: 'bn1', placement: 'promo', placementLabel: labels.promo, title: 'خصم العيد ٢٠٪', subtitle: 'على كل الفساتين', imageDesktop: swatch('#c9a227'), imageMobile: null, ctaLabel: 'تسوّقي', ctaUrl: '/products', startsAt: '', endsAt: '2026-09-30', isActive: true, expired: false },
+      { id: 'bn2', placement: 'category', placementLabel: labels.category, title: '', subtitle: '', imageDesktop: swatch('#0f4c81'), imageMobile: swatch('#0d9488'), ctaLabel: '', ctaUrl: '', startsAt: '', endsAt: '2026-08-01', isActive: true, expired: true },
+    ],
+  }
+}
+
+export function automations() {
+  return {
+    whatsappReady: false,
+    telegramReady: true,
+    recipients: [
+      { id: 'rc1', name: 'صاحب المحل', channel: 'telegram', channelLabel: 'تيليجرام', target: '123456789', eventsLabel: 'طلب جديد، طلب اتلغى', isActive: true },
+      { id: 'rc2', name: '', channel: 'whatsapp', channelLabel: 'واتساب', target: '+201001112233', eventsLabel: 'طلب جديد', isActive: false },
+    ],
+    rules: [
+      { id: 'ru1', name: 'ترحيب بالعميل الجديد', triggerLabel: 'عميل جديد', conditions: [], actions: ['ولّد كوبون خصم'], cooldownHours: 0, enabled: true, runCount: 37, lastRunAt: hoursAgo(5) },
+      { id: 'ru2', name: 'استرجاع السلة', triggerLabel: 'سلة متروكة', conditions: ['إجمالي الطلب أكبر من أو يساوي 500'], actions: ['ولّد كوبون خصم', 'ابعت بريدًا للعميل'], cooldownHours: 24, enabled: false, runCount: 0, lastRunAt: null },
+    ],
+  }
+}
+
 /** فورم التعديل من تفاصيل المنتج الوهمية (mock-api.mjs) */
 export function productEdit(detail) {
   const p = detail.product
