@@ -471,7 +471,11 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
   «فاضل ٧ أيام» هيتبعت يوم 2026-09-21 تقريبًا.
 - **آخر نشر للموقع بعده:** commit `f20bed6` (لودرات التحليلات والشحنات المشتركة + `/api/app/analytics` و`/api/app/shipments`).
   اتختبر على الحي: المسارين الجداد 401 من غير جلسة، والصفحات 200/307 زي ما هي.
-- **آخر نشر للموقع (2.9):** commit `8344c3b` — اتنشر لوحده خلال دقيقة. اتختبر على الحي: `/api/app/{payments,shipping}` = 401،
+- **آخر نشر للموقع (دعوة الموظف + 3.0):** commit `c80cb5c` (بعد `f53e10b` الناقص — درس الرفع تحت). اتختبر على الحي: `/join?t=غلط` = 200
+  وفيها «الدعوة مش شغّالة»، `/join` = 200 وفيها «الرابط ناقص»، `/login?next=/join…` = 200 بعنوان «سجّل دخول عشان تنضم للفريق»،
+  `/api/app/posts` = 401، و`posts/:id/{publish,delete}` = 403 من غير Origin، والصفحات (`/`، `/login`، `/signup` = 200؛ `/verify`، `/dashboard`،
+  `/dashboard/settings/team`، `/dashboard/studio/posts` = 307) زي ما هي. **ما اتجرّبش لسه:** دعوة حقيقية لبريد جديد (الإيميل وإنشاء الحساب والانضمام).
+- **نشر الموقع (2.9):** commit `8344c3b` — اتنشر لوحده خلال دقيقة. اتختبر على الحي: `/api/app/{payments,shipping}` = 401،
   و`payments/{method,gateway}` و`shipping/{cod,zone,rates,fill,carrier}` و`shipping/methods/save` و`shipping/methods/:id/delete`
   = 403 من غير Origin، والصفحات (`/dashboard/payments` و`/dashboard/shipping` = 307 من غير جلسة) زي ما هي. نسخة 2.8 (commit `2f80717`)
   كانت تعديل تطبيق بس — الموقع ما اتغيّرش.
@@ -493,6 +497,9 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
 - **نشر الموقع (2.1):** commit `4cb078c` + commit فاضي `977556c` (Vercel ما نشرش الأول لوحده — حصلت مرتين، لو المسارات
   الجديدة فضلت 404 بعد ١٠ دقايق ارفع commit فاضي). اتختبر على الحي: `/api/app/{blocked,bookings,couriers}` و`products/:id/edit`
   = 401، والـPOST من غير Origin = 403، والصفحات 200/307 زي ما هي.
+- **درس 3.0 (رفع):** ما تربطش `git commit` بعد `git add` بـ`;` — `git add` فشل (مسار اتمسح بـ`git rm` قبلها) والـcommit اشتغل برضه
+  ورفع **مسح صفحة الدعوة القديمة لوحده** (`f53e10b`) قبل ما الجديدة تترفع؛ اتصلّح بعدها بدقيقة (`c80cb5c`). استخدم `&&` دايمًا،
+  ولو في `git rm` متعمل قبل كده ما تكتبش المسار الممسوح في `git add`.
 - **درس 3.0:** لو نقلت أو مسحت صفحة (`page.tsx`) و`next build` وقف بـ`Cannot find module '…/page.js'` في `.next/dev/types/validator.ts`
   — دي ملفات مولّدة قديمة من `next dev`: `rm -rf .next/dev/types` وابني تاني (مش غلط في الكود).
 - **التطبيق:** آخر نسخة مبنية **3.0 (versionCode 21)** في `H:\for claude\zawya-release\zawya-3.0.apk` و`.aab`
