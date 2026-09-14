@@ -71,6 +71,10 @@ import { BlogScreen } from './blog'
 import { BannersScreen } from './banners'
 import { AutomationsScreen } from './automations'
 import { AssistantButton } from './assistant'
+import { PaymentsScreen } from './payments'
+import { ShippingScreen } from './shipping'
+import { clearCommerceCaches } from './commerce-api'
+import { COMMERCE_CSS } from './styles-commerce'
 
 const ORDER_DETAIL = /^\/dashboard\/orders\/([^/]+)$/
 /* صفحات جوّه المنتجات مش منتجات — new وcategories وimport وtrash بيفضلوا صفحات المنصة */
@@ -122,8 +126,12 @@ type ScreenKey =
   | 'blog'
   | 'banners'
   | 'automations'
+  | 'payments'
+  | 'shipping'
 
 const SCREEN_KEYS: ScreenKey[] = [
+  'payments',
+  'shipping',
   'banners',
   'automations',
   'media',
@@ -221,6 +229,7 @@ function Shell() {
       clearShipmentsCache()
       clearBusinessCaches()
       clearOpsCaches()
+      clearCommerceCaches()
       clearMeCache()
     }
   }, [path])
@@ -363,6 +372,14 @@ function Shell() {
         visible={path === '/dashboard/automations' && !unavailable.automations && !web}
         onUnavailable={markUnavailable.automations}
       />
+      <PaymentsScreen
+        visible={path === '/dashboard/payments' && !unavailable.payments && !web}
+        onUnavailable={markUnavailable.payments}
+      />
+      <ShippingScreen
+        visible={path === '/dashboard/shipping' && !unavailable.shipping && !web}
+        onUnavailable={markUnavailable.shipping}
+      />
       <VerifyBar visible={path === '/verify'} />
       {/* شاشات التفاصيل ومنتج جديد ليها أزرار تحت — المساعد على الشاشات الرئيسية وصفحات المنصة */}
       <AssistantButton
@@ -379,7 +396,7 @@ export function installShell(): void {
   const root = layer()
   const style = document.createElement('style')
   style.textContent =
-    SHELL_CSS + ORDERS_CSS + PRODUCTS_CSS + CUSTOMERS_CSS + MORE_CSS + VERIFY_CSS + ANALYTICS_CSS + BUSINESS_CSS + OPS_CSS
+    SHELL_CSS + ORDERS_CSS + PRODUCTS_CSS + CUSTOMERS_CSS + MORE_CSS + VERIFY_CSS + ANALYTICS_CSS + BUSINESS_CSS + OPS_CSS + COMMERCE_CSS
   root.appendChild(style)
   const mount = document.createElement('div')
   mount.className = 'shell'

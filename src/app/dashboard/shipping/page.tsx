@@ -1,6 +1,3 @@
-import { and, asc, eq } from 'drizzle-orm'
-import { db } from '@/db'
-import { shippingMethods, shippingRates, shippingZones } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { guard } from '@/lib/permissions'
 import { regionsFor } from '@/lib/regions'
@@ -10,10 +7,9 @@ import { ShippingForm } from './shipping-form'
 import { CarriersManager } from './carriers-manager'
 import { AutoShipCard } from './auto-ship-card'
 import { MethodsManager } from './methods-manager'
-import { readCarrierProviders, activeCarrier } from '@/lib/provider-store'
+import { loadShipping } from '@/lib/shipping-data'
 import { zonesFor } from '@/lib/shipping-zones'
 import { supportsTariff } from '@/lib/integrations/shipping-tariff'
-import { CARRIER_PROVIDERS } from '@/lib/providers'
 import { platformOrigin } from '@/lib/domain'
 
 export const metadata = { title: 'الشحن' }
@@ -22,30 +18,8 @@ export default async function ShippingPage() {
   const { store, actor } = await getDashboardContext()
   guard(actor, 'settings.manage')
 
-  const [zone] = await db
-    .select()
-    .from(shippingZones)
-    .where(and(eq(shippingZones.storeId, store.id), eq(shippingZones.country, store.country)))
-    .limit(1)
-
-  const rateRows = zone
-    ? await db
-        .select({ city: shippingRates.city, price: shippingRates.price, enabled: shippingRates.enabled })
-        .from(shippingRates)
-        .where(eq(shippingRates.zoneId, zone.id))
-    : []
-
-  const rates = Object.fromEntries(rateRows.map((r) => [r.city, { price: r.price, enabled: r.enabled }]))
-
-  const [carriers, linked, methods] = await Promise.all([
-    readCarrierProviders(store.id, CARRIER_PROVIDERS),
-    activeCarrier(store.id),
-    db
-      .select()
-      .from(shippingMethods)
-      .where(eq(shippingMethods.storeId, store.id))
-      .orderBy(asc(shippingMethods.sortOrder), asc(shippingMethods.createdAt)),
-  ])
+  /* البيانات مشتركة مع تطبيق الموبايل (`/api/app/shipping`) */
+  const { zone, rates, carriers, linked, methods } = await loadShipping(store.id, store.country)
 
   return (
     <div className="flex flex-col gap-8">

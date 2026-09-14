@@ -144,6 +144,13 @@ git push origin main                              # ده اللي بينشر ا�
 | معرض الوسائط `/dashboard/media` (شبكة صور ٣ أعمدة بفلتر المجلد و«في X منتج»، «صوّر»/«من المعرض» بيرفعوا لحد ١٠ صور على `/api/upload` في المجلد المختار (الكل = `misc`)، دوسة = لوحة: معاينة، تغيير الاسم، انسخ/شارك/افتح، الحذف بتأكيد — المستعملة في منتج مالهاش زرار حذف) | `media.tsx` | `/api/app/media` (`storefront.manage` — بيعمل `syncFromStorage` زي الصفحة)، `POST /api/app/media/:id/{rename,delete}` |
 | البانرات `/dashboard/storefront/banners` (البانرات بالصورة والمكان وتاريخ الانتهاء و«انتهى»، مفتاح تشغيل، «بانر جديد» والدوسة = لوحة: المكان (ترويجي/قسم — الرئيسي والمنبثق بيظهروا بس لو البانر منهم)، صورة الكمبيوتر وصورة الموبايل بالكاميرا/المعرض (مجلد `banners`)، العنوان والسطر، نص الزرار ورابطه، التواريخ، التفعيل، الحذف بتأكيد) | `banners.tsx` | `/api/app/banners` (`storefront.manage`)، `POST /api/app/banners/save`، `POST /api/app/banners/:id/{toggle,delete}` |
 | الأتمتة `/dashboard/automations` (حالة واتساب وتيليجرام، «مين يتبلّغ» بمفتاح + لوحة «ابعت إشعار تجريبي» وشيل بتأكيد، القواعد «لما ← اعمل» بعدد التشغيل ومفتاح + لوحة بالشروط والإجراءات وحذف بتأكيد) — إضافة مستقبِل وبناء قاعدة ← `?web=1` | `automations.tsx` | `/api/app/automations` (`marketing.manage`)، `POST /api/app/automations/rules/:id/{toggle,delete}`، `POST /api/app/automations/recipients/:id/{toggle,delete,test}` |
+| الدفع `/dashboard/payments` (**من 2.9** — كل مميزات صفحة اللوحة: الدفع عند الاستلام بمفتاح + لوحة الاسم والرسوم، التحويل بمفتاح + لوحة الاسم والتعليمات، بوابات الدفع بمفتاح + **لوحة الربط بالمفاتيح**، سجل محاولات الدفع بسبب الفشل وفتح الطلب) | `payments.tsx`, `provider-sheet.tsx`, `commerce-api.ts`, `styles-commerce.ts` | `/api/app/payments` (`settings.manage`)، `POST /api/app/payments/{method,gateway}`، `POST /api/app/shipping/cod` |
+| الشحن `/dashboard/shipping` (**من 2.9** — كل مميزات صفحة اللوحة: الدفع عند الاستلام، شركات الشحن بمفتاح + لوحة ربط بالسعر، التسجيل التلقائي، إعدادات عامة، سعر كل محافظة + «طبّق الافتراضي»، الملء مرة واحدة (تعريفة الشركة أو المناطق ← بيفتح المحافظات للمراجعة)، طرق الشحن إضافة/تعديل بمعاينة السعر/حذف بتأكيد) | `shipping.tsx`, `provider-sheet.tsx` | `/api/app/shipping`، `POST /api/app/shipping/{cod,zone,rates,fill,auto-ship,carrier}`، `POST /api/app/shipping/methods/save`، `POST /api/app/shipping/methods/:id/delete` |
+
+**لوحة ربط المزوّدين (`provider-sheet.tsx`) — أمان:** المفاتيح السرّية عمرها ما بترجع للتطبيق (`providerView` في
+`src/lib/app-providers.ts` بيرجّع اسم الخانة و`saved` بس). الخانة السرّية الفاضية = «سيب المحفوظ» (`providerValues` بيشيلها قبل
+الحفظ). المفتاح السريع في القايمة (`providerBody`) **لازم يبعت الخانات العادية بقيمها** لأن `savePaymentProvider`/`saveCarrierProvider`
+بيكتبوا `config.values` من الأول. أسعار المحافظات والملء بينادوا `ensureShippingZone` الأول (في اللوحة الإعدادات والأسعار بيتحفظوا مع بعض).
 | المدوّنة `/dashboard/blog` (المقالات بالغلاف والمشاهدات ومفتاح نشر، «مقال جديد» والدوسة = لوحة كتابة: الغلاف بالكاميرا/المعرض (مجلد `misc`)، العنوان، المقدّمة، المحتوى، الكاتب، الرابط، النشر، «شارك رابط المقال»، الحذف بتأكيد) | `blog.tsx` | `/api/app/blog` (`storefront.manage`)، `POST /api/app/blog/save`، `POST /api/app/blog/:id/{toggle,delete}` |
 
 شاشات الحظر والمندوبين والحجوزات والمصروفات والموردين والأقسام والسلة والولاء والمسوّقين والإحالة بياناتهم في `shell/ops-api.ts` (فيه كمان `copyText` و`COPY_ICON`/`WALLET_ICON`) (فيه كمان `waNumber` لرقم واتساب دولي و`toLatin` للأرقام العربي) وستايلهم في `shell/styles-ops.ts`. رفع الصور (`shrink` و`upload(file, folder)`) متصدّر من `shell/product-new.tsx`.
@@ -286,6 +293,8 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
 | `src/lib/blog-data.ts` (`loadBlogPosts`) + `blog/actions.ts` (`savePostAction`, `togglePostAction`, `deletePostAction`) | `src/app/dashboard/blog/page.tsx` | `/api/app/blog*` ← `src/lib/app-blog.ts` ← `shell/blog.tsx` |
 | `src/lib/banners-data.ts` (`loadBanners`) + `storefront/banners/actions.ts` | `src/app/dashboard/storefront/banners/page.tsx` | `/api/app/banners*` ← `src/lib/app-banners.ts` ← `shell/banners.tsx` |
 | `src/lib/automations-data.ts` (`loadAutomations` — القواعد والمستقبلين وحالة واتساب/تيليجرام) + `automations/actions.ts` و`recipient-actions.ts` + `src/lib/automation-defs.ts` | `src/app/dashboard/automations/page.tsx` | `/api/app/automations*` ← `src/lib/app-automations.ts` (فيه نسخة من أسماء الأحداث والقنوات بتاعة `recipients-manager.tsx`) ← `shell/automations.tsx` |
+| `src/lib/payments-data.ts` (`loadPayments`, `loadPaymentAttempts`) + `payments/{actions,provider-actions}.ts` + `src/lib/provider-store.ts` | `src/app/dashboard/payments/page.tsx` و`attempts.tsx` | `/api/app/payments*` ← `src/lib/app-payments.ts` (فيه **نسخة** من `METHODS` بتاعة `payments-manager.tsx` و`STATUS` بتاعة `attempts.tsx` — أي تعديل هناك يتعدّل هنا) + `src/lib/app-providers.ts` ← `shell/payments.tsx` |
+| `src/lib/shipping-data.ts` (`loadShipping`) + `shipping/{actions,methods-actions}.ts` + `payments/provider-actions.ts` (`saveCarrierProviderAction`) | `src/app/dashboard/shipping/page.tsx` | `/api/app/shipping*` ← `src/lib/app-shipping.ts` (`shippingPayload`, `currentCod`, `ensureShippingZone`) ← `shell/shipping.tsx` (لو اتضافت خانة لـ`saveZoneAction` أو `ProviderCard` لازم تتضاف في مسارات التطبيق) |
 
 ⚠ **ما تصدّرش ثوابت من ملف `page.tsx`** (Next بيرفض أي export غير المعروفين) — الثوابت المشتركة مكانها `src/lib/*-data.ts`.
 و**ما تستوردش قيم (مش أنواع) من ملف فيه `'use client'` في كود الخادم** — بتوصل كمرجع مش كقيمة. `import type` بس.
@@ -410,7 +419,25 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
 - **التفعيل:** شاشة الإعدادات الأصلية ← «الأمان» ← «قفل التطبيق بالبصمة» (بيظهر بس لو الجهاز يدعم). التفعيل والإلغاء
   الاتنين محتاجين بصمة. iOS: مش مدعوم لسه (محتاج Face ID plugin).
 
-## 8) الحالة الحالية (آخر تحديث: 2026-09-13)
+## 7و) الشريط السفلي + زرار مساعد المتجر — نسخة 2.8 (commit `2f80717`)
+
+- **المشكلة ١:** شريط التبويبات كان بيختفي أول ما التطبيق يفتح على الرئيسية ويرجع لما تفتح أي صفحة تانية. السبب:
+  `overlayOpen()` في `shell/tabbar.tsx` كان بيعتبر أي `.zw-sheet` قايمة مفتوحة — و**كروت التنبيهات اللي الإدارة بتبعتها
+  للتجّار** (`src/components/dashboard/notice-cards.tsx`، زي «الف مبروك…») عليها نفس الكلاس (للحركة بس). **الحل:** العنصر بيتحسب
+  نافذة بس لو ظاهر و`position:fixed` هو أو حاجة حواليه (`floating()`). **التنبيهات ما اتشالتش ولا اتغيّرت** — صاحب المشروع
+  بيستخدمها للتجّار ولازم تفضل.
+- **المشكلة ٢:** أيقونة «مساعد المتجر» (`src/components/dashboard/assistant-panel.tsx` — زرار + لوحة `role=dialog`) جوّه صفحة
+  المنصة، والشاشات الأصلية بتترسم فوقها فكانت مش باينة. **الحل:** `shell/assistant.tsx` (`AssistantButton`) — زرار بنفس الشكل
+  على الشمال فوق الشريط، بيظهر بس لو زرار المنصة موجود (المساعد مفعّل)، وبيضغط زرار المنصة نفسه (نفس المساعد بكل مميزاته).
+  وهي مفتوحة: `html.zw-assist-open` (في `PAGE_CSS` بـ`mobile/src/layer/styles.ts`) بيرفع اللوحة فوق الطبقة (`z-index:2147483200`)
+  وبيوقف حركة الـ`main` (الحركة بـfill `both` بتعمل stacking context بيحبس اللوحة تحتها). زرار المنصة الأصلي `display:none`
+  جوّه التطبيق. الزرار بيستخبى مع: شاشات التفاصيل ومنتج جديد، لوحة التطبيق المفتوحة (`.sheet--open`)، الكيبورد، أي نافذة
+  ثابتة، واللوحة نفسها مفتوحة. في شاشة المنتجات بيطلع لفوق زرار «منتج جديد» (`assist-fab--raised`). الرجوع في أندرويد بيقفل
+  اللوحة (زرار «إغلاق» جوّه طبقة ثابتة — `closeTopLayer`).
+- **قاعدة للجاي:** أي حاجة في الموقع بتظهر عايمة فوق الصفحة (زرار/نافذة) مش هتبان فوق الشاشات الأصلية — لازم مقابل ليها في
+  الطبقة زي المساعد. وأي اختيار عناصر بكلاس عام (`zw-sheet`، `role=dialog`) اتأكد إنه ما بيمسكش حاجات جوّه محتوى الصفحة.
+
+## 8) الحالة الحالية (آخر تحديث: 2026-09-14)
 
 - **الموقع:** آخر نشر = commit `51e8067` (رسايل الاشتراك + زرار «جدّد الاشتراك» + مسارات `/api/app/account/*`).
   اتختبر على الحي: المسارات الجديدة 403 من غير Origin، و`abandon` من غير جلسة `{"ok":true,"deleted":false}`،
@@ -436,10 +463,10 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
 - **نشر الموقع (2.1):** commit `4cb078c` + commit فاضي `977556c` (Vercel ما نشرش الأول لوحده — حصلت مرتين، لو المسارات
   الجديدة فضلت 404 بعد ١٠ دقايق ارفع commit فاضي). اتختبر على الحي: `/api/app/{blocked,bookings,couriers}` و`products/:id/edit`
   = 401، والـPOST من غير Origin = 403، والصفحات 200/307 زي ما هي.
-- **التطبيق:** آخر نسخة مبنية **2.7 (versionCode 18)** في `H:\for claude\zawya-release\zawya-2.7.apk` و`.aab`
-  (البانرات بالصور من الكاميرا، الأتمتة: تشغيل/إيقاف وإشعار تجريبي — فوق 2.6: معرض الوسائط بالرفع من الكاميرا، المدوّنة بالكتابة والنشر — فوق 2.5: عروض الكمية والباقات من التطبيق، تعديل مستويات الولاء وجوايز العجلة من التطبيق — فوق 2.4: إنشاء/تعديل/حذف كوبون من التطبيق، تسجيل شحنة وتغيير حالتها والتحصيل من التطبيق — فوق 2.3: الولاء والنقاط، المسوّقون بالعمولة، حِيل صاحبك — فوق 2.2: المصروفات والأرباح، الموردون، الأقسام، سلة المهملات — فوق 2.1: تعديل منتج بالكاميرا، الحظر، المندوبون، الحجوزات —
+- **التطبيق:** آخر نسخة مبنية **2.9 (versionCode 20)** في `H:\for claude\zawya-release\zawya-2.9.apk` و`.aab`
+  (شاشتي الدفع والشحن بكل مميزاتهم — فوق 2.8: الشريط السفلي ما بيختفيش مع كروت التنبيهات + زرار مساعد المتجر فوق الشاشات الأصلية — قسم 7و — فوق 2.7: البانرات بالصور من الكاميرا، الأتمتة: تشغيل/إيقاف وإشعار تجريبي — فوق 2.6: معرض الوسائط بالرفع من الكاميرا، المدوّنة بالكتابة والنشر — فوق 2.5: عروض الكمية والباقات من التطبيق، تعديل مستويات الولاء وجوايز العجلة من التطبيق — فوق 2.4: إنشاء/تعديل/حذف كوبون من التطبيق، تسجيل شحنة وتغيير حالتها والتحصيل من التطبيق — فوق 2.3: الولاء والنقاط، المسوّقون بالعمولة، حِيل صاحبك — فوق 2.2: المصروفات والأرباح، الموردون، الأقسام، سلة المهملات — فوق 2.1: تعديل منتج بالكاميرا، الحظر، المندوبون، الحجوزات —
   فوق 2.0: منتج جديد بالكاميرا، المراجعات، المرتجعات، الشكاوى، قفل البصمة — فوق 1.9: الكوبونات والمخزون والرسايل
-  والاشتراك والإعدادات، وفوق 1.8: التحليلات والشحنات والهيكل الفوري وشاشة الافتتاح المتحركة). النسخة الجاية **2.8 / versionCode 19**.
+  والاشتراك والإعدادات، وفوق 1.8: التحليلات والشحنات والهيكل الفوري وشاشة الافتتاح المتحركة). النسخة الجاية **3.0 / versionCode 21**.
 - **درس من 2.6:** رفع الصور يتجرّب في المتصفح من غير كاميرا: اعمل `File` من `canvas.toBlob`، حطّه في `DataTransfer`،
   واكتب `input.files = dt.files` وابعت `change` — سيرفر التجربة بيرد على `/api/upload` برابط وهمي.
 - **درس من 2.5:** سيرفر التجربة بيستورد `mock-*.mjs` بـ`import()` وNode بيحفظ الموديول — أي تعديل في ملفات الـmock
@@ -495,12 +522,15 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
 
 ## 9) اللي لسه (بالترتيب)
 
+0. صاحب المشروع يثبّت **2.9** ويتأكد: الشريط السفلي ظاهر أول ما التطبيق يفتح على الرئيسية (حتى مع تنبيه «الف مبروك»)،
+   أيقونة مساعد المتجر على الشمال وبتفتح المحادثة فوق الشاشة، وشاشتي الدفع والشحن ببيانات متجره الحقيقية (اتجرّبوا ببيانات
+   وهمية بس — **ما تجرّبش ربط بوابة/شركة بمفاتيح غلط على متجر حقيقي شغّال**، الحفظ بيشغّلها).
+
 1. صاحب المشروع يثبّت **2.1** ويجرّب على موبايله الحقيقي: الكاميرا (منتج جديد + تعديل منتج)، قفل البصمة، الحظر،
    المندوبين («ابعتله الرابط» بيفتح واتساب)، الحجوزات — بالبيانات الحقيقية (اتجرّبوا ببيانات وهمية بس).
 2. صاحب المشروع يربط واتساب متجر الإدارة (atlosa) من «الإعدادات ← واتساب» عشان رسايل الاشتراك توصل واتساب كمان،
    ويجرّب «جدّد الاشتراك» من «إدارة المنصة» على متجر تجريبي ويتأكد الإيميل وصل الوارد.
-3. الجاي في التطبيق: باقي صفحات اللوحة اللي لسه موقع — بالترتيب المقترح: الدفع `/dashboard/payments` والشحن
-   `/dashboard/shipping` (إعدادات)، البوستات `/dashboard/studio/posts`، إضافة مستقبِل إشعارات من التطبيق، ثم الاستوديو
+3. الجاي في التطبيق: باقي صفحات اللوحة اللي لسه موقع — بالترتيب المقترح (الدفع والشحن اتعملوا في 2.9): البوستات `/dashboard/studio/posts`، إضافة مستقبِل إشعارات من التطبيق، ثم الاستوديو
    والإضافات وواجهة المتجر (كبار — ممكن يفضلوا موقع).
 4. iOS: Face ID للقفل + إشعارات APNs (محتاج حساب Apple Developer + ماك).
 5. **جوجل بلاي مؤجّل** (صاحب المشروع قال مفيش ميزانية دلوقتي) — ما تفتحش الموضوع غير لو طلبه.

@@ -1,7 +1,5 @@
-import { desc, eq } from 'drizzle-orm'
 import { CircleAlert, CircleCheck, CircleDot, Receipt } from 'lucide-react'
-import { db } from '@/db'
-import { orders, paymentAttempts } from '@/db/schema'
+import { loadPaymentAttempts } from '@/lib/payments-data'
 import { paymentProvider } from '@/lib/providers'
 import { formatDateTime, formatMoney } from '@/lib/utils'
 import { Card } from '@/components/ui'
@@ -61,24 +59,8 @@ export async function PaymentAttempts({
   storeId: string
   currency: string
 }) {
-  const rows = await db
-    .select({
-      id: paymentAttempts.id,
-      gateway: paymentAttempts.gateway,
-      status: paymentAttempts.status,
-      amount: paymentAttempts.amount,
-      currency: paymentAttempts.currency,
-      reference: paymentAttempts.reference,
-      errorMessage: paymentAttempts.errorMessage,
-      createdAt: paymentAttempts.createdAt,
-      orderId: paymentAttempts.orderId,
-      orderNumber: orders.orderNumber,
-    })
-    .from(paymentAttempts)
-    .leftJoin(orders, eq(orders.id, paymentAttempts.orderId))
-    .where(eq(paymentAttempts.storeId, storeId))
-    .orderBy(desc(paymentAttempts.createdAt))
-    .limit(40)
+  /* مشتركة مع تطبيق الموبايل (`/api/app/payments`) */
+  const rows = await loadPaymentAttempts(storeId)
 
   if (rows.length === 0) return null
 

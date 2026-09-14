@@ -1,13 +1,9 @@
-import { and, eq } from 'drizzle-orm'
-import { db } from '@/db'
-import { paymentMethods, shippingZones } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { guard } from '@/lib/permissions'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { PaymentsManager, type PaymentRow } from './payments-manager'
-import { readPaymentProviders } from '@/lib/provider-store'
-import { PAYMENT_PROVIDERS } from '@/lib/providers'
+import { loadPayments } from '@/lib/payments-data'
 import { platformOrigin } from '@/lib/domain'
 import { PaymentAttempts } from './attempts'
 
@@ -17,34 +13,8 @@ export default async function PaymentsPage() {
   const { store, actor } = await getDashboardContext()
   guard(actor, 'settings.manage')
 
-  const rows = await db
-    .select({
-      gateway: paymentMethods.gateway,
-      enabled: paymentMethods.enabled,
-      displayName: paymentMethods.displayName,
-      instructions: paymentMethods.instructions,
-      fixedFee: paymentMethods.fixedFee,
-    })
-    .from(paymentMethods)
-    .where(eq(paymentMethods.storeId, store.id))
-
-  /*
-    حالة البوابات بتتقرا لوحدها عشان المفاتيح تفضل على الخادم.
-    اللي بيرجع للمتصفح: مفعّلة ولا لأ، وأسماء المفاتيح المحفوظة —
-    من غير أي قيمة.
-  */
-  const providers = await readPaymentProviders(store.id, PAYMENT_PROVIDERS)
-
-  /*
-    حالة الدفع عند الاستلام بتتقرا من منطقة الشحن لا من طرق الدفع:
-    مفتاحه هناك، وعرضه هنا بقيمة تانية كان هيخلّي التاجر يفتكر إنه
-    قافله وهو مفتوح.
-  */
-  const [zone] = await db
-    .select({ codEnabled: shippingZones.codEnabled })
-    .from(shippingZones)
-    .where(and(eq(shippingZones.storeId, store.id), eq(shippingZones.country, store.country)))
-    .limit(1)
+  /* البيانات مشتركة مع تطبيق الموبايل (`/api/app/payments`) */
+  const { methods: rows, providers, codEnabled } = await loadPayments(store.id, store.country)
 
   return (
     <div className="flex flex-col gap-6">
@@ -59,7 +29,7 @@ export default async function PaymentsPage() {
           providers={providers}
           origin={platformOrigin()}
           storeId={store.id}
-          codEnabled={zone?.codEnabled ?? true}
+          codEnabled={codEnabled}
         />
       </Reveal>
 

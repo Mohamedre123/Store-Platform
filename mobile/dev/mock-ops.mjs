@@ -313,3 +313,56 @@ export function productEdit(detail) {
     },
   }
 }
+
+const mockField = (key, label, secret, extra = {}) => ({ key, label, secret, placeholder: '', hint: '', required: true, value: '', saved: false, ...extra })
+const mockProvider = (o) => ({ desc: '', mode: 'api', signupUrl: 'https://example.com/signup', where: 'من لوحتهم ← الإعدادات ← المفاتيح', docsUrl: null, hasTestMode: true, webhookUrl: null, enabled: false, testMode: false, lastError: null, hasCreds: false, flatRate: '', freeOver: '', ...o })
+
+export function payments() {
+  return {
+    currency: 'EGP',
+    codEnabled: true,
+    methods: [
+      { gateway: 'cod', title: 'الدفع عند الاستلام', desc: 'العميل بيدفع كاش لمّا الطلب يوصله. الأكثر استخدامًا في مصر.', defaultName: 'الدفع عند الاستلام', hasFee: true, hasInstructions: false, instructionsLabel: '', instructionsHint: '', enabled: true, displayName: 'الدفع عند الاستلام', instructions: '', fee: '10' },
+      { gateway: 'manual', title: 'تحويل بنكي أو محفظة', desc: 'العميل بيحوّل على حسابك أو محفظتك، ويبعتلك الإيصال. من غير أي عقود.', defaultName: 'تحويل بنكي / فودافون كاش', hasFee: false, hasInstructions: true, instructionsLabel: 'تعليمات التحويل', instructionsHint: 'اكتب رقم حسابك أو محفظتك، والعميل هيشوفها في الشيك أوت.', enabled: false, displayName: 'تحويل بنكي / فودافون كاش', instructions: '', fee: '' },
+    ],
+    gateways: [
+      mockProvider({ slug: 'paymob', name: 'باي موب', brand: 'Paymob', color: '#1e40af', desc: 'فيزا وماستر كارد ومحافظ إلكترونية وميزة. الأشهر في مصر.', webhookUrl: 'https://www.zawyaeg.site/api/webhooks/pay/paymob/demo-store', fields: [mockField('apiKey', 'API Key', true, { saved: true }), mockField('integrationId', 'Integration ID', false, { value: '4412345' }), mockField('iframeId', 'iFrame ID', false, { required: false, hint: 'من Developers ← iframes' })], enabled: true, testMode: true, hasCreds: true, docsUrl: 'https://docs.paymob.com' }),
+      mockProvider({ slug: 'kashier', name: 'كاشير', brand: 'Kashier', color: '#0f766e', desc: 'بطاقات ومحافظ بعمولة أقل للمتاجر الصغيرة.', fields: [mockField('merchantId', 'Merchant ID', false, { value: 'MID-123' }), mockField('apiKey', 'API Key', true, { saved: true })], hasCreds: true, lastError: 'المفتاح اترفض من كاشير — راجعه من لوحتهم' }),
+      mockProvider({ slug: 'fawry', name: 'فوري', brand: 'Fawry', color: '#f59e0b', desc: 'الدفع من أي منفذ فوري أو بالبطاقة.', fields: [mockField('merchantCode', 'Merchant Code', false), mockField('secureKey', 'Secure Key', true)] }),
+    ],
+    attempts: [
+      { id: 'pa1', gateway: 'باي موب', status: 'succeeded', statusLabel: 'اتدفع', tone: 'good', amount: 125000, currency: 'EGP', orderId: 'o-1042', orderNumber: 1042, error: null, createdAt: hoursAgo(2) },
+      { id: 'pa2', gateway: 'باي موب', status: 'failed', statusLabel: 'فشلت', tone: 'bad', amount: 56000, currency: 'EGP', orderId: 'o-1041', orderNumber: 1041, error: 'البطاقة اترفضت من البنك — العميل يجرّب بطاقة تانية', createdAt: hoursAgo(20) },
+      { id: 'pa3', gateway: 'باي موب', status: 'redirected', statusLabel: 'اتحوّل للبوابة', tone: 'info', amount: 32000, currency: 'EGP', orderId: null, orderNumber: null, error: null, createdAt: hoursAgo(30) },
+    ],
+  }
+}
+
+export function shipping() {
+  const regions = ['القاهرة', 'الجيزة', 'الإسكندرية', 'القليوبية', 'الدقهلية', 'الشرقية', 'أسيوط', 'أسوان']
+  return {
+    country: 'EG',
+    currency: 'EGP',
+    codEnabled: true,
+    autoShip: true,
+    carrier: { name: 'بوسطة', canFetch: true },
+    zone: { enabled: true, defaultPrice: '60', freeShippingEnabled: true, freeOverAmount: '1500', minDays: 2, maxDays: 5 },
+    regions: regions.map((name, i) => ({ name, price: i < 2 ? '45' : i === 7 ? '90' : '' })),
+    zones: [
+      { key: 'greater_cairo', label: 'القاهرة الكبرى', hint: 'القاهرة، الجيزة، القليوبية' },
+      { key: 'alexandria', label: 'الإسكندرية', hint: 'الإسكندرية والبحيرة' },
+      { key: 'delta', label: 'الدلتا', hint: 'الدقهلية، الشرقية، الغربية…' },
+      { key: 'upper_egypt', label: 'الصعيد', hint: 'أسيوط، سوهاج، أسوان…' },
+    ],
+    carriers: [
+      mockProvider({ slug: 'bosta', name: 'بوسطة', brand: 'Bosta', color: '#e11d48', desc: 'أشهر شركة شحن في مصر — تغطية كل المحافظات وتحصيل عند الاستلام.', webhookUrl: 'https://www.zawyaeg.site/api/webhooks/ship/bosta/demo-store', fields: [mockField('apiKey', 'API Key', true, { saved: true }), mockField('pickupCity', 'مدينة الاستلام', false, { value: 'القاهرة', required: false })], enabled: true, hasTestMode: false, hasCreds: true, flatRate: '55' }),
+      mockProvider({ slug: 'aramex', name: 'أرامكس', brand: 'Aramex', color: '#dc2626', mode: 'manual', hasTestMode: false, desc: 'شحن محلي ودولي.', fields: [mockField('accountNumber', 'رقم الحساب', false)] }),
+    ],
+    pricedCarriers: ['بوسطة'],
+    sampleBase: 6000,
+    methods: [
+      { id: '0b8a5d7e-1c2f-4e3a-9b8c-7d6e5f4a3b21', name: 'توصيل سريع', hint: 'يوصلك خلال ٢٤ ساعة', priceDelta: 3000, minDays: 1, maxDays: 1, enabled: true, sortOrder: 0 },
+      { id: '1c9b6e8f-2d3a-4f4b-8c9d-8e7f6a5b4c32', name: 'استلام من الفرع', hint: '', priceDelta: -6000, minDays: null, maxDays: null, enabled: false, sortOrder: 1 },
+    ],
+  }
+}
