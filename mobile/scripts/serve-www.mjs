@@ -54,7 +54,7 @@ createServer(async (req, res) => {
   }
 
   /* تعديل المنتج والحظر والمندوبين والحجوزات (dev/mock-ops.mjs) */
-  if (/^\/api\/app\/(blocked|couriers|bookings|expenses|suppliers|categories|trash|loyalty|affiliates|referrals|media|blog|banners|automations|payments|shipping|posts|schedules|social-accounts)(\/|$)/.test(url.pathname) || /^\/api\/app\/products\/[^/]+\/edit$/.test(url.pathname)) {
+  if (/^\/api\/app\/(blocked|couriers|bookings|expenses|suppliers|categories|trash|loyalty|affiliates|referrals|media|blog|banners|automations|payments|shipping|posts|schedules|social-accounts|team|sessions|activity)(\/|$)/.test(url.pathname) || /^\/api\/app\/products\/[^/]+\/edit$/.test(url.pathname)) {
     const mock = await import(new URL('../dev/mock-ops.mjs', import.meta.url))
     await new Promise((r) => setTimeout(r, 450))
     const send = (status, body) => {
@@ -72,6 +72,7 @@ createServer(async (req, res) => {
     }
     if (req.method === 'POST') {
       const body = raw ? JSON.parse(raw) : {}
+      if (/\/team\/(invite|invites\/[^/]+\/resend)$/.test(url.pathname)) return send(200, { ok: true, inviteUrl: `https://www.zawyaeg.site/join?t=demo${Date.now()}`, emailed: true })
       if (url.pathname.endsWith('/blocked/add') && !String(body.value ?? '').trim()) return send(400, { ok: false, error: 'اكتب القيمة' })
       return send(200, { ok: true, count: 3 })
     }

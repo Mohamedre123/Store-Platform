@@ -80,6 +80,11 @@ import { clearStudioCaches } from './studio-api'
 import { STUDIO_CSS } from './styles-studio'
 import { SchedulesScreen } from './schedules'
 import { SocialAccountsScreen } from './social-accounts'
+import { TeamScreen } from './team'
+import { SessionsScreen } from './sessions'
+import { ActivityScreen } from './activity'
+import { clearSettingsCaches } from './settings-api'
+import { SETTINGS_CSS } from './styles-settings'
 
 const ORDER_DETAIL = /^\/dashboard\/orders\/([^/]+)$/
 /* صفحات جوّه المنتجات مش منتجات — new وcategories وimport وtrash بيفضلوا صفحات المنصة */
@@ -136,8 +141,14 @@ type ScreenKey =
   | 'posts'
   | 'schedules'
   | 'socialAccounts'
+  | 'team'
+  | 'sessions'
+  | 'activity'
 
 const SCREEN_KEYS: ScreenKey[] = [
+  'team',
+  'sessions',
+  'activity',
   'posts',
   'schedules',
   'socialAccounts',
@@ -242,6 +253,7 @@ function Shell() {
       clearOpsCaches()
       clearCommerceCaches()
       clearStudioCaches()
+      clearSettingsCaches()
       clearMeCache()
     }
   }, [path])
@@ -404,6 +416,18 @@ function Shell() {
         visible={path === '/dashboard/studio/accounts' && !unavailable.socialAccounts && !web}
         onUnavailable={markUnavailable.socialAccounts}
       />
+      <TeamScreen
+        visible={path === '/dashboard/settings/team' && !unavailable.team && !web}
+        onUnavailable={markUnavailable.team}
+      />
+      <SessionsScreen
+        visible={path === '/dashboard/settings/sessions' && !unavailable.sessions && !web}
+        onUnavailable={markUnavailable.sessions}
+      />
+      <ActivityScreen
+        visible={path === '/dashboard/settings/activity' && !unavailable.activity && !web}
+        onUnavailable={markUnavailable.activity}
+      />
       <VerifyBar visible={path === '/verify'} />
       {/* شاشات التفاصيل ومنتج جديد ليها أزرار تحت — المساعد على الشاشات الرئيسية وصفحات المنصة */}
       <AssistantButton
@@ -420,7 +444,7 @@ export function installShell(): void {
   const root = layer()
   const style = document.createElement('style')
   style.textContent =
-    SHELL_CSS + ORDERS_CSS + PRODUCTS_CSS + CUSTOMERS_CSS + MORE_CSS + VERIFY_CSS + ANALYTICS_CSS + BUSINESS_CSS + OPS_CSS + COMMERCE_CSS + STUDIO_CSS
+    SHELL_CSS + ORDERS_CSS + PRODUCTS_CSS + CUSTOMERS_CSS + MORE_CSS + VERIFY_CSS + ANALYTICS_CSS + BUSINESS_CSS + OPS_CSS + COMMERCE_CSS + STUDIO_CSS + SETTINGS_CSS
   root.appendChild(style)
   const mount = document.createElement('div')
   mount.className = 'shell'

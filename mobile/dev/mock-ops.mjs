@@ -418,3 +418,47 @@ export function socialAccounts() {
     ],
   }
 }
+
+export function team() {
+  const permissions = [
+    { key: 'orders.view', label: 'يشوف الطلبات', hint: 'القايمة وتفاصيل كل طلب' },
+    { key: 'orders.manage', label: 'يشتغل على الطلبات', hint: 'يغيّر الحالة، يسجّل طلب، يعمل شحنة' },
+    { key: 'products.view', label: 'يشوف المنتجات', hint: 'الكتالوج من غير تعديل' },
+    { key: 'customers.view', label: 'يشوف العملاء', hint: 'بياناتهم وطلباتهم' },
+    { key: 'finance.view', label: 'يشوف الفلوس', hint: 'التكلفة والمصروفات وصافي الربح.' },
+    { key: 'team.manage', label: 'يدير الفريق والاشتراك', hint: 'يضيف موظفين ويغيّر صلاحياتهم' },
+  ]
+  return {
+    canManage: true,
+    currentUserId: 'u1',
+    roleLabels: { owner: 'المالك', admin: 'مدير', staff: 'موظف' },
+    permissions,
+    presets: [{ key: 'support', label: 'خدمة عملاء', hint: '', role: 'staff', permissions: ['orders.view', 'orders.manage', 'customers.view', 'products.view'] }],
+    members: [
+      { id: '4f0b5a3c-6d7e-4f8a-9b0c-1d2e3f4a5b61', userId: 'u1', name: 'محمد أحمد', email: 'owner@mail.com', role: 'owner', permissions: [], isBlocked: false, joinedAt: hoursAgo(900) },
+      { id: '5a1c6b4d-7e8f-4a9b-8c1d-2e3f4a5b6c72', userId: 'u2', name: 'سارة', email: 'sara@mail.com', role: 'staff', permissions: ['orders.view', 'orders.manage', 'products.view', 'customers.view'], isBlocked: false, joinedAt: hoursAgo(200) },
+      { id: '6b2d7c5e-8f9a-4b0c-9d2e-3f4a5b6c7d83', userId: 'u3', name: 'كريم', email: 'karim@mail.com', role: 'admin', permissions: [], isBlocked: true, joinedAt: hoursAgo(100) },
+    ],
+    invites: [{ id: '7c3e8d6f-9a0b-4c1d-8e3f-4a5b6c7d8e94', email: 'new.staff@mail.com', role: 'staff', roleLabel: 'موظف', expiresAt: hoursAgo(-120) }],
+  }
+}
+
+export function sessions() {
+  return {
+    sessions: [
+      { id: '8d4f9e7a-0b1c-4d2e-9f4a-5b6c7d8e9fa5', device: 'mobile', label: 'كروم على أندرويد', ip: '41.33.12.8', createdAt: hoursAgo(2), expiresAt: hoursAgo(-700), isCurrent: true },
+      { id: '9e5a0f8b-1c2d-4e3f-8a5b-6c7d8e9fa0b6', device: 'desktop', label: 'كروم على ويندوز', ip: '156.200.4.19', createdAt: hoursAgo(50), expiresAt: hoursAgo(-600), isCurrent: false },
+      { id: 'af6b1a9c-2d3e-4f4a-9b6c-7d8e9fa0b1c7', device: 'tablet', label: 'سفاري على آيفون', ip: null, createdAt: hoursAgo(300), expiresAt: hoursAgo(-300), isCurrent: false },
+    ],
+  }
+}
+
+export function activity() {
+  return {
+    items: [
+      { id: 'ac1', label: 'تغيير حالة طلب', risky: false, who: 'سارة', whoKey: 'sara@mail.com', createdAt: hoursAgo(1), before: '{\n "status": "pending"\n}', after: '{\n "status": "confirmed"\n}' },
+      { id: 'ac2', label: 'حذف منتج', risky: true, who: 'محمد أحمد', whoKey: 'owner@mail.com', createdAt: hoursAgo(20), before: '{\n "name": "شنطة قديمة"\n}', after: null },
+      { id: 'ac3', label: 'تغيير الإعدادات', risky: false, who: 'النظام', whoKey: 'system', createdAt: hoursAgo(40), before: null, after: null },
+    ],
+  }
+}

@@ -1,10 +1,7 @@
-import { desc, eq } from 'drizzle-orm'
 import { ShieldCheck } from 'lucide-react'
-import { db } from '@/db'
-import { auditLog, users } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { guard } from '@/lib/permissions'
-import { auditLabel } from '@/lib/audit'
+import { loadActivity } from '@/lib/activity-data'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { Card } from '@/components/ui'
@@ -17,29 +14,8 @@ export default async function ActivityPage() {
   const { store, actor } = await getDashboardContext()
   guard(actor, 'settings.manage')
 
-  const rows = await db
-    .select({
-      id: auditLog.id,
-      action: auditLog.action,
-      resource: auditLog.resource,
-      resourceId: auditLog.resourceId,
-      before: auditLog.before,
-      after: auditLog.after,
-      ip: auditLog.ip,
-      createdAt: auditLog.createdAt,
-      userName: users.name,
-      userEmail: users.email,
-    })
-    .from(auditLog)
-    .leftJoin(users, eq(users.id, auditLog.userId))
-    .where(eq(auditLog.storeId, store.id))
-    .orderBy(desc(auditLog.createdAt))
-    .limit(200)
-
-  const items: ActivityRow[] = rows.map((r) => ({
-    ...r,
-    label: auditLabel(r.action),
-  }))
+  /* البيانات مشتركة مع تطبيق الموبايل (`/api/app/activity`) */
+  const items: ActivityRow[] = await loadActivity(store.id)
 
   return (
     <div className="flex flex-col gap-6">
