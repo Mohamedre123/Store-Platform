@@ -180,6 +180,16 @@ button.row:active{background:var(--surface-2,#f1f2f6)}
 /* ─── شريط التبويبات ─── */
 .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:6;pointer-events:auto;isolation:isolate;display:flex;height:calc(64px + env(safe-area-inset-bottom,0px));padding-bottom:env(safe-area-inset-bottom,0px);background:var(--surface,#fff);border-top:1px solid var(--border,#e2e4ec);transition:transform .32s cubic-bezier(.2,.8,.2,1)}
 .tabbar--hidden{transform:translate3d(0,110%,0);pointer-events:none}
+
+/* ─── زرار مساعد المتجر (assistant.tsx) — على الشمال فوق الشريط زي المنصة ─── */
+.assist-fab{position:fixed;left:16px;bottom:calc(64px + 16px + env(safe-area-inset-bottom,0px));z-index:5;width:56px;height:56px;display:flex;align-items:center;justify-content:center;padding:0;border:0;border-radius:50%;color:#fff!important;background:linear-gradient(135deg,#8b5cf6,#ec4899);box-shadow:0 14px 28px -12px rgba(139,92,246,.9),inset 0 0 0 1px rgba(255,255,255,.2);pointer-events:auto;-webkit-tap-highlight-color:transparent;transition:transform .28s cubic-bezier(.2,.8,.2,1),opacity .2s ease,bottom .28s cubic-bezier(.2,.8,.2,1)}
+.assist-fab:active{transform:scale(.92)}
+.assist-fab .ic{position:relative;width:24px;height:24px}
+.assist-fab-ping{position:absolute;width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.4);animation:assist-ping 3s cubic-bezier(0,0,.2,1) infinite}
+@keyframes assist-ping{75%,100%{transform:scale(2);opacity:0}}
+.assist-fab--raised{bottom:calc(64px + 18px + 54px + 14px + env(safe-area-inset-bottom,0px))}
+.assist-fab--hidden{opacity:0;transform:scale(.6);pointer-events:none;visibility:hidden;transition:transform .2s ease,opacity .2s ease,visibility 0s linear .2s}
+.assist-fab--hidden .assist-fab-ping{animation:none}
 .tab{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;border:0;background:none;font-size:11.5px!important;font-weight:600;color:var(--fg-muted,#5c6890)!important;transition:color .2s}
 .tab .ic{width:24px;height:24px;transition:transform .32s cubic-bezier(.34,1.56,.64,1)}
 .tab[aria-current="page"]{color:var(--primary,#634b9a)!important}

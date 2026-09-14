@@ -68,8 +68,26 @@ function readTabs(): Tab[] {
   })
 }
 
+/**
+ * العنصر ظاهر وثابت فوق الصفحة (مش جوّه محتواها).
+ *
+ * كروت التنبيهات اللي الإدارة بتبعتها للتجّار («الف مبروك…») عليها نفس
+ * كلاس الحركة `zw-sheet` بتاع القوايم، بس هي كارت عادي جوّه الصفحة —
+ * وكانت بتخفي الشريط طول ما التنبيه ظاهر (أول ما التطبيق يفتح على الرئيسية).
+ * النافذة الحقيقية دايمًا `position:fixed` هي أو حاجة حواليها.
+ */
+function floating(node: Element): boolean {
+  for (let n: Element | null = node; n && n !== document.body; n = n.parentElement) {
+    const style = getComputedStyle(n)
+    if (style.display === 'none' || style.visibility === 'hidden') return false
+    if (style.position === 'fixed') return true
+  }
+  return false
+}
+
 /** قايمة «المزيد» أو البحث أو نافذة مفتوحة — الشريط بيتشال من قدامهم */
-const overlayOpen = () => Boolean(document.querySelector('.zw-sheet, [role="dialog"], [aria-modal="true"], dialog[open]'))
+export const overlayOpen = () =>
+  Array.from(document.querySelectorAll('.zw-sheet, [role="dialog"], [aria-modal="true"], dialog[open]')).some(floating)
 
 export function TabBar({ path, active }: { path: string; active: boolean }) {
   const [, rerender] = useState(0)

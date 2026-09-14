@@ -58,6 +58,15 @@ html.zw-app ${NAV}>*:active svg{transform:scale(.84)}
 /* شريط التبويبات الأصلي بياخد مكان شريط الموقع — نفس الارتفاع فمسافات الصفحة ما بتتغيّرش */
 html.zw-app.zw-native-tabs ${NAV}{display:none!important}
 
+/*
+  مساعد المتجر (shell/assistant.tsx): زرار المنصة مستخبي ومكانه زرار التطبيق
+  فوق الشاشات الأصلية. ولوحة المحادثة وهي مفتوحة بتترفع فوق الطبقة — والـmain
+  من غير حركة وقتها، لأن الحركة بتعمل stacking context بيحبس اللوحة تحت.
+*/
+html.zw-app.zw-native-tabs button[aria-label="افتح مساعد المتجر"],html.zw-app.zw-native-tabs button[aria-label="إغلاق المساعد"]{display:none!important}
+html.zw-app.zw-assist-open main{animation:none!important}
+html.zw-app.zw-assist-open [role="dialog"][aria-label="مساعد المتجر"]{z-index:2147483200!important}
+
 @media (prefers-reduced-motion:reduce){
   html.zw-app main[class*="zw-enter"]>*,html.zw-app ${NAV}>*::before{animation:none!important}
 }

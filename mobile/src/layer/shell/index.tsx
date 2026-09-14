@@ -70,6 +70,7 @@ import { MediaScreen } from './media'
 import { BlogScreen } from './blog'
 import { BannersScreen } from './banners'
 import { AutomationsScreen } from './automations'
+import { AssistantButton } from './assistant'
 
 const ORDER_DETAIL = /^\/dashboard\/orders\/([^/]+)$/
 /* صفحات جوّه المنتجات مش منتجات — new وcategories وimport وtrash بيفضلوا صفحات المنصة */
@@ -363,6 +364,11 @@ function Shell() {
         onUnavailable={markUnavailable.automations}
       />
       <VerifyBar visible={path === '/verify'} />
+      {/* شاشات التفاصيل ومنتج جديد ليها أزرار تحت — المساعد على الشاشات الرئيسية وصفحات المنصة */}
+      <AssistantButton
+        active={onDashboard && !orderId && !productId && !customerId && path !== '/dashboard/products/new'}
+        raised={path === '/dashboard/products' && !web && !unavailable.products}
+      />
       <TabBar path={path} active={onDashboard} />
       {onDashboard && <MoreSheet path={path} search={effective.searchParams.toString()} />}
     </>
