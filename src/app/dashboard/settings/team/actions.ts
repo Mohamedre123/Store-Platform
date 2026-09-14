@@ -5,27 +5,28 @@ import { and, eq, gt, isNull, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/db'
 import { storeMembers, users, verificationTokens } from '@/db/schema'
-import { getDashboardContext } from '@/lib/store-context'
-import { assertCan, defaultPermissions, PERMISSIONS } from '@/lib/permissions'
+import { getDashboardContext, type DashboardContext } from '@/lib/store-context'
+import { assertCan, defaultPermissions, PERMISSIONS, ROLE_LABELS } from '@/lib/permissions'
 import { generateToken, hashToken } from '@/lib/crypto'
 import { recordAudit } from '@/lib/audit'
 import { appUrl } from '@/lib/domain'
+import { safeReplyTo, sendEmail } from '@/lib/email'
+import { teamInviteEmail } from '@/lib/email-templates'
 
 /**
  * إدارة الفريق.
  *
- * ## الدعوة رابط لا رسالة
- * كل فعل هنا بيرجّع رابط التاجر بيبعته بإيده على واتساب. السبب
- * عملي: بريد الدعوة بيقع في السبام كتير، والتاجر بيفضل مستني موظفه
- * وموظفه مستنّي رسالة ما جتش. الرابط بيتنسخ ويتبعت في المحادثة
- * اللي هما الاتنين فيها أصلًا — وبيوصل في ثانية.
+ * ## الدعوة رابط **وإيميل**
+ * كل دعوة بترجّع رابط التاجر بينسخه أو يبعته على واتساب (بيوصل في ثانية)، وفي
+ * نفس الوقت بتتبعت على بريد الموظف باسم المتجر — لو التاجر ما بعتش الرابط، أو
+ * الموظف مش على واتساب معاه، الدعوة بتوصله برضه.
  *
  * ## الرابط مربوط ببريد بعينه
- * أي حد يفتحه بحساب بريده مختلف بيترفض. من غير الشرط ده، رابط
- * اتسرّب في مجموعة واتساب بيدخّل أي حد لوحة التاجر.
+ * أي حد يفتحه بحساب بريده مختلف بيترفض. من غير الشرط ده، رابط اتسرّب في مجموعة
+ * واتساب بيدخّل أي حد لوحة التاجر.
  */
 
-export type TeamState = { ok?: boolean; error?: string; inviteUrl?: string } | null
+export type TeamState = { ok?: boolean; error?: string; inviteUrl?: string; emailed?: boolean } | null
 
 const permissionKeys = PERMISSIONS.map((p) => p.key) as [string, ...string[]]
 
@@ -38,14 +39,13 @@ const inviteSchema = z.object({
 /** مدّة الدعوة — أسبوع كفاية، وبعده التاجر بيبعت واحدة جديدة */
 const INVITE_DAYS = 7
 
-export async function inviteMemberAction(raw: unknown): Promise<TeamState> {
-  const parsed = inviteSchema.safeParse(raw)
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'بيانات ناقصة' }
-  const input = parsed.data
+type InviteInput = { email: string; role: 'admin' | 'staff'; permissions: string[] }
 
-  const { store, user, actor } = await getDashboardContext()
-  assertCan(actor, 'team.manage')
-
+/**
+ * بيعمل الدعوة: يلغي أي دعوة قديمة لنفس البريد، رمز جديد، سجل النشاط، والإيميل.
+ * مشترك بين «ضيف عضو» و«ابعت الدعوة تاني».
+ */
+async function createInvite({ store, user }: Pick<DashboardContext, 'store' | 'user'>, input: InviteInput): Promise<TeamState> {
   if (input.email === user.email.toLowerCase()) {
     return { error: 'ده بريدك إنت — إنت في الفريق أصلًا.' }
   }
@@ -87,8 +87,7 @@ export async function inviteMemberAction(raw: unknown): Promise<TeamState> {
     )
 
   const token = generateToken(24)
-  const permissions =
-    input.permissions.length > 0 ? input.permissions : defaultPermissions(input.role)
+  const permissions = input.permissions.length > 0 ? input.permissions : defaultPermissions(input.role)
 
   await db.insert(verificationTokens).values({
     identifier: `${store.id}:${input.email}`,
@@ -107,22 +106,77 @@ export async function inviteMemberAction(raw: unknown): Promise<TeamState> {
   })
 
   /*
-    الرابط على النطاق الجذري لا على اللوحة.
-
-    الوكيل بيعيد كتابة أي مسار على مضيف اللوحة لـ،
-    و كان هيدخل جوّه تخطيط اللوحة — واللي اتدعى
-    ومعندوش متجر بتاعه كان بيتحوّل على التسجيل قبل ما الانضمام
-    يحصل أصلًا.
-  */
-  revalidatePath('/dashboard/settings/team')
-  /*
     الرابط على النطاق الجذري لا على مضيف اللوحة.
 
     الوكيل بيعيد كتابة أي مسار على مضيف اللوحة تحت «dashboard/»،
     فالصفحة كانت هتدخل جوّه تخطيط اللوحة — واللي اتدعى ومعندوش متجر
     بتاعه كان بيتحوّل على التسجيل قبل ما الانضمام يحصل أصلًا.
   */
-  return { ok: true, inviteUrl: appUrl(`/join?t=${encodeURIComponent(token)}`) }
+  const inviteUrl = appUrl(`/join?t=${encodeURIComponent(token)}`)
+
+  /* فشل الإيميل ما يوقّعش الدعوة — الرابط لسه قدام التاجر يبعته بنفسه */
+  const message = teamInviteEmail({
+    storeName: store.name,
+    inviterName: user.name,
+    roleLabel: ROLE_LABELS[input.role],
+    url: inviteUrl,
+    email: input.email,
+    days: INVITE_DAYS,
+  })
+  const emailed = await sendEmail({
+    to: input.email,
+    ...message,
+    sender: { name: store.name, slug: store.slug },
+    replyTo: safeReplyTo(user.email),
+    log: { storeId: store.id, event: 'team_invite' },
+  })
+    .then((r) => r.ok)
+    .catch(() => false)
+
+  revalidatePath('/dashboard/settings/team')
+  return { ok: true, inviteUrl, emailed }
+}
+
+export async function inviteMemberAction(raw: unknown): Promise<TeamState> {
+  const parsed = inviteSchema.safeParse(raw)
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? 'بيانات ناقصة' }
+
+  const ctx = await getDashboardContext()
+  assertCan(ctx.actor, 'team.manage')
+  return createInvite(ctx, parsed.data)
+}
+
+/**
+ * «ابعت الدعوة تاني» — نفس البريد والدور والصلاحيات.
+ *
+ * الرمز متخزّن هاش بس، فالرابط القديم ما بيترجعش — بيتعمل رابط جديد والقديم
+ * بيتلغي، والإيميل بيتبعت تاني.
+ */
+export async function resendInviteAction(tokenId: string): Promise<TeamState> {
+  const ctx = await getDashboardContext()
+  assertCan(ctx.actor, 'team.manage')
+
+  const [row] = await db
+    .select({ meta: verificationTokens.meta })
+    .from(verificationTokens)
+    .where(
+      and(
+        eq(verificationTokens.id, tokenId),
+        eq(verificationTokens.purpose, 'invite'),
+        sql`${verificationTokens.identifier} like ${`${ctx.store.id}:%`}`,
+        isNull(verificationTokens.usedAt),
+      ),
+    )
+    .limit(1)
+
+  const meta = (row?.meta ?? {}) as { email?: string; role?: 'admin' | 'staff'; permissions?: string[] }
+  if (!row || !meta.email) return { error: 'الدعوة دي اتقبلت أو اتلغت.' }
+
+  return createInvite(ctx, {
+    email: meta.email,
+    role: meta.role === 'admin' ? 'admin' : 'staff',
+    permissions: meta.permissions ?? [],
+  })
 }
 
 const updateSchema = z.object({

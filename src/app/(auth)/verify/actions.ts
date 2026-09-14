@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
 import { issueEmailOtp, verifyEmailOtp } from '@/lib/otp'
+import { afterVerifyPath } from '@/lib/after-verify'
 
 export type VerifyState = { error?: string; notice?: string; devCode?: string } | null
 
@@ -25,7 +26,7 @@ function emailSendErrorMessage(error: string): string {
 export async function verifyCodeAction(_prev: VerifyState, formData: FormData): Promise<VerifyState> {
   const user = await getCurrentUser()
   if (!user) redirect('/login')
-  if (user.emailVerifiedAt) redirect('/dashboard')
+  if (user.emailVerifiedAt) redirect((await afterVerifyPath()) ?? '/dashboard')
 
   const code = String(formData.get('code') ?? '').replace(/[^\d]/g, '')
   if (code.length !== 6) return { error: 'اكتب الرمز المكوّن من ٦ أرقام' }
@@ -41,13 +42,13 @@ export async function verifyCodeAction(_prev: VerifyState, formData: FormData): 
     return { error: messages[result.reason] }
   }
 
-  redirect('/dashboard')
+  redirect((await afterVerifyPath()) ?? '/dashboard')
 }
 
 export async function resendCodeAction(): Promise<VerifyState> {
   const user = await getCurrentUser()
   if (!user) redirect('/login')
-  if (user.emailVerifiedAt) redirect('/dashboard')
+  if (user.emailVerifiedAt) redirect((await afterVerifyPath()) ?? '/dashboard')
 
   const result = await issueEmailOtp(user.id, user.email, user.name)
 
@@ -58,7 +59,7 @@ export async function resendCodeAction(): Promise<VerifyState> {
     return { error: emailSendErrorMessage(result.sendError) }
   }
 
-  if (result.autoVerified) redirect('/dashboard')
+  if (result.autoVerified) redirect((await afterVerifyPath()) ?? '/dashboard')
 
   return { notice: 'بعتنا رمز جديد على بريدك.', devCode: result.devCode }
 }

@@ -2,8 +2,7 @@ import Link from 'next/link'
 import { Inbox } from 'lucide-react'
 import { getDashboardContext } from '@/lib/store-context'
 import { guard } from '@/lib/permissions'
-import { listPosts } from '@/lib/content-schedules'
-import { listAccounts } from '@/lib/social'
+import { loadPosts } from '@/lib/posts-data'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { Card } from '@/components/ui'
@@ -23,7 +22,8 @@ export default async function PostsPage() {
   const { store, actor } = await getDashboardContext()
   guard(actor, 'marketing.manage')
 
-  const [posts, accounts] = await Promise.all([listPosts(store.id, 60), listAccounts(store.id)])
+  /* البيانات مشتركة مع تطبيق الموبايل (`/api/app/posts`) */
+  const { posts, accounts } = await loadPosts(store.id)
 
   return (
     <div className="flex flex-col gap-6">

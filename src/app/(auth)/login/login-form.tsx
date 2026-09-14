@@ -5,14 +5,19 @@ import Link from 'next/link'
 import { loginAction, type FormState } from '../actions'
 import { Alert, Button, Field, Input } from '@/components/ui'
 
-export function LoginForm({ next }: { next: string | null }) {
+export function LoginForm({ next, email }: { next: string | null; email?: string | null }) {
   const [state, formAction, pending] = useActionState<FormState, FormData>(loginAction, null)
+
+  /* جاي من دعوة فريق — الكلام والرجوع بيتكلموا عن الدعوة مش عن فتح متجر */
+  const joining = Boolean(next?.startsWith('/join'))
 
   return (
     <div className="flex flex-col gap-7">
       <div className="flex flex-col gap-2">
-        <h1 className="text-2xl font-bold tracking-tight">أهلًا بيك تاني</h1>
-        <p className="text-sm text-[var(--fg-muted)]">سجّل دخول عشان تدير متجرك.</p>
+        <h1 className="text-2xl font-bold tracking-tight">{joining ? 'سجّل دخول عشان تنضم للفريق' : 'أهلًا بيك تاني'}</h1>
+        <p className="text-sm text-[var(--fg-muted)]">
+          {joining ? 'بعد الدخول هترجع لصفحة الدعوة تكمّل الانضمام.' : 'سجّل دخول عشان تدير متجرك.'}
+        </p>
       </div>
 
       {state?.error && <Alert>{state.error}</Alert>}
@@ -26,14 +31,6 @@ export function LoginForm({ next }: { next: string | null }) {
         */}
         {next && <input type="hidden" name="next" value={next} />}
 
-        {/*
-          الوجهة بتتمرّر مع النموذج لا في الرابط بس.
-
-          الفعل بيقرا من  لا من الـURL، فالخانة المخفية دي
-          هي الطريق الوحيد اللي بيوصّل «رجّعني للدعوة» للخادم.
-        */}
-        {next && <input type="hidden" name="next" value={next} />}
-
         <Field label="البريد الإلكتروني" required htmlFor="email" error={state?.fieldErrors?.email}>
           <Input
             id="email"
@@ -44,6 +41,7 @@ export function LoginForm({ next }: { next: string | null }) {
             dir="ltr"
             className="text-start"
             required
+            defaultValue={email ?? undefined}
             placeholder="you@example.com"
           />
         </Field>
@@ -64,6 +62,7 @@ export function LoginForm({ next }: { next: string | null }) {
             name="password"
             type="password"
             autoComplete="current-password"
+            autoFocus={Boolean(email)}
             required
           />
         </Field>
@@ -82,12 +81,21 @@ export function LoginForm({ next }: { next: string | null }) {
         </Button>
       </form>
 
-      <p className="text-center text-sm text-[var(--fg-muted)]">
-        لسه ماعندكش متجر؟{' '}
-        <Link href="/signup" className="font-semibold text-[var(--primary)] hover:underline">
-          افتح متجرك
-        </Link>
-      </p>
+      {joining && next ? (
+        <p className="text-center text-sm text-[var(--fg-muted)]">
+          معندكش حساب؟{' '}
+          <Link href={next} className="font-semibold text-[var(--primary)] hover:underline">
+            ارجع للدعوة واعمل حسابك
+          </Link>
+        </p>
+      ) : (
+        <p className="text-center text-sm text-[var(--fg-muted)]">
+          لسه ماعندكش متجر؟{' '}
+          <Link href="/signup" className="font-semibold text-[var(--primary)] hover:underline">
+            افتح متجرك
+          </Link>
+        </p>
+      )}
     </div>
   )
 }

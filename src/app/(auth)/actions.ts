@@ -24,6 +24,7 @@ import {
 import { createSession, destroySession, hashPassword, verifyPassword } from '@/lib/auth'
 import { isValidSlug } from '@/lib/domain'
 import { issueEmailOtp } from '@/lib/otp'
+import { rememberAfterVerify } from '@/lib/after-verify'
 import { uniqueAccountId } from '@/lib/account-id'
 import { isAdminEmail } from '@/lib/admin'
 import { contentFor } from '@/lib/theme-content'
@@ -288,6 +289,8 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
   await createSession(user.id, await requestMeta())
 
   if (!user.emailVerifiedAt) {
+    /* الوجهة (دعوة فريق مثلًا) بتستنى لحد ما البريد يتأكّد */
+    if (next) await rememberAfterVerify(next)
     const otp = await issueEmailOtp(user.id, email, user.name)
     if (!(otp.ok && otp.autoVerified)) redirect('/verify')
   }

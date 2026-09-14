@@ -75,6 +75,9 @@ import { PaymentsScreen } from './payments'
 import { ShippingScreen } from './shipping'
 import { clearCommerceCaches } from './commerce-api'
 import { COMMERCE_CSS } from './styles-commerce'
+import { PostsScreen } from './posts'
+import { clearStudioCaches } from './studio-api'
+import { STUDIO_CSS } from './styles-studio'
 
 const ORDER_DETAIL = /^\/dashboard\/orders\/([^/]+)$/
 /* صفحات جوّه المنتجات مش منتجات — new وcategories وimport وtrash بيفضلوا صفحات المنصة */
@@ -128,8 +131,10 @@ type ScreenKey =
   | 'automations'
   | 'payments'
   | 'shipping'
+  | 'posts'
 
 const SCREEN_KEYS: ScreenKey[] = [
+  'posts',
   'payments',
   'shipping',
   'banners',
@@ -230,6 +235,7 @@ function Shell() {
       clearBusinessCaches()
       clearOpsCaches()
       clearCommerceCaches()
+      clearStudioCaches()
       clearMeCache()
     }
   }, [path])
@@ -380,6 +386,10 @@ function Shell() {
         visible={path === '/dashboard/shipping' && !unavailable.shipping && !web}
         onUnavailable={markUnavailable.shipping}
       />
+      <PostsScreen
+        visible={path === '/dashboard/studio/posts' && !unavailable.posts && !web}
+        onUnavailable={markUnavailable.posts}
+      />
       <VerifyBar visible={path === '/verify'} />
       {/* شاشات التفاصيل ومنتج جديد ليها أزرار تحت — المساعد على الشاشات الرئيسية وصفحات المنصة */}
       <AssistantButton
@@ -396,7 +406,7 @@ export function installShell(): void {
   const root = layer()
   const style = document.createElement('style')
   style.textContent =
-    SHELL_CSS + ORDERS_CSS + PRODUCTS_CSS + CUSTOMERS_CSS + MORE_CSS + VERIFY_CSS + ANALYTICS_CSS + BUSINESS_CSS + OPS_CSS + COMMERCE_CSS
+    SHELL_CSS + ORDERS_CSS + PRODUCTS_CSS + CUSTOMERS_CSS + MORE_CSS + VERIFY_CSS + ANALYTICS_CSS + BUSINESS_CSS + OPS_CSS + COMMERCE_CSS + STUDIO_CSS
   root.appendChild(style)
   const mount = document.createElement('div')
   mount.className = 'shell'

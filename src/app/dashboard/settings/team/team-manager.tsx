@@ -5,6 +5,7 @@ import { Check, Copy, Link2, Mail, ShieldCheck, UserPlus, X } from 'lucide-react
 import {
   cancelInviteAction,
   inviteMemberAction,
+  resendInviteAction,
   setMemberBlockedAction,
   updateMemberAction,
 } from './actions'
@@ -56,18 +57,18 @@ export function TeamManager({
 }) {
   const [inviting, setInviting] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
-  const [freshLink, setFreshLink] = useState<string | null>(null)
+  const [freshLink, setFreshLink] = useState<FreshInvite | null>(null)
 
   return (
     <div className="flex flex-col gap-6">
-      {freshLink && <InviteLink url={freshLink} onClose={() => setFreshLink(null)} />}
+      {freshLink && <InviteLink url={freshLink.url} emailed={freshLink.emailed} onClose={() => setFreshLink(null)} />}
 
       {canManage &&
         (inviting ? (
           <InviteForm
-            onDone={(url) => {
+            onDone={(res) => {
               setInviting(false)
-              if (url) setFreshLink(url)
+              if (res) setFreshLink(res)
             }}
           />
         ) : (
@@ -157,7 +158,12 @@ export function TeamManager({
                     {formatDate(i.expiresAt)}
                   </span>
                 </span>
-                {canManage && <CancelInvite id={i.id} />}
+                {canManage && (
+                  <span className="flex shrink-0 gap-1">
+                    <ResendInvite id={i.id} onSent={setFreshLink} />
+                    <CancelInvite id={i.id} />
+                  </span>
+                )}
               </div>
             ))}
           </Card>
@@ -182,7 +188,9 @@ function summarize(permissions: string[]): string {
   return `${labels.slice(0, 3).join(' · ')} و${labels.length - 3} غيرها`
 }
 
-function InviteForm({ onDone }: { onDone: (url: string | null) => void }) {
+type FreshInvite = { url: string; emailed: boolean }
+
+function InviteForm({ onDone }: { onDone: (res: FreshInvite | null) => void }) {
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<'admin' | 'staff'>('staff')
   const [permissions, setPermissions] = useState<Permission[]>([
@@ -198,7 +206,7 @@ function InviteForm({ onDone }: { onDone: (url: string | null) => void }) {
     start(async () => {
       const res = await inviteMemberAction({ email, role, permissions })
       if (res?.error) setError(res.error)
-      else onDone(res?.inviteUrl ?? null)
+      else onDone(res?.inviteUrl ? { url: res.inviteUrl, emailed: Boolean(res.emailed) } : null)
     })
   }
 
@@ -219,7 +227,7 @@ function InviteForm({ onDone }: { onDone: (url: string | null) => void }) {
       <Field
         label="بريده"
         required
-        hint="الدعوة مربوطة بالبريد ده — أي حد يفتح الرابط ببريد تاني بيترفض."
+        hint="هنبعتله الدعوة على البريد ده، وتقدر كمان تبعتله الرابط على واتساب. أي حد يفتح الرابط ببريد تاني بيترفض."
       >
         <Input
           dir="ltr"
@@ -437,7 +445,7 @@ function PermissionGrid({
   )
 }
 
-function InviteLink({ url, onClose }: { url: string; onClose: () => void }) {
+function InviteLink({ url, emailed, onClose }: { url: string; emailed: boolean; onClose: () => void }) {
   const [copied, setCopied] = useState(false)
 
   return (
@@ -448,7 +456,10 @@ function InviteLink({ url, onClose }: { url: string; onClose: () => void }) {
       </div>
 
       <p className="text-xs leading-relaxed text-[var(--fg-muted)]">
-        شغّال أسبوع، ومربوط ببريده هو. أي حد يفتحه بحساب تاني بيترفض.
+        {emailed
+          ? 'وبعتناله الدعوة على بريده كمان. '
+          : 'ما قدرناش نبعت الدعوة على بريده دلوقتي — ابعتله الرابط بنفسك. '}
+        الرابط شغّال أسبوع ومربوط ببريده: لو معندوش حساب هيعمل واحد في دقيقة، ولو عنده هيسجّل دخول وينضم.
       </p>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -471,7 +482,7 @@ function InviteLink({ url, onClose }: { url: string; onClose: () => void }) {
           انسخ
         </button>
         <a
-          href={`https://wa.me/?text=${encodeURIComponent(`ادخل على لوحة المتجر من الرابط ده: ${url}`)}`}
+          href={`https://wa.me/?text=${encodeURIComponent(`اتدعيت تنضم لفريق المتجر 👋\nافتح الرابط ده — لو معندكش حساب هتعمل واحد في دقيقة، ولو عندك سجّل دخول:\n${url}`)}`}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex h-11 shrink-0 items-center rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-semibold"
@@ -526,6 +537,31 @@ function CancelInvite({ id }: { id: string }) {
       }
     >
       ألغِ
+    </Button>
+  )
+}
+
+/** رابط جديد + إيميل تاني لنفس الدعوة */
+function ResendInvite({ id, onSent }: { id: string; onSent: (res: FreshInvite) => void }) {
+  const [pending, start] = useTransition()
+  return (
+    <Button
+      size="sm"
+      variant="secondary"
+      loading={pending}
+      onClick={() =>
+        start(async () => {
+          const res = await resendInviteAction(id)
+          if (res?.error || !res?.inviteUrl) {
+            toast(res?.error ?? 'ما قدرناش نبعتها — جرّب تاني', 'error')
+            return
+          }
+          onSent({ url: res.inviteUrl, emailed: Boolean(res.emailed) })
+          toast(res.emailed ? 'اتبعتت تاني على بريده' : 'رابط جديد جاهز — ابعته بنفسك')
+        })
+      }
+    >
+      ابعت تاني
     </Button>
   )
 }

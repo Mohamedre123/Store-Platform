@@ -366,3 +366,20 @@ export function shipping() {
     ],
   }
 }
+
+export function posts() {
+  const accounts = [
+    { id: 'sa1', name: 'متجر الأناقة', platform: 'facebook', platformLabel: 'فيسبوك', color: '#1877F2', status: 'active' },
+    { id: 'sa2', name: '@elanaka.store', platform: 'instagram', platformLabel: 'إنستجرام', color: '#E1306C', status: 'active' },
+    { id: 'sa3', name: 'elanaka', platform: 'tiktok', platformLabel: 'تيك توك', color: '#010101', status: 'expired' },
+  ]
+  return {
+    studioEnabled: true,
+    accounts,
+    posts: [
+      { id: 'sp1', caption: 'فستان الصيف الجديد وصل 🌸\nقماش خفيف ومريح، ومقاسات من S لـ XXL.\nاطلبيه دلوقتي والشحن مجاني فوق ١٥٠٠ ج.', hashtags: ['#فساتين', '#موضة', '#متجر_الأناقة'], imageUrls: [swatch('#c084fc')], videoUrl: null, status: 'ready', statusLabel: 'جاهز للنشر', targets: [], publishedAt: null, createdAt: hoursAgo(3), results: [] },
+      { id: 'sp2', caption: 'كوليكشن الشنط الجلد — ٤ ألوان', hashtags: ['#شنط'], imageUrls: [swatch('#92400e'), swatch('#1e3a8a'), swatch('#065f46')], videoUrl: null, status: 'published', statusLabel: 'اتنشر', targets: ['sa1', 'sa2'], publishedAt: hoursAgo(26), createdAt: hoursAgo(27), results: [{ accountId: 'sa1', accountName: 'متجر الأناقة', color: '#1877F2', ok: true, error: null }, { accountId: 'sa2', accountName: '@elanaka.store', color: '#E1306C', ok: true, error: null }] },
+      { id: 'sp3', caption: 'خصم ٢٠٪ على الأحذية لآخر الأسبوع', hashtags: [], imageUrls: [swatch('#0f766e')], videoUrl: null, status: 'failed', statusLabel: 'فشل', targets: ['sa2'], publishedAt: null, createdAt: hoursAgo(50), results: [{ accountId: 'sa2', accountName: '@elanaka.store', color: '#E1306C', ok: false, error: 'إنستجرام رفض الصورة — لازم تكون مربعة أو طولية' }] },
+    ],
+  }
+}

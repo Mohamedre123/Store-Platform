@@ -7,9 +7,9 @@ export const metadata = { title: 'تسجيل الدخول' }
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string }>
+  searchParams: Promise<{ next?: string; email?: string }>
 }) {
-  const { next } = await searchParams
+  const { next, email } = await searchParams
 
   // لو مسجّل دخول أصلًا، وديه للوحة على طول بدل ما يعيد الدخول.
   // الجلسة على كوكي، فالزيارة التانية للموقع مش محتاجة تسجيل تاني.
@@ -23,5 +23,5 @@ export default async function LoginPage({
     redirect(next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard')
   }
 
-  return <LoginForm next={next ?? null} />
+  return <LoginForm next={next ?? null} email={email?.slice(0, 120) ?? null} />
 }

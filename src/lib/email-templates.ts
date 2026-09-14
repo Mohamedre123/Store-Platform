@@ -202,6 +202,80 @@ export function passwordResetEmail(code: string, name?: string) {
   }
 }
 
+const escapeHtml = (s: string) =>
+  s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] ?? c)
+
+/**
+ * دعوة للانضمام لفريق متجر.
+ *
+ * بتخرج باسم المتجر (الموظف عارف المتجر مش عارف المنصة)، ومعاها نفس رابط
+ * الدعوة اللي التاجر بينسخه — فالموظف يقدر يفتح من الإيميل أو من واتساب.
+ */
+export function teamInviteEmail(input: {
+  storeName: string
+  inviterName?: string | null
+  roleLabel: string
+  url: string
+  email: string
+  days: number
+}) {
+  const store = escapeHtml(input.storeName)
+  const inviter = input.inviterName ? escapeHtml(input.inviterName) : null
+  const url = escapeHtml(input.url)
+
+  const inner = `
+    <p style="margin:0 0 14px;font-size:16px;line-height:1.9;font-weight:600;">أهلًا،</p>
+
+    <p style="margin:0 0 18px;font-size:15px;line-height:1.9;color:${COLORS.muted};">
+      ${inviter ? `<strong style="color:${COLORS.ink};">${inviter}</strong> من ` : ''}متجر
+      <strong style="color:${COLORS.ink};">${store}</strong> بيدعوك تنضم لفريق المتجر كـ<strong style="color:${COLORS.ink};">${escapeHtml(input.roleLabel)}</strong>.
+    </p>
+
+    <p style="margin:0 0 24px;font-size:15px;line-height:1.9;color:${COLORS.muted};">
+      افتح الدعوة من الزرار: لو معندكش حساب هتعمل واحد بالبريد ده في دقيقة، ولو عندك هتسجّل دخول وتنضم على طول.
+    </p>
+
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;">
+      <tr>
+        <td align="center" style="background-color:${COLORS.primary};border-radius:10px;">
+          <a href="${url}" style="display:inline-block;padding:13px 26px;font-family:'Segoe UI',Tahoma,Arial,sans-serif;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">
+            افتح الدعوة
+          </a>
+        </td>
+      </tr>
+    </table>
+
+    <p style="margin:24px 0 0;font-size:13px;line-height:1.9;color:${COLORS.subtle};">
+      الدعوة مربوطة ببريدك <span dir="ltr">${escapeHtml(input.email)}</span> وشغّالة ${input.days} أيام.
+      لو الزرار مش شغّال، انسخ الرابط ده في المتصفح:<br>
+      <a href="${url}" dir="ltr" style="color:${COLORS.primary};word-break:break-all;">${url}</a>
+    </p>
+
+    <hr style="border:0;border-top:1px solid ${COLORS.border};margin:24px 0;">
+
+    <p style="margin:0;font-size:13px;line-height:1.9;color:${COLORS.subtle};">
+      لو مش متوقّع الرسالة دي، تجاهلها — محدش هيدخل بيها غير صاحب البريد ده.
+    </p>
+  `
+
+  return {
+    subject: `${input.storeName} بيدعوك تنضم لفريق المتجر على ${brand.name}`,
+    html: layout(inner, `دعوة للانضمام لفريق ${input.storeName}`),
+    text: [
+      'أهلًا،',
+      '',
+      `${input.inviterName ? `${input.inviterName} من ` : ''}متجر ${input.storeName} بيدعوك تنضم لفريق المتجر كـ${input.roleLabel}.`,
+      'افتح الدعوة: لو معندكش حساب هتعمل واحد بالبريد ده، ولو عندك هتسجّل دخول وتنضم.',
+      '',
+      input.url,
+      '',
+      `الدعوة مربوطة ببريدك وشغّالة ${input.days} أيام.`,
+      '',
+      `${brand.name} — ${brand.tagline}`,
+    ].join('\n'),
+  }
+}
+
 /** ترحيب بعد تأكيد الحساب */
 export function welcomeEmail(name: string, storeName: string, storeLink: string) {
   const inner = `
