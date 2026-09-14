@@ -482,7 +482,10 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
   «فاضل ٧ أيام» هيتبعت يوم 2026-09-21 تقريبًا.
 - **آخر نشر للموقع بعده:** commit `f20bed6` (لودرات التحليلات والشحنات المشتركة + `/api/app/analytics` و`/api/app/shipments`).
   اتختبر على الحي: المسارين الجداد 401 من غير جلسة، والصفحات 200/307 زي ما هي.
-- **آخر نشر للموقع (3.1):** commit `cd6d761` — اتنشر لوحده خلال دقيقتين. اتختبر على الحي: `/api/app/{schedules,schedules/models,social-accounts}` = 401،
+- **آخر نشر للموقع (3.2):** commit `92cac12` — اتنشر لوحده. اتختبر على الحي: `/api/app/{team,sessions,activity}` = 401،
+  و`team/invite` و`team/members/:id/update` و`team/invites/:id/resend` و`sessions/{others,:id}/revoke` = 403 من غير Origin، والصفحات
+  (`/`، `/login`، `/signup`، `/join` = 200؛ `/dashboard`، `/dashboard/settings/{team,sessions,activity}` = 307) زي ما هي.
+- **نشر الموقع (3.1):** commit `cd6d761` — اتنشر لوحده خلال دقيقتين. اتختبر على الحي: `/api/app/{schedules,schedules/models,social-accounts}` = 401،
   و`schedules/save` و`schedules/:id/{run,delete}` و`social-accounts/sync` و`social-accounts/:id/disconnect` = 403 من غير Origin، والصفحات
   (`/`، `/login`، `/signup`، `/join` = 200؛ `/dashboard`، `/dashboard/studio/{schedules,accounts}` = 307) زي ما هي.
 - **نشر الموقع (دعوة الموظف + 3.0):** commit `c80cb5c` (بعد `f53e10b` الناقص — درس الرفع تحت). اتختبر على الحي: `/join?t=غلط` = 200
