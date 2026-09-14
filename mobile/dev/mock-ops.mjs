@@ -462,3 +462,44 @@ export function activity() {
     ],
   }
 }
+
+export function manualOrder() {
+  return {
+    enabled: true,
+    quota: { blocked: false, limit: null },
+    config: {
+      currency: 'EGP',
+      allowOversell: false,
+      allowCustomPrice: true,
+      allowDeposit: true,
+      regions: [{ code: 'CAI', name: 'القاهرة' }, { code: 'GZ', name: 'الجيزة' }, { code: 'ASW', name: 'أسوان' }],
+      shippingCities: ['القاهرة', 'الجيزة'],
+      pickupAllowed: true,
+    },
+  }
+}
+
+const MO_PRODUCTS = [
+  { id: 'mp1', name: 'فستان صيفي', sku: 'DR-1', image: swatch('#c084fc'), price: 45000, stock: 6, trackInventory: true, status: 'active', categoryName: 'فساتين', variants: [] },
+  { id: 'mp2', name: 'تيشيرت قطن', sku: 'TS-2', image: null, price: 25000, stock: 0, trackInventory: true, status: 'active', categoryName: null, variants: [{ id: 'mv1', title: 'M — أسود', price: 25000, stock: 4, isActive: true }, { id: 'mv2', title: 'L — أبيض', price: 27000, stock: 0, isActive: true }] },
+  { id: 'mp3', name: 'شنطة جلد', sku: 'BG-3', image: swatch('#92400e'), price: 90000, stock: 0, trackInventory: true, status: 'draft', categoryName: 'شنط', variants: [] },
+]
+
+export function manualProducts(q) {
+  return { products: MO_PRODUCTS.filter((p) => !q || p.name.includes(q) || p.sku.includes(q)) }
+}
+
+export function manualCustomers(q) {
+  if (q.length < 2) return { customers: [] }
+  const all = [{ id: 'mc1', name: 'منى علي', phone: '01001234567', email: 'mona@mail.com', ordersCount: 4, city: 'الجيزة', area: 'الدقي', street: '٥ شارع التحرير' }]
+  return { customers: all.filter((c) => c.phone.includes(q) || c.name.includes(q)) }
+}
+
+export function manualQuote(body) {
+  const lines = body.lines ?? []
+  const subtotal = lines.reduce((n, l) => n + (l.price ?? 0) * l.quantity, 0)
+  const shipping = body.fulfillment === 'pickup' ? 0 : typeof body.shippingOverride === 'number' ? body.shippingOverride : body.city ? 4500 : 0
+  const discount = body.discount ?? 0
+  const issues = lines.filter((l) => l.productId === 'mp1' && l.quantity > 6).map(() => ({ name: 'فستان صيفي', reason: 'stock' }))
+  return { ok: true, subtotal, shipping, tax: 0, discount, total: Math.max(0, subtotal - discount + shipping), issues }
+}

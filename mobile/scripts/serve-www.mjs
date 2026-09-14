@@ -54,7 +54,7 @@ createServer(async (req, res) => {
   }
 
   /* تعديل المنتج والحظر والمندوبين والحجوزات (dev/mock-ops.mjs) */
-  if (/^\/api\/app\/(blocked|couriers|bookings|expenses|suppliers|categories|trash|loyalty|affiliates|referrals|media|blog|banners|automations|payments|shipping|posts|schedules|social-accounts|team|sessions|activity)(\/|$)/.test(url.pathname) || /^\/api\/app\/products\/[^/]+\/edit$/.test(url.pathname)) {
+  if (/^\/api\/app\/(blocked|couriers|bookings|expenses|suppliers|categories|trash|loyalty|affiliates|referrals|media|blog|banners|automations|payments|shipping|posts|schedules|social-accounts|team|sessions|activity|manual-order)(\/|$)/.test(url.pathname) || /^\/api\/app\/products\/[^/]+\/edit$/.test(url.pathname)) {
     const mock = await import(new URL('../dev/mock-ops.mjs', import.meta.url))
     await new Promise((r) => setTimeout(r, 450))
     const send = (status, body) => {
@@ -64,6 +64,15 @@ createServer(async (req, res) => {
     let raw = ''
     if (req.method === 'POST') for await (const chunk of req) raw += chunk
     const parts = url.pathname.split('/').filter(Boolean)
+    if (parts[2] === 'manual-order') {
+      const body = raw ? JSON.parse(raw) : {}
+      const q = url.searchParams.get('q') ?? ''
+      if (parts[3] === 'products') return send(200, mock.manualProducts(q))
+      if (parts[3] === 'customers') return send(200, mock.manualCustomers(q))
+      if (parts[3] === 'quote') return send(200, mock.manualQuote(body))
+      if (parts[3] === 'create') return body.lines?.length ? send(200, { ok: true, orderId: 'o-1043', orderNumber: 1043 }) : send(400, { ok: false, error: 'ضيف منتج واحد على الأقل' })
+      return send(200, mock.manualOrder())
+    }
     if (parts[2] === 'products') {
       const api = await import(new URL('../dev/mock-api.mjs', import.meta.url))
       const d = api.productDetail(parts[3])
