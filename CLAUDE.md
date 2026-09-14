@@ -445,7 +445,11 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
   «فاضل ٧ أيام» هيتبعت يوم 2026-09-21 تقريبًا.
 - **آخر نشر للموقع بعده:** commit `f20bed6` (لودرات التحليلات والشحنات المشتركة + `/api/app/analytics` و`/api/app/shipments`).
   اتختبر على الحي: المسارين الجداد 401 من غير جلسة، والصفحات 200/307 زي ما هي.
-- **آخر نشر للموقع (2.7):** commit `be3ead3` — اتنشر لوحده. اتختبر على الحي: `/api/app/{banners,automations}` = 401،
+- **آخر نشر للموقع (2.9):** commit `8344c3b` — اتنشر لوحده خلال دقيقة. اتختبر على الحي: `/api/app/{payments,shipping}` = 401،
+  و`payments/{method,gateway}` و`shipping/{cod,zone,rates,fill,carrier}` و`shipping/methods/save` و`shipping/methods/:id/delete`
+  = 403 من غير Origin، والصفحات (`/dashboard/payments` و`/dashboard/shipping` = 307 من غير جلسة) زي ما هي. نسخة 2.8 (commit `2f80717`)
+  كانت تعديل تطبيق بس — الموقع ما اتغيّرش.
+- **نشر الموقع (2.7):** commit `be3ead3` — اتنشر لوحده. اتختبر على الحي: `/api/app/{banners,automations}` = 401،
   و`banners/save` و`banners/:id/toggle` و`automations/rules/:id/toggle` و`automations/recipients/:id/test` = 403 من غير Origin،
   والصفحات 200/307 زي ما هي.
 - **نشر الموقع (2.6):** commit `0306005` — اتنشر لوحده. اتختبر على الحي: `/api/app/{media,blog}` = 401،
