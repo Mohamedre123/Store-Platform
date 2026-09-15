@@ -1,5 +1,6 @@
 import { getDashboardContext } from '@/lib/store-context'
 import { guard } from '@/lib/permissions'
+import { orderSettingsValues } from '@/lib/order-settings-data'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { OrderSettingsForm } from './order-settings-form'
@@ -18,18 +19,7 @@ export default async function OrderSettingsPage() {
       />
 
       <Reveal>
-        <OrderSettingsForm
-          initial={{
-            manualOrdersEnabled: store.manualOrdersEnabled,
-            manualOversell: store.manualOversell,
-            manualCustomPricing: store.manualCustomPricing,
-            manualDepositEnabled: store.manualDepositEnabled,
-            orderPrefix: store.orderPrefix ?? '',
-            orderSuffix: store.orderSuffix ?? '',
-            /* `orderSequence` آخر رقم اتصرف — اللي جاي هو اللي بعده */
-            nextOrderNumber: store.orderSequence + 1,
-          }}
-        />
+        <OrderSettingsForm initial={orderSettingsValues(store)} />
       </Reveal>
     </div>
   )

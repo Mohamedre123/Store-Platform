@@ -87,6 +87,12 @@ import { clearSettingsCaches } from './settings-api'
 import { SETTINGS_CSS } from './styles-settings'
 import { NewOrderScreen } from './order-new'
 import { MANUAL_ORDER_CSS } from './styles-manual-order'
+import { OrderSettingsScreen } from './order-settings'
+import { CheckoutSettingsScreen } from './checkout-settings'
+import { WhatsappSettingsScreen } from './whatsapp-settings'
+import { EmailSettingsScreen } from './email-settings'
+import { clearStoreSettingsCaches } from './store-settings-api'
+import { STORE_SETTINGS_CSS } from './styles-store-settings'
 
 const ORDER_DETAIL = /^\/dashboard\/orders\/([^/]+)$/
 /* صفحات جوّه المنتجات مش منتجات — new وcategories وimport وtrash بيفضلوا صفحات المنصة */
@@ -147,8 +153,16 @@ type ScreenKey =
   | 'sessions'
   | 'activity'
   | 'newOrder'
+  | 'orderSettings'
+  | 'checkoutSettings'
+  | 'whatsappSettings'
+  | 'emailSettings'
 
 const SCREEN_KEYS: ScreenKey[] = [
+  'orderSettings',
+  'checkoutSettings',
+  'whatsappSettings',
+  'emailSettings',
   'newOrder',
   'team',
   'sessions',
@@ -258,6 +272,7 @@ function Shell() {
       clearCommerceCaches()
       clearStudioCaches()
       clearSettingsCaches()
+      clearStoreSettingsCaches()
       clearMeCache()
     }
   }, [path])
@@ -436,10 +451,26 @@ function Shell() {
         visible={path === '/dashboard/orders/new' && !unavailable.newOrder && !web}
         onUnavailable={markUnavailable.newOrder}
       />
+      <OrderSettingsScreen
+        visible={path === '/dashboard/settings/orders' && !unavailable.orderSettings && !web}
+        onUnavailable={markUnavailable.orderSettings}
+      />
+      <CheckoutSettingsScreen
+        visible={path === '/dashboard/settings/checkout' && !unavailable.checkoutSettings && !web}
+        onUnavailable={markUnavailable.checkoutSettings}
+      />
+      <WhatsappSettingsScreen
+        visible={path === '/dashboard/settings/whatsapp' && !unavailable.whatsappSettings && !web}
+        onUnavailable={markUnavailable.whatsappSettings}
+      />
+      <EmailSettingsScreen
+        visible={path === '/dashboard/settings/email' && !unavailable.emailSettings && !web}
+        onUnavailable={markUnavailable.emailSettings}
+      />
       <VerifyBar visible={path === '/verify'} />
       {/* شاشات التفاصيل ومنتج جديد ليها أزرار تحت — المساعد على الشاشات الرئيسية وصفحات المنصة */}
       <AssistantButton
-        active={onDashboard && !orderId && !productId && !customerId && path !== '/dashboard/products/new' && path !== '/dashboard/orders/new'}
+        active={onDashboard && !orderId && !productId && !customerId && path !== '/dashboard/products/new' && path !== '/dashboard/orders/new' && path !== '/dashboard/settings/orders' && path !== '/dashboard/settings/checkout'}
         raised={path === '/dashboard/products' && !web && !unavailable.products}
       />
       <TabBar path={path} active={onDashboard} />
@@ -452,7 +483,7 @@ export function installShell(): void {
   const root = layer()
   const style = document.createElement('style')
   style.textContent =
-    SHELL_CSS + ORDERS_CSS + PRODUCTS_CSS + CUSTOMERS_CSS + MORE_CSS + VERIFY_CSS + ANALYTICS_CSS + BUSINESS_CSS + OPS_CSS + COMMERCE_CSS + STUDIO_CSS + SETTINGS_CSS + MANUAL_ORDER_CSS
+    SHELL_CSS + ORDERS_CSS + PRODUCTS_CSS + CUSTOMERS_CSS + MORE_CSS + VERIFY_CSS + ANALYTICS_CSS + BUSINESS_CSS + OPS_CSS + COMMERCE_CSS + STUDIO_CSS + SETTINGS_CSS + MANUAL_ORDER_CSS + STORE_SETTINGS_CSS
   root.appendChild(style)
   const mount = document.createElement('div')
   mount.className = 'shell'

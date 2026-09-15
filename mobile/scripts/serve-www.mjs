@@ -53,6 +53,30 @@ createServer(async (req, res) => {
     return
   }
 
+  /* إعدادات الطلبات والشيك أوت وواتساب والبريد (dev/mock-settings.mjs) */
+  if (/^\/api\/app\/(order-settings|checkout-settings|whatsapp|email)(\/|$)/.test(url.pathname)) {
+    const mock = await import(new URL('../dev/mock-settings.mjs', import.meta.url))
+    await new Promise((r) => setTimeout(r, 450))
+    const send = (status, body) => {
+      res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
+      res.end(JSON.stringify(body))
+    }
+    const parts = url.pathname.split('/').filter(Boolean)
+    if (req.method === 'POST') {
+      let raw = ''
+      for await (const chunk of req) raw += chunk
+      const body = raw ? JSON.parse(raw) : {}
+      if (parts[2] === 'whatsapp') return send(...mock.whatsappAction(parts[3], body))
+      if (parts[2] === 'email') return String(body.to ?? '').includes('@') ? send(200, { ok: true, message: 'اتبعتت. شوف الوارد والسبام — ولو لقيتها في السبام دوس «ليست غير مرغوب فيها».', from: 'x' }) : send(400, { ok: false, error: 'اكتب بريدًا صحيحًا' })
+      if (parts[2] === 'checkout-settings' && (body.fieldName === 'hidden' || body.fieldPhone === 'hidden')) return send(400, { ok: false, error: 'الاسم والرقم ما ينفعش يتخفوا — من غيرهم الطلب مالوش صاحب.' })
+      if (parts[2] === 'order-settings' && body.nextOrderNumber < 1043) return send(400, { ok: false, error: 'الرقم الجاي لازم يكون 1043 أو أكبر — الأقل بيتصادم مع طلب موجود.' })
+      return send(200, { ok: true })
+    }
+    if (parts[2] === 'checkout-settings' && parts[3] === 'products') return send(200, mock.checkoutProducts(url.searchParams.get('q') ?? ''))
+    const name = { 'order-settings': 'orderSettings', 'checkout-settings': 'checkoutSettings', whatsapp: 'whatsapp', email: 'email' }[parts[2]]
+    return send(200, mock[name]())
+  }
+
   /* تعديل المنتج والحظر والمندوبين والحجوزات (dev/mock-ops.mjs) */
   if (/^\/api\/app\/(blocked|couriers|bookings|expenses|suppliers|categories|trash|loyalty|affiliates|referrals|media|blog|banners|automations|payments|shipping|posts|schedules|social-accounts|team|sessions|activity|manual-order)(\/|$)/.test(url.pathname) || /^\/api\/app\/products\/[^/]+\/edit$/.test(url.pathname)) {
     const mock = await import(new URL('../dev/mock-ops.mjs', import.meta.url))
