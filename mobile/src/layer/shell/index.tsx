@@ -97,6 +97,11 @@ import { ReceiptSettingsScreen } from './receipt-settings'
 import { SeoSettingsScreen } from './seo-settings'
 import { StorePagesScreen } from './store-pages'
 import { DomainSettingsScreen } from './domain-settings'
+import { LiveScreen } from './live'
+import { ReportsScreen } from './reports'
+import { SignalScreen } from './signal'
+import { clearReportsCaches } from './reports-api'
+import { REPORTS_CSS } from './styles-reports'
 
 const ORDER_DETAIL = /^\/dashboard\/orders\/([^/]+)$/
 /* صفحات جوّه المنتجات مش منتجات — new وcategories وimport وtrash بيفضلوا صفحات المنصة */
@@ -165,6 +170,9 @@ type ScreenKey =
   | 'seoSettings'
   | 'storePages'
   | 'domainSettings'
+  | 'liveView'
+  | 'reportsView'
+  | 'signalView'
 
 const SCREEN_KEYS: ScreenKey[] = [
   'orderSettings',
@@ -175,6 +183,9 @@ const SCREEN_KEYS: ScreenKey[] = [
   'seoSettings',
   'storePages',
   'domainSettings',
+  'liveView',
+  'reportsView',
+  'signalView',
   'newOrder',
   'team',
   'sessions',
@@ -285,6 +296,7 @@ function Shell() {
       clearStudioCaches()
       clearSettingsCaches()
       clearStoreSettingsCaches()
+      clearReportsCaches()
       clearMeCache()
     }
   }, [path])
@@ -495,6 +507,18 @@ function Shell() {
         visible={path === '/dashboard/settings/domain' && !unavailable.domainSettings && !web}
         onUnavailable={markUnavailable.domainSettings}
       />
+      <LiveScreen
+        visible={path === '/dashboard/analytics/live' && !unavailable.liveView && !web}
+        onUnavailable={markUnavailable.liveView}
+      />
+      <ReportsScreen
+        visible={path === '/dashboard/analytics/reports' && !unavailable.reportsView && !web}
+        onUnavailable={markUnavailable.reportsView}
+      />
+      <SignalScreen
+        visible={path === '/dashboard/analytics/signal' && !unavailable.signalView && !web}
+        onUnavailable={markUnavailable.signalView}
+      />
       <VerifyBar visible={path === '/verify'} />
       {/* شاشات التفاصيل ومنتج جديد ليها أزرار تحت — المساعد على الشاشات الرئيسية وصفحات المنصة */}
       <AssistantButton
@@ -511,7 +535,7 @@ export function installShell(): void {
   const root = layer()
   const style = document.createElement('style')
   style.textContent =
-    SHELL_CSS + ORDERS_CSS + PRODUCTS_CSS + CUSTOMERS_CSS + MORE_CSS + VERIFY_CSS + ANALYTICS_CSS + BUSINESS_CSS + OPS_CSS + COMMERCE_CSS + STUDIO_CSS + SETTINGS_CSS + MANUAL_ORDER_CSS + STORE_SETTINGS_CSS
+    SHELL_CSS + ORDERS_CSS + PRODUCTS_CSS + CUSTOMERS_CSS + MORE_CSS + VERIFY_CSS + ANALYTICS_CSS + BUSINESS_CSS + OPS_CSS + COMMERCE_CSS + STUDIO_CSS + SETTINGS_CSS + MANUAL_ORDER_CSS + STORE_SETTINGS_CSS + REPORTS_CSS
   root.appendChild(style)
   const mount = document.createElement('div')
   mount.className = 'shell'

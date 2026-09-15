@@ -172,6 +172,14 @@ function AnalyticsContent({ data }: { data: AnalyticsPayload }) {
           </span>
           <Icon svg={icons.chevronLeft()} className="ic an-chev" />
         </button>
+        <button type="button" class="an-link press" onClick={() => go('/dashboard/analytics/signal')}>
+          <Icon svg={icons.trending()} />
+          <span>
+            جودة إشارة التحويل
+            <small>مبيعاتك بتوصل ميتا وتيك توك كاملة ولا لأ</small>
+          </span>
+          <Icon svg={icons.chevronLeft()} className="ic an-chev" />
+        </button>
       </div>
 
       <p class="fine center">«صافي الربح» = المبيعات ناقص تكلفة المنتجات والمصروفات المسجّلة.</p>

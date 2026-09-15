@@ -53,6 +53,15 @@ createServer(async (req, res) => {
     return
   }
 
+  /* العرض المباشر والتقارير المفصّلة وجودة الإشارة (dev/mock-reports.mjs) */
+  if (/^\/api\/app\/(live|reports|signal)$/.test(url.pathname)) {
+    const mock = await import(new URL('../dev/mock-reports.mjs', import.meta.url))
+    await new Promise((r) => setTimeout(r, 350))
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
+    res.end(JSON.stringify(mock[url.pathname.split('/').pop()]()))
+    return
+  }
+
   /* إعدادات الطلبات والشيك أوت وواتساب والبريد (dev/mock-settings.mjs) */
   if (/^\/api\/app\/(order-settings|checkout-settings|whatsapp|email|receipt|seo|store-pages|domain|improve)(\/|$)/.test(url.pathname)) {
     const mock = await import(new URL('../dev/mock-settings.mjs', import.meta.url))

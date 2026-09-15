@@ -44,6 +44,7 @@ import { postsPayload } from '@/lib/app-posts'
 import { schedulesPayload } from '@/lib/app-schedules'
 import { socialAccountsPayload } from '@/lib/app-social'
 import { subscriptionPayload } from '@/lib/app-subscription'
+import { livePayload, reportsPayload, signalPayload } from '@/lib/app-reports'
 
 /**
  * سجل أفعال مساعد المتجر — «يتحكّم في كل حاجة في اللوحة».
@@ -799,6 +800,9 @@ export const REGISTRY: RegistryAction[] = [
     }),
 
   /* ═════════ التقارير والمصروفات ═════════ */
+  read('live_now', 'reports', 'reports.view', 'العرض المباشر: الزوار دلوقتي وجلسات وسلات وطلبات آخر ساعة، الأجهزة والمدن والمصادر، والصفحات، وآخر نشاط', undefined, (c) => livePayload(c)),
+  read('detailed_reports', 'reports', 'reports.view', 'تقارير مفصّلة: قنوات البيع، الطلبات جاية منين (زيارات وتحويل)، أداء شركات الشحن ونسبة التسليم، شغل الفريق', undefined, (c) => reportsPayload(c)),
+  read('signal_quality', 'reports', 'reports.view', 'جودة إشارة التحويل لميتا وتيك توك: الدرجة، الطلبات اللي وصلت، مفاتيح المطابقة، وأخطاء المنصات', undefined, (c) => signalPayload(c.store.id)),
   read('analytics', 'reports', 'reports.view', 'التحليلات: الإيرادات والطلبات والتحويل والأكثر مبيعًا', undefined, (c) => analyticsPayload(c.store)),
   read('expenses', 'reports', 'finance.view', 'المصروفات وصافي الربح', undefined, (c) => expensesPayload(c.store)),
   read('activity', 'reports', 'settings.manage', 'سجل النشاط (مين عمل إيه)', undefined, (c) => activityPayload(c.store.id)),
