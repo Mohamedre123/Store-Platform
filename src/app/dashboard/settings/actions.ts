@@ -57,6 +57,7 @@ export async function saveStoreInfoAction(input: {
   }
 
   const dial = store.country === 'EG' ? '20' : '966'
+  const whatsapp = input.whatsapp.trim() ? normalizePhone(input.whatsapp, dial) : null
 
   await db
     .update(stores)
@@ -66,7 +67,7 @@ export async function saveStoreInfoAction(input: {
       tagline: input.tagline.trim() || null,
       email: email || null,
       phone: input.phone.trim() ? normalizePhone(input.phone, dial) : null,
-      whatsapp: input.whatsapp.trim() ? normalizePhone(input.whatsapp, dial) : null,
+      whatsapp,
       logoLight: input.logoLight,
       favicon: input.favicon,
       socialLinks: Object.fromEntries(
@@ -90,10 +91,78 @@ export async function saveStoreInfoAction(input: {
     })
   }
 
+  await syncWhatsappCopies(store.id, store.whatsapp, whatsapp)
+
   revalidatePath('/dashboard/settings')
   revalidatePath('/dashboard')
   revalidatePath('/dashboard/storefront')
+  revalidatePath(`/s/${store.slug}`, 'layout')
   return { ok: true }
+}
+
+/**
+ * نسخ رقم الواتساب القديمة في التخصيص.
+ *
+ * ## المشكلة
+ * زر واتساب العايم بياخد «رقم مختلف للزر» من تخصيص المتجر لو موجود، وإلا رقم
+ * المتجر — وأيقونة الفوتر كذلك (`footer.social.whatsapp`). التاجر اللي كتب نفس
+ * الرقم في المكانين، ولما مسحه من «بيانات المتجر» الأيقونة فضلت ظاهرة بالرقم
+ * القديم من الخانة التانية، ومش عارف ليه.
+ *
+ * ## القاعدة
+ * - مسح رقم المتجر = مفيش واتساب في المتجر: أي رقم في التخصيص بيتمسح معاه.
+ * - تغيير الرقم = النسخة اللي كانت نفس الرقم القديم بتتمسح (فالزر ياخد الجديد)،
+ *   والرقم المختلف فعلًا اللي التاجر قاصده للزر بيفضل زي ما هو.
+ */
+async function syncWhatsappCopies(storeId: string, previous: string | null, next: string | null) {
+  const [row] = await db
+    .select({ draft: storeThemes.draft, footer: storeThemes.footer })
+    .from(storeThemes)
+    .where(eq(storeThemes.storeId, storeId))
+    .limit(1)
+  if (!row) return
+
+  const tail = (v: unknown) => String(v ?? '').replace(/\D/g, '').slice(-10)
+  const old = tail(previous)
+  const stale = (v: unknown) => {
+    const digits = tail(v)
+    if (!digits) return false
+    return !next || (old.length >= 8 && digits === old)
+  }
+
+  const draft = { ...((row.draft ?? {}) as Record<string, unknown>) }
+  const footer = { ...((row.footer ?? {}) as Record<string, unknown>) }
+  let draftChanged = false
+  let footerChanged = false
+
+  const toolbar = draft.toolbar as Record<string, unknown> | undefined
+  if (toolbar && stale(toolbar.whatsappNumber)) {
+    draft.toolbar = { ...toolbar, whatsappNumber: '' }
+    draftChanged = true
+  }
+
+  const draftFooter = draft.footer as Record<string, unknown> | undefined
+  const draftSocial = draftFooter?.social as Record<string, unknown> | undefined
+  if (draftFooter && draftSocial && stale(draftSocial.whatsapp)) {
+    draft.footer = { ...draftFooter, social: { ...draftSocial, whatsapp: '' } }
+    draftChanged = true
+  }
+
+  const social = footer.social as Record<string, unknown> | undefined
+  if (social && stale(social.whatsapp)) {
+    footer.social = { ...social, whatsapp: '' }
+    footerChanged = true
+  }
+
+  if (!draftChanged && !footerChanged) return
+
+  await db
+    .update(storeThemes)
+    .set({
+      ...(draftChanged ? { draft } : {}),
+      ...(footerChanged ? { footer } : {}),
+    })
+    .where(eq(storeThemes.storeId, storeId))
 }
 
 /**

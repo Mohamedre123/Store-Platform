@@ -359,6 +359,77 @@ export async function sendWhatsappDocument(
   return res
 }
 
+/**
+ * صورة بتعليق — رسايل التاجر لعملاءه (عرض، منتج، إعلان) من المساعد.
+ *
+ * برابط زي المستند: المزوّد بيجيب الصورة بنفسه. واللي بينادي بيرجع للنص لوحده
+ * لو الصورة اترفضت — الكلام أهم من المرفق.
+ */
+export async function sendWhatsappImage(
+  storeId: string,
+  phone: string,
+  imageUrl: string,
+  caption: string,
+  log?: Omit<LogContext, 'storeId'>,
+): Promise<SendResult> {
+  const ctx: LogContext | undefined = log ? { storeId, ...log } : undefined
+  const to = e164(phone)
+  if (to.length < 9) return { ok: false, error: 'رقم غير صالح' }
+
+  const [row] = await db
+    .select({
+      provider: messagingSettings.whatsappProvider,
+      creds: messagingSettings.whatsappCredentials,
+      phoneId: messagingSettings.whatsappPhoneId,
+    })
+    .from(messagingSettings)
+    .where(eq(messagingSettings.storeId, storeId))
+    .limit(1)
+
+  const provider = normalizeProvider(row?.provider)
+  if (provider === 'off') return { ok: false, error: 'واتساب مش مربوط' }
+
+  const secrets = decryptJson<Secrets>(row?.creds ?? null)
+  const key = secrets?.apiKey ?? secrets?.token
+  if (!key) return { ok: false, error: 'مفتاح واتساب ناقص' }
+
+  let res: SendResult
+  try {
+    const r =
+      provider === 'wasender'
+        ? await fetch('https://www.wasenderapi.com/api/send-message', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to, text: caption, imageUrl }),
+            signal: AbortSignal.timeout(20_000),
+          })
+        : await fetch(`https://graph.facebook.com/v21.0/${row?.phoneId ?? ''}/messages`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messaging_product: 'whatsapp',
+              to: to.replace(/\D/g, ''),
+              type: 'image',
+              image: { link: imageUrl, caption },
+            }),
+            signal: AbortSignal.timeout(20_000),
+          })
+    res = r.ok ? { ok: true } : { ok: false, error: `${r.status}: ${(await r.text()).slice(0, 200)}` }
+  } catch (e) {
+    res = { ok: false, error: e instanceof Error ? e.message : 'فشل الاتصال' }
+  }
+
+  await record(
+    ctx ? { ...ctx, provider } : undefined,
+    to,
+    caption ? `[صورة] ${caption}` : '[صورة]',
+    res.ok ? 'sent' : 'failed',
+    res.ok ? undefined : res.error,
+  )
+
+  return res
+}
+
 /** البوابة السهلة — رقم عادي مربوط بمسح كود */
 async function sendViaWasender(key: string, to: string, text: string): Promise<SendResult> {
   try {

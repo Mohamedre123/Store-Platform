@@ -72,6 +72,19 @@ async function buildSystem(storeId: string, brief: string | null, storeName: str
     '- ردودك قصيرة. جملتين أو تلاتة، وبعدين نفّذ أو اسأل.',
     '- لو بعتلك صور منتج، اقرا منها الاسم والخامة واللون واقترحهم عليه.',
     '',
+    'إنت متحكّم في اللوحة كلها — مش الأدوات اللي فوق بس:',
+    '- list_actions بترجّع كل اللي تقدر تقراه (get_data) وتنفّذه (run_action) في أي جزء: الطلبات، العملاء،',
+    '  المنتجات والمخزون، التسويق والحملات والأتمتة، شكل المتجر وزر واتساب، الإعدادات والشيك أوت والسيو،',
+    '  الإضافات، الفريق، التقارير. لو التاجر طلب حاجة مش لاقي أداة ليها فوق، دوّر في list_actions الأول.',
+    '- في run_action وget_data ابعت الخانات في argsJson كنص JSON بنفس الشكل المكتوب في list_actions.',
+    '- اقرا الإعداد بـget_data قبل ما تعدّله، وابعت الخانات اللي هتتغيّر بس.',
+    '- رسايل العملاء (message_customers): التاجر يقولك «ابعت لطلبات ١٠٤٣ و١٠٤٤ بريد بكذا وصورة كذا» —',
+    '  اكتب العنوان والكلام بأسلوب المتجر، واستخدم {{اسم_العميل}} و{{رقم_الطلب}} لو مناسب، وحط رابط الصورة',
+    '  اللي بعتها في الشات. لو طلب واتساب: اتأكد إن واتساب مربوط (get_data whatsapp)، ولو مش مربوط قوله يربطه',
+    '  من الإعدادات ← واتساب بمسح الكود الأول. تقدر تبعت لكذا طلب في نفس الإجراء.',
+    '- تقدر تقترح أكتر من إجراء في نفس الرد — كل واحد بيتعرض على التاجر لوحده.',
+    '- عمرك ما تطلب أو تقرا مفتاح API أو كلمة سر، والدومين والاشتراك وكلمة السر بيتغيّروا من صفحاتهم بس.',
+    '',
     'كل إجراء بيغيّر حاجة في المتجر بيتعرض على التاجر ويستنى موافقته قبل',
     'ما يتنفّذ — فما تقولش «تمام عملتها» قبل ما توصلك نتيجة التنفيذ.',
   ].join('\n')
@@ -166,7 +179,8 @@ export async function sendToAssistantAction(raw: unknown): Promise<AgentState> {
   const parsed = sendSchema.safeParse(raw)
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? 'بيانات ناقصة' }
 
-  const { store, user } = await getDashboardContext()
+  const ctx = await getDashboardContext()
+  const { store, user } = ctx
   const key = await resolveKey(store.id, parsed.data.provider)
   if (!key.ok) return { ok: false, error: key.error, needsSetup: key.needsSetup }
 
@@ -223,7 +237,7 @@ export async function sendToAssistantAction(raw: unknown): Promise<AgentState> {
   let finalText = ''
   let pendingCalls: AiToolCall[] = []
 
-  for (let round = 0; round < 4; round++) {
+  for (let round = 0; round < 6; round++) {
     const res = await agentStep(engine, {
       system,
       messages,
@@ -252,7 +266,7 @@ export async function sendToAssistantAction(raw: unknown): Promise<AgentState> {
 
     // القراءة بتتنفّذ فورًا وبترجع للموديل
     for (const c of reads) {
-      const result = await executeTool(store.id, store.currency, c)
+      const result = await executeTool(ctx, c)
       messages.push({
         role: 'tool',
         name: c.name,
@@ -268,6 +282,8 @@ export async function sendToAssistantAction(raw: unknown): Promise<AgentState> {
         thoughtSignature: c.thoughtSignature,
         /* وده لـChatGPT: النتيجة بتترد على النداء بمعرّفه */
         callId: c.id,
+        /* الوصف العربي بيتحسب هنا على الخادم — اللوحة بتعرضه قبل الموافقة */
+        label: getTool(c.name)?.describe(c.args),
         status: 'pending' as const,
       }))
       break
@@ -302,7 +318,8 @@ export async function decideToolAction(input: {
   index: number
   approve: boolean
 }): Promise<AgentState> {
-  const { store, user } = await getDashboardContext()
+  const ctx = await getDashboardContext()
+  const { store, user } = ctx
 
   const [msg] = await db
     .select({
@@ -326,7 +343,7 @@ export async function decideToolAction(input: {
   if (!input.approve) {
     calls[input.index] = { ...call, status: 'rejected' }
   } else {
-    const result = await executeTool(store.id, store.currency, {
+    const result = await executeTool(ctx, {
       name: call.name,
       args: call.args,
     })

@@ -35,6 +35,7 @@ export type JobType =
   | 'order.confirm_request'
   | 'campaign.send'
   | 'content.schedule'
+  | 'customer.message'
 
 /** يحجز مهمة للتنفيذ بعد مدة */
 export async function enqueue(input: {
@@ -270,6 +271,29 @@ const HANDLERS: Record<string, Handler> = {
     const { touchCatalogFeed } = await import('./marketplace')
     await touchCatalogFeed(storeId, String(payload.platform ?? ''))
     return { ok: true }
+  },
+
+  /*
+    رسالة واتساب من التاجر لعميل (بيبعتها المساعد) — واحدة كل دقيقة.
+
+    الباقات المجانية عند مزوّد واتساب بتسمح برسالة كل دقيقة، فالرسايل لأكتر من عميل
+    بتتحجز متباعدة بدل ما تترفض كلها بعد أول واحدة.
+  */
+  'customer.message': async (payload, storeId) => {
+    if (!storeId || typeof payload.phone !== 'string' || typeof payload.text !== 'string') {
+      return { ok: false, error: 'حمولة ناقصة' }
+    }
+    const { deliverWhatsappMessage } = await import('./customer-messages')
+    const res = await deliverWhatsappMessage(storeId, {
+      phone: payload.phone,
+      text: payload.text,
+      imageUrl: typeof payload.imageUrl === 'string' ? payload.imageUrl : null,
+      orderId: typeof payload.orderId === 'string' ? payload.orderId : null,
+      customerId: typeof payload.customerId === 'string' ? payload.customerId : null,
+    })
+    /* الرقم الغلط مالوش حل بإعادة المحاولة */
+    if (!res.ok && res.error === 'رقم غير صالح') return { ok: true }
+    return res
   },
 }
 

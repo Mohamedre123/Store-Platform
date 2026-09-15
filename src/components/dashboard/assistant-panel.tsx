@@ -634,7 +634,7 @@ function Message({
           }}
         >
           <p className="text-xs font-medium">
-            {TOOL_LABELS[call.name]?.(call.args) ?? call.name}
+            {call.label ?? TOOL_LABELS[call.name]?.(call.args) ?? call.name}
           </p>
 
           {call.status === 'pending' && (

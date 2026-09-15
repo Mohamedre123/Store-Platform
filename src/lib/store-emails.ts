@@ -656,8 +656,20 @@ export function orderStatusEmail(
  */
 export function merchantMessageEmail(
   store: StoreBrand,
-  o: { subject: string; body: string; actionUrl?: string | null; actionLabel?: string },
+  o: {
+    subject: string
+    body: string
+    actionUrl?: string | null
+    actionLabel?: string
+    /** صورة فوق الكلام (عرض أو منتج) — رابط https بس */
+    imageUrl?: string | null
+  },
 ) {
+  const image =
+    o.imageUrl && /^https:\/\/[^\s"'<>]+$/.test(o.imageUrl)
+      ? `<img src="${escapeHtml(o.imageUrl)}" alt="" width="520" style="display:block;width:100%;max-width:520px;height:auto;margin:0 auto 18px;border:0;border-radius:12px;" />`
+      : ''
+
   /* أسطر النص بتتحوّل لفقرات — الرسالة بسطر واحد طويل بتبقى كتلة */
   const paragraphs = o.body
     .split(/\n{2,}/)
@@ -680,7 +692,7 @@ export function merchantMessageEmail(
 
   return {
     subject: o.subject,
-    html: layout(store, paragraphs + button, o.body.slice(0, 120)),
+    html: layout(store, image + paragraphs + button, o.body.slice(0, 120)),
     text: o.actionUrl ? `${o.body}\n\n${o.actionUrl}` : o.body,
   }
 }

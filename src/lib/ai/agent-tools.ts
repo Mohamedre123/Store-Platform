@@ -11,7 +11,10 @@ import {
   stores,
 } from '@/db/schema'
 import { formatMoney, suggestStoreSlug } from '@/lib/utils'
+import type { DashboardContext } from '@/lib/store-context'
+import { can, type Permission } from '@/lib/permissions'
 import type { ToolDef } from './gemini'
+import { AREA_LABELS, availableActions, describeAction, runRegistryAction, updateStoreInfo } from './agent-registry'
 
 /**
  * أدوات مساعد التاجر.
@@ -25,13 +28,20 @@ import type { ToolDef } from './gemini'
  *   مخزون المتجر بجنيه.
  *
  * وعدد الأدوات مقصود إنه محدود: كل أداة بتتبعت مع كل رسالة، والقايمة
- * الطويلة بتغرق الموديل وبتزوّد التكلفة على التاجر في كل سؤال.
+ * الطويلة بتغرق الموديل وبتزوّد التكلفة على التاجر في كل سؤال. باقي
+ * اللوحة كلها (الإعدادات، الرسايل للعملاء، التخصيص، الإضافات…) ورا
+ * `list_actions` / `get_data` / `run_action` في `agent-registry.ts`.
+ *
+ * وكل أداة ليها صلاحية بتتقاس على الموظف اللي بيكلّم المساعد — الموظف اللي
+ * ما يقدرش يغيّر الأسعار من اللوحة ما يقدرش يغيّرها من الشات.
  */
 
 export type ToolKind = 'read' | 'write'
 
 export type AgentTool = ToolDef & {
   kind: ToolKind
+  /** الصلاحية المطلوبة (مفيش = أي عضو في الفريق) */
+  permission?: Permission
   /** وصف الإجراء بالعربي للتاجر قبل ما يوافق */
   describe: (args: Record<string, unknown>) => string
 }
@@ -40,6 +50,26 @@ const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
 const num = (v: unknown) => {
   const n = Number(v)
   return Number.isFinite(n) ? n : NaN
+}
+
+/** خانات `run_action`/`get_data` — نص JSON (أو كائن لو المزوّد بعته كده) */
+function registryArgs(a: Record<string, unknown>): Record<string, unknown> {
+  if (a.args && typeof a.args === 'object' && !Array.isArray(a.args)) return a.args as Record<string, unknown>
+  const raw = str(a.argsJson)
+  if (!raw) return {}
+  try {
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+/** البيانات الكبيرة بتتقص — الموديل مش محتاج آلاف الأسطر ورسالته بتغلى */
+function compact(data: unknown): unknown {
+  const text = JSON.stringify(data ?? null)
+  if (text.length <= 16_000) return data
+  return { ملحوظة: 'البيانات كتير فدي أولها بس — اسأل عن حاجة محددة لو محتاج الباقي', جزء: text.slice(0, 16_000) }
 }
 
 /* ────────────────────────── التعريفات ────────────────────────── */
@@ -55,7 +85,56 @@ export const AGENT_TOOLS: AgentTool[] = [
   },
   {
     kind: 'read',
+    name: 'list_actions',
+    description:
+      'كل اللي تقدر تقراه وتنفّذه في اللوحة (بصلاحيات الحساب ده) — مع شكل الخانات. استخدمها لما التاجر يطلب حاجة مالهاش أداة مباشرة: إعدادات، رسايل للعملاء بالبريد أو واتساب، تخصيص المتجر وزر واتساب، الإضافات، الفريق، المرتجعات، الشكاوى، الحملات، وغيرها.',
+    parameters: {
+      type: 'object',
+      properties: {
+        area: {
+          type: 'string',
+          description: `الجزء (اختياري — من غيره بترجع الكل): ${Object.entries(AREA_LABELS)
+            .map(([k, v]) => `${k} = ${v}`)
+            .join(' · ')}`,
+          enum: Object.keys(AREA_LABELS),
+        },
+      },
+    },
+    describe: () => 'قراءة الإجراءات المتاحة',
+  },
+  {
+    kind: 'read',
+    name: 'get_data',
+    description: 'اقرا بيانات من اللوحة بإجراء قراءة من list_actions (زي order أو checkout_settings أو whatsapp).',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', description: 'اسم إجراء القراءة من list_actions' },
+        argsJson: { type: 'string', description: 'الخانات كنص JSON بالشكل المكتوب في list_actions — أو فاضي' },
+      },
+      required: ['action'],
+    },
+    describe: (a) => `قراءة «${str(a.action)}»`,
+  },
+  {
+    kind: 'write',
+    name: 'run_action',
+    description:
+      'نفّذ إجراء بيغيّر حاجة في المتجر من list_actions (زي message_customers أو update_checkout_settings أو update_storefront). التاجر بيشوفه بالعربي ويوافق قبل التنفيذ.',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', description: 'اسم الإجراء من list_actions' },
+        argsJson: { type: 'string', description: 'الخانات كنص JSON بالشكل المكتوب في list_actions' },
+      },
+      required: ['action', 'argsJson'],
+    },
+    describe: (a) => describeAction(str(a.action), registryArgs(a)),
+  },
+  {
+    kind: 'read',
     name: 'search_products',
+    permission: 'products.view',
     description: 'دوّر على منتجات بالاسم. استخدمها قبل أي تعديل عشان تجيب معرّف المنتج الصح.',
     parameters: {
       type: 'object',
@@ -67,6 +146,7 @@ export const AGENT_TOOLS: AgentTool[] = [
   {
     kind: 'read',
     name: 'list_recent_orders',
+    permission: 'orders.view',
     description: 'آخر الطلبات وحالتها. استخدمها لو التاجر سأل عن طلباته أو عايز يعرف فيه إيه محتاج تدخّل.',
     parameters: {
       type: 'object',
@@ -83,6 +163,7 @@ export const AGENT_TOOLS: AgentTool[] = [
   {
     kind: 'read',
     name: 'list_categories',
+    permission: 'products.view',
     description: 'أقسام المتجر. استخدمها قبل ما تضيف منتج عشان تحطّه في قسم موجود بدل ما تعمل قسم مكرّر.',
     parameters: { type: 'object', properties: {} },
     describe: () => 'قراءة الأقسام',
@@ -91,6 +172,7 @@ export const AGENT_TOOLS: AgentTool[] = [
   {
     kind: 'write',
     name: 'create_product',
+    permission: 'products.manage',
     description:
       'إضافة منتج جديد للمتجر. لو التاجر بعت صور، حطّ روابطها في imageUrls زي ما وصلتك بالظبط. اسأله عن أي بيانات ناقصة قبل ما تستخدمها.',
     parameters: {
@@ -114,6 +196,7 @@ export const AGENT_TOOLS: AgentTool[] = [
   {
     kind: 'write',
     name: 'update_product',
+    permission: 'products.manage',
     description:
       'تعديل منتج موجود. استخدم search_products الأول عشان تجيب productId. عدّل الحقول اللي التاجر طلبها بس.',
     parameters: {
@@ -141,6 +224,7 @@ export const AGENT_TOOLS: AgentTool[] = [
   {
     kind: 'write',
     name: 'create_category',
+    permission: 'products.manage',
     description: 'إضافة قسم جديد للمتجر.',
     parameters: {
       type: 'object',
@@ -155,6 +239,7 @@ export const AGENT_TOOLS: AgentTool[] = [
   {
     kind: 'write',
     name: 'create_coupon',
+    permission: 'marketing.manage',
     description: 'إنشاء كود خصم. النسبة بالمئة (مثلًا 10 يعني ١٠٪) والمبلغ بالجنيه.',
     parameters: {
       type: 'object',
@@ -175,6 +260,7 @@ export const AGENT_TOOLS: AgentTool[] = [
   {
     kind: 'write',
     name: 'set_shipping_prices',
+    permission: 'settings.manage',
     description:
       'تظبيط أسعار الشحن. تقدر تحدّد سعرًا موحّدًا لكل المحافظات، أو سعرًا لمحافظة بعينها، أو الاتنين. السعر بالجنيه.',
     parameters: {
@@ -220,6 +306,7 @@ export const AGENT_TOOLS: AgentTool[] = [
   {
     kind: 'read',
     name: 'get_shipping',
+    permission: 'settings.manage',
     description: 'قراءة إعدادات الشحن الحالية: السعر الموحّد، أسعار المحافظات، وحد الشحن المجاني.',
     parameters: { type: 'object', properties: {} },
     describe: () => 'قراءة إعدادات الشحن',
@@ -227,7 +314,8 @@ export const AGENT_TOOLS: AgentTool[] = [
   {
     kind: 'write',
     name: 'update_order_status',
-    description: 'تغيير حالة طلب برقمه. ده بيبعت رسالة للعميل تلقائيًا.',
+    permission: 'orders.manage',
+    description: 'تغيير حالة طلب برقمه. ده بيبعت رسالة للعميل تلقائيًا. (لأكتر من طلب مرة واحدة: run_action set_orders_status)',
     parameters: {
       type: 'object',
       properties: {
@@ -245,6 +333,7 @@ export const AGENT_TOOLS: AgentTool[] = [
   {
     kind: 'write',
     name: 'set_store_published',
+    permission: 'settings.manage',
     description: 'نشر المتجر أو إيقافه. المتجر غير المنشور ما حدش يقدر يطلب منه.',
     parameters: {
       type: 'object',
@@ -256,7 +345,9 @@ export const AGENT_TOOLS: AgentTool[] = [
   {
     kind: 'write',
     name: 'update_store_info',
-    description: 'تعديل بيانات المتجر الأساسية.',
+    permission: 'settings.manage',
+    description:
+      'تعديل بيانات المتجر الأساسية. ابعت الخانات اللي هتتغيّر بس. whatsapp فاضي ("") = مسح رقم واتساب المتجر وزر واتساب بيختفي من المتجر.',
     parameters: {
       type: 'object',
       properties: {
@@ -264,12 +355,14 @@ export const AGENT_TOOLS: AgentTool[] = [
         tagline: { type: 'string', description: 'الجملة التعريفية' },
         email: { type: 'string', description: 'بريد المتجر' },
         phone: { type: 'string', description: 'تليفون المتجر' },
+        whatsapp: { type: 'string', description: 'رقم واتساب المتجر (فاضي = امسحه)' },
       },
     },
     describe: (a) => {
+      const names: Record<string, string> = { name: 'الاسم', tagline: 'الجملة التعريفية', email: 'البريد', phone: 'التليفون' }
       const parts = Object.entries(a)
-        .filter(([, v]) => v)
-        .map(([k]) => ({ name: 'الاسم', tagline: 'الجملة التعريفية', email: 'البريد', phone: 'التليفون' })[k] ?? k)
+        .filter(([k, v]) => typeof v === 'string' && (v || k === 'whatsapp'))
+        .map(([k, v]) => (k === 'whatsapp' ? (v ? 'واتساب' : 'مسح واتساب') : (names[k] ?? k)))
       return `تعديل بيانات المتجر: ${parts.join('، ')}`
     },
   },
@@ -286,17 +379,37 @@ export type ExecResult = { ok: true; summary: string; data?: unknown } | { ok: f
 /**
  * تنفيذ أداة.
  *
- * `storeId` بيتحط هنا من الجلسة لا من الموديل — لو سبناه للموديل،
- * كلمة في رسالة عميل كانت تخلّيه يكتب في متجر تاني.
+ * المتجر والموظف بيتحطّوا هنا من الجلسة لا من الموديل — لو سبناهم للموديل،
+ * كلمة في رسالة عميل كانت تخلّيه يكتب في متجر تاني أو بصلاحيات حد تاني.
  */
 export async function executeTool(
-  storeId: string,
-  currency: string,
+  ctx: DashboardContext,
   call: { name: string; args: Record<string, unknown> },
 ): Promise<ExecResult> {
   const a = call.args
+  const storeId = ctx.store.id
+  const currency = ctx.store.currency
+
+  const tool = getTool(call.name)
+  if (tool?.permission && !can(ctx.actor, tool.permission)) {
+    return { ok: false, error: 'الحساب ده مالوش صلاحية على الجزء ده من المتجر' }
+  }
 
   switch (call.name) {
+    case 'list_actions': {
+      const area = str(a.area)
+      const actions = availableActions(ctx, area || undefined)
+      return { ok: true, summary: `${actions.length} إجراء متاح`, data: actions }
+    }
+
+    case 'get_data': {
+      const res = await runRegistryAction(ctx, 'read', str(a.action), registryArgs(a))
+      return res.ok ? { ...res, data: compact(res.data) } : res
+    }
+
+    case 'run_action':
+      return runRegistryAction(ctx, 'write', str(a.action), registryArgs(a))
+
     case 'get_store_overview': {
       const [[store], [stats], [orderStats], low] = await Promise.all([
         db
@@ -590,18 +703,12 @@ export async function executeTool(
       return { ok: true, summary: published ? 'المتجر اتنشر' : 'المتجر اتوقف' }
     }
 
-    case 'update_store_info': {
-      const values: Record<string, unknown> = {}
-      if (str(a.name)) values.name = str(a.name)
-      if (str(a.tagline)) values.tagline = str(a.tagline)
-      if (str(a.email)) values.email = str(a.email)
-      if (str(a.phone)) values.phone = str(a.phone)
-
-      if (Object.keys(values).length === 0) return { ok: false, error: 'مفيش حاجة تتعدّل' }
-
-      await db.update(stores).set(values).where(eq(stores.id, storeId))
-      return { ok: true, summary: 'بيانات المتجر اتحدّثت' }
-    }
+    /*
+      بفعل صفحة «بيانات المتجر» نفسه — عشان مسح رقم واتساب يمسح نسخه في التخصيص
+      كمان (الزر العايم والفوتر) زي ما بيحصل لما التاجر يمسحه بإيده.
+    */
+    case 'update_store_info':
+      return updateStoreInfo(ctx, a)
 
     case 'get_shipping': {
       const [zone] = await db

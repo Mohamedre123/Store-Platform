@@ -330,6 +330,11 @@ export type AiToolCall = {
   /** pending = مستنية موافقة التاجر · done = اتنفّذت · rejected = رفضها */
   status: 'pending' | 'done' | 'rejected' | 'failed'
   result?: string
+  /**
+   * وصف الإجراء بالعربي وقت ما اتقترح — اللوحة بتعرضه قبل الموافقة.
+   * أدوات `run_action` بتتوصف من سجل الأفعال على الخادم، فالوصف بيتخزّن مع النداء.
+   */
+  label?: string
 }
 
 export const aiMessages = pgTable(
