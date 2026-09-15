@@ -521,7 +521,10 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
   «فاضل ٧ أيام» هيتبعت يوم 2026-09-21 تقريبًا.
 - **آخر نشر للموقع بعده:** commit `f20bed6` (لودرات التحليلات والشحنات المشتركة + `/api/app/analytics` و`/api/app/shipments`).
   اتختبر على الحي: المسارين الجداد 401 من غير جلسة، والصفحات 200/307 زي ما هي.
-- **آخر نشر للموقع (3.4):** commit `0bde6bb` — اتنشر لوحده خلال دقيقة تقريبًا. اتختبر على الحي: `/api/app/{order-settings,checkout-settings,checkout-settings/products,whatsapp,email}` = 401،
+- **آخر نشر للموقع (أيقونة واتساب + المساعد — قسم 7ح):** commit `cb80b4c` — موقع بس (مفيش نسخة تطبيق). اتختبر على الحي بعد ~دقيقتين ونص:
+  `/`، `/login`، `/signup`، `/join`، `/s/atlosa` = 200؛ `/dashboard`، `/dashboard/settings`، `/dashboard/storefront/customize` = 307؛ `/api/app/{home,me,whatsapp,order-settings}` = 401؛
+  و`POST /api/ai/agent` من غير جلسة بيرجّع رفض. **ما اتجرّبش لسه:** المساعد بمفتاح حقيقي (قراءة/تنفيذ/رسايل للعملاء)، ومسح الرقم من atlosa.
+- **نشر الموقع (3.4):** commit `0bde6bb` — اتنشر لوحده خلال دقيقة تقريبًا. اتختبر على الحي: `/api/app/{order-settings,checkout-settings,checkout-settings/products,whatsapp,email}` = 401،
   و`order-settings/save` و`checkout-settings/save` و`whatsapp/{save,link,templates}` و`email/test` = 403 من غير Origin، والصفحات (`/`، `/login`، `/signup`، `/join` = 200؛
   `/dashboard`، `/dashboard/settings/{orders,checkout,whatsapp,email}` = 307) زي ما هي. **ما اتجرّبش لسه:** الحفظ على متجر حقيقي، وربط واتساب حقيقي بكود المسح من التطبيق،
   والرسالة التجريبية للبريد.
