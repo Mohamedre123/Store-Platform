@@ -1,6 +1,7 @@
 import { getDashboardContext } from '@/lib/store-context'
 import { guard } from '@/lib/permissions'
 import { publicStoreUrl } from '@/lib/domain'
+import { seoValues } from '@/lib/seo-data'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { SeoForm } from './seo-form'
@@ -22,21 +23,7 @@ export default async function SeoPage() {
         <SeoForm
           storeName={store.name}
           storeUrl={publicStoreUrl(store)}
-          initial={{
-            seoTitle: store.seoTitle ?? '',
-            seoDescription: store.seoDescription ?? '',
-            seoKeywords: store.seoKeywords ?? '',
-            ogImage: store.ogImage ?? '',
-            ogTitle: store.ogTitle ?? '',
-            ogDescription: store.ogDescription ?? '',
-            headHtml: store.headHtml ?? '',
-            allowIndexing: store.allowIndexing,
-            hideOutOfStock: store.hideOutOfStock,
-            maintenanceMode: store.maintenanceMode,
-            maintenanceMessage: store.maintenanceMessage ?? '',
-            comingSoon: store.comingSoon,
-            comingSoonMessage: store.comingSoonMessage ?? '',
-          }}
+          initial={seoValues(store)}
         />
       </Reveal>
     </div>

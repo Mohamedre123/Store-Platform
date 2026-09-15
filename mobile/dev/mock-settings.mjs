@@ -125,6 +125,90 @@ export function whatsappAction(action, body) {
   return [404, { ok: false, error: 'not_found' }]
 }
 
+export function receipt() {
+  return {
+    values: { showOrderSummary: true, showProgressTracker: true, showWhatsappButton: true, showTelegramButton: false, allowDownloadReceipt: true, customMessage: '' },
+    hasWhatsapp: false,
+    hasTelegram: true,
+  }
+}
+
+export function seo() {
+  return {
+    values: {
+      seoTitle: 'متجر زاوية — ملابس صيفي',
+      seoDescription: '',
+      seoKeywords: '',
+      ogImage: '',
+      ogTitle: '',
+      ogDescription: '',
+      headHtml: '',
+      allowIndexing: true,
+      hideOutOfStock: false,
+      maintenanceMode: false,
+      maintenanceMessage: '',
+      comingSoon: false,
+      comingSoonMessage: '',
+    },
+    storeName: 'متجر زاوية',
+    storeUrl: 'https://zawya.zawyaeg.site',
+    limits: { title: 60, description: 160 },
+  }
+}
+
+const pagesState = [
+  { id: 'a1b2c3d4-0000-4000-8000-000000000001', slug: 'refund-policy', title: 'سياسة الإرجاع', content: null, type: 'refund', showInFooter: true, isPublished: false },
+  { id: 'a1b2c3d4-0000-4000-8000-000000000002', slug: 'privacy', title: 'الخصوصية', content: 'بنجمع اسمك ورقمك وعنوانك عشان نوصّلك طلبك بس.', type: 'privacy', showInFooter: true, isPublished: true },
+]
+
+export function storePages() {
+  return {
+    pages: pagesState,
+    starters: { refund: 'بنقبل الإرجاع خلال ١٤ يوم من استلام الطلب بشرط إن المنتج يكون بحالته وتغليفه الأصلي.' },
+  }
+}
+
+export function savePage(id, body) {
+  const page = pagesState.find((p) => p.id === id)
+  if (!page) return [404, { ok: false, error: 'الصفحة مش موجودة' }]
+  if (!String(body.title ?? '').trim()) return [400, { ok: false, error: 'عنوان الصفحة مطلوب' }]
+  Object.assign(page, { title: body.title, content: body.content?.trim() ? body.content : null, showInFooter: body.showInFooter, isPublished: Boolean(body.content?.trim()) })
+  return [200, { ok: true }]
+}
+
+const domainState = { domain: null, verified: false, tries: 0 }
+
+export function domain() {
+  const records = domainState.domain
+    ? [
+        { type: 'A', host: '@', value: '216.198.79.1', note: 'النطاق الأساسي' },
+        { type: 'CNAME', host: 'www', value: 'cname.zawyaeg.site', note: 'www' },
+        { type: 'TXT', host: '_zawya', value: 'zawya-verify-demo123', note: 'إثبات الملكية' },
+      ]
+    : []
+  return { currentHost: 'zawya.zawyaeg.site', domain: domainState.domain, verified: domainState.verified, records, locked: false, linkReady: true }
+}
+
+export function domainAction(action, body) {
+  if (action === 'save') {
+    const d = String(body.domain ?? '').trim().toLowerCase()
+    if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(d)) return [200, { ok: true, state: { error: 'النطاق مش مكتوب صح.' } }]
+    Object.assign(domainState, { domain: d, verified: false, tries: 0 })
+    return [200, { ok: true, state: { notice: 'ضيف السجلات دي في لوحة نطاقك، وبعدها اضغط «تحقّق».' } }]
+  }
+  if (action === 'verify') {
+    domainState.tries += 1
+    if (domainState.tries < 2) return [200, { ok: true, state: { verified: false, error: 'السجلات لسه ما انتشرتش — استنى شوية وجرّب تاني.' } }]
+    domainState.verified = true
+    return [200, { ok: true, state: { verified: true, notice: 'النطاق اتربط واتسجّل عند المستضيف.' } }]
+  }
+  if (action === 'remove') {
+    Object.assign(domainState, { domain: null, verified: false, tries: 0 })
+    return [200, { ok: true, state: { notice: 'اتشال الربط. متجرك شغّال على نطاقه الفرعي زي الأول.' } }]
+  }
+  return [404, { ok: false, error: 'not_found' }]
+}
+
 export function email() {
   return {
     configured: true,

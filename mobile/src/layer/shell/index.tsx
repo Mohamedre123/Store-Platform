@@ -93,6 +93,10 @@ import { WhatsappSettingsScreen } from './whatsapp-settings'
 import { EmailSettingsScreen } from './email-settings'
 import { clearStoreSettingsCaches } from './store-settings-api'
 import { STORE_SETTINGS_CSS } from './styles-store-settings'
+import { ReceiptSettingsScreen } from './receipt-settings'
+import { SeoSettingsScreen } from './seo-settings'
+import { StorePagesScreen } from './store-pages'
+import { DomainSettingsScreen } from './domain-settings'
 
 const ORDER_DETAIL = /^\/dashboard\/orders\/([^/]+)$/
 /* صفحات جوّه المنتجات مش منتجات — new وcategories وimport وtrash بيفضلوا صفحات المنصة */
@@ -157,12 +161,20 @@ type ScreenKey =
   | 'checkoutSettings'
   | 'whatsappSettings'
   | 'emailSettings'
+  | 'receiptSettings'
+  | 'seoSettings'
+  | 'storePages'
+  | 'domainSettings'
 
 const SCREEN_KEYS: ScreenKey[] = [
   'orderSettings',
   'checkoutSettings',
   'whatsappSettings',
   'emailSettings',
+  'receiptSettings',
+  'seoSettings',
+  'storePages',
+  'domainSettings',
   'newOrder',
   'team',
   'sessions',
@@ -467,10 +479,26 @@ function Shell() {
         visible={path === '/dashboard/settings/email' && !unavailable.emailSettings && !web}
         onUnavailable={markUnavailable.emailSettings}
       />
+      <ReceiptSettingsScreen
+        visible={path === '/dashboard/settings/receipt' && !unavailable.receiptSettings && !web}
+        onUnavailable={markUnavailable.receiptSettings}
+      />
+      <SeoSettingsScreen
+        visible={path === '/dashboard/settings/seo' && !unavailable.seoSettings && !web}
+        onUnavailable={markUnavailable.seoSettings}
+      />
+      <StorePagesScreen
+        visible={path === '/dashboard/settings/pages' && !unavailable.storePages && !web}
+        onUnavailable={markUnavailable.storePages}
+      />
+      <DomainSettingsScreen
+        visible={path === '/dashboard/settings/domain' && !unavailable.domainSettings && !web}
+        onUnavailable={markUnavailable.domainSettings}
+      />
       <VerifyBar visible={path === '/verify'} />
       {/* شاشات التفاصيل ومنتج جديد ليها أزرار تحت — المساعد على الشاشات الرئيسية وصفحات المنصة */}
       <AssistantButton
-        active={onDashboard && !orderId && !productId && !customerId && path !== '/dashboard/products/new' && path !== '/dashboard/orders/new' && path !== '/dashboard/settings/orders' && path !== '/dashboard/settings/checkout'}
+        active={onDashboard && !orderId && !productId && !customerId && path !== '/dashboard/products/new' && path !== '/dashboard/orders/new' && path !== '/dashboard/settings/orders' && path !== '/dashboard/settings/checkout' && path !== '/dashboard/settings/receipt' && path !== '/dashboard/settings/seo'}
         raised={path === '/dashboard/products' && !web && !unavailable.products}
       />
       <TabBar path={path} active={onDashboard} />

@@ -11,6 +11,7 @@ import { publicStoreUrl } from '@/lib/domain'
 import { readTemplates } from '@/lib/whatsapp'
 import { loadCheckoutSettings } from '@/lib/checkout-settings-data'
 import { orderSettingsValues } from '@/lib/order-settings-data'
+import { loadStorePages } from '@/lib/store-pages-data'
 import { sendCustomerMessages, type MessageChannel } from '@/lib/customer-messages'
 import { checkoutPayload, whatsappPayload } from '@/lib/app-settings-pages'
 import { activityPayload, teamPayload } from '@/lib/app-settings'
@@ -599,6 +600,27 @@ export const REGISTRY: RegistryAction[] = [
       const id = need(uuid(a.bannerId), 'معرّف البانر')
       const mod = await import('@/app/dashboard/storefront/banners/actions')
       return bool(a.delete) ? outcome(await mod.deleteBannerAction(id), 'البانر اتمسح') : outcome(await mod.toggleBannerAction(id, bool(a.isActive)), 'اتحفظ')
+    }),
+
+  read('store_pages', 'storefront', 'storefront.manage', 'صفحات المتجر (الإرجاع والخصوصية والشروط) بمحتواها وهل ظاهرة في الفوتر', undefined, (c) => loadStorePages(c.store.id)),
+
+  write('save_store_page', 'storefront', 'storefront.manage', 'اكتب أو عدّل صفحة من صفحات المتجر — ابعت الخانات اللي هتتغيّر بس. الصفحة الفاضية بتختفي من المتجر',
+    '{"pageId":"uuid من store_pages","title":"(اختياري)","content":"(اختياري)","showInFooter":true}',
+    (a) => `تعديل صفحة المتجر${a.title ? ` «${short(a.title, 40)}»` : ''}${a.content !== undefined ? ' (المحتوى)' : ''}`,
+    async (c, a) => {
+      const id = need(uuid(a.pageId), 'معرّف الصفحة')
+      const current = (await loadStorePages(c.store.id)).find((p) => p.id === id)
+      if (!current) throw new Refuse('الصفحة مش موجودة')
+      const { savePageAction } = await import('@/app/dashboard/settings/pages/actions')
+      return outcome(
+        await savePageAction({
+          id,
+          title: typeof a.title === 'string' ? str(a.title, 120) : current.title,
+          content: typeof a.content === 'string' ? str(a.content, 20000) : (current.content ?? ''),
+          showInFooter: typeof a.showInFooter === 'boolean' ? a.showInFooter : current.showInFooter,
+        }),
+        'الصفحة اتحفظت',
+      )
     }),
 
   write('set_blog_post', 'storefront', 'storefront.manage', 'نشر مقال أو إخفاؤه أو مسحه', '{"postId":"uuid","isPublished":true,"delete":false}',

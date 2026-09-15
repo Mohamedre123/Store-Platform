@@ -79,9 +79,67 @@ export const checkoutSettingsData = cachedResource<CheckoutPayload>('zw-checkout
 export const whatsappData = cachedResource<WhatsappPayload>('zw-whatsapp-settings:v1', '/api/app/whatsapp')
 export const emailData = cachedResource<EmailPayload>('zw-email-settings:v1', '/api/app/email')
 
+export type ReceiptValues = {
+  showOrderSummary: boolean
+  showProgressTracker: boolean
+  showWhatsappButton: boolean
+  showTelegramButton: boolean
+  allowDownloadReceipt: boolean
+  customMessage: string
+}
+
+export type SeoValues = {
+  seoTitle: string
+  seoDescription: string
+  seoKeywords: string
+  ogImage: string
+  ogTitle: string
+  ogDescription: string
+  headHtml: string
+  allowIndexing: boolean
+  hideOutOfStock: boolean
+  maintenanceMode: boolean
+  maintenanceMessage: string
+  comingSoon: boolean
+  comingSoonMessage: string
+}
+
+export type StorePage = {
+  id: string
+  slug: string
+  title: string
+  content: string | null
+  type: string
+  showInFooter: boolean
+  isPublished: boolean
+}
+
+export type DnsRecord = { type: string; host: string; value: string; note: string }
+
+export type DomainPayload = {
+  currentHost: string
+  domain: string | null
+  verified: boolean
+  records: DnsRecord[]
+  locked: boolean
+  linkReady: boolean
+}
+
+export const receiptData = cachedResource<{ values: ReceiptValues; hasWhatsapp: boolean; hasTelegram: boolean }>('zw-receipt:v1', '/api/app/receipt')
+export const seoData = cachedResource<{ values: SeoValues; storeName: string; storeUrl: string; limits: { title: number; description: number } }>(
+  'zw-seo:v1',
+  '/api/app/seo',
+)
+export const storePagesData = cachedResource<{ pages: StorePage[]; starters: Record<string, string> }>('zw-store-pages:v1', '/api/app/store-pages')
+export const domainData = cachedResource<DomainPayload>('zw-domain:v1', '/api/app/domain')
+
 export function clearStoreSettingsCaches(): void {
   orderSettingsData.clear()
   checkoutSettingsData.clear()
   whatsappData.clear()
   emailData.clear()
+  receiptData.clear()
+  seoData.clear()
+  storePagesData.clear()
+  domainData.clear()
 }

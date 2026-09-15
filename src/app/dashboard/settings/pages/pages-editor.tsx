@@ -6,6 +6,7 @@ import { savePageAction } from './actions'
 import { Alert, Card } from '@/components/ui'
 import { ImproveButton } from '@/components/dashboard/improve-button'
 import { Toggle } from '@/components/dashboard/controls'
+import { PAGE_STARTERS } from '@/lib/page-starters'
 
 export type PageRow = {
   id: string
@@ -17,24 +18,8 @@ export type PageRow = {
   isPublished: boolean
 }
 
-/** نصوص ابتدائية تساعد التاجر يبدأ بدل صفحة بيضا */
-const STARTERS: Record<string, string> = {
-  refund: `بنقبل الإرجاع خلال ١٤ يوم من استلام الطلب بشرط إن المنتج يكون بحالته وتغليفه الأصلي.
-
-للإرجاع: كلّمنا على رقم المتجر أو رد على رسالة تأكيد الطلب، وهنرتّب استلام المنتج.
-
-مصاريف الإرجاع بتكون على المتجر لو المنتج فيه عيب أو غلط في الشحن، وعلى العميل في باقي الحالات.`,
-  privacy: `بنجمع البيانات اللي محتاجينها عشان نوصّلك طلبك بس: الاسم، رقم التليفون، والعنوان.
-
-بياناتك ما بتتباعش ولا بتتشارك مع أي طرف تاني غير شركة الشحن اللي هتوصّلك.
-
-لو عايز تحذف بياناتك، كلّمنا وهنعملها.`,
-  terms: `باستخدامك للمتجر ده بتوافق على الشروط دي.
-
-الأسعار المعروضة بالجنيه المصري وشاملة الضريبة إن وُجدت. بنحتفظ بحقنا في تعديل الأسعار في أي وقت.
-
-الطلب بيتأكّد لما نتواصل معاك ونتأكد من بياناتك.`,
-}
+/** نصوص ابتدائية تساعد التاجر يبدأ بدل صفحة بيضا (مشتركة مع شاشة التطبيق) */
+const STARTERS = PAGE_STARTERS
 
 export function PagesEditor({ pages }: { pages: PageRow[] }) {
   if (pages.length === 0) {

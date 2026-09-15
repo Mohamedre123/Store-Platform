@@ -1,11 +1,9 @@
-import { eq } from 'drizzle-orm'
-import { db } from '@/db'
-import { pages } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
 import { guard } from '@/lib/permissions'
+import { loadStorePages } from '@/lib/store-pages-data'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
-import { PagesEditor, type PageRow } from './pages-editor'
+import { PagesEditor } from './pages-editor'
 
 export const metadata = { title: 'صفحات المتجر' }
 
@@ -13,19 +11,7 @@ export default async function StorePagesPage() {
   const { store, actor } = await getDashboardContext()
   guard(actor, 'storefront.manage')
 
-  const rows = await db
-    .select({
-      id: pages.id,
-      slug: pages.slug,
-      title: pages.title,
-      content: pages.content,
-      type: pages.type,
-      showInFooter: pages.showInFooter,
-      isPublished: pages.isPublished,
-    })
-    .from(pages)
-    .where(eq(pages.storeId, store.id))
-    .orderBy(pages.sortOrder)
+  const rows = await loadStorePages(store.id)
 
   return (
     <div className="flex flex-col gap-6">
@@ -35,7 +21,7 @@ export default async function StorePagesPage() {
       />
 
       <Reveal>
-        <PagesEditor pages={rows as PageRow[]} />
+        <PagesEditor pages={rows} />
       </Reveal>
     </div>
   )

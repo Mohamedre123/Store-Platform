@@ -53,6 +53,10 @@ const NATIVE: RegExp[] = [
   /^\/dashboard\/settings\/checkout$/,
   /^\/dashboard\/settings\/whatsapp$/,
   /^\/dashboard\/settings\/email$/,
+  /^\/dashboard\/settings\/receipt$/,
+  /^\/dashboard\/settings\/seo$/,
+  /^\/dashboard\/settings\/pages$/,
+  /^\/dashboard\/settings\/domain$/,
 ]
 
 export function isNativePath(url: URL): boolean {
