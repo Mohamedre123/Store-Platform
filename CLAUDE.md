@@ -497,7 +497,11 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
   «فاضل ٧ أيام» هيتبعت يوم 2026-09-21 تقريبًا.
 - **آخر نشر للموقع بعده:** commit `f20bed6` (لودرات التحليلات والشحنات المشتركة + `/api/app/analytics` و`/api/app/shipments`).
   اتختبر على الحي: المسارين الجداد 401 من غير جلسة، والصفحات 200/307 زي ما هي.
-- **آخر نشر للموقع (3.3):** commit `0867c36` — اتنشر لوحده خلال دقيقة ونص. اتختبر على الحي: `/api/app/manual-order` و`manual-order/{products,customers}` = 401،
+- **آخر نشر للموقع (3.4):** commit `0bde6bb` — اتنشر لوحده خلال دقيقة تقريبًا. اتختبر على الحي: `/api/app/{order-settings,checkout-settings,checkout-settings/products,whatsapp,email}` = 401،
+  و`order-settings/save` و`checkout-settings/save` و`whatsapp/{save,link,templates}` و`email/test` = 403 من غير Origin، والصفحات (`/`، `/login`، `/signup`، `/join` = 200؛
+  `/dashboard`، `/dashboard/settings/{orders,checkout,whatsapp,email}` = 307) زي ما هي. **ما اتجرّبش لسه:** الحفظ على متجر حقيقي، وربط واتساب حقيقي بكود المسح من التطبيق،
+  والرسالة التجريبية للبريد.
+- **نشر الموقع (3.3):** commit `0867c36` — اتنشر لوحده خلال دقيقة ونص. اتختبر على الحي: `/api/app/manual-order` و`manual-order/{products,customers}` = 401،
   و`manual-order/{quote,create}` = 403 من غير Origin، والصفحات (`/`، `/login`، `/signup`، `/join` = 200؛ `/dashboard`، `/dashboard/orders`، `/dashboard/orders/new` = 307) زي ما هي.
   **ما اتجرّبش لسه:** تسجيل طلب يدوي حقيقي من التطبيق على متجر حقيقي.
 - **نشر الموقع (3.2):** commit `92cac12` — اتنشر لوحده. اتختبر على الحي: `/api/app/{team,sessions,activity}` = 401،
