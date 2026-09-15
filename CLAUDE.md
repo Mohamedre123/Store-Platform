@@ -538,7 +538,9 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
   «فاضل ٧ أيام» هيتبعت يوم 2026-09-21 تقريبًا.
 - **آخر نشر للموقع بعده:** commit `f20bed6` (لودرات التحليلات والشحنات المشتركة + `/api/app/analytics` و`/api/app/shipments`).
   اتختبر على الحي: المسارين الجداد 401 من غير جلسة، والصفحات 200/307 زي ما هي.
-- **آخر نشر للموقع (3.5):** commit `8b99521` — اتنشر لوحده خلال ~دقيقة ونص. اتختبر على الحي: `/api/app/{receipt,seo,store-pages,domain}` = 401،
+- **آخر نشر للموقع (3.6):** commit `f40603e` — اتنشر لوحده خلال ~دقيقة. اتختبر على الحي: `/api/app/{live,reports,signal}` = 401، والصفحات (`/`، `/login`، `/signup`، `/join` = 200؛
+  `/dashboard`، `/dashboard/analytics` و`/dashboard/analytics/{live,reports,signal}` = 307) زي ما هي. **ما اتجرّبش لسه:** الشاشات التلاتة ببيانات متجر حقيقي، والتحديث التلقائي على موبايل حقيقي.
+- **نشر الموقع (3.5):** commit `8b99521` — اتنشر لوحده خلال ~دقيقة ونص. اتختبر على الحي: `/api/app/{receipt,seo,store-pages,domain}` = 401،
   و`receipt/save` و`seo/save` و`store-pages/:id/save` و`domain/{save,verify}` و`improve` = 403 من غير Origin، والصفحات (`/`، `/login`، `/signup`، `/join` = 200؛
   `/dashboard`، `/dashboard/settings/{receipt,seo,pages,domain}` = 307) زي ما هي. **ما اتجرّبش لسه:** الحفظ على متجر حقيقي، ورفع صورة المشاركة من الموبايل، و«تحسين» بمفتاح حقيقي، وربط نطاق حقيقي.
 - **نشر الموقع (أيقونة واتساب + المساعد — قسم 7ح):** commit `cb80b4c` — موقع بس (مفيش نسخة تطبيق). اتختبر على الحي بعد ~دقيقتين ونص:
