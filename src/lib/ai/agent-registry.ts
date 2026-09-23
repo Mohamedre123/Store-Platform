@@ -45,6 +45,9 @@ import { schedulesPayload } from '@/lib/app-schedules'
 import { socialAccountsPayload } from '@/lib/app-social'
 import { subscriptionPayload } from '@/lib/app-subscription'
 import { livePayload, reportsPayload, signalPayload } from '@/lib/app-reports'
+import { loadCampaigns } from '@/lib/campaigns-data'
+import { loadBranchesPage } from '@/lib/branches-data'
+import { channelProgress, loadSalesChannels } from '@/lib/sales-channels'
 
 /**
  * سجل أفعال مساعد المتجر — «يتحكّم في كل حاجة في اللوحة».
@@ -473,6 +476,37 @@ export const REGISTRY: RegistryAction[] = [
       )
     }),
 
+  read('branches', 'products', 'inventory.manage', 'الفروع والمخازن بمعرّفاتها، وتوزيع كمية كل منتج عليها', undefined, (c) => loadBranchesPage(c.store.id)),
+
+  write('save_branch', 'products', 'inventory.manage', 'ضيف فرع أو عدّله (فرع افتراضي واحد بس — البيع بيخصم منه)',
+    '{"id":"uuid (للتعديل — اختياري)","name":"","city":"","address":"","phone":"","isDefault":false,"isActive":true}',
+    (a) => `${a.id ? 'تعديل' : 'إضافة'} فرع «${short(a.name, 40)}»${bool(a.isDefault) ? ' (افتراضي)' : ''}`,
+    async (_c, a) => {
+      const { saveBranchAction } = await import('@/app/dashboard/inventory/branch-actions')
+      return outcome(
+        await saveBranchAction({
+          id: uuid(a.id) || undefined,
+          name: str(a.name, 80),
+          city: str(a.city, 80) || undefined,
+          address: str(a.address, 200) || undefined,
+          phone: str(a.phone, 30) || undefined,
+          isDefault: bool(a.isDefault),
+          isActive: a.isActive === undefined ? true : bool(a.isActive),
+        }),
+        'الفرع اتحفظ',
+      )
+    }),
+
+  write('transfer_stock', 'products', 'inventory.manage', 'انقل كمية منتج من فرع لفرع (الإجمالي ما بيتغيّرش)', '{"productId":"uuid","fromId":"uuid","toId":"uuid","quantity":5}',
+    (a) => `نقل ${num(a.quantity)} قطعة بين الفروع`,
+    async (_c, a) => {
+      const { transferStockAction } = await import('@/app/dashboard/inventory/branch-actions')
+      return outcome(
+        await transferStockAction({ productId: need(uuid(a.productId), 'معرّف المنتج'), fromId: need(uuid(a.fromId), 'الفرع'), toId: need(uuid(a.toId), 'الفرع'), quantity: Math.trunc(num(a.quantity)) }),
+        'اتنقلت',
+      )
+    }),
+
   write('set_low_stock_threshold', 'products', 'inventory.manage', 'حد تنبيه «قرّب يخلص» لمنتج', '{"productId":"uuid","threshold":3}', (a) => `حد التنبيه → ${num(a.threshold)}`,
     async (_c, a) => {
       const { setLowStockThresholdAction } = await import('@/app/dashboard/inventory/actions')
@@ -487,6 +521,16 @@ export const REGISTRY: RegistryAction[] = [
 
   /* ═════════ التسويق ═════════ */
   read('marketing', 'marketing', 'marketing.manage', 'الكوبونات وعروض الكمية والباقات بمعرّفاتها', undefined, (c) => marketingPayload(c.store)),
+  read('campaigns', 'marketing', 'marketing.manage', 'حملات البريد بمعرّفاتها وحالتها (مسوّدة/بتتبعت/اتبعتت) وكام اتبعت، وعدد المشتركين', undefined, (c) => loadCampaigns(c.store.id)),
+  read('sales_channels', 'marketing', 'marketing.manage', 'قنوات البيع (فيسبوك، إنستجرام، تيك توك، جوجل، واتساب…) وإيه الناقص في كل واحدة', undefined, async (c) => {
+    const channels = await loadSalesChannels({ storeId: c.store.id, socialLinks: c.store.socialLinks, storeWhatsapp: c.store.whatsapp })
+    return channels.map((ch) => ({ name: ch.name, progress: channelProgress(ch), steps: ch.steps.map((s) => ({ label: s.label, done: s.status === 'done', hint: s.hint })) }))
+  }),
+  write('delete_email_campaign', 'marketing', 'marketing.manage', 'امسح حملة بريد لسه مسوّدة', '{"campaignId":"uuid"}', () => 'مسح مسوّدة حملة بريد',
+    async (_c, a) => {
+      const { deleteCampaignAction } = await import('@/app/dashboard/marketing/campaigns/actions')
+      return outcome(await deleteCampaignAction(need(uuid(a.campaignId), 'معرّف الحملة')), 'الحملة اتمسحت')
+    }),
   read('automations', 'marketing', 'marketing.manage', 'قواعد الأتمتة ومستقبلي الإشعارات', undefined, (c) => automationsPayload(c.store)),
   read('affiliates', 'marketing', 'marketing.manage', 'المسوّقين بالعمولة ومستحقاتهم', undefined, (c) => affiliatesPayload(c.store)),
   read('posts', 'marketing', 'marketing.manage', 'بوستات الاستوديو', undefined, (c) => postsPayload(c.store.id)),

@@ -53,6 +53,33 @@ createServer(async (req, res) => {
     return
   }
 
+  /* الحملات والقنوات والفروع والاستيراد وحسابي (dev/mock-growth.mjs) */
+  if (/^\/api\/app\/(campaigns|channels|branches|product-import|account)(\/|$)/.test(url.pathname) && !/^\/api\/app\/account\/(change-email|abandon)/.test(url.pathname)) {
+    const mock = await import(new URL('../dev/mock-growth.mjs', import.meta.url))
+    await new Promise((r) => setTimeout(r, 350))
+    const send = (status, body) => {
+      res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
+      res.end(JSON.stringify(body))
+    }
+    const parts = url.pathname.split('/').filter(Boolean)
+    if (req.method === 'POST') {
+      let raw = ''
+      for await (const chunk of req) raw += chunk
+      const body = raw ? JSON.parse(raw) : {}
+      if (parts[2] === 'campaigns') return send(...(parts[3] === 'save' ? mock.campaignSave(body) : mock.campaignAction(parts[3], parts[4])))
+      if (parts[2] === 'branches') return send(...mock.branchAction(parts, body))
+      if (parts[2] === 'product-import') {
+        if (parts[3] === 'preview') return send(...mock.importPreview(body))
+        if (parts[3] === 'csv') return send(200, { ok: true, created: (body.rows ?? []).length, skipped: 0, categories: 1 })
+        return send(200, { ok: true, created: 25, skipped: 2, categories: 3, fetched: 27 })
+      }
+      if (parts[2] === 'account') return send(...mock.accountAction(parts[3], body))
+      return send(404, { ok: false, error: 'not_found' })
+    }
+    const name = { campaigns: 'campaigns', channels: 'channels', branches: 'branches', 'product-import': 'productImport', account: 'accountInfo' }[parts[2]]
+    return send(200, mock[name]())
+  }
+
   /* العرض المباشر والتقارير المفصّلة وجودة الإشارة (dev/mock-reports.mjs) */
   if (/^\/api\/app\/(live|reports|signal)$/.test(url.pathname)) {
     const mock = await import(new URL('../dev/mock-reports.mjs', import.meta.url))

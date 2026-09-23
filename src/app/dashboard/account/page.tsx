@@ -1,10 +1,7 @@
 import Link from 'next/link'
-import { eq } from 'drizzle-orm'
 import { Crown, MonitorSmartphone, ScrollText, Store } from 'lucide-react'
-import { db } from '@/db'
-import { users } from '@/db/schema'
 import { getDashboardContext } from '@/lib/store-context'
-import { getUserStores } from '@/lib/auth'
+import { loadAccount } from '@/lib/account-data'
 import { PageHeader } from '@/components/dashboard/page-shell'
 import { Reveal } from '@/components/motion'
 import { Card } from '@/components/ui'
@@ -28,14 +25,9 @@ export const metadata = { title: 'حسابي' }
 export default async function AccountPage() {
   const { user } = await getDashboardContext()
 
-  const [[row], stores] = await Promise.all([
-    db
-      .select({ phone: users.phone, createdAt: users.createdAt })
-      .from(users)
-      .where(eq(users.id, user.id))
-      .limit(1),
-    getUserStores(user.id),
-  ])
+  /* نفس اللودر اللي شاشة التطبيق بتقرا منه */
+  const account = await loadAccount(user)
+  const stores = account.stores
 
   return (
     <div className="flex flex-col gap-6">
@@ -48,7 +40,7 @@ export default async function AccountPage() {
         <AccountForms
           name={user.name}
           email={user.email}
-          phone={row?.phone ?? ''}
+          phone={account.phone}
           publicId={user.publicId}
         />
       </Reveal>

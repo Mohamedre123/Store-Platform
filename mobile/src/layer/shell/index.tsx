@@ -102,6 +102,13 @@ import { ReportsScreen } from './reports'
 import { SignalScreen } from './signal'
 import { clearReportsCaches } from './reports-api'
 import { REPORTS_CSS } from './styles-reports'
+import { CampaignsScreen } from './campaigns'
+import { ChannelsScreen } from './channels'
+import { BranchesScreen } from './branches'
+import { ProductImportScreen } from './product-import'
+import { AccountScreen } from './account'
+import { clearGrowthCaches } from './growth-api'
+import { GROWTH_CSS } from './styles-growth'
 
 const ORDER_DETAIL = /^\/dashboard\/orders\/([^/]+)$/
 /* صفحات جوّه المنتجات مش منتجات — new وcategories وimport وtrash بيفضلوا صفحات المنصة */
@@ -173,6 +180,11 @@ type ScreenKey =
   | 'liveView'
   | 'reportsView'
   | 'signalView'
+  | 'campaigns'
+  | 'channels'
+  | 'branches'
+  | 'productImport'
+  | 'account'
 
 const SCREEN_KEYS: ScreenKey[] = [
   'orderSettings',
@@ -186,6 +198,11 @@ const SCREEN_KEYS: ScreenKey[] = [
   'liveView',
   'reportsView',
   'signalView',
+  'campaigns',
+  'channels',
+  'branches',
+  'productImport',
+  'account',
   'newOrder',
   'team',
   'sessions',
@@ -297,6 +314,7 @@ function Shell() {
       clearSettingsCaches()
       clearStoreSettingsCaches()
       clearReportsCaches()
+      clearGrowthCaches()
       clearMeCache()
     }
   }, [path])
@@ -519,6 +537,26 @@ function Shell() {
         visible={path === '/dashboard/analytics/signal' && !unavailable.signalView && !web}
         onUnavailable={markUnavailable.signalView}
       />
+      <CampaignsScreen
+        visible={path === '/dashboard/marketing/campaigns' && !unavailable.campaigns && !web}
+        onUnavailable={markUnavailable.campaigns}
+      />
+      <ChannelsScreen
+        visible={path === '/dashboard/marketing/channels' && !unavailable.channels && !web}
+        onUnavailable={markUnavailable.channels}
+      />
+      <BranchesScreen
+        visible={path === '/dashboard/inventory/branches' && !unavailable.branches && !web}
+        onUnavailable={markUnavailable.branches}
+      />
+      <ProductImportScreen
+        visible={path === '/dashboard/products/import' && !unavailable.productImport && !web}
+        onUnavailable={markUnavailable.productImport}
+      />
+      <AccountScreen
+        visible={path === '/dashboard/account' && !unavailable.account && !web}
+        onUnavailable={markUnavailable.account}
+      />
       <VerifyBar visible={path === '/verify'} />
       {/* شاشات التفاصيل ومنتج جديد ليها أزرار تحت — المساعد على الشاشات الرئيسية وصفحات المنصة */}
       <AssistantButton
@@ -535,7 +573,7 @@ export function installShell(): void {
   const root = layer()
   const style = document.createElement('style')
   style.textContent =
-    SHELL_CSS + ORDERS_CSS + PRODUCTS_CSS + CUSTOMERS_CSS + MORE_CSS + VERIFY_CSS + ANALYTICS_CSS + BUSINESS_CSS + OPS_CSS + COMMERCE_CSS + STUDIO_CSS + SETTINGS_CSS + MANUAL_ORDER_CSS + STORE_SETTINGS_CSS + REPORTS_CSS
+    SHELL_CSS + ORDERS_CSS + PRODUCTS_CSS + CUSTOMERS_CSS + MORE_CSS + VERIFY_CSS + ANALYTICS_CSS + BUSINESS_CSS + OPS_CSS + COMMERCE_CSS + STUDIO_CSS + SETTINGS_CSS + MANUAL_ORDER_CSS + STORE_SETTINGS_CSS + REPORTS_CSS + GROWTH_CSS
   root.appendChild(style)
   const mount = document.createElement('div')
   mount.className = 'shell'
