@@ -551,7 +551,10 @@ cp Z:/mobile/android/app/build/outputs/bundle/release/app-release.aab "H:/FORCLA
   «فاضل ٧ أيام» هيتبعت يوم 2026-09-21 تقريبًا.
 - **آخر نشر للموقع بعده:** commit `f20bed6` (لودرات التحليلات والشحنات المشتركة + `/api/app/analytics` و`/api/app/shipments`).
   اتختبر على الحي: المسارين الجداد 401 من غير جلسة، والصفحات 200/307 زي ما هي.
-- **آخر نشر للموقع (3.6):** commit `f40603e` — اتنشر لوحده خلال ~دقيقة. اتختبر على الحي: `/api/app/{live,reports,signal}` = 401، والصفحات (`/`، `/login`، `/signup`، `/join` = 200؛
+- **آخر نشر للموقع (3.7):** commit `3688200` — اتنشر لوحده خلال ~دقيقتين. اتختبر على الحي: `/api/app/{campaigns,channels,branches,product-import,account}` = 401،
+  و`campaigns/save` و`branches/{save,transfer}` و`product-import/{preview,csv,api}` و`account/{profile,password,abandon}` = 403 من غير Origin، والصفحات (`/`، `/login`، `/signup`، `/join` = 200؛
+  `/dashboard`، `/dashboard/{account,marketing/campaigns,marketing/channels,inventory/branches,products/import}` = 307) زي ما هي. **ما اتجرّبش لسه:** إرسال حملة حقيقية، واستيراد ملف حقيقي، ونقل مخزون حقيقي، وتغيير كلمة السر من التطبيق.
+- **نشر الموقع (3.6):** commit `f40603e` — اتنشر لوحده خلال ~دقيقة. اتختبر على الحي: `/api/app/{live,reports,signal}` = 401، والصفحات (`/`، `/login`، `/signup`، `/join` = 200؛
   `/dashboard`، `/dashboard/analytics` و`/dashboard/analytics/{live,reports,signal}` = 307) زي ما هي. **ما اتجرّبش لسه:** الشاشات التلاتة ببيانات متجر حقيقي، والتحديث التلقائي على موبايل حقيقي.
 - **نشر الموقع (3.5):** commit `8b99521` — اتنشر لوحده خلال ~دقيقة ونص. اتختبر على الحي: `/api/app/{receipt,seo,store-pages,domain}` = 401،
   و`receipt/save` و`seo/save` و`store-pages/:id/save` و`domain/{save,verify}` و`improve` = 403 من غير Origin، والصفحات (`/`، `/login`، `/signup`، `/join` = 200؛
